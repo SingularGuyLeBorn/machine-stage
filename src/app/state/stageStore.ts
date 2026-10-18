@@ -373,7 +373,7 @@ export const useStageStore = create<StageState>((set, get) => ({
     if (box.isEmpty()) return;
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
-    get().focusPoint([center.x, center.y, center.z], Math.max(size.length() * 0.5, 0.35));
+    get().focusPoint([center.x, center.y, center.z], Math.max(size.length() * 0.5, 0.18));
   },
 
   focusPoint: (center, radius = 0.8, resetAngle = false) =>

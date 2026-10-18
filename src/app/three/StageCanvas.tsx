@@ -128,6 +128,9 @@ function StageRuntime() {
     Array<{ id: string; name: string; position: [number, number, number] }>
   >([]);
   const [buildError, setBuildError] = useState<string | null>(null);
+  // 模型「地面」：包围盒底 + 水平footprint（接触阴影与网格都锚在这里，避免
+  // 阴影板切在机体中间、网格从模型腰部穿出）。
+  const [stageFloor, setStageFloor] = useState<{ y: number; footprint: number } | null>(null);
   const clockRef = useRef(0);
   const assembled = scene?.assembled ?? null;
 
@@ -181,12 +184,13 @@ function StageRuntime() {
     // 重建时保留当前构建进度（改参数不该把玩家从 L2 拉回整车）
     store.setBuildIndex(store.buildIndex);
     store.attach(next);
-    // 全车体包围盒 → 复位视角基准
+    // 全车体包围盒 → 复位视角基准 + 地面锚点
     const bounds = new THREE.Box3().setFromObject(next.root);
     if (!bounds.isEmpty()) {
       const center = bounds.getCenter(new THREE.Vector3());
       const size = bounds.getSize(new THREE.Vector3());
       store.setHome([center.x, center.y, center.z], Math.max(size.length() * 0.5, 0.5));
+      setStageFloor({ y: bounds.min.y, footprint: Math.max(size.x, size.z) });
       store.requestViewReset();
     }
     clockRef.current = 0;
@@ -280,7 +284,7 @@ function StageRuntime() {
     <>
       {views.grid ? (
         <Grid
-          position={[0, -0.001, 0]}
+          position={[0, (stageFloor?.y ?? 0) - 0.004, 0]}
           args={[40, 40]}
           cellSize={0.25}
           cellThickness={0.5}
@@ -302,7 +306,13 @@ function StageRuntime() {
           onHover={hoverPart}
         />
       ) : null}
-      {assembled && views.shadow ? <ContactShadow key={`shadow:${scene?.seq ?? 0}`} /> : null}
+      {assembled && views.shadow ? (
+        <ContactShadow
+          key={`shadow:${scene?.seq ?? 0}`}
+          y={(stageFloor?.y ?? 0) - 0.004}
+          scale={Math.max((stageFloor?.footprint ?? 1.2) * 2, 2.4)}
+        />
+      ) : null}
       {labelPoints.map((point) => (
         <Html
           key={point.id}
@@ -352,13 +362,13 @@ function AssembledObject({
   );
 }
 
-/** 接地阴影（软 AO 贴地）：重建时重新烘焙两帧。 */
-function ContactShadow() {
+/** 接地阴影（软 AO 贴地）：锚在模型包围盒底（stageFloor），重建时重新烘焙两帧。 */
+function ContactShadow({ y, scale }: { y: number; scale: number }) {
   return (
     <ContactShadows
-      position={[0, 0.004, 0]}
+      position={[0, y, 0]}
       opacity={0.42}
-      scale={14}
+      scale={scale}
       blur={2.4}
       far={4}
       frames={2}
@@ -392,7 +402,8 @@ function CameraRig() {
     if (direction.lengthSq() < 1e-8) direction.copy(HOME_DIRECTION);
     direction.normalize();
     const fov = (camera as THREE.PerspectiveCamera).fov ?? 34;
-    const distance = Math.max(0.35, (focus.radius * 1.65) / Math.tan(THREE.MathUtils.degToRad(fov / 2)));
+    // 1.15 ≈ 让包围球填满 ~85% 视锥（1.65 会把整机拉得又小又远，像展示柜角落里的玩具）
+    const distance = Math.max(0.35, (focus.radius * 1.15) / Math.tan(THREE.MathUtils.degToRad(fov / 2)));
     flight.current = {
       fromPosition: camera.position.clone(),
       toPosition: target.clone().addScaledVector(direction, distance),

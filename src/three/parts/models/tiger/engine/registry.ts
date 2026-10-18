@@ -41,6 +41,7 @@ const AXIS_X_NEG: ExprVec3 = [0, 0, 90]; // +Y → -X
 export const ENGINE_LAYOUTS = {
   bank: "engine.bank",
   crankJournal: "engine.crankJournal",
+  crankJournalAxis: "engine.crankJournalAxis",
   crankPin: "engine.crankPin",
   crankWeb: "engine.crankWeb",
   caseRib: "engine.caseRib",
@@ -244,8 +245,8 @@ const CONSTANTS: Record<string, Expr> = {
   COVER_Z: "CASE_HALF_W+0.005",
   COVER_Y: -0.075,
   SUMP_FLANGE_Y: -0.178,
-  SUMP_BOX_Y: -0.215,
-  DRAIN_PLUG_Y: -0.259,
+  // 放油塞顶面嵌入油底壳 6mm（油底壳底 -0.209），露出约 18mm
+  DRAIN_PLUG_Y: "SUMP_FLANGE_Y-0.037",
   BREATHER_Y: "DECK_INNER_Y+0.0355",
   DIPSTICK_X: -0.5,
   DIPSTICK_Y: 0.02,
@@ -524,8 +525,16 @@ function makeLayouts(): Record<string, InstanceLayout> {
     return bankMatrix(side, constants.CYL_X1 - pin * constants.CYL_PITCH, height(constants), 0, 0, constants);
   };
 
+  // 主轴承座：沿 X 绝对排布（mate 不带任何位移，否则 J0 会被加两次、整排前移 0.42m）
   layouts[ENGINE_LAYOUTS.crankJournal] = ({ index, constants }) =>
     new THREE.Matrix4().makeTranslation(constants.JOURNAL_X0 - index * constants.CYL_PITCH, 0, 0);
+
+  // 主轴颈：同一排位，管轴倒向 X —— 旋转必须写在布局里：写进 mate.rotation 会把
+  // 布局位移 (x,y) 一起旋转，7 个轴颈会竖着叠成一摞（实测 Y -0.42…+0.53，全在 X=0.42）。
+  layouts[ENGINE_LAYOUTS.crankJournalAxis] = ({ index, constants }) =>
+    new THREE.Matrix4()
+      .makeTranslation(constants.JOURNAL_X0 - index * constants.CYL_PITCH, 0, 0)
+      .multiply(new THREE.Matrix4().makeRotationZ(deg2rad(-90)));
 
   // 曲柄销：绕曲轴轴线转到 60k 相位后抬到曲柄半径处
   layouts[ENGINE_LAYOUTS.crankPin] = ({ index, constants }) => {
@@ -624,12 +633,13 @@ function makeLayouts(): Record<string, InstanceLayout> {
       )
       .multiply(new THREE.Matrix4().makeRotationZ(index === 0 ? deg2rad(-90) : deg2rad(90)));
 
+  // 风扇轴承：位移写在世界方位上，管轴倒向 X（AXIS_X）放在布局里 ——
+  // 若把它写进 mate.rotation，位移会连同 (x,y) 一起被旋转，零件甩到机体下方
+  // （曾实测飞到 y=-0.562，离最近零件 63mm）。与 fuelPump 同一约定。
   layouts[ENGINE_LAYOUTS.fanBearing] = ({ index, constants }) =>
-    new THREE.Matrix4().makeTranslation(
-      constants.FAN_BEARING_X,
-      constants.FAN_Y,
-      (index === 0 ? -1 : 1) * constants.FAN_Z,
-    );
+    new THREE.Matrix4()
+      .makeTranslation(constants.FAN_BEARING_X, constants.FAN_Y, (index === 0 ? -1 : 1) * constants.FAN_Z)
+      .multiply(new THREE.Matrix4().makeRotationZ(deg2rad(-90)));
 
   // 风扇皮带：0 = 左风扇（z 负侧），1 = 右风扇；绕 X 转出「主动轮 → 被动轮」方向
   layouts[ENGINE_LAYOUTS.driveBelt] = ({ index, constants }) => {
@@ -817,7 +827,8 @@ function buildParts(): PartDefinition[] {
       },
     },
     material: "cast_iron",
-    mate: { type: "absolute", position: ["JOURNAL_X0", 0, 0] },
+    // 位置全部交给 instance_layout（mate 再加 JOURNAL_X0 会把整排前移 0.42m）
+    mate: { type: "absolute" },
     instances: 7,
     indexed: true,
     instance_layout: ENGINE_LAYOUTS.crankJournal,
@@ -1032,10 +1043,11 @@ function buildParts(): PartDefinition[] {
     geometry: { type: "cylinder", r: "JOURNAL_R", h: "JOURNAL_W", bevel: 0.002 },
     material: "steel",
     node: "Crank",
-    mate: { type: "absolute", position: ["JOURNAL_X0", 0, 0], rotation: AXIS_X },
+    // 管轴倒向 X + 排位都在 instance_layout（mate 带位移/旋转都会被布局叠乘一次）
+    mate: { type: "absolute" },
     instances: 7,
     indexed: true,
-    instance_layout: ENGINE_LAYOUTS.crankJournal,
+    instance_layout: ENGINE_LAYOUTS.crankJournalAxis,
   });
   add({
     id: "tiger.crankshaft.crank_pin",
@@ -1584,7 +1596,8 @@ function buildParts(): PartDefinition[] {
       h: "FAN_BEARING_W",
     },
     material: "cast_iron",
-    mate: { type: "absolute", rotation: AXIS_X },
+    // 不使用 mate.rotation：旋转交给 instance_layout（见 makeEngineLayouts.fanBearing）
+    mate: { type: "absolute" },
     instances: 2,
     indexed: true,
     instance_layout: ENGINE_LAYOUTS.fanBearing,
