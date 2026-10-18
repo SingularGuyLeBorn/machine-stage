@@ -1,0 +1,66 @@
+/* ============================================================================
+ * design tokens —— 浅色 · 素雅 · 军工工作台
+ * 单一真值源：颜色/间距/圆角/字体只在这里定义，组件不写裸值。
+ * ========================================================================== */
+
+:root {
+  /* 底色系：冷灰白，避免纯白刺眼（长时间看模型不累） */
+  --bg: #f3f4f6;
+  --bg-deep: #e9ebef;
+  --panel: #ffffff;
+  --panel-sub: #fafbfc;
+  --panel-hover: #f1f4f8;
+
+  /* 描边 */
+  --line: #e3e6ea;
+  --line-soft: #eef0f3;
+  --line-strong: #ced4dc;
+
+  /* 文字 */
+  --text: #1b2027;
+  --text-2: #525c69;
+  --text-3: #8b95a3;
+  --text-inv: #ffffff;
+
+  /* 主色：钢蓝（军工图纸蓝，非饱和） */
+  --accent: #2f6ea8;
+  --accent-soft: #eaf2f9;
+  --accent-line: #b9d4ea;
+  --accent-deep: #24547e;
+
+  /* 语义色 */
+  --danger: #ab3229;
+  --danger-soft: #fbeeed;
+  --danger-line: #ecc7c3;
+  --warn: #8a6100;
+  --warn-soft: #fdf6e7;
+  --ok: #2c7550;
+  --ok-soft: #ecf6f0;
+
+  /* 尺寸 */
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-lg: 12px;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 28px;
+
+  /* 阴影：极浅，只用来分层，不做“浮起卡片堆叠” */
+  --shadow-1: 0 1px 2px rgba(19, 25, 33, 0.05), 0 1px 1px rgba(19, 25, 33, 0.03);
+  --shadow-2: 0 4px 14px rgba(19, 25, 33, 0.08);
+  --shadow-float: 0 8px 26px rgba(19, 25, 33, 0.14);
+
+  /* 字体 */
+  --sans:
+    "Inter", system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+
+  /* 3D 视口专用（与 UI 同源，方便改主题时一起变） */
+  --viewport-bg: #e9ecf0;
+  --grid-cell: #d7dce3;
+  --grid-section: #c2cad4;
+}
