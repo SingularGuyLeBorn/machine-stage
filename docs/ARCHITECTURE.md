@@ -1,7 +1,7 @@
 # 架构说明 · machine-stage
 
 > 本文描述 M-A 交付后的真实实现（代码为准，文档随架构变更同步）。
-> 需求与验收口径来源：`docs/展示台项目总体设计.md`、`docs/零件化建模框架.md`。
+> 需求与验收口径来源：`docs/展示台项目总体设计.md`、`docs/零件化建模框架.md`、`docs/reference/mil3d-spec-v1.md`（21 型总规格：零件命名手册来源 + §3.13 反积木 + §15 验收）、`docs/UI_STYLE.md`（浅色素雅 UI）、`docs/REFERENCE_RULES.md`（老项目参考规则）。
 
 ## 1. 目标与不变量
 
