@@ -1,0 +1,39 @@
+name: Bug 报告
+description: 报告一个缺陷（建模错误 / 穿模漏检 / UI 异常 / 性能问题等）
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请尽量提供可复现信息。涉及**穿模**的问题请附上穿模报告条目（`a ↔ b`、`depth_mm`）。
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 问题描述
+      description: 发生了什么？期望是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开 / 左栏选择 ...
+        2. 拖动构建滑杆到 L2 ...
+        3. 看到 ...
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: 浏览器与系统
+      placeholder: Chrome 130 / Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: 截图 / 控制台输出 / 穿模报告
+      description: QA 浮层报告的 JSON，或控制台报错。
+    validations:
+      required: false
