@@ -11,7 +11,7 @@ import {
   type AssembledModel,
 } from "@/three/parts";
 import { findModel } from "../catalog";
-import { useStageStore } from "../state/stageStore";
+import { faultFromError, useStageStore } from "../state/stageStore";
 import { applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
 
 // ============================================================================
@@ -43,49 +43,69 @@ export function StageCanvas() {
   );
 }
 
-/** 程序化 studio 环境：三面柔光箱 + 顶部条形光，无外部 HDR 资产。 */
+/** 程序化 studio 环境：三面柔光箱 + 顶部条形光 + 暗底，无外部 HDR 资产。
+ *  明暗对比是金属感的来源——环境若是一块均匀灰，金属反射出来就是灰塑料。 */
 function Studio() {
   return (
     <>
-      <ambientLight intensity={0.32} />
+      <ambientLight intensity={0.3} />
       <directionalLight
         castShadow
         position={[5.5, 8.5, 4.5]}
-        intensity={1.65}
+        intensity={1.7}
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0006}
         shadow-normalBias={0.012}
       >
         <orthographicCamera attach="shadow-camera" args={[-5, 5, 5, -5, 0.1, 40]} />
       </directionalLight>
-      <directionalLight position={[-6, 3.5, -4.5]} intensity={0.32} color="#dfe7f2" />
+      <directionalLight position={[-6, 3.5, -4.5]} intensity={0.34} color="#dfe7f2" />
       <Environment resolution={256} frames={1}>
-        <color attach="background" args={["#dfe3e8"]} />
+        <color attach="background" args={["#aab2bc"]} />
         <Lightformer
           form="rect"
-          intensity={2.4}
+          intensity={3.4}
           position={[0, 6.5, 1.5]}
           rotation-x={Math.PI / 2}
           scale={[9, 5, 1]}
         />
         <Lightformer
           form="rect"
-          intensity={1.5}
+          intensity={2.0}
           position={[-6.5, 3, 2]}
           rotation-y={Math.PI / 2}
           scale={[6, 4, 1]}
         />
         <Lightformer
           form="rect"
-          intensity={1.1}
+          intensity={1.4}
           position={[6.5, 2.5, -2]}
           rotation-y={-Math.PI / 2}
           scale={[6, 4, 1]}
         />
-        <Lightformer form="ring" intensity={0.9} position={[0, 3, -7]} scale={4} />
+        <Lightformer form="ring" intensity={1.1} position={[0, 3, -7]} scale={4} />
+        {/* 暗底：给金属一条明确的地平线，反射里才有明暗分界 */}
+        <Lightformer
+          form="rect"
+          color="#1d2126"
+          intensity={0.16}
+          position={[0, -3.2, 0]}
+          rotation-x={-Math.PI / 2}
+          scale={[16, 12, 1]}
+        />
       </Environment>
+      <SceneEnvIntensity value={1.15} />
     </>
   );
+}
+
+/** 环境反射总强度（three r163+ 的 Scene.environmentIntensity）。 */
+function SceneEnvIntensity({ value }: { value: number }) {
+  const scene = useThree((state) => state.scene);
+  useEffect(() => {
+    scene.environmentIntensity = value;
+  }, [scene, value]);
+  return null;
 }
 
 function StageEffects() {
@@ -126,12 +146,22 @@ function StageRuntime() {
       return;
     }
     setBuildError(null);
-    const library = createMaterialLibrary(registry.materials);
-    const next = buildModel(registry, {
-      materials: library.materials,
-      instanceLayouts: model.layouts,
-      warnMissingLayout: false,
-    });
+    // 装配可能抛（常量拼写、kit 参数、几何自检……）。这里必须捕获：
+    // effect 里抛出的异常会冒泡到 React，没有边界就是整页白屏。
+    let library: ReturnType<typeof createMaterialLibrary>;
+    let next: AssembledModel;
+    try {
+      library = createMaterialLibrary(registry.materials);
+      next = buildModel(registry, {
+        builders: model.builders,
+        materials: library.materials,
+        instanceLayouts: model.layouts,
+        warnMissingLayout: false,
+      });
+    } catch (error) {
+      useStageStore.getState().reportFault(faultFromError(`装配 ${model.title}`, error));
+      return;
+    }
     next.root.traverse((object) => {
       if ((object as THREE.Mesh).isMesh) {
         object.castShadow = true;
@@ -248,24 +278,22 @@ function StageRuntime() {
 
   return (
     <>
-      <mesh rotation-x={-Math.PI / 2} position={[0, -0.002, 0]} receiveShadow raycast={() => null}>
-        <planeGeometry args={[80, 80]} />
-        <meshStandardMaterial color="#eef0f3" roughness={0.96} metalness={0} />
-      </mesh>
-      <Grid
-        position={[0, 0, 0]}
-        args={[40, 40]}
-        cellSize={0.25}
-        cellThickness={0.5}
-        cellColor="#d3d9e1"
-        sectionSize={1}
-        sectionThickness={1}
-        sectionColor="#bcc4cf"
-        fadeDistance={26}
-        fadeStrength={1.2}
-        followCamera={false}
-        raycast={() => null}
-      />
+      {views.grid ? (
+        <Grid
+          position={[0, -0.001, 0]}
+          args={[40, 40]}
+          cellSize={0.25}
+          cellThickness={0.5}
+          cellColor="#d3d9e1"
+          sectionSize={1}
+          sectionThickness={1}
+          sectionColor="#bcc4cf"
+          fadeDistance={26}
+          fadeStrength={1.2}
+          followCamera={false}
+          raycast={() => null}
+        />
+      ) : null}
       {assembled ? (
         <AssembledObject
           key={`assembled:${scene?.seq ?? 0}`}
@@ -274,7 +302,7 @@ function StageRuntime() {
           onHover={hoverPart}
         />
       ) : null}
-      {assembled ? <ContactShadow key={`shadow:${scene?.seq ?? 0}`} /> : null}
+      {assembled && views.shadow ? <ContactShadow key={`shadow:${scene?.seq ?? 0}`} /> : null}
       {labelPoints.map((point) => (
         <Html
           key={point.id}

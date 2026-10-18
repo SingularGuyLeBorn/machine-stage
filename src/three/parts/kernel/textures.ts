@@ -33,6 +33,9 @@ export interface MaterialSpec {
   repeat?: [number, number];
   opacity?: number;
   envMapIntensity?: number;
+  /** > 0 时改用 MeshPhysicalMaterial 并开启清漆（漆面罩壳的「亮膜」层）。 */
+  clearcoat?: number;
+  clearcoatRoughness?: number;
   emissive?: string;
   emissiveIntensity?: number;
   doubleSided?: boolean;
@@ -608,7 +611,8 @@ export function presetTextures(preset: Exclude<TexturePreset, "none">, repeat: [
   return set;
 }
 
-/** 由材质声明批量构建 THREE 材质库；返回 dispose 统一释放。 */
+/** 由材质声明批量构建 THREE 材质库；返回 dispose 统一释放。
+ *  金属三要素都在这里落地：metalness 分档 / roughness 不与全场一致 / envMapIntensity 让反射可见。 */
 export function createMaterialLibrary(specs: Record<string, MaterialSpec>): {
   materials: Record<string, THREE.MeshStandardMaterial>;
   dispose: () => void;
@@ -616,16 +620,25 @@ export function createMaterialLibrary(specs: Record<string, MaterialSpec>): {
   const materials: Record<string, THREE.MeshStandardMaterial> = {};
   const usedTextures = new Set<THREE.Texture>();
   for (const [name, spec] of Object.entries(specs)) {
-    const material = new THREE.MeshStandardMaterial({
+    const params: THREE.MeshStandardMaterialParameters = {
       color: new THREE.Color(spec.base),
       metalness: spec.metalness,
       roughness: spec.roughness,
       transparent: spec.opacity !== undefined && spec.opacity < 1,
       opacity: spec.opacity ?? 1,
-      envMapIntensity: spec.envMapIntensity ?? 0.85,
+      envMapIntensity: spec.envMapIntensity ?? 1,
       side: spec.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
       flatShading: spec.flatShading ?? false,
-    });
+    };
+    // 漆面用 physical（clearcoat）：标准材质给不出清漆的二次高光。
+    const material =
+      spec.clearcoat && spec.clearcoat > 0
+        ? new THREE.MeshPhysicalMaterial({
+            ...params,
+            clearcoat: spec.clearcoat,
+            clearcoatRoughness: spec.clearcoatRoughness ?? 0.3,
+          })
+        : new THREE.MeshStandardMaterial(params);
     if (spec.emissive) {
       material.emissive = new THREE.Color(spec.emissive);
       material.emissiveIntensity = spec.emissiveIntensity ?? 1;

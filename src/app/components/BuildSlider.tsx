@@ -1,4 +1,4 @@
-import { ChevronRight, Layers } from "lucide-react";
+import { ChevronRight, Crosshair, Layers } from "lucide-react";
 import { useMemo } from "react";
 import { BUILD_LAYER_LABELS } from "@/three/parts";
 import { findModel } from "../catalog";
@@ -19,6 +19,19 @@ export function BuildSlider() {
 
   const orders = useMemo(() => buildOrdersOf(modelId), [modelId]);
   const registry = findModel(modelId).registry;
+  const selectedPart = useStageStore((state) => state.selectedPart);
+
+  // 选中件优先显示：滑杆读数要能回答「我现在选中的这件装到第几件了」，
+  // 而不只是「最后一格是哪件」。未选中时退回「当前装配件」。
+  const selected = useMemo(() => {
+    if (!selectedPart || !registry) return null;
+    const part = registry.parts.find((item) => item.id === selectedPart);
+    if (!part) return null;
+    const index = orders.indexOf(part.build_order);
+    const threshold =
+      buildIndex >= orders.length ? Infinity : buildIndex > 0 ? orders[buildIndex - 1] : -Infinity;
+    return { part, index: index >= 0 ? index + 1 : null, assembled: part.build_order <= threshold };
+  }, [selectedPart, registry, orders, buildIndex]);
 
   const meta = useMemo(() => {
     const parts = registry?.parts ?? [];
@@ -69,7 +82,20 @@ export function BuildSlider() {
           </div>
           <div className="buildbar__counts">
             已装配 <span className="num">{meta.visible}</span>/<span className="num">{meta.total}</span> 件
-            {meta.currentPart ? ` · 当前 ${meta.currentPart.name_cn}` : ""}
+            {selected ? (
+              <>
+                {" · 选中 "}
+                <strong className="buildbar__sel">{selected.part.name_cn}</strong>{" "}
+                <span className="badge badge--plain">
+                  第 {selected.index ?? "—"} 件 · L{selected.part.build_layer}
+                </span>
+                {selected.assembled ? null : <span className="buildbar__pending">未装配</span>}
+              </>
+            ) : meta.currentPart ? (
+              ` · 当前 ${meta.currentPart.name_cn}`
+            ) : (
+              ""
+            )}
           </div>
         </div>
         <div className="buildbar__track">
@@ -102,6 +128,17 @@ export function BuildSlider() {
           </div>
         </div>
         <div className="btn-row">
+          {selected && selected.index !== null && selected.index !== buildIndex ? (
+            <button
+              type="button"
+              className="btn btn--sm"
+              title="把装配进度对齐到选中零件（装到它为止）"
+              onClick={() => setBuildIndex(selected.index!)}
+            >
+              <Crosshair size={13} aria-hidden />
+              对齐
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn--sm"

@@ -12,6 +12,70 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // 启动兜底：主模块加载失败 / 首次渲染始终未发生 / 模块求值期抛错时，
+      // 不留空白页。React 起来之后 #root 有子节点，这段逻辑自动让路。
+      (function () {
+        var timer = null;
+        function show(reason) {
+          var root = document.getElementById("root");
+          if (!root || root.children.length > 0) return;
+          root.textContent = "";
+          var box = document.createElement("div");
+          box.setAttribute("role", "alert");
+          box.style.cssText =
+            "max-width:620px;margin:12vh auto 0;padding:22px 24px;border:1px solid #e3c9c6;" +
+            "border-radius:12px;background:#fff;color:#2b2f36;box-shadow:0 8px 30px rgba(31,41,55,.08);" +
+            "font:14px/1.6 system-ui,'Segoe UI',sans-serif";
+          var title = document.createElement("div");
+          title.style.cssText = "font-weight:600;font-size:15px;margin-bottom:6px";
+          title.textContent = "启动失败 · 界面未能加载";
+          var desc = document.createElement("div");
+          desc.style.cssText = "color:#6b7280;font-size:13px;margin-bottom:10px";
+          desc.textContent = reason || "页面未挂载。";
+          var pre = document.createElement("pre");
+          pre.style.cssText =
+            "margin:0 0 12px;padding:10px;border:1px solid #e5e7eb;border-radius:8px;background:#fafafa;" +
+            "font:12px/1.5 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-word;" +
+            "max-height:220px;overflow:auto";
+          pre.textContent = window.__bootError || "没有捕获到具体错误（可能是模块图未加载）。";
+          var button = document.createElement("button");
+          button.type = "button";
+          button.textContent = "重新加载页面";
+          button.style.cssText =
+            "height:30px;padding:0 12px;border:1px solid #cfd6df;border-radius:8px;" +
+            "background:linear-gradient(#fff,#f4f6f9);cursor:pointer;font-size:13px";
+          button.onclick = function () {
+            location.reload();
+          };
+          box.appendChild(title);
+          box.appendChild(desc);
+          box.appendChild(pre);
+          box.appendChild(button);
+          root.appendChild(box);
+        }
+        window.addEventListener(
+          "error",
+          function (event) {
+            if (event.error) {
+              window.__bootError = String(event.error.stack || event.error.message || event.error);
+            } else if (event.target && event.target.tagName === "SCRIPT") {
+              window.__bootError = "脚本加载失败：" + (event.target.src || "");
+            }
+            show("启动过程中出现错误。");
+          },
+          true,
+        );
+        window.addEventListener("DOMContentLoaded", function () {
+          timer = setTimeout(function () {
+            show("10 秒内未见界面挂载。");
+          }, 10000);
+        });
+        window.__bootCancel = function () {
+          if (timer) clearTimeout(timer);
+        };
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

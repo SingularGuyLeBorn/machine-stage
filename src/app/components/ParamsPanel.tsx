@@ -1,4 +1,4 @@
-import { Gauge, RotateCcw } from "lucide-react";
+import { Gauge, Lock, RotateCcw } from "lucide-react";
 import { useMemo } from "react";
 import { resolveConstants } from "@/three/parts";
 import { findModel } from "../catalog";
@@ -7,8 +7,8 @@ import { useStageStore } from "../state/stageStore";
 // ============================================================================
 // ParamsPanel —— 参数面板（改常量 → 实时重建 → 重新检测穿模）
 //
-// 数值常量给滑杆（范围来自 catalog 声明）；派生常量（表达式）只读展示解析值，
-// 因为它们是单一真值源的推导结果，不允许手改。
+// 数值常量给滑杆（范围来自 catalog 声明）；表达式派生的常量不给滑杆，
+// 只显示解析值与锁形「自动」标记——它们是单一真值源的推导结果，改它等于改出两个真值源。
 // ============================================================================
 
 const HEURISTIC = { min: 0, max: 1, step: 0.001 };
@@ -71,7 +71,10 @@ export function ParamsPanel() {
               {isDerived ? (
                 <span className="param__derived">
                   <code>{value as string}</code>
-                  <span>派生（只读）</span>
+                  <span className="param__auto">
+                    <Lock size={10} aria-hidden />
+                    自动
+                  </span>
                 </span>
               ) : (
                 <div className="param__control">

@@ -1,10 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { buildModel } from "@/three/parts";
+import { buildModel, type ClippingReport } from "@/three/parts";
 import { findModel } from "../catalog";
-import { buildOrdersOf, useStageStore } from "./stageStore";
+import {
+  buildFilterOf,
+  buildOrdersOf,
+  faultFromError,
+  filterReportsByProgress,
+  reportKey,
+  useStageStore,
+} from "./stageStore";
 
 // ============================================================================
-// stageStore 单测：构建滑杆 / 参数覆盖 / 扫描 / 视图 / 状态机
+// stageStore 单测：构建滑杆 / 参数覆盖 / 扫描 / 视图 / 状态机 / 报告×进度 / 布局 / 故障
 // 扫描是异步的（先让浏览器画「扫描中」），这里用假定时器驱动。
 // ============================================================================
 
@@ -16,6 +23,21 @@ const buildTestModel = (overrides: Record<string, number> = {}) => {
   );
 };
 
+/** 合成一条实例级报告（只测过滤/联动，不跑真实检测）。 */
+const makeReport = (partA: string, partB: string, depth = 1): ClippingReport => ({
+  type: "clipping",
+  phase: "static",
+  a: `${partA}[0]`,
+  b: `${partB}[1]`,
+  depth_mm: depth,
+  point: [0, 0, 0],
+  frame: null,
+  severity: "error",
+  hint: "检查 GAP 常量",
+  aLayer: 1,
+  bLayer: 1,
+});
+
 const resetStore = () => {
   useStageStore.setState({
     modelId: "test",
@@ -26,15 +48,24 @@ const resetStore = () => {
     buildIndex: buildOrdersOf("test").length,
     selectedPart: null,
     hoveredPart: null,
+    activeReport: null,
+    isolation: null,
+    allReports: [],
     reports: [],
     scanPhase: "idle",
     scanKind: null,
     scanMs: null,
-    views: { explode: false, xray: false, labels: false },
+    views: { explode: false, xray: false, labels: false, grid: false, shadow: true },
+    layout: {
+      left: { width: 272, open: true },
+      right: { width: 324, open: true },
+      drawer: { open: false, width: 360 },
+    },
     machineState: "idle",
     focus: null,
     home: null,
     notice: null,
+    fault: null,
   });
 };
 
@@ -192,7 +223,7 @@ describe("stageStore 模型切换", () => {
   beforeEach(resetStore);
 
   it("未交付模型不可选、重复选同一模型为空操作", () => {
-    useStageStore.getState().setModel("tiger");
+    useStageStore.getState().setModel("m2hb");
     expect(useStageStore.getState().modelId).toBe("test");
     useStageStore.getState().setParam("GAP", 0.01);
     useStageStore.getState().setModel("test");
@@ -206,15 +237,176 @@ describe("stageStore 模型切换", () => {
       overrides: { GAP: 0.01 },
       buildIndex: 0,
       selectedPart: "test.frame.box",
-      views: { explode: true, xray: true, labels: true },
+      views: { explode: true, xray: true, labels: true, grid: true, shadow: false },
     });
     useStageStore.getState().setModel("test");
     const state = useStageStore.getState();
     expect(state.modelId).toBe("test");
     expect(state.overrides).toEqual({});
-    expect(state.views).toEqual({ explode: false, xray: false, labels: false });
+    expect(state.views).toEqual({ explode: false, xray: false, labels: false, grid: false, shadow: true });
     expect(state.selectedPart).toBeNull();
     expect(state.buildIndex).toBe(buildOrdersOf("test").length);
     expect(state.reports).toEqual([]);
+  });
+});
+
+describe("stageStore 报告 × 构建进度联动", () => {
+  beforeEach(resetStore);
+
+  const idsAtOrder = (order: number) =>
+    findModel("test")
+      .registry!.parts.filter((part) => part.build_order === order)
+      .map((part) => part.id);
+
+  it("拖滑杆减少零件 → 报告按候选集重算，数量单调不增；拖到 0 清空", () => {
+    const orders = buildOrdersOf("test");
+    const early = idsAtOrder(orders[0])[0];
+    const late = idsAtOrder(orders[orders.length - 1])[0];
+    const all = [makeReport(early, early), makeReport(late, late)];
+    useStageStore.setState({ allReports: all });
+
+    useStageStore.getState().setBuildIndex(orders.length);
+    expect(useStageStore.getState().reports).toHaveLength(2);
+
+    const counts: number[] = [];
+    for (let index = orders.length; index >= 0; index--) {
+      useStageStore.getState().setBuildIndex(index);
+      counts.push(useStageStore.getState().reports.length);
+    }
+    for (let i = 1; i < counts.length; i++) expect(counts[i]).toBeLessThanOrEqual(counts[i - 1]);
+    expect(counts[counts.length - 1]).toBe(0);
+    expect(useStageStore.getState().reports).toEqual([]);
+  });
+
+  it("进度回退时越界的报告选中项自动复位", () => {
+    const orders = buildOrdersOf("test");
+    const early = idsAtOrder(orders[0])[0];
+    useStageStore.setState({
+      allReports: [makeReport(early, early)],
+      reports: [makeReport(early, early)],
+      activeReport: 0,
+    });
+    useStageStore.getState().setBuildIndex(0);
+    expect(useStageStore.getState().reports).toEqual([]);
+    expect(useStageStore.getState().activeReport).toBeNull();
+  });
+
+  it("buildFilterOf 用 build_order 阈值给出候选集，全量进度返回 null", () => {
+    const orders = buildOrdersOf("test");
+    const filter = buildFilterOf("test", 1)!;
+    expect(filter({ buildOrder: orders[0] } as never)).toBe(true);
+    expect(filter({ buildOrder: orders[1] } as never)).toBe(false);
+    expect(buildFilterOf("test", orders.length)).toBeNull();
+    expect(buildFilterOf("test", 0)!({ buildOrder: orders[0] } as never)).toBe(false);
+  });
+
+  it("filterReportsByProgress 保持原顺序（只删不改）", () => {
+    const orders = buildOrdersOf("test");
+    const early = idsAtOrder(orders[0])[0];
+    const late = idsAtOrder(orders[orders.length - 1])[0];
+    const all = [makeReport(early, late, 3), makeReport(early, early, 2), makeReport(late, late, 1)];
+    const filtered = filterReportsByProgress(all, "test", 1);
+    expect(filtered.map((report) => report.depth_mm)).toEqual([2]);
+    expect(filterReportsByProgress(all, "test", orders.length)).toEqual(all);
+  });
+});
+
+describe("stageStore 隔离小视图", () => {
+  beforeEach(resetStore);
+
+  it("打开报告隔离：key 与 activeReport 同源；stepReport 环绕", () => {
+    const orders = buildOrdersOf("test");
+    const early = findModel("test").registry!.parts.find((part) => part.build_order === orders[0])!.id;
+    useStageStore.setState({
+      allReports: [makeReport(early, early, 1), makeReport(early, early, 2)],
+    });
+    useStageStore.getState().setBuildIndex(orders.length);
+    useStageStore.getState().openReportIsolation(0);
+    let state = useStageStore.getState();
+    expect(state.isolation).toEqual({ kind: "pair", key: reportKey(state.reports[0]) });
+    expect(state.activeReport).toBe(0);
+
+    useStageStore.getState().stepReport(1);
+    state = useStageStore.getState();
+    expect(state.activeReport).toBe(1);
+    expect(state.isolation).toEqual({ kind: "pair", key: reportKey(state.reports[1]) });
+
+    useStageStore.getState().stepReport(1); // 末尾 +1 → 回到第一条
+    expect(useStageStore.getState().activeReport).toBe(0);
+
+    useStageStore.getState().closeIsolation();
+    expect(useStageStore.getState().isolation).toBeNull();
+  });
+
+  it("单件隔离 + 点零件树会清掉报告选中（同一选中源）", () => {
+    const orders = buildOrdersOf("test");
+    const early = findModel("test").registry!.parts.find((part) => part.build_order === orders[0])!.id;
+    useStageStore.setState({ allReports: [makeReport(early, early)] });
+    useStageStore.getState().setBuildIndex(orders.length);
+    useStageStore.getState().openReportIsolation(0);
+    expect(useStageStore.getState().activeReport).toBe(0);
+
+    useStageStore.getState().openPartIsolation("test.frame.box");
+    expect(useStageStore.getState().isolation).toEqual({ kind: "part", partId: "test.frame.box" });
+    useStageStore.getState().selectPart("test.frame.box");
+    expect(useStageStore.getState().activeReport).toBeNull();
+  });
+});
+
+describe("stageStore 布局自由化", () => {
+  beforeEach(resetStore);
+
+  it("栏宽钳制在可读范围内，收起 / 展开翻转 open", () => {
+    useStageStore.getState().setColumnWidth("left", 10);
+    expect(useStageStore.getState().layout.left.width).toBe(188);
+    useStageStore.getState().setColumnWidth("left", 900);
+    expect(useStageStore.getState().layout.left.width).toBe(520);
+    useStageStore.getState().setColumnWidth("right", 300.4);
+    expect(useStageStore.getState().layout.right.width).toBe(300);
+
+    useStageStore.getState().toggleColumn("right");
+    expect(useStageStore.getState().layout.right.open).toBe(false);
+    useStageStore.getState().toggleColumn("right");
+    expect(useStageStore.getState().layout.right.open).toBe(true);
+  });
+
+  it("报告抽屉：开关与宽度钳制", () => {
+    expect(useStageStore.getState().layout.drawer.open).toBe(false);
+    useStageStore.getState().setDrawer(true);
+    expect(useStageStore.getState().layout.drawer.open).toBe(true);
+    useStageStore.getState().setDrawerWidth(1000);
+    expect(useStageStore.getState().layout.drawer.width).toBe(620);
+    useStageStore.getState().setDrawerWidth(100);
+    expect(useStageStore.getState().layout.drawer.width).toBe(288);
+  });
+});
+
+describe("stageStore 运行故障（白屏防御）", () => {
+  beforeEach(resetStore);
+
+  it("faultFromError 覆盖 Error / 字符串 / 对象 / undefined", () => {
+    const fromError = faultFromError("装配", new Error("boom"));
+    expect(fromError.scope).toBe("装配");
+    expect(fromError.message).toBe("boom");
+    expect(fromError.stack).toContain("boom");
+
+    expect(faultFromError("全局", "字符串错误").message).toBe("字符串错误");
+    expect(faultFromError("全局", { code: 7 }).message).toBe('{"code":7}');
+    expect(faultFromError("全局", undefined).message).toBe("undefined");
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    expect(faultFromError("全局", circular).message).toBe("[object Object]");
+  });
+
+  it("reportFault / clearFault，切模型时清空故障", () => {
+    useStageStore.getState().reportFault({ scope: "渲染", message: "WebGL 上下文丢失" });
+    expect(useStageStore.getState().fault?.message).toBe("WebGL 上下文丢失");
+    useStageStore.getState().clearFault();
+    expect(useStageStore.getState().fault).toBeNull();
+
+    useStageStore.getState().reportFault({ scope: "装配", message: "灯丝断了" });
+    useStageStore.getState().setModel("tiger");
+    expect(useStageStore.getState().fault).toBeNull();
+    expect(useStageStore.getState().modelId).toBe("tiger");
   });
 });

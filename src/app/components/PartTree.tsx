@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BUILD_LAYER_LABELS } from "@/three/parts";
 import { findModel } from "../catalog";
 import { useStageStore } from "../state/stageStore";
@@ -64,12 +64,26 @@ export function PartTree() {
   const selectedPart = useStageStore((state) => state.selectedPart);
   const selectPart = useStageStore((state) => state.selectPart);
   const requestFocus = useStageStore((state) => state.requestFocus);
+  const openPartIsolation = useStageStore((state) => state.openPartIsolation);
   const hoverPart = useStageStore((state) => state.hoverPart);
   const tree = useMemo(() => buildTree(modelId), [modelId]);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const rowRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const toggle = (groupId: string) =>
     setCollapsed((previous) => ({ ...previous, [groupId]: !previous[groupId] }));
+
+  // 反向联动：视口点选 / 报告点选 / 飞行到零件后，左树要能看见它——
+  // 自动展开所在总成，并把该行滚进视野。
+  useEffect(() => {
+    if (!selectedPart) return;
+    const group = tree.groups.find((item) => item.parts.some((part) => part.id === selectedPart));
+    if (group && collapsed[group.id]) {
+      setCollapsed((previous) => ({ ...previous, [group.id]: false }));
+      return; // 展开后重跑一次，再滚动
+    }
+    rowRefs.current.get(selectedPart)?.scrollIntoView?.({ block: "nearest" });
+  }, [selectedPart, tree, collapsed]);
 
   return (
     <section className="panel panel--grow">
@@ -105,6 +119,10 @@ export function PartTree() {
                         key={part.id}
                         type="button"
                         className="tree__part"
+                        ref={(element) => {
+                          if (element) rowRefs.current.set(part.id, element);
+                          else rowRefs.current.delete(part.id);
+                        }}
                         aria-current={part.id === selectedPart}
                         title={`${part.id} · ${BUILD_LAYER_LABELS[part.layer]?.name_cn ?? ""}`}
                         onMouseEnter={() => hoverPart(part.id)}
@@ -112,6 +130,7 @@ export function PartTree() {
                         onClick={() => {
                           selectPart(part.id);
                           requestFocus(part.id);
+                          openPartIsolation(part.id);
                         }}
                       >
                         <span className="tree__layer" data-layer={part.layer} />
