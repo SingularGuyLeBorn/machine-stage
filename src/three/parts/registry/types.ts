@@ -24,7 +24,11 @@ export type Axis = "x" | "y" | "z";
 export type Anchor = string;
 
 /** 几何声明。数值均为米制；自定义 kit 由模型注册（见 assembler 的 builders 选项）。 */
-export type KitParam = number | string | boolean | number[] | string[];
+/**
+ * kit 参数：可以是数 / 字符串 / 布尔，也可以是混合数组或结构化对象
+ * （如歧管 runners: [{from: [x, "CONST", 0], to, r, bend}, …]）。递归定义，允许嵌套。
+ */
+export type KitParam = number | string | boolean | KitParam[] | { [key: string]: KitParam };
 export type GeometrySpec =
   | { type: "box"; w: Expr; h: Expr; d: Expr; bevel?: Expr }
   | { type: "plate"; w: Expr; h: Expr; t?: Expr; bevel?: Expr }
@@ -55,6 +59,12 @@ export interface NodeDef {
   parent: string;
   /** 相对父节点的装配原点（旋转/平移中心），默认 [0,0,0]。 */
   pivot?: ExprVec3;
+  /**
+   * 节点静止姿态旋转（度，XYZ 欧拉）。缺省无旋转。
+   * 用于「静止时就已经有倾角」的机构（如 V 型发动机的活塞/连杆列倾角）：
+   * 静态装配检测看到的就是这个姿态，动画在此基础上继续驱动。
+   */
+  rest_rotation?: ExprVec3;
   /** 运动类型；缺省表示静态装配分组节点。 */
   motion?: "rotate" | "translate" | "scalar";
   axis?: Axis;

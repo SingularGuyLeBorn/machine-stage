@@ -5,6 +5,9 @@ import {
   type InstanceLayout,
   type ModelRegistry,
 } from "@/three/parts";
+import type { GeometryBuilder } from "@/three/parts/assembler/geometry";
+import { makeEngineLayouts, makeEngineRegistry } from "@/three/parts/models/tiger/engine/registry";
+import { tigerKitBuilders } from "@/three/parts/models/tiger/engine/kits";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -14,7 +17,7 @@ import {
 // planned 卡片是路线图占位（M-B…M-F），没有注册表时不可选中。
 // ============================================================================
 
-export type ViewKey = "explode" | "xray" | "labels";
+export type ViewKey = "explode" | "xray" | "labels" | "grid" | "shadow";
 
 export type StageAction =
   | { id: string; group: string; label: string; kind: "machine-state"; state: string }
@@ -45,6 +48,8 @@ export interface StageModel {
   status: "ready" | "planned";
   registry?: ModelRegistry;
   layouts?: Record<string, InstanceLayout>;
+  /** 模型自定义几何 kit 构造器（如发动机 borePlate/siameseBlock 等）。 */
+  builders?: Record<string, GeometryBuilder>;
   /** 动画：只驱动节点，每帧调用前框架已 resetNodes。t 为秒。 */
   animate?: (assembled: AssembledModel, seconds: number) => void;
   /** 主角数字（状态栏/参数面板展示，必须由求解器或常量算出）。 */
@@ -111,9 +116,28 @@ export const CATALOG: StageModel[] = [
   {
     id: "tiger",
     title: "虎式坦克 Tiger I",
-    subtitle: "M-B…M-C：HL230 发动机 → 全五层",
+    subtitle: "M-B 进行中：HL230 发动机（曲轴箱已可见）",
     milestone: "M-B",
-    status: "planned",
+    status: "ready",
+    registry: makeEngineRegistry(),
+    layouts: makeEngineLayouts(),
+    builders: tigerKitBuilders,
+    states: [
+      { id: "idle", label: "停机", hint: "发动机静止，可拖构建滑杆看装配" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "M-B 进行中：当前可见 L1 已写零件（曲轴箱为主）；后续零件随注册表补全自动出现，无需等待全部完成。",
+      "机构动画（曲轴/活塞联动）由实现者接入后，此处追加 running 状态与启动/停机动作。",
+    ],
   },
   {
     id: "m2hb",

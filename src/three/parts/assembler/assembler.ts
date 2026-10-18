@@ -123,6 +123,29 @@ function isPartRef(to: string): boolean {
   return to.includes(".");
 }
 
+/**
+ * 几何自检：NaN / Infinity 顶点不会报错，只会变成「看不见或破面的零件」，
+ * 白白浪费一整轮排查。这里在装配期就指名零件炸掉。
+ * 常见成因：声明里引用了未定义的常量名（resolveSpec 对解析失败的字符串保持原样）。
+ */
+export function assertFiniteGeometry(geometry: THREE.BufferGeometry, owner: string): void {
+  const position = geometry.getAttribute("position");
+  if (!position) {
+    throw new Error(`装配器：零件 "${owner}" 的几何缺少 position 属性`);
+  }
+  const array = position.array as ArrayLike<number>;
+  for (let i = 0; i < array.length; i++) {
+    if (!Number.isFinite(array[i])) {
+      const vertex = Math.floor(i / 3);
+      const axis = "xyz"[i % 3] ?? "?";
+      throw new Error(
+        `装配器：零件 "${owner}" 的几何含非有限坐标（顶点 ${vertex} 的 ${axis} 分量 = ${array[i]}）。` +
+          "多为 geometry/mate 里引用了未定义常量或表达式无法解析，请检查该零件的声明。",
+      );
+    }
+  }
+}
+
 export function buildModel(registry: ModelRegistry, options: BuildOptions = {}): AssembledModel {
   const constants = resolveConstants(registry.constants);
   const builders = { ...options.builders };
@@ -132,13 +155,26 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
   const geometryCache = new Map<string, THREE.BufferGeometry>();
   const ownedGeometries = new Set<THREE.BufferGeometry>();
 
-  const getGeometry = (spec: unknown, mirrored: boolean, cacheKey: string): THREE.BufferGeometry => {
+  const getGeometry = (
+    spec: unknown,
+    mirrored: boolean,
+    cacheKey: string,
+    owner: string,
+  ): THREE.BufferGeometry => {
     const key = mirrored ? `${cacheKey}#mirror` : cacheKey;
     const cached = geometryCache.get(key);
     if (cached) return cached;
     const resolved = resolveSpec(spec, constants);
-    let built = buildGeometry(resolved as never, geometryContext);
+    let built: THREE.BufferGeometry;
+    try {
+      built = buildGeometry(resolved as never, geometryContext);
+    } catch (error) {
+      throw new Error(`装配器：零件 "${owner}" 的几何构建失败（${(error as Error).message}）`, {
+        cause: error,
+      });
+    }
     if (mirrored) built = mirrorGeometry(built);
+    assertFiniteGeometry(built, owner);
     built.computeBoundingBox();
     built.computeBoundingSphere();
     geometryCache.set(key, built);
@@ -161,6 +197,18 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
     if (def.pivot) {
       const resolved = resolveSpec(def.pivot, constants) as [number, number, number];
       group.position.set(resolved[0], resolved[1], resolved[2]);
+    }
+    if (def.rest_rotation) {
+      // 静止姿态旋转：静态装配检测看到的就是这个姿态（如 V 型发动机列倾角）
+      const euler = resolveSpec(def.rest_rotation, constants) as [number, number, number];
+      group.quaternion.setFromEuler(
+        new THREE.Euler(
+          THREE.MathUtils.degToRad(euler[0]),
+          THREE.MathUtils.degToRad(euler[1]),
+          THREE.MathUtils.degToRad(euler[2]),
+          "XYZ",
+        ),
+      );
     }
     parent.add(group);
     group.updateMatrix();
@@ -201,7 +249,12 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
   const geometryFor = (item: ExpandedPart): THREE.BufferGeometry => {
     const cached = resolvedGeometry.get(item.id);
     if (cached) return cached;
-    const geometry = getGeometry(item.def.geometry, item.mirrored, JSON.stringify(item.def.geometry));
+    const geometry = getGeometry(
+      item.def.geometry,
+      item.mirrored,
+      JSON.stringify(item.def.geometry),
+      item.id,
+    );
     resolvedGeometry.set(item.id, geometry);
     return geometry;
   };
@@ -443,9 +496,9 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
     getNode: (name) => nodes.get(name),
     resetNodes: () => {
       for (const [name, group] of nodes) {
-        group.position.copy(new THREE.Vector3().setFromMatrixPosition(nodeRest.get(name)!));
-        group.quaternion.identity();
-        group.scale.set(1, 1, 1);
+        // 静止姿态 = nodeRest 的完整 TRS（含 rest_rotation），不是「无旋转」
+        nodeRest.get(name)!.decompose(group.position, group.quaternion, group.scale);
+        group.updateMatrix();
       }
       root.updateMatrixWorld(true);
     },

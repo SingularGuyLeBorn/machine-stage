@@ -1,0 +1,2038 @@
+import * as THREE from "three";
+import type { InstanceLayout } from "../../../assembler/assembler";
+import { evaluateExpression } from "../../../registry/expression";
+import type { Expr, ExprVec3, ModelRegistry, NodeDef, PartDefinition } from "../../../registry/types";
+
+// ============================================================================
+// models/tiger/engine/registry —— Maybach HL230 P45（虎式 I 后期型）L1 核心机构
+//
+// 单一真值源：本文件 constants 表。所有零件位置由 mate / instance_layout 派生，
+// 尺寸不在别处重复书写；动画只驱动节点，数字只来自 kinematics.ts。
+//
+// 公开资料（近似值，用于真实比例与真实数字）：
+//   Maybach HL230 P45 —— 60° V12 水冷汽油机，缸径 130mm × 行程 145mm，
+//   排量 23095cc，压缩比 6.8:1，700PS @ 3000rpm，1850N·m @ 2100rpm，干重 1200kg，
+//   外形约 1000×1190×1310mm，灰铸铁机体与缸盖，SOHC + 摇臂（摇臂机构 M-C），
+//   隧道式曲轴（滚动轴承、无剖分主轴承盖），4× Solex 52JFF 化油器，2 磁电机。
+//   来源：Wikipedia "Maybach HL230"、Jentz & Doyle《Germany's Tiger Tanks》、
+//         Bovington Tiger 131 修复档案；折算式近似均已在常量注释中标注。
+//
+// 坐标系（发动机局部，与 kinematics.ts 同源）：
+//   +X = 曲轴轴向（前端 = 皮带轮 / 风扇侧），+Y = 上，+Z = 右
+//   缸序 1..12：奇数 = 左列（β = -30°），偶数 = 右列（β = +30°）；曲柄销 6 个每 60°
+//   曲柄角约定：pinAlpha = 60k + θ（度），缸 i 的曲柄角 φ = pinAlpha - β
+//
+// 构建层（自内向外）：
+//   L1 核心机构 = 曲轴箱 → 曲轴 → 缸体（本层单独可立住）
+//   L2 传动支撑 = 活塞连杆 → 配气机构
+//   L3 内衬内饰 = 冷却 / 进排气 / 点火 / 附件（相对整机属"内部装置"）
+// ============================================================================
+
+const MODEL = "tiger";
+
+/** 轴向辅助：几何体默认绕 +Y 建模，用 mate.rotation 转到目标轴向。 */
+const AXIS_X: ExprVec3 = [0, 0, -90]; // lathe/cylinder 的 +Y → +X
+const AXIS_X_NEG: ExprVec3 = [0, 0, 90]; // +Y → -X
+
+// ---------------------------------------------------------------------------
+// 实例布局（instance_layout 引用名 + 实现）
+// ---------------------------------------------------------------------------
+
+export const ENGINE_LAYOUTS = {
+  bank: "engine.bank",
+  crankJournal: "engine.crankJournal",
+  crankPin: "engine.crankPin",
+  crankWeb: "engine.crankWeb",
+  caseRib: "engine.caseRib",
+  caseMount: "engine.caseMount",
+  inspectionCover: "engine.inspectionCover",
+  pistonRing: "engine.pistonRing",
+  valve: "engine.valve",
+  sparkPlug: "engine.sparkPlug",
+  magneto: "engine.magneto",
+  fuelPump: "engine.fuelPump",
+  fanBearing: "engine.fanBearing",
+  driveBelt: "engine.driveBelt",
+  carburetor: "engine.carburetor",
+  airFilter: "engine.airFilter",
+} as const;
+
+/** 缸号（0..11）→ 曲柄销序号 / 所在侧 / 缸心 X / 缸列倾角（度）。 */
+function cylinderInfo(index: number, constants: Record<string, number>) {
+  const ordinal = index + 1;
+  const pin = Math.floor(index / 2);
+  const side: 1 | -1 = ordinal % 2 === 1 ? -1 : 1; // 奇 = 左列
+  return {
+    ordinal,
+    pin,
+    side,
+    beta: side * constants.HALF_V,
+    x: constants.CYL_X1 - pin * constants.CYL_PITCH,
+  };
+}
+
+const deg2rad = (deg: number) => (deg * Math.PI) / 180;
+
+/**
+ * 缸列坐标系矩阵：位置 = 缸心 X + 缸轴高度 h + 法向偏移 lateral；
+ * 旋转 = Rz(β)（β 取缸列倾角，附加角 extra 只作用于旋转，用于气门倾角）。
+ */
+function bankMatrix(
+  side: 1 | -1,
+  x: number,
+  height: number,
+  lateral: number,
+  extra: number,
+  constants: Record<string, number>,
+): THREE.Matrix4 {
+  const beta = side * constants.HALF_V;
+  const n = new THREE.Vector3(0, Math.cos(deg2rad(beta)), Math.sin(deg2rad(beta)));
+  const m = new THREE.Vector3(0, -Math.sin(deg2rad(beta)), Math.cos(deg2rad(beta)));
+  const position = new THREE.Vector3(x, 0, 0).addScaledVector(n, height).addScaledVector(m, lateral);
+  const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(deg2rad(beta + extra), 0, 0, "XYZ"));
+  return new THREE.Matrix4().compose(position, quaternion, new THREE.Vector3(1, 1, 1));
+}
+
+/** 缸列局部点 (x, y, z) → 模型坐标表达式（y = 缸轴高度，z = 法向，右列为 +Z 外侧）。 */
+function bankPos(x: Expr, y: Expr, z: Expr, side: 1 | -1): ExprVec3 {
+  const yExpr = side === 1 ? `(${y})*COS_HV-(${z})*SIN_HV` : `(${y})*COS_HV+(${z})*SIN_HV`;
+  const zExpr = side === 1 ? `(${y})*SIN_HV+(${z})*COS_HV` : `-(${y})*SIN_HV+(${z})*COS_HV`;
+  return [x, yExpr, zExpr];
+}
+
+// ---------------------------------------------------------------------------
+// 常量（单一真值源）
+// ---------------------------------------------------------------------------
+
+const CONSTANTS: Record<string, Expr> = {
+  // ===== 公开规格 =====
+  CYLINDERS: 12,
+  V_ANGLE: 60,
+  HALF_V: "V_ANGLE/2",
+  COS_HV: "cos(HALF_V)",
+  SIN_HV: "sin(HALF_V)",
+  BORE: 0.13,
+  STROKE: 0.145,
+  /** 展示基准转速（r/min）：额定 3000，展示取 240 便于目视与 36fps 密集采样。 */
+  ENGINE_RPM: 240,
+  RATED_RPM: 3000,
+  RATED_TORQUE: 1850,
+  COMPRESSION_RATIO: 6.8,
+  DRY_MASS: 1200,
+
+  // ===== 缸列排布 =====
+  CYL_PITCH: 0.158,
+  CYL_X1: 0.341,
+
+  // ===== 曲柄连杆 =====
+  CRANK_R: "STROKE/2",
+  ROD_L: 0.29,
+  PIN_TDC: "CRANK_R+ROD_L",
+  JOURNAL_R: 0.042,
+  JOURNAL_W: 0.05,
+  PIN_R: 0.036,
+  PIN_W: 0.054,
+  ROD_BIG_R: 0.052,
+  ROD_BIG_BORE: "PIN_R+0.001",
+  ROD_SMALL_R: 0.026,
+  ROD_SMALL_BORE: "PISTON_PIN_R+0.0008",
+  ROD_SHANK_W: 0.036,
+  ROD_SHANK_T: 0.026,
+
+  // ===== 活塞 =====
+  PISTON_R: 0.0628,
+  PISTON_CROWN_Y: 0.08,
+  PISTON_CROWN_T: 0.014,
+  PISTON_SKIRT: 0.066,
+  PISTON_WALL: 0.008,
+  GROOVE_R: 0.0596,
+  GROOVE_H: 0.0055,
+  RING_R: 0.0642,
+  RING_R_IN: 0.0604,
+  RING_H: 0.004,
+  RING_Y1: 0.056,
+  RING_STEP: 0.008,
+  PISTON_PIN_R: 0.019,
+  PISTON_PIN_LEN: 0.062,
+
+  // ===== 缸套 / 缸体 =====
+  LINER_R_IN: "BORE/2",
+  LINER_R_OUT: 0.073,
+  LINER_BOTTOM: "CASE_TOP+0.0008",
+  LINER_TOP: "DECK",
+  LINER_LEN: "LINER_TOP-LINER_BOTTOM",
+  LINER_CENTER: "(LINER_TOP+LINER_BOTTOM)/2",
+  JACKET_R: "LINER_R_OUT+0.004",
+  GASKET_BOTTOM: "DECK+0.0006",
+  GASKET_T: 0.0024,
+  HEAD_BASE: "GASKET_BOTTOM+GASKET_T+0.0006",
+  HEAD_H: 0.085,
+  HEAD_TOP: "HEAD_BASE+HEAD_H",
+  HEAD_CHAMBER_R: 0.072,
+  GASKET_BORE_R: "LINER_R_OUT+0.0025",
+  COVER_BASE: "HEAD_TOP+0.0018",
+  COVER_H: 0.082,
+  CAM_HALF_Z: 0.048,
+  CAM_COVER_LEN: 0.154,
+  CAM_BASE: "COVER_BASE+0.041",
+  CAM_SHAFT_R: 0.017,
+  CAM_LOBE_R: 0.028,
+  CAM_LOBE_W: 0.016,
+  CAM_JOURNAL_R: 0.0235,
+  CAM_JOURNAL_W: 0.02,
+  CAM_LEN: 0.9,
+  BLOCK_BASE: "CASE_TOP+0.0008",
+  BLOCK_W: "CYL_PITCH-0.002",
+  BLOCK_D: "JACKET_R*2+0.02",
+  BLOCK_H: "DECK-BLOCK_BASE",
+  CASE_TOP: 0.215,
+  DECK: 0.4475,
+
+  // ===== 气门 / 火花塞 =====
+  VALVE_Z: 0.038,
+  VALVE_TILT: 6,
+  VALVE_SEAT: "HEAD_BASE+0.0012",
+  VALVE_DISC_R: 0.026,
+  VALVE_STEM_R: 0.008,
+  VALVE_STEM_LEN: 0.084,
+  PLUG_Z: 0.074,
+  PLUG_BASE: "HEAD_TOP+0.0008",
+  PLUG_TIP_Y: "HEAD_TOP-0.012",
+  PLUG_TIP_R: 0.007,
+
+  // ===== 曲轴箱壳体 =====
+  CASE_X: -0.054,
+  CASE_LEN: 1.0,
+  CASE_FRONT_X: "CASE_X+CASE_LEN/2",
+  CASE_REAR_X: "CASE_X-CASE_LEN/2",
+  CASE_HALF_W: 0.155,
+  CASE_WALL: 0.019,
+  CASE_BOTTOM_Y: -0.17,
+  CASE_FLOOR: 0.012,
+  DECK_RIM: 0.004,
+  RIDGE_BOTTOM_Y: 0.205,
+  DECK_INNER_Y: "CASE_TOP*COS_HV+BLOCK_D/2*SIN_HV",
+  DECK_INNER_Z: "CASE_TOP*SIN_HV-BLOCK_D/2*COS_HV",
+  DECK_OUTER_Y: "CASE_TOP*COS_HV-BLOCK_D/2*SIN_HV",
+  DECK_OUTER_Z: "CASE_TOP*SIN_HV+BLOCK_D/2*COS_HV",
+  ENDPLATE_T: 0.022,
+  ENDPLATE_FRONT_X: "CASE_FRONT_X+ENDPLATE_T/2",
+  ENDPLATE_REAR_X: "CASE_REAR_X-ENDPLATE_T/2",
+  FRONT_BORE_R: 0.055,
+  REAR_BORE_R: 0.05,
+  TIMING_COVER_X: "CASE_FRONT_X+0.032",
+  TIMING_COVER_BORE: 0.05,
+  BEARING_R_IN: "JOURNAL_R+0.0035",
+  BEARING_R_OUT: 0.112,
+  BEARING_W: 0.03,
+  BEARING_REACH_Z: 0.135,
+  BEARING_REACH_UP: 0.117,
+  BEARING_REACH_DOWN: 0.157,
+  RIB_T: 0.025,
+  RIB_W_X: 0.02,
+  RIB_H: 0.17,
+  RIB_Z: "CASE_HALF_W+0.0125",
+  RIB_X1: 0.42,
+  RIB_PITCH: 0.158,
+  RIB_COUNT: 6,
+  RIB_Y: -0.075,
+  MOUNT_X: 0.395,
+  MOUNT_Y: -0.155,
+  MOUNT_Z: "CASE_HALF_W+0.0455",
+  COVER_X1: 0.183,
+  COVER_X2: -0.291,
+  COVER_Z: "CASE_HALF_W+0.005",
+  COVER_Y: -0.075,
+  SUMP_FLANGE_Y: -0.178,
+  SUMP_BOX_Y: -0.215,
+  DRAIN_PLUG_Y: -0.259,
+  BREATHER_Y: "DECK_INNER_Y+0.0355",
+  DIPSTICK_X: -0.5,
+  DIPSTICK_Y: 0.02,
+  DIPSTICK_Z: "-(CASE_HALF_W+0.01)",
+  OIL_FILLER_X: "CASE_FRONT_X+0.045",
+  OIL_FILLER_Y: 0.09,
+  OIL_FILLER_Z: -0.11,
+  OIL_PUMP_Y: -0.09,
+  OIL_PUMP_Z: "-(CASE_HALF_W+0.05)",
+  OIL_FILTER_X: -0.455,
+  OIL_FILTER_Y: -0.12,
+  OIL_FILTER_Z: "CASE_HALF_W+0.065",
+  OIL_FILTER_LEN: 0.13,
+  OIL_FILTER_R: 0.06,
+  NAMEPLATE_X: "TIMING_COVER_X+0.013",
+  NAMEPLATE_Y: 0.06,
+  NAMEPLATE_Z: -0.04,
+  HOUSING_X: "CASE_REAR_X-0.056",
+  HOUSING_R_OUT: 0.285,
+  HOUSING_R_IN: 0.27,
+  HOUSING_W: 0.1,
+
+  // ===== 曲轴 =====
+  JOURNAL_X0: "CYL_X1+CYL_PITCH/2",
+  WEB_T: 0.022,
+  WEB_R: 0.098,
+  WEB_GAP: 0.04,
+  COUNTER_R: 0.114,
+  NOSE_R: 0.036,
+  NOSE_LEN: 0.28,
+  NOSE_X: "CASE_FRONT_X+NOSE_LEN/2",
+  DAMPER_R: 0.104,
+  DAMPER_T: 0.032,
+  DAMPER_BORE: "NOSE_R+0.002",
+  DAMPER_X: "CASE_FRONT_X+0.115",
+  PULLEY_X: 0.7,
+  PULLEY_R: 0.09,
+  PULLEY_HALF_W: 0.025,
+  PULLEY_GROOVE_R: 0.0825,
+  PULLEY_HUB_R: 0.062,
+  PULLEY_BORE: "NOSE_R+0.001",
+  PULLEY_OFF: 0.0125,
+  PULLEY_OPEN_HALF: "BELT_WIDTH/2+0.0035",
+  PULLEY_ROOT_HALF: "BELT_WIDTH/2+0.0012",
+  PULLEY_EDGE_OFF: "PULLEY_OFF+PULLEY_OPEN_HALF",
+  BELT_WIDTH: 0.0152,
+  BELT_T: 0.0065,
+  FLYWHEEL_R: 0.23,
+  FLYWHEEL_T: 0.045,
+  FLYWHEEL_X: "CASE_REAR_X-0.066",
+  RINGGEAR_R_IN: 0.232,
+  RINGGEAR_R_OUT: 0.247,
+  RINGGEAR_W: 0.022,
+  RINGGEAR_TEETH: 96,
+  FLYWHEEL_BOLT_R: 0.009,
+  FLYWHEEL_BOLT_H: 0.008,
+  FLYWHEEL_BOLT_CIRCLE: 0.2,
+  FLYWHEEL_BOLT_X: "FLYWHEEL_X-FLYWHEEL_T/2-0.005",
+  TAIL_R: 0.04,
+  TAIL_LEN: 0.15,
+  TAIL_X: "CASE_REAR_X-0.075",
+
+  // ===== 冷却 =====
+  FAN_R: 0.235,
+  FAN_HUB_R: 0.062,
+  FAN_HUB_W: 0.07,
+  FAN_BLADES: 8,
+  FAN_CHORD: 0.078,
+  FAN_PITCH_DEG: 32,
+  FAN_X: "CASE_FRONT_X+0.185",
+  FAN_Y: 0.34,
+  FAN_Z: 0.3,
+  FAN_DIST: "sqrt(FAN_Y^2+FAN_Z^2)",
+  FAN_PULLEY_R: 0.0792,
+  FAN_PULLEY_W: 0.021,
+  FAN_PULLEY_X: "0.069",
+  FAN_SHAFT_R: 0.032,
+  FAN_FRAME_X: "CASE_FRONT_X+0.024",
+  FAN_BEARING_R_OUT: 0.042,
+  FAN_BEARING_R_IN: 0.026,
+  FAN_BEARING_W: 0.06,
+  FAN_BEARING_X: "FAN_X-0.069",
+  WATERPUMP_R: 0.055,
+  WATERPUMP_LEN: 0.08,
+  WATERPUMP_X: "TIMING_COVER_X+0.047",
+  ACC_Y: 0.06,
+  ACC_Z: 0.16,
+  GEN_R: 0.055,
+  GEN_LEN: 0.09,
+  GEN_X: "TIMING_COVER_X+0.057",
+
+  // ===== 进排气 =====
+  PLENUM_Y: 0.356,
+  PLENUM_Z: 0.1534,
+  INTAKE_MAIN_R: 0.036,
+  INTAKE_RUNNER_R: 0.024,
+  PORT_Y: "HEAD_H*0.45",
+  PORT_Z: "BLOCK_D/2+0.04",
+  EXHAUST_MAIN_Y: 0.055,
+  EXHAUST_MAIN_Z: "BLOCK_D/2+0.088",
+  EXHAUST_MAIN_R: 0.042,
+  EXHAUST_RUNNER_R: 0.024,
+  EXHAUST_PIPE_R: 0.022,
+  CARB_BASE_Y: "PLENUM_Y+INTAKE_MAIN_R+0.0015",
+  CARB_H: 0.135,
+  CARB_R: 0.0475,
+  CARB_X_A: -0.158,
+  CARB_X_B: -0.632,
+  FILTER_BASE_Y: "CARB_BASE_Y+CARB_H+0.002",
+  FILTER_NECK_R: 0.032,
+  FILTER_NECK_H: 0.08,
+  FILTER_R: 0.115,
+  FILTER_H: 0.16,
+
+  // ===== 点火 / 附件 =====
+  MAGNETO_R: 0.048,
+  MAGNETO_LEN: 0.1,
+  MAGNETO_X: "TIMING_COVER_X+0.112",
+  MAGNETO_Y: 0.1,
+  MAGNETO_Z: 0.09,
+  FUELPUMP_R: 0.03,
+  FUELPUMP_LEN: 0.062,
+  FUELPUMP_X: 0.24,
+  FUELPUMP_Y: 0.075,
+  FUELPUMP_Z: "CASE_HALF_W+0.0015",
+  STARTER_R: 0.075,
+  STARTER_LEN: 0.28,
+  STARTER_X: "CASE_REAR_X-0.066",
+  STARTER_Y: 0.16,
+  STARTER_Z: -0.34,
+};
+
+// ---------------------------------------------------------------------------
+// 节点（动画只驱动节点；rest = 曲轴角 θ=0 的自洽姿态）
+// ---------------------------------------------------------------------------
+
+function pistonNodeName(ordinal: number): string {
+  return `Piston_${ordinal}`;
+}
+
+function rodNodeName(ordinal: number): string {
+  return `Rod_${ordinal}`;
+}
+
+/** 缸号（0..11）在 θ=0 时的活塞销高度表达式（n·s(φ0)，s 由曲柄连杆解析式给出）。 */
+function pistonTravel0(pin: number, side: 1 | -1): string {
+  const phi0 = pin * 60 - side * 30;
+  return `(CRANK_R*cos(${phi0})+sqrt(ROD_L^2-(CRANK_R*sin(${phi0}))^2))`;
+}
+
+/** θ=0 时连杆摆角（度）：atan2(-r·sinφ, sqrt(l²-(r·sinφ)²))。 */
+function rodSwing0(pin: number, side: 1 | -1): string {
+  const phi0 = pin * 60 - side * 30;
+  return `atan2(-CRANK_R*sin(${phi0}), sqrt(ROD_L^2-(CRANK_R*sin(${phi0}))^2))`;
+}
+
+function buildNodes(): NodeDef[] {
+  const nodes: NodeDef[] = [
+    { name: "Crank", parent: "root", pivot: [0, 0, 0], motion: "rotate", axis: "x", note: "曲轴轴线 = X 轴" },
+    {
+      name: "Cam_L",
+      parent: "root",
+      pivot: ["CASE_X", "CAM_BASE*COS_HV", "-CAM_BASE*SIN_HV"],
+      motion: "rotate",
+      axis: "x",
+      note: "左列凸轮轴（半速，相位烘焙在几何里）",
+    },
+    {
+      name: "Cam_R",
+      parent: "root",
+      pivot: ["CASE_X", "CAM_BASE*COS_HV", "CAM_BASE*SIN_HV"],
+      motion: "rotate",
+      axis: "x",
+      note: "右列凸轮轴",
+    },
+    {
+      name: "Fan_L",
+      parent: "root",
+      pivot: ["FAN_X", "FAN_Y", "-FAN_Z"],
+      motion: "rotate",
+      axis: "x",
+      note: "左风扇（皮带轮与叶轮同轴）",
+    },
+    {
+      name: "Fan_R",
+      parent: "root",
+      pivot: ["FAN_X", "FAN_Y", "FAN_Z"],
+      motion: "rotate",
+      axis: "x",
+      note: "右风扇",
+    },
+  ];
+  for (let i = 0; i < 12; i++) {
+    const pin = Math.floor(i / 2);
+    const side: 1 | -1 = (i + 1) % 2 === 1 ? -1 : 1;
+    const x = `CYL_X1-${pin}*CYL_PITCH`;
+    const s0 = pistonTravel0(pin, side);
+    nodes.push({
+      name: pistonNodeName(i + 1),
+      parent: "root",
+      pivot: [x, `${s0}*COS_HV`, side === 1 ? `${s0}*SIN_HV` : `-${s0}*SIN_HV`],
+      rest_rotation: [side === 1 ? "HALF_V" : "-HALF_V", 0, 0],
+      motion: "translate",
+      note: `缸 ${i + 1} 活塞（${side === 1 ? "右" : "左"}列，θ=0 姿态）`,
+    });
+    nodes.push({
+      name: rodNodeName(i + 1),
+      parent: "root",
+      pivot: [x, `CRANK_R*cos(${pin * 60})`, `CRANK_R*sin(${pin * 60})`],
+      rest_rotation: [`${side === 1 ? "HALF_V" : "-HALF_V"}+${rodSwing0(pin, side)}`, 0, 0],
+      motion: "rotate",
+      axis: "x",
+      note: `缸 ${i + 1} 连杆（大端套曲柄销，θ=0 姿态）`,
+    });
+  }
+  return nodes;
+}
+
+// ---------------------------------------------------------------------------
+// 材质
+// ---------------------------------------------------------------------------
+
+// 材质分档（对照 docs/去塑料积木感-视觉真实感技术指南.md 第 3 章）：
+//   铸铁 metalness 0.6–0.66 / 锻钢 0.8+ / 铝 0.75+ / 黄铜 0.9 / 漆面 ≤ 0.2 / 橡胶 ≈ 0
+//   roughness 不齐平：铸面 0.58–0.66、锻钢 0.28–0.46、铝 0.3、漆面 0.45、橡胶 0.9
+//   envMapIntensity 逐材质给出，金属 ≥ 1 才能反射出环境。
+const MATERIALS: ModelRegistry["materials"] = {
+  cast_iron: { base: "#71767b", metalness: 0.62, roughness: 0.58, preset: "cast", envMapIntensity: 0.95 },
+  cast_iron_dark: { base: "#585d62", metalness: 0.6, roughness: 0.66, preset: "cast", envMapIntensity: 0.9 },
+  steel: { base: "#9ba1a7", metalness: 0.88, roughness: 0.28, preset: "steel", envMapIntensity: 1.2 },
+  steel_worn: {
+    base: "#84898f",
+    metalness: 0.82,
+    roughness: 0.46,
+    preset: "steel_rough",
+    envMapIntensity: 1.05,
+  },
+  aluminium: { base: "#c2c8ce", metalness: 0.78, roughness: 0.3, preset: "steel", envMapIntensity: 1.25 },
+  paint: {
+    base: "#59604f",
+    metalness: 0.12,
+    roughness: 0.5,
+    preset: "primer",
+    clearcoat: 0.72,
+    clearcoatRoughness: 0.24,
+    envMapIntensity: 1,
+  },
+  rubber_belt: { base: "#26292d", metalness: 0.02, roughness: 0.9, preset: "rubber", envMapIntensity: 0.5 },
+  bakelite: { base: "#2f2b26", metalness: 0.1, roughness: 0.6, preset: "none", envMapIntensity: 0.6 },
+  brass: { base: "#b3893c", metalness: 0.92, roughness: 0.32, preset: "steel", envMapIntensity: 1.3 },
+};
+
+// ---------------------------------------------------------------------------
+// 布局实现
+// ---------------------------------------------------------------------------
+
+/** 缸列高度表（layout = bank 时按零件取高度）。 */
+const BANK_HEIGHT: Record<string, (c: Record<string, number>) => number> = {
+  "tiger.cylinder.block": (c) => c.BLOCK_BASE,
+  "tiger.cylinder.liner": (c) => c.LINER_CENTER,
+  "tiger.cylinder.head_gasket": (c) => c.GASKET_BOTTOM,
+  "tiger.cylinder.head": (c) => c.HEAD_BASE,
+  "tiger.cylinder.cam_cover": (c) => c.COVER_BASE,
+};
+
+/** 单缸内联的活塞环：3 道环按 index % 3 分布在活塞销上方。 */
+const RING_COUNT = 3;
+
+function makeLayouts(): Record<string, InstanceLayout> {
+  const layouts: Record<string, InstanceLayout> = {};
+
+  layouts[ENGINE_LAYOUTS.bank] = ({ partId, index, constants }) => {
+    const height = BANK_HEIGHT[partId];
+    if (!height) throw new Error(`engine.bank 布局：零件 "${partId}" 未登记高度`);
+    const { pin, side } = cylinderInfo(index, constants);
+    return bankMatrix(side, constants.CYL_X1 - pin * constants.CYL_PITCH, height(constants), 0, 0, constants);
+  };
+
+  layouts[ENGINE_LAYOUTS.crankJournal] = ({ index, constants }) =>
+    new THREE.Matrix4().makeTranslation(constants.JOURNAL_X0 - index * constants.CYL_PITCH, 0, 0);
+
+  // 曲柄销：绕曲轴轴线转到 60k 相位后抬到曲柄半径处
+  layouts[ENGINE_LAYOUTS.crankPin] = ({ index, constants }) => {
+    const k = index;
+    return new THREE.Matrix4()
+      .makeTranslation(constants.CYL_X1 - k * constants.CYL_PITCH, 0, 0)
+      .multiply(new THREE.Matrix4().makeRotationX(deg2rad(k * 60)))
+      .multiply(new THREE.Matrix4().makeTranslation(0, constants.CRANK_R, 0));
+  };
+
+  // 曲柄臂：曲柄销两侧各一片，相位与所属销一致
+  layouts[ENGINE_LAYOUTS.crankWeb] = ({ index, constants }) => {
+    const k = Math.floor(index / 2);
+    const sign = index % 2 === 0 ? -1 : 1;
+    return new THREE.Matrix4()
+      .makeTranslation(constants.CYL_X1 - k * constants.CYL_PITCH + sign * constants.WEB_GAP, 0, 0)
+      .multiply(new THREE.Matrix4().makeRotationX(deg2rad(k * 60)));
+  };
+
+  layouts[ENGINE_LAYOUTS.caseRib] = ({ index, constants }) => {
+    const slot = Math.floor(index / 2);
+    const sign = index % 2 === 0 ? -1 : 1;
+    return new THREE.Matrix4().makeTranslation(
+      constants.RIB_X1 - slot * constants.RIB_PITCH,
+      constants.RIB_Y,
+      sign * constants.RIB_Z,
+    );
+  };
+
+  layouts[ENGINE_LAYOUTS.caseMount] = ({ index, constants }) => {
+    const slot = Math.floor(index / 2);
+    const sign = index % 2 === 0 ? -1 : 1;
+    return new THREE.Matrix4().makeTranslation(
+      slot === 0 ? -constants.MOUNT_X : constants.MOUNT_X,
+      constants.MOUNT_Y,
+      sign * constants.MOUNT_Z,
+    );
+  };
+
+  layouts[ENGINE_LAYOUTS.inspectionCover] = ({ index, constants }) => {
+    const slot = Math.floor(index / 2);
+    const sign = index % 2 === 0 ? -1 : 1;
+    return new THREE.Matrix4().makeTranslation(
+      slot === 0 ? constants.COVER_X1 : constants.COVER_X2,
+      constants.COVER_Y,
+      sign * constants.COVER_Z,
+    );
+  };
+
+  layouts[ENGINE_LAYOUTS.pistonRing] = ({ index, constants }) => {
+    const slot = index % RING_COUNT;
+    return new THREE.Matrix4().makeTranslation(0, constants.RING_Y1 - slot * constants.RING_STEP, 0);
+  };
+
+  // 气门：每缸 2 只（index 偶 = 进气 / 奇 = 排气），坐标随列侧镜像
+  layouts[ENGINE_LAYOUTS.valve] = ({ index, constants }) => {
+    const { pin, side } = cylinderInfo(Math.floor(index / 2), constants);
+    const exhaust = index % 2 === 1;
+    const lateral = (exhaust ? 1 : -1) * side * constants.VALVE_Z;
+    const tilt = (exhaust ? 1 : -1) * side * constants.VALVE_TILT;
+    return bankMatrix(
+      side,
+      constants.CYL_X1 - pin * constants.CYL_PITCH,
+      constants.VALVE_SEAT,
+      lateral,
+      tilt,
+      constants,
+    );
+  };
+
+  layouts[ENGINE_LAYOUTS.sparkPlug] = ({ index, constants }) => {
+    const { pin, side } = cylinderInfo(index, constants);
+    return bankMatrix(
+      side,
+      constants.CYL_X1 - pin * constants.CYL_PITCH,
+      constants.PLUG_BASE,
+      side * constants.PLUG_Z,
+      0,
+      constants,
+    );
+  };
+
+  layouts[ENGINE_LAYOUTS.magneto] = ({ index, constants }) =>
+    new THREE.Matrix4().makeTranslation(
+      constants.MAGNETO_X,
+      constants.MAGNETO_Y,
+      (index === 0 ? -1 : 1) * constants.MAGNETO_Z,
+    );
+
+  layouts[ENGINE_LAYOUTS.fuelPump] = ({ index, constants }) =>
+    new THREE.Matrix4()
+      .makeTranslation(
+        constants.FUELPUMP_X,
+        constants.FUELPUMP_Y,
+        (index === 0 ? -1 : 1) * constants.FUELPUMP_Z,
+      )
+      .multiply(new THREE.Matrix4().makeRotationZ(index === 0 ? deg2rad(-90) : deg2rad(90)));
+
+  layouts[ENGINE_LAYOUTS.fanBearing] = ({ index, constants }) =>
+    new THREE.Matrix4().makeTranslation(
+      constants.FAN_BEARING_X,
+      constants.FAN_Y,
+      (index === 0 ? -1 : 1) * constants.FAN_Z,
+    );
+
+  // 风扇皮带：0 = 左风扇（z 负侧），1 = 右风扇；绕 X 转出「主动轮 → 被动轮」方向
+  layouts[ENGINE_LAYOUTS.driveBelt] = ({ index, constants }) => {
+    const left = index === 0;
+    const rotation = deg2rad(
+      evaluateExpression(left ? "atan2(-FAN_Y,-FAN_Z)" : "atan2(-FAN_Y,FAN_Z)", constants),
+    );
+    return new THREE.Matrix4()
+      .makeTranslation(constants.PULLEY_X + (left ? -1 : 1) * constants.PULLEY_OFF, 0, 0)
+      .multiply(new THREE.Matrix4().makeRotationX(rotation));
+  };
+
+  layouts[ENGINE_LAYOUTS.carburetor] = ({ index, constants }) => bankPairOf("CARB_BASE_Y", index, constants);
+  layouts[ENGINE_LAYOUTS.airFilter] = ({ index, constants }) => bankPairOf("FILTER_BASE_Y", index, constants);
+
+  return layouts;
+}
+
+/** 化油器 / 空滤的缸列定位（每列 2 只：前组 x = CARB_X_A，后组 x = CARB_X_B）。 */
+function bankPairOf(
+  heightKey: "CARB_BASE_Y" | "FILTER_BASE_Y",
+  index: number,
+  constants: Record<string, number>,
+): THREE.Matrix4 {
+  const side: 1 | -1 = index < 2 ? -1 : 1;
+  const localX = index % 2 === 0 ? constants.CARB_X_A : constants.CARB_X_B;
+  return bankMatrix(
+    side,
+    constants.CYL_X1 + localX,
+    constants[heightKey],
+    -side * constants.PLENUM_Z,
+    0,
+    constants,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 零件
+// ---------------------------------------------------------------------------
+
+export function makeEngineLayouts(): Record<string, InstanceLayout> {
+  return makeLayouts();
+}
+
+export function makeEngineRegistry(): ModelRegistry {
+  return {
+    model: MODEL,
+    title: "Maybach HL230 P45 V12 汽油机",
+    subtitle: "虎式 I 后期型动力装置（L1 核心机构自内向外构建）",
+    source_notes: [
+      "公开资料：缸径 130 × 行程 145 mm，排量 23095 cc，6.8:1，700 PS @ 3000 r/min，1850 N·m @ 2100 r/min，干重 1200 kg。",
+      "简化记录（M-C 待补）：摇臂/气门弹簧/张紧轮/正时齿轮组/调速器不建模；气缸盖不做气门导管座（气门直接站在燃烧室孔内）；活塞销座省略；飞轮壳不做起动机让位口。",
+      "缸列坐标系：+Y 沿缸轴，+Z 右列朝外；进排气法兰面取 BLOCK_D/2 外侧，气门共线 ±6° 倾角相对缸轴。",
+    ].join("\n"),
+    constants: CONSTANTS,
+    assemblies: [
+      { id: "crankcase", name_cn: "曲轴箱总成", name_en: "crankcase", explode: [0, -0.7, 0] },
+      { id: "crankshaft", name_cn: "曲轴总成", name_en: "crankshaft", explode: [1, 0, 0] },
+      { id: "cylinder", name_cn: "缸体缸盖总成", name_en: "cylinder & head", explode: [0, 1, 0] },
+      { id: "piston_rod", name_cn: "活塞连杆总成", name_en: "piston & rod", explode: [0, 1, 0] },
+      { id: "valvetrain", name_cn: "配气机构", name_en: "valvetrain", explode: [0, 1, 0.4] },
+      { id: "cooling", name_cn: "冷却系统", name_en: "cooling system", explode: [0, 1, 0] },
+      { id: "induction", name_cn: "进排气系统", name_en: "induction & exhaust", explode: [0, 1, 0] },
+      { id: "ignition", name_cn: "点火系统", name_en: "ignition", explode: [0, 1, 0] },
+      { id: "accessory", name_cn: "附件驱动", name_en: "accessories", explode: [0, 0.6, 0] },
+    ],
+    nodes: buildNodes(),
+    materials: MATERIALS,
+    parts: buildParts(),
+  };
+}
+
+function buildParts(): PartDefinition[] {
+  const parts: PartDefinition[] = [];
+  const add = (def: PartDefinition) => parts.push(def);
+
+  // ================= L1 曲轴箱 =================
+  add({
+    id: "tiger.crankcase.shell",
+    name_cn: "曲轴箱壳体",
+    name_en: "crankcase shell",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 100,
+    geometry: {
+      type: "kit",
+      kit: "caseShell",
+      params: {
+        length: "CASE_LEN",
+        halfWidth: "CASE_HALF_W",
+        wall: "CASE_WALL",
+        bottom: "CASE_BOTTOM_Y",
+        floor: "CASE_FLOOR",
+        top: "CASE_TOP",
+        deckOuterY: "DECK_OUTER_Y",
+        deckOuterZ: "DECK_OUTER_Z",
+        deckInnerY: "DECK_INNER_Y",
+        deckInnerZ: "DECK_INNER_Z",
+        ridgeBottomY: "RIDGE_BOTTOM_Y",
+        rim: "DECK_RIM",
+        cavity: 1,
+      },
+    },
+    material: "cast_iron",
+    mate: { type: "absolute", position: ["CASE_X", 0, 0] },
+    source: "隧道式曲轴箱：V 型机体截面沿 X 挤出，谷底开口腔（RIDGE_BOTTOM_Y 避开连杆扫掠）",
+  });
+  add({
+    id: "tiger.crankcase.endplate_front",
+    name_cn: "曲轴箱前隔板",
+    name_en: "front end plate",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 101,
+    geometry: {
+      type: "kit",
+      kit: "caseShell",
+      params: {
+        length: "ENDPLATE_T",
+        halfWidth: "CASE_HALF_W",
+        wall: "CASE_WALL",
+        bottom: "CASE_BOTTOM_Y",
+        floor: "CASE_FLOOR",
+        top: "CASE_TOP",
+        deckOuterY: "DECK_OUTER_Y",
+        deckOuterZ: "DECK_OUTER_Z",
+        deckInnerY: "DECK_INNER_Y",
+        deckInnerZ: "DECK_INNER_Z",
+        ridgeBottomY: "RIDGE_BOTTOM_Y",
+        rim: "DECK_RIM",
+        cavity: 0,
+        bore: "FRONT_BORE_R",
+      },
+    },
+    material: "cast_iron",
+    mate: { type: "absolute", position: ["ENDPLATE_FRONT_X", 0, 0] },
+  });
+  add({
+    id: "tiger.crankcase.endplate_rear",
+    name_cn: "曲轴箱后隔板",
+    name_en: "rear end plate",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 102,
+    geometry: {
+      type: "kit",
+      kit: "caseShell",
+      params: {
+        length: "ENDPLATE_T",
+        halfWidth: "CASE_HALF_W",
+        wall: "CASE_WALL",
+        bottom: "CASE_BOTTOM_Y",
+        floor: "CASE_FLOOR",
+        top: "CASE_TOP",
+        deckOuterY: "DECK_OUTER_Y",
+        deckOuterZ: "DECK_OUTER_Z",
+        deckInnerY: "DECK_INNER_Y",
+        deckInnerZ: "DECK_INNER_Z",
+        ridgeBottomY: "RIDGE_BOTTOM_Y",
+        rim: "DECK_RIM",
+        cavity: 0,
+        bore: "REAR_BORE_R",
+      },
+    },
+    material: "cast_iron",
+    mate: { type: "absolute", position: ["ENDPLATE_REAR_X", 0, 0] },
+  });
+  add({
+    id: "tiger.crankcase.bearing_support",
+    name_cn: "主轴承座",
+    name_en: "main bearing support",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 103,
+    geometry: {
+      type: "kit",
+      kit: "bearingSupport",
+      params: {
+        rInner: "BEARING_R_IN",
+        rOuter: "BEARING_R_OUT",
+        width: "BEARING_W",
+        reachZ: "BEARING_REACH_Z",
+        reachUp: "BEARING_REACH_UP",
+        reachDown: "BEARING_REACH_DOWN",
+      },
+    },
+    material: "cast_iron",
+    mate: { type: "absolute", position: ["JOURNAL_X0", 0, 0] },
+    instances: 7,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.crankJournal,
+    source: "隧道式曲轴箱：7 个环形轴承座替代剖分式主轴承盖",
+  });
+  add({
+    id: "tiger.crankcase.rib",
+    name_cn: "机体加强肋",
+    name_en: "crankcase rib",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 104,
+    geometry: { type: "box", w: "RIB_W_X", h: "RIB_H", d: "RIB_T", bevel: 0.002 },
+    material: "cast_iron",
+    mate: { type: "absolute" },
+    instances: 12,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.caseRib,
+  });
+  add({
+    id: "tiger.crankcase.mount",
+    name_cn: "发动机机脚",
+    name_en: "engine mount foot",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 105,
+    geometry: { type: "box", w: 0.1, h: 0.05, d: 0.09, bevel: 0.003 },
+    material: "cast_iron",
+    mate: { type: "absolute" },
+    instances: 4,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.caseMount,
+  });
+  add({
+    id: "tiger.crankcase.inspection_cover",
+    name_cn: "曲轴箱检查盖",
+    name_en: "inspection cover",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 106,
+    geometry: { type: "plate", w: 0.11, h: 0.09, t: 0.008, bevel: 0.002 },
+    material: "cast_iron_dark",
+    mate: { type: "absolute" },
+    instances: 4,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.inspectionCover,
+  });
+  add({
+    id: "tiger.crankcase.sump",
+    name_cn: "油底壳",
+    name_en: "oil sump",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 107,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "plate", w: 0.5, h: 0.012, t: 0.3, bevel: 0.002 },
+        { type: "box", w: 0.44, h: 0.062, d: 0.26, bevel: 0.004 },
+      ],
+    },
+    material: "cast_iron_dark",
+    mate: { type: "absolute", position: [0, "SUMP_FLANGE_Y", 0] },
+    source: "简化：法兰板 + 单腔壳体（真实为前后双腔带隔板）",
+  });
+  add({
+    id: "tiger.crankcase.drain_plug",
+    name_cn: "放油塞",
+    name_en: "drain plug",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 108,
+    geometry: { type: "cylinder", r: 0.016, h: 0.024, bevel: 0.002 },
+    material: "steel",
+    mate: { type: "absolute", position: ["CASE_X", "DRAIN_PLUG_Y", 0] },
+  });
+  add({
+    id: "tiger.crankcase.breather",
+    name_cn: "曲轴箱通风器",
+    name_en: "crankcase breather",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 109,
+    geometry: { type: "cylinder", r: 0.026, h: 0.07, bevel: 0.003 },
+    material: "cast_iron",
+    mate: { type: "absolute", position: ["ENDPLATE_FRONT_X", "BREATHER_Y", 0] },
+  });
+  add({
+    id: "tiger.crankcase.dipstick",
+    name_cn: "油尺",
+    name_en: "dipstick",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 110,
+    geometry: { type: "cylinder", r: 0.009, h: 0.2, bevel: 0.0015 },
+    material: "steel",
+    mate: { type: "absolute", position: ["DIPSTICK_X", "DIPSTICK_Y", "DIPSTICK_Z"] },
+  });
+  add({
+    id: "tiger.crankcase.oil_filler",
+    name_cn: "加油口",
+    name_en: "oil filler",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 111,
+    geometry: { type: "cylinder", r: 0.028, h: 0.05, bevel: 0.003, rTop: 0.032 },
+    material: "cast_iron",
+    mate: { type: "absolute", position: ["OIL_FILLER_X", "OIL_FILLER_Y", "OIL_FILLER_Z"], rotation: AXIS_X },
+  });
+  add({
+    id: "tiger.crankcase.oil_pump",
+    name_cn: "机油泵",
+    name_en: "oil pump",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 112,
+    geometry: { type: "cylinder", r: 0.045, h: 0.055, bevel: 0.003 },
+    material: "cast_iron_dark",
+    mate: { type: "absolute", position: [-0.2, "OIL_PUMP_Y", "OIL_PUMP_Z"], rotation: AXIS_X },
+  });
+  add({
+    id: "tiger.crankcase.oil_filter",
+    name_cn: "机油滤清器",
+    name_en: "oil filter",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 113,
+    geometry: { type: "tube", rOuter: "OIL_FILTER_R", rInner: "OIL_FILTER_R-0.01", h: "OIL_FILTER_LEN" },
+    material: "steel",
+    mate: { type: "absolute", position: ["OIL_FILTER_X", "OIL_FILTER_Y", "OIL_FILTER_Z"], rotation: AXIS_X },
+  });
+  add({
+    id: "tiger.crankcase.oil_line_l",
+    name_cn: "机油管（左）",
+    name_en: "oil line (left)",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 114,
+    geometry: {
+      type: "weld",
+      from: [-0.3, -0.14, "-OIL_PUMP_Z"],
+      to: [-0.22, -0.115, "-CASE_HALF_W"],
+      radius: 0.012,
+      seed: 11,
+    },
+    material: "steel",
+    mate: { type: "absolute" },
+  });
+  add({
+    id: "tiger.crankcase.oil_line_r",
+    name_cn: "机油管（右）",
+    name_en: "oil line (right)",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 115,
+    geometry: {
+      type: "weld",
+      from: [-0.41, -0.12, "OIL_FILTER_Z"],
+      to: [-0.3, -0.145, "CASE_HALF_W"],
+      radius: 0.014,
+      seed: 12,
+    },
+    material: "steel",
+    mate: { type: "absolute" },
+  });
+  add({
+    id: "tiger.crankcase.nameplate",
+    name_cn: "铭牌",
+    name_en: "nameplate",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 116,
+    geometry: { type: "plate", w: 0.16, h: 0.05, t: 0.004, bevel: 0.0008 },
+    material: "brass",
+    mate: { type: "absolute", position: ["NAMEPLATE_X", "NAMEPLATE_Y", "NAMEPLATE_Z"], rotation: [0, 90, 0] },
+  });
+  add({
+    id: "tiger.crankcase.flywheel_housing",
+    name_cn: "飞轮壳",
+    name_en: "flywheel housing",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 117,
+    geometry: { type: "tube", rOuter: "HOUSING_R_OUT", rInner: "HOUSING_R_IN", h: "HOUSING_W" },
+    material: "cast_iron",
+    mate: { type: "absolute", position: ["HOUSING_X", 0, 0], rotation: AXIS_X },
+  });
+  add({
+    id: "tiger.crankcase.timing_cover",
+    name_cn: "正时齿轮盖",
+    name_en: "timing gear cover",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 118,
+    geometry: {
+      type: "kit",
+      kit: "borePlate",
+      params: { w: 0.26, d: 0.26, h: 0.02, bore: "TIMING_COVER_BORE", corner: 0.05, axis: "x" },
+    },
+    material: "cast_iron",
+    mate: { type: "absolute", position: ["TIMING_COVER_X", 0.03, 0] },
+  });
+
+  // ================= L1 曲轴 =================
+  add({
+    id: "tiger.crankshaft.main_journal",
+    name_cn: "主轴颈",
+    name_en: "main journal",
+    assembly: "crankshaft",
+    build_layer: 1,
+    build_order: 120,
+    geometry: { type: "cylinder", r: "JOURNAL_R", h: "JOURNAL_W", bevel: 0.002 },
+    material: "steel",
+    node: "Crank",
+    mate: { type: "absolute", position: ["JOURNAL_X0", 0, 0], rotation: AXIS_X },
+    instances: 7,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.crankJournal,
+  });
+  add({
+    id: "tiger.crankshaft.crank_pin",
+    name_cn: "曲柄销",
+    name_en: "crank pin",
+    assembly: "crankshaft",
+    build_layer: 1,
+    build_order: 121,
+    geometry: { type: "cylinder", r: "PIN_R", h: "PIN_W", bevel: 0.002 },
+    material: "steel",
+    node: "Crank",
+    mate: { type: "absolute" },
+    instances: 6,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.crankPin,
+  });
+  add({
+    id: "tiger.crankshaft.crank_web",
+    name_cn: "曲柄臂",
+    name_en: "crank web",
+    assembly: "crankshaft",
+    build_layer: 1,
+    build_order: 122,
+    geometry: {
+      type: "kit",
+      kit: "crankWeb",
+      params: {
+        t: "WEB_T",
+        webR: "WEB_R",
+        pinOffset: "CRANK_R",
+        pinR: "PIN_R",
+        journalR: "JOURNAL_R",
+        counterR: "COUNTER_R",
+      },
+    },
+    material: "steel",
+    node: "Crank",
+    mate: { type: "absolute" },
+    instances: 12,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.crankWeb,
+  });
+  add({
+    id: "tiger.crankshaft.nose",
+    name_cn: "曲轴前端",
+    name_en: "crank nose",
+    assembly: "crankshaft",
+    build_layer: 1,
+    build_order: 123,
+    geometry: { type: "cylinder", r: "NOSE_R", h: "NOSE_LEN", bevel: 0.002 },
+    material: "steel",
+    node: "Crank",
+    mate: { type: "absolute", position: ["NOSE_X", 0, 0], rotation: AXIS_X },
+  });
+  add({
+    id: "tiger.crankshaft.damper",
+    name_cn: "扭振减振器",
+    name_en: "torsional damper",
+    assembly: "crankshaft",
+    build_layer: 1,
+    build_order: 124,
+    geometry: { type: "tube", rOuter: "DAMPER_R", rInner: "DAMPER_BORE", h: "DAMPER_T" },
+    material: "steel_worn",
+    node: "Crank",
+    mate: { type: "absolute", position: ["DAMPER_X", 0, 0], rotation: AXIS_X },
+  });
+  add({
+    id: "tiger.crankshaft.pulley",
+    name_cn: "曲轴皮带轮",
+    name_en: "crankshaft pulley",
+    assembly: "crankshaft",
+    build_layer: 1,
+    build_order: 125,
+    geometry: {
+      type: "lathe",
+      segments: 40,
+      profile: [
+        ["PULLEY_BORE", "-PULLEY_HALF_W"],
+        ["PULLEY_HUB_R", "-PULLEY_HALF_W"],
+        ["PULLEY_HUB_R", "-PULLEY_EDGE_OFF"],
+        ["PULLEY_R", "-PULLEY_EDGE_OFF"],
+        ["PULLEY_R", "-PULLEY_OFF-PULLEY_OPEN_HALF"],
+        ["PULLEY_GROOVE_R", "-PULLEY_OFF-PULLEY_ROOT_HALF"],
+        ["PULLEY_GROOVE_R", "-PULLEY_OFF+PULLEY_ROOT_HALF"],
+        ["PULLEY_R", "-PULLEY_OFF+PULLEY_OPEN_HALF"],
+        ["PULLEY_R", "PULLEY_OFF-PULLEY_OPEN_HALF"],
+        ["PULLEY_GROOVE_R", "PULLEY_OFF-PULLEY_ROOT_HALF"],
+        ["PULLEY_GROOVE_R", "PULLEY_OFF+PULLEY_ROOT_HALF"],
+        ["PULLEY_R", "PULLEY_OFF+PULLEY_OPEN_HALF"],
+        ["PULLEY_R", "PULLEY_EDGE_OFF"],
+        ["PULLEY_HUB_R", "PULLEY_EDGE_OFF"],
+        ["PULLEY_HUB_R", "PULLEY_HALF_W"],
+        ["PULLEY_BORE", "PULLEY_HALF_W"],
+        ["PULLEY_BORE", "-PULLEY_HALF_W"],
+      ],
+    },
+    material: "steel_worn",
+    node: "Crank",
+    mate: { type: "absolute", position: ["PULLEY_X", 0, 0], rotation: AXIS_X_NEG },
+    source: "双槽 V 带轮：槽根半径比皮带底面低 1mm，槽口比皮带每侧宽 3.5mm（零穿模余量）",
+  });
+  add({
+    id: "tiger.crankshaft.flywheel",
+    name_cn: "飞轮",
+    name_en: "flywheel",
+    assembly: "crankshaft",
+    build_layer: 1,
+    build_order: 126,
+    geometry: { type: "cylinder", r: "FLYWHEEL_R", h: "FLYWHEEL_T", bevel: 0.003 },
+    material: "cast_iron",
+    node: "Crank",
+    mate: { type: "absolute", position: ["FLYWHEEL_X", 0, 0], rotation: AXIS_X },
+  });
+  add({
+    id: "tiger.crankshaft.ring_gear",
+    name_cn: "飞轮齿圈",
+    name_en: "flywheel ring gear",
+    assembly: "crankshaft",
+    build_layer: 1,
+    build_order: 127,
+    geometry: {
+      type: "kit",
+      kit: "gearRing",
+      params: {
+        rInner: "RINGGEAR_R_IN",
+        rOuter: "RINGGEAR_R_OUT",
+        teeth: "RINGGEAR_TEETH",
+        width: "RINGGEAR_W",
+      },
+    },
+    material: "steel_worn",
+    node: "Crank",
+    mate: { type: "absolute", position: ["FLYWHEEL_X", 0, 0] },
+  });
+  add({
+    id: "tiger.crankshaft.flywheel_bolts",
+    name_cn: "飞轮螺栓",
+    name_en: "flywheel bolts",
+    assembly: "crankshaft",
+    build_layer: 1,
+    build_order: 128,
+    geometry: {
+      type: "boltCircle",
+      count: 8,
+      radius: "FLYWHEEL_BOLT_CIRCLE",
+      boltR: "FLYWHEEL_BOLT_R",
+      boltH: "FLYWHEEL_BOLT_H",
+    },
+    material: "steel",
+    node: "Crank",
+    mate: { type: "absolute", position: ["FLYWHEEL_BOLT_X", 0, 0], rotation: AXIS_X_NEG },
+  });
+  add({
+    id: "tiger.crankshaft.tail_shaft",
+    name_cn: "曲轴尾轴",
+    name_en: "tail shaft",
+    assembly: "crankshaft",
+    build_layer: 1,
+    build_order: 129,
+    geometry: { type: "cylinder", r: "TAIL_R", h: "TAIL_LEN", bevel: 0.002 },
+    material: "steel",
+    node: "Crank",
+    mate: { type: "absolute", position: ["TAIL_X", 0, 0], rotation: AXIS_X },
+  });
+
+  // ================= L1 缸体缸盖 =================
+  add({
+    id: "tiger.cylinder.block",
+    name_cn: "连体缸壁",
+    name_en: "siamese cylinder block",
+    assembly: "cylinder",
+    build_layer: 1,
+    build_order: 130,
+    geometry: {
+      type: "kit",
+      kit: "siameseBlock",
+      params: {
+        w: "BLOCK_W",
+        d: "BLOCK_D",
+        h: "BLOCK_H",
+        jacket: "JACKET_R",
+        corner: 0.012,
+        deckH: 0.014,
+        ribH: 0.011,
+      },
+    },
+    material: "cast_iron",
+    mate: { type: "absolute" },
+    instances: 12,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.bank,
+    source: "缸心距 158mm < 缸壁外径 → 相邻缸必须切平共壁（连体缸筒）",
+  });
+  add({
+    id: "tiger.cylinder.liner",
+    name_cn: "缸套",
+    name_en: "cylinder liner",
+    assembly: "cylinder",
+    build_layer: 1,
+    build_order: 131,
+    geometry: { type: "tube", rOuter: "LINER_R_OUT", rInner: "LINER_R_IN", h: "LINER_LEN" },
+    material: "steel_worn",
+    mate: { type: "absolute" },
+    instances: 12,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.bank,
+    source: "短湿式缸套：下端与油底壳腔连通（活塞裙部在下止点略伸入曲轴箱）",
+  });
+  add({
+    id: "tiger.cylinder.head_gasket",
+    name_cn: "缸垫",
+    name_en: "head gasket",
+    assembly: "cylinder",
+    build_layer: 1,
+    build_order: 132,
+    geometry: {
+      type: "kit",
+      kit: "siameseBlock",
+      params: {
+        w: "BLOCK_W",
+        d: "BLOCK_D",
+        h: "GASKET_T",
+        jacket: "GASKET_BORE_R",
+        corner: 0.012,
+        deckH: 0,
+        ribH: 0,
+      },
+    },
+    material: "cast_iron_dark",
+    mate: { type: "absolute" },
+    instances: 12,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.bank,
+  });
+  add({
+    id: "tiger.cylinder.head",
+    name_cn: "气缸盖",
+    name_en: "cylinder head",
+    assembly: "cylinder",
+    build_layer: 1,
+    build_order: 133,
+    geometry: {
+      type: "kit",
+      kit: "cylinderHead",
+      params: {
+        w: "BLOCK_W",
+        d: "BLOCK_D",
+        h: "HEAD_H",
+        chamber: "HEAD_CHAMBER_R",
+        portW: 0.054,
+        boltRadius: 0.045,
+      },
+    },
+    material: "cast_iron",
+    mate: { type: "absolute" },
+    instances: 12,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.bank,
+    source: "平板缸盖（真实为双涡流室半球盖）：燃烧室为通孔，气门共线装于孔内",
+  });
+  add({
+    id: "tiger.cylinder.cam_cover",
+    name_cn: "凸轮轴罩",
+    name_en: "camshaft cover",
+    assembly: "cylinder",
+    build_layer: 1,
+    build_order: 134,
+    geometry: {
+      type: "kit",
+      kit: "camCover",
+      params: {
+        length: "CAM_COVER_LEN",
+        halfZ: "CAM_HALF_Z",
+        height: "COVER_H",
+        wall: 0.008,
+        filler: 0,
+      },
+    },
+    material: "paint",
+    mate: { type: "absolute" },
+    instances: 12,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.bank,
+  });
+
+  // ================= L2 活塞连杆 =================
+  add({
+    id: "tiger.piston_rod.piston",
+    name_cn: "活塞",
+    name_en: "piston",
+    assembly: "piston_rod",
+    build_layer: 2,
+    build_order: 200,
+    geometry: {
+      type: "lathe",
+      segments: 32,
+      profile: [
+        [0, "PISTON_CROWN_Y-PISTON_CROWN_T"],
+        ["PISTON_R-PISTON_WALL", "PISTON_CROWN_Y-PISTON_CROWN_T"],
+        ["PISTON_R-PISTON_WALL", "-PISTON_SKIRT"],
+        ["PISTON_R", "-PISTON_SKIRT-0.006"],
+        ["PISTON_R", "RING_Y1-RING_STEP*2-GROOVE_H/2"],
+        ["GROOVE_R", "RING_Y1-RING_STEP*2-GROOVE_H/2+0.0006"],
+        ["GROOVE_R", "RING_Y1-RING_STEP*2+GROOVE_H/2-0.0006"],
+        ["PISTON_R", "RING_Y1-RING_STEP*2+GROOVE_H/2"],
+        ["PISTON_R", "RING_Y1-RING_STEP-GROOVE_H/2"],
+        ["GROOVE_R", "RING_Y1-RING_STEP-GROOVE_H/2+0.0006"],
+        ["GROOVE_R", "RING_Y1-RING_STEP+GROOVE_H/2-0.0006"],
+        ["PISTON_R", "RING_Y1-RING_STEP+GROOVE_H/2"],
+        ["PISTON_R", "RING_Y1-GROOVE_H/2"],
+        ["GROOVE_R", "RING_Y1-GROOVE_H/2+0.0006"],
+        ["GROOVE_R", "RING_Y1+GROOVE_H/2-0.0006"],
+        ["PISTON_R", "RING_Y1+GROOVE_H/2"],
+        ["PISTON_R", "PISTON_CROWN_Y"],
+        [0, "PISTON_CROWN_Y"],
+      ],
+    },
+    material: "aluminium",
+    mate: { type: "absolute" },
+    instances: 12,
+    indexed: true,
+    instance_nodes: Array.from({ length: 12 }, (_, i) => pistonNodeName(i + 1)),
+    source: "简化：活塞销座省略（销直接穿过活塞内腔），冠部平顶",
+  });
+  add({
+    id: "tiger.piston_rod.piston_ring",
+    name_cn: "活塞环",
+    name_en: "piston ring",
+    assembly: "piston_rod",
+    build_layer: 2,
+    build_order: 201,
+    geometry: { type: "tube", rOuter: "RING_R", rInner: "RING_R_IN", h: "RING_H" },
+    material: "steel_worn",
+    mate: { type: "absolute" },
+    instances: 36,
+    indexed: true,
+    instance_nodes: Array.from({ length: 36 }, (_, i) => pistonNodeName(Math.floor(i / RING_COUNT) + 1)),
+    instance_layout: ENGINE_LAYOUTS.pistonRing,
+    source: "每缸 3 道（2 气环 + 1 油环）；环与环槽/缸套各留 0.8mm",
+  });
+  add({
+    id: "tiger.piston_rod.piston_pin",
+    name_cn: "活塞销",
+    name_en: "piston pin",
+    assembly: "piston_rod",
+    build_layer: 2,
+    build_order: 202,
+    geometry: { type: "cylinder", r: "PISTON_PIN_R", h: "PISTON_PIN_LEN", bevel: 0.0015 },
+    material: "steel",
+    mate: { type: "absolute", rotation: AXIS_X },
+    instances: 12,
+    indexed: true,
+    instance_nodes: Array.from({ length: 12 }, (_, i) => pistonNodeName(i + 1)),
+  });
+  add({
+    id: "tiger.piston_rod.connecting_rod",
+    name_cn: "连杆",
+    name_en: "connecting rod",
+    assembly: "piston_rod",
+    build_layer: 2,
+    build_order: 203,
+    geometry: {
+      type: "kit",
+      kit: "rodAssembly",
+      params: {
+        length: "ROD_L",
+        bigR: "ROD_BIG_R",
+        bigBore: "ROD_BIG_BORE",
+        smallR: "ROD_SMALL_R",
+        smallBore: "ROD_SMALL_BORE",
+        shankW: "ROD_SHANK_W",
+        shankT: "ROD_SHANK_T",
+      },
+    },
+    material: "steel",
+    mate: { type: "absolute" },
+    instances: 12,
+    indexed: true,
+    instance_nodes: Array.from({ length: 12 }, (_, i) => rodNodeName(i + 1)),
+    source: "简化：不做油道与小端衬套孔座；大端上半环与连杆盖在 y=0 分面",
+  });
+  add({
+    id: "tiger.piston_rod.rod_cap",
+    name_cn: "连杆盖",
+    name_en: "rod bearing cap",
+    assembly: "piston_rod",
+    build_layer: 2,
+    build_order: 204,
+    geometry: {
+      type: "kit",
+      kit: "rodCap",
+      params: {
+        bigR: "ROD_BIG_R",
+        bigBore: "ROD_BIG_BORE",
+        shankT: "ROD_SHANK_T",
+        drop: 0.012,
+      },
+    },
+    material: "steel",
+    mate: { type: "absolute" },
+    instances: 12,
+    indexed: true,
+    instance_nodes: Array.from({ length: 12 }, (_, i) => rodNodeName(i + 1)),
+  });
+
+  // ================= L2 配气机构 =================
+  const lobeX = [0.395, 0.237, 0.079, -0.079, -0.237, -0.395];
+  const lobePhaseLeft = lobeX.map((_, k) => -15 + 30 * k);
+  const lobePhaseRight = lobeX.map((_, k) => 15 + 30 * k);
+  const camParams = (phases: number[]) => ({
+    length: "CAM_LEN",
+    shaftR: "CAM_SHAFT_R",
+    lobeR: "CAM_LOBE_R",
+    lobeW: "CAM_LOBE_W",
+    journalR: "CAM_JOURNAL_R",
+    journalW: "CAM_JOURNAL_W",
+    lobeX,
+    lobePhase: phases,
+  });
+  add({
+    id: "tiger.valvetrain.camshaft_l",
+    name_cn: "凸轮轴（左列）",
+    name_en: "camshaft (left bank)",
+    assembly: "valvetrain",
+    build_layer: 2,
+    build_order: 210,
+    geometry: { type: "kit", kit: "camshaft", params: camParams(lobePhaseLeft) },
+    material: "steel",
+    node: "Cam_L",
+    mate: { type: "absolute", rotation: AXIS_X },
+    source: "SOHC：单根凸轮轴位于缸列中线上方，凸轮相位按 30° 等分（摇臂机构 M-C）",
+  });
+  add({
+    id: "tiger.valvetrain.camshaft_r",
+    name_cn: "凸轮轴（右列）",
+    name_en: "camshaft (right bank)",
+    assembly: "valvetrain",
+    build_layer: 2,
+    build_order: 211,
+    geometry: { type: "kit", kit: "camshaft", params: camParams(lobePhaseRight) },
+    material: "steel",
+    node: "Cam_R",
+    mate: { type: "absolute", rotation: AXIS_X },
+  });
+  add({
+    id: "tiger.valvetrain.valve",
+    name_cn: "气门",
+    name_en: "poppet valve",
+    assembly: "valvetrain",
+    build_layer: 2,
+    build_order: 212,
+    geometry: {
+      type: "lathe",
+      segments: 24,
+      profile: [
+        [0, 0],
+        ["VALVE_DISC_R", 0],
+        ["VALVE_DISC_R", 0.0025],
+        [0.018, 0.007],
+        [0.0105, 0.011],
+        ["VALVE_STEM_R", 0.016],
+        ["VALVE_STEM_R", "VALVE_STEM_LEN"],
+        [0, "VALVE_STEM_LEN"],
+      ],
+    },
+    material: "steel_worn",
+    mate: { type: "absolute" },
+    instances: 24,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.valve,
+    source: "每缸进/排气门各 1；倾角 ±6°（进排气对置），杆顶 5mm 内藏于凸轮罩内",
+  });
+  add({
+    id: "tiger.valvetrain.spark_plug",
+    name_cn: "火花塞",
+    name_en: "spark plug",
+    assembly: "valvetrain",
+    build_layer: 2,
+    build_order: 213,
+    geometry: {
+      type: "lathe",
+      segments: 20,
+      profile: [
+        [0, 0],
+        ["PLUG_TIP_R", 0],
+        ["PLUG_TIP_R", 0.01],
+        [0.0175, 0.013],
+        [0.0175, 0.03],
+        [0.0115, 0.035],
+        [0.0115, 0.078],
+        [0.0125, 0.081],
+        [0.0125, 0.09],
+        [0, 0.09],
+      ],
+    },
+    material: "bakelite",
+    mate: { type: "absolute" },
+    instances: 12,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.sparkPlug,
+    source: "火花塞位于排气侧外侧（每缸 1 只），座面略高于缸盖顶面",
+  });
+
+  // ================= L3 冷却 =================
+  add({
+    id: "tiger.cooling.fan_rotor",
+    name_cn: "冷却风扇",
+    name_en: "cooling fan",
+    assembly: "cooling",
+    build_layer: 3,
+    build_order: 300,
+    geometry: {
+      type: "kit",
+      kit: "fanRotor",
+      params: {
+        blades: "FAN_BLADES",
+        rHub: "FAN_HUB_R",
+        rTip: "FAN_R",
+        chord: "FAN_CHORD",
+        pitchDeg: "FAN_PITCH_DEG",
+        hubWidth: "FAN_HUB_W",
+        pulleyR: "FAN_PULLEY_R",
+        pulleyW: "FAN_PULLEY_W",
+        pulleyX: "FAN_PULLEY_X",
+        shaftR: "FAN_SHAFT_R",
+      },
+    },
+    material: "aluminium",
+    mate: { type: "absolute" },
+    instances: 2,
+    indexed: true,
+    instance_nodes: ["Fan_L", "Fan_R"],
+    source: "两台 8 叶轴流风扇：带轮位于叶轮前方（同轴），避免皮带与叶片互插",
+  });
+  add({
+    id: "tiger.cooling.fan_bearing",
+    name_cn: "风扇轴承座",
+    name_en: "fan bearing housing",
+    assembly: "cooling",
+    build_layer: 3,
+    build_order: 301,
+    geometry: {
+      type: "tube",
+      rOuter: "FAN_BEARING_R_OUT",
+      rInner: "FAN_BEARING_R_IN",
+      h: "FAN_BEARING_W",
+    },
+    material: "cast_iron",
+    mate: { type: "absolute", rotation: AXIS_X },
+    instances: 2,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.fanBearing,
+  });
+  add({
+    id: "tiger.cooling.fan_frame",
+    name_cn: "风扇支架",
+    name_en: "fan support frame",
+    assembly: "cooling",
+    build_layer: 3,
+    build_order: 302,
+    geometry: {
+      type: "kit",
+      kit: "fanFrame",
+      params: {
+        beamX: 0.03,
+        beamDepth: 0.045,
+        beamH: 0.09,
+        halfSpan: 0.34,
+        beamY: "FAN_Y",
+        legTopZ: 0.26,
+        footZ: 0.1,
+        footY: 0.19,
+        legW: 0.03,
+        footLen: 0.05,
+        fanZ: "FAN_Z",
+        shroudR: 0.239,
+        shroudWall: 0.012,
+        shroudH: 0.09,
+        shroudX: 0.115,
+        accBeamY: "ACC_Y",
+        accHalfSpan: 0.26,
+        accBeamH: 0.055,
+      },
+    },
+    material: "cast_iron",
+    mate: { type: "absolute", position: ["FAN_FRAME_X", 0, 0] },
+    source: "一体式：上横梁 + 附件下横梁 + 斜撑 + 地脚 + 两风扇导流罩环（无悬空零件）",
+  });
+  add({
+    id: "tiger.cooling.drive_belt",
+    name_cn: "风扇皮带",
+    name_en: "fan drive belt",
+    assembly: "cooling",
+    build_layer: 3,
+    build_order: 303,
+    geometry: {
+      type: "kit",
+      kit: "beltLoop",
+      params: {
+        rDriving: "PULLEY_R-BELT_T/2",
+        rDriven: "FAN_PULLEY_R+BELT_T/2",
+        d: "FAN_DIST",
+        width: "BELT_WIDTH",
+        halfThickness: "BELT_T/2",
+        seed: 21,
+      },
+    },
+    material: "rubber_belt",
+    mate: { type: "absolute" },
+    instances: 2,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.driveBelt,
+    source: "开口带外切几何；主动轮侧皮带沉入 V 槽（外表面与轮缘齐平），被动轮侧包在凸脊外侧",
+  });
+  add({
+    id: "tiger.cooling.water_pump",
+    name_cn: "水泵",
+    name_en: "water pump",
+    assembly: "cooling",
+    build_layer: 3,
+    build_order: 304,
+    geometry: {
+      type: "lathe",
+      segments: 24,
+      profile: [
+        [0, 0],
+        ["WATERPUMP_R", 0],
+        ["WATERPUMP_R", "WATERPUMP_LEN-0.012"],
+        ["WATERPUMP_R-0.012", "WATERPUMP_LEN"],
+        [0, "WATERPUMP_LEN"],
+      ],
+    },
+    material: "cast_iron",
+    mate: {
+      type: "absolute",
+      position: ["WATERPUMP_X", "ACC_Y", "-ACC_Z"],
+      rotation: AXIS_X,
+    },
+    source: "由正时齿轮驱动（不做皮带轮）；挂在风扇支架下横梁前端",
+  });
+  add({
+    id: "tiger.cooling.generator",
+    name_cn: "发电机",
+    name_en: "generator",
+    assembly: "cooling",
+    build_layer: 3,
+    build_order: 305,
+    geometry: {
+      type: "lathe",
+      segments: 24,
+      profile: [
+        [0, 0],
+        ["GEN_R", 0],
+        ["GEN_R", "GEN_LEN"],
+        [0, "GEN_LEN"],
+      ],
+    },
+    material: "cast_iron_dark",
+    mate: { type: "absolute", position: ["GEN_X", "ACC_Y", "ACC_Z"], rotation: AXIS_X },
+  });
+
+  // ================= L3 进排气 =================
+  add({
+    id: "tiger.induction.carburetor",
+    name_cn: "化油器",
+    name_en: "carburetor",
+    assembly: "induction",
+    build_layer: 3,
+    build_order: 310,
+    geometry: {
+      type: "lathe",
+      segments: 28,
+      profile: [
+        [0, 0],
+        ["CARB_R", 0],
+        ["CARB_R", 0.012],
+        [0.042, 0.02],
+        [0.042, 0.086],
+        [0.03, 0.098],
+        [0.03, "CARB_H"],
+        [0, "CARB_H"],
+      ],
+    },
+    material: "aluminium",
+    mate: { type: "absolute" },
+    instances: 4,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.carburetor,
+    source: "4 × Solex 52JFF 双喉化油器：每两缸共用一个（简化：每缸列 2 只）",
+  });
+  add({
+    id: "tiger.induction.air_filter",
+    name_cn: "空气滤清器",
+    name_en: "air filter",
+    assembly: "induction",
+    build_layer: 3,
+    build_order: 311,
+    geometry: {
+      type: "lathe",
+      segments: 28,
+      profile: [
+        [0, 0],
+        ["FILTER_NECK_R", 0],
+        ["FILTER_NECK_R", "FILTER_NECK_H"],
+        ["FILTER_R", "FILTER_NECK_H+0.01"],
+        ["FILTER_R", "FILTER_NECK_H+0.01+FILTER_H"],
+        [0.06, "FILTER_NECK_H+0.02+FILTER_H"],
+        [0, "FILTER_NECK_H+0.02+FILTER_H"],
+      ],
+    },
+    material: "steel_worn",
+    mate: { type: "absolute" },
+    instances: 4,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.airFilter,
+    source: "简化：4 只罐式空滤直插化油器上方（真实为两侧各一大直径油浴滤清器）",
+  });
+  add({
+    id: "tiger.induction.intake_manifold_l",
+    name_cn: "进气歧管（左列）",
+    name_en: "intake manifold (left bank)",
+    assembly: "induction",
+    build_layer: 3,
+    build_order: 312,
+    geometry: {
+      type: "kit",
+      kit: "manifold",
+      params: {
+        mainFrom: [0.07, "PLENUM_Y", "-PLENUM_Z"],
+        mainTo: [-0.86, "PLENUM_Y", "-PLENUM_Z"],
+        mainR: "INTAKE_MAIN_R",
+        runners: [0, 1, 2, 3, 4, 5].map((k) => {
+          const x = -(0.079 + 0.158 * k) + 0.0;
+          return {
+            from: [x, "PORT_Y", "-(BLOCK_D/2+0.033)"],
+            to: [x, "PLENUM_Y-0.02", "-PLENUM_Z"],
+            r: "INTAKE_RUNNER_R",
+            bend: 0.05,
+          };
+        }),
+      },
+    },
+    material: "aluminium",
+    mate: {
+      type: "absolute",
+      position: bankPos("CYL_X1", "HEAD_BASE", 0, -1),
+      rotation: ["-HALF_V", 0, 0],
+    },
+    source: "等长支管（化油器式进气）；支管起点距缸盖进气道法兰面 2mm",
+  });
+  add({
+    id: "tiger.induction.intake_manifold_r",
+    name_cn: "进气歧管（右列）",
+    name_en: "intake manifold (right bank)",
+    assembly: "induction",
+    build_layer: 3,
+    build_order: 313,
+    geometry: {
+      type: "kit",
+      kit: "manifold",
+      params: {
+        mainFrom: [0.07, "PLENUM_Y", "PLENUM_Z"],
+        mainTo: [-0.86, "PLENUM_Y", "PLENUM_Z"],
+        mainR: "INTAKE_MAIN_R",
+        runners: [0, 1, 2, 3, 4, 5].map((k) => {
+          const x = -(0.079 + 0.158 * k) + 0.0;
+          return {
+            from: [x, "PORT_Y", "BLOCK_D/2+0.033"],
+            to: [x, "PLENUM_Y-0.02", "PLENUM_Z"],
+            r: "INTAKE_RUNNER_R",
+            bend: 0.05,
+          };
+        }),
+      },
+    },
+    material: "aluminium",
+    mate: {
+      type: "absolute",
+      position: bankPos("CYL_X1", "HEAD_BASE", 0, 1),
+      rotation: ["HALF_V", 0, 0],
+    },
+  });
+  add({
+    id: "tiger.induction.exhaust_manifold_l",
+    name_cn: "排气歧管（左列）",
+    name_en: "exhaust manifold (left bank)",
+    assembly: "induction",
+    build_layer: 3,
+    build_order: 314,
+    geometry: {
+      type: "kit",
+      kit: "manifold",
+      params: {
+        mainFrom: [0.07, "EXHAUST_MAIN_Y", "-EXHAUST_MAIN_Z"],
+        mainTo: [-0.86, "EXHAUST_MAIN_Y", "-EXHAUST_MAIN_Z"],
+        mainR: "EXHAUST_MAIN_R",
+        runners: [0, 1, 2, 3, 4, 5].map((k) => {
+          const x = -(0.079 + 0.158 * k) + 0.0;
+          return {
+            from: [x, "PORT_Y", "-(BLOCK_D/2+0.033)"],
+            to: [x, "EXHAUST_MAIN_Y", "-EXHAUST_MAIN_Z"],
+            r: "EXHAUST_RUNNER_R",
+            bend: 0.03,
+          };
+        }),
+      },
+    },
+    material: "cast_iron_dark",
+    mate: {
+      type: "absolute",
+      position: bankPos("CYL_X1", "HEAD_BASE", 0, -1),
+      rotation: ["-HALF_V", 0, 0],
+    },
+  });
+  add({
+    id: "tiger.induction.exhaust_manifold_r",
+    name_cn: "排气歧管（右列）",
+    name_en: "exhaust manifold (right bank)",
+    assembly: "induction",
+    build_layer: 3,
+    build_order: 315,
+    geometry: {
+      type: "kit",
+      kit: "manifold",
+      params: {
+        mainFrom: [0.07, "EXHAUST_MAIN_Y", "EXHAUST_MAIN_Z"],
+        mainTo: [-0.86, "EXHAUST_MAIN_Y", "EXHAUST_MAIN_Z"],
+        mainR: "EXHAUST_MAIN_R",
+        runners: [0, 1, 2, 3, 4, 5].map((k) => {
+          const x = -(0.079 + 0.158 * k) + 0.0;
+          return {
+            from: [x, "PORT_Y", "BLOCK_D/2+0.033"],
+            to: [x, "EXHAUST_MAIN_Y", "EXHAUST_MAIN_Z"],
+            r: "EXHAUST_RUNNER_R",
+            bend: 0.03,
+          };
+        }),
+      },
+    },
+    material: "cast_iron_dark",
+    mate: {
+      type: "absolute",
+      position: bankPos("CYL_X1", "HEAD_BASE", 0, 1),
+      rotation: ["HALF_V", 0, 0],
+    },
+  });
+  add({
+    id: "tiger.induction.exhaust_pipe_l",
+    name_cn: "排气下管（左）",
+    name_en: "exhaust downpipe (left)",
+    assembly: "induction",
+    build_layer: 3,
+    build_order: 316,
+    geometry: {
+      type: "weld",
+      from: [0.4, 0.35, "-0.405"],
+      to: [0.5, 0.1, "-0.37"],
+      radius: "EXHAUST_PIPE_R",
+      seed: 31,
+    },
+    material: "cast_iron_dark",
+    mate: { type: "absolute" },
+  });
+  add({
+    id: "tiger.induction.exhaust_pipe_r",
+    name_cn: "排气下管（右）",
+    name_en: "exhaust downpipe (right)",
+    assembly: "induction",
+    build_layer: 3,
+    build_order: 317,
+    geometry: {
+      type: "weld",
+      from: [0.4, 0.35, 0.405],
+      to: [0.5, 0.1, 0.37],
+      radius: "EXHAUST_PIPE_R",
+      seed: 32,
+    },
+    material: "cast_iron_dark",
+    mate: { type: "absolute" },
+  });
+
+  // ================= L3 点火 =================
+  add({
+    id: "tiger.ignition.magneto",
+    name_cn: "磁电机",
+    name_en: "magneto",
+    assembly: "ignition",
+    build_layer: 3,
+    build_order: 320,
+    geometry: {
+      type: "lathe",
+      segments: 24,
+      profile: [
+        [0, 0],
+        ["MAGNETO_R", 0],
+        ["MAGNETO_R", "MAGNETO_LEN-0.01"],
+        [0.03, "MAGNETO_LEN"],
+        [0, "MAGNETO_LEN"],
+      ],
+    },
+    material: "bakelite",
+    mate: { type: "absolute", rotation: AXIS_X_NEG },
+    instances: 2,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.magneto,
+    source: "两台磁电机（每 6 缸一台）挂在正时齿轮盖前面；高压线 M-C",
+  });
+
+  // ================= L3 附件 =================
+  add({
+    id: "tiger.accessory.fuel_pump",
+    name_cn: "输油泵",
+    name_en: "fuel pump",
+    assembly: "accessory",
+    build_layer: 3,
+    build_order: 330,
+    geometry: {
+      type: "lathe",
+      segments: 22,
+      profile: [
+        [0, 0],
+        ["FUELPUMP_R", 0],
+        ["FUELPUMP_R", "FUELPUMP_LEN-0.008"],
+        [0.018, "FUELPUMP_LEN"],
+        [0, "FUELPUMP_LEN"],
+      ],
+    },
+    material: "cast_iron_dark",
+    mate: { type: "absolute" },
+    instances: 2,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.fuelPump,
+    source: "机械式膜片泵，装在曲轴箱两侧（真实为 2 台，由凸轮轴驱动）",
+  });
+  add({
+    id: "tiger.accessory.starter",
+    name_cn: "起动机",
+    name_en: "starter motor",
+    assembly: "accessory",
+    build_layer: 3,
+    build_order: 331,
+    geometry: {
+      type: "lathe",
+      segments: 24,
+      profile: [
+        [0, 0],
+        [0.028, 0],
+        [0.028, 0.03],
+        [0.05, 0.045],
+        ["STARTER_R", 0.06],
+        ["STARTER_R", "STARTER_LEN-0.015"],
+        [0.055, "STARTER_LEN"],
+        [0, "STARTER_LEN"],
+      ],
+    },
+    material: "cast_iron_dark",
+    mate: {
+      type: "absolute",
+      position: ["STARTER_X", "STARTER_Y", "STARTER_Z"],
+      rotation: AXIS_X,
+    },
+    source: "简化：飞轮壳不做起动机让位口，起动机齿轮与齿圈不啮合（M-C）",
+  });
+  add({
+    id: "tiger.accessory.water_pipe_l",
+    name_cn: "冷却水管（左）",
+    name_en: "coolant pipe (left)",
+    assembly: "accessory",
+    build_layer: 3,
+    build_order: 332,
+    geometry: {
+      type: "weld",
+      from: ["WATERPUMP_X-0.05", "ACC_Y+0.03", "-ACC_Z-0.03"],
+      to: [0.421, "DECK_OUTER_Y+0.001", "-DECK_OUTER_Z"],
+      radius: 0.02,
+      seed: 41,
+    },
+    material: "steel",
+    mate: { type: "absolute" },
+  });
+  add({
+    id: "tiger.accessory.water_pipe_r",
+    name_cn: "冷却水管（右）",
+    name_en: "coolant pipe (right)",
+    assembly: "accessory",
+    build_layer: 3,
+    build_order: 333,
+    geometry: {
+      type: "weld",
+      from: ["WATERPUMP_X-0.05", "ACC_Y+0.03", "-ACC_Z+0.03"],
+      to: [0.421, "DECK_OUTER_Y-0.055", "-DECK_OUTER_Z+0.02"],
+      radius: 0.02,
+      seed: 42,
+    },
+    material: "steel",
+    mate: { type: "absolute" },
+  });
+
+  return parts;
+}
