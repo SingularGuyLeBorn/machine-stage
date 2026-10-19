@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { InstanceLayout } from "../../../assembler/assembler";
 import { evaluateExpression } from "../../../registry/expression";
 import type { Expr, ExprVec3, ModelRegistry, NodeDef, PartDefinition } from "../../../registry/types";
+import { tigerEngineExpectedContacts } from "./expectedContacts";
 
 // ============================================================================
 // models/tiger/engine/registry —— Maybach HL230 P45（虎式 I 后期型）L1 核心机构
@@ -726,6 +727,8 @@ export function makeEngineRegistry(): ModelRegistry {
     nodes: buildNodes(),
     materials: MATERIALS,
     parts: buildParts(),
+    // 构造性接触白名单：装配咬合（轴承/压装/剖分/插接）不报缺陷，真缺陷照报。
+    expectedContacts: tigerEngineExpectedContacts,
   };
 }
 

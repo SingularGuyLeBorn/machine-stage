@@ -4,9 +4,11 @@ import {
   detectStatic,
   detectSweep,
   parseInstanceRef,
+  partitionExpectedContacts,
   summarizeReports,
   type AssembledModel,
   type ClippingReport,
+  type ContactPartition,
   type PartHandle,
 } from "@/three/parts";
 import { findModel, type ViewKey } from "../catalog";
@@ -124,6 +126,8 @@ interface StageState {
   allReports: ClippingReport[];
   /** 显示值：allReports 按当前构建进度派生过滤。 */
   reports: ClippingReport[];
+  /** 分层显示值：未豁免（真缺陷候选）/ 已豁免（构造性接触，带命中规则）。 */
+  reportPartition: ContactPartition;
   scanPhase: ScanPhase;
   scanKind: "static" | "sweep" | null;
   scanMs: number | null;
@@ -222,6 +226,7 @@ export const useStageStore = create<StageState>((set, get) => ({
 
   allReports: [],
   reports: [],
+  reportPartition: { active: [], expected: [] },
   scanPhase: "idle",
   scanKind: null,
   scanMs: null,
@@ -252,6 +257,7 @@ export const useStageStore = create<StageState>((set, get) => ({
       isolation: null,
       allReports: [],
       reports: [],
+      reportPartition: { active: [], expected: [] },
       scanPhase: "idle",
       scanKind: null,
       scanMs: null,
@@ -297,6 +303,7 @@ export const useStageStore = create<StageState>((set, get) => ({
       return {
         buildIndex: clamped,
         reports,
+        reportPartition: splitReports(model.id, reports),
         activeReport:
           state.activeReport !== null && state.activeReport < reports.length ? state.activeReport : null,
       };
@@ -425,9 +432,11 @@ export const useStageStore = create<StageState>((set, get) => ({
       }
       assembled.resetNodes();
       if (model.animate) model.animate(assembled, 0);
+      const reports = filterReportsByProgress(raw, modelId, state.buildIndex);
       set({
         allReports: raw,
-        reports: filterReportsByProgress(raw, modelId, state.buildIndex),
+        reports,
+        reportPartition: splitReports(modelId, reports),
         scanPhase: "ready",
         scanKind: kind,
         scanMs: Math.round(performance.now() - started),
@@ -442,6 +451,11 @@ export const useStageStore = create<StageState>((set, get) => ({
 
   clearFault: () => set({ fault: null }),
 }));
+
+/** 报告分层（按当前模型注册表的白名单：构造性接触豁免，真缺陷不豁免）。 */
+export function splitReports(modelId: string, reports: ClippingReport[]): ContactPartition {
+  return partitionExpectedContacts(reports, findModel(modelId).registry?.expectedContacts ?? []);
+}
 
 /** 报告汇总（UI 徽标用）。 */
 export function reportSummary(reports: ClippingReport[]) {
