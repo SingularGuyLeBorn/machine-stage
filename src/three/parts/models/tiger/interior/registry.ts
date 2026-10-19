@@ -577,12 +577,12 @@ function buildInteriorParts(): PartDefinition[] {
     geometry: {
       type: "kit",
       kit: "bowMg",
-      params: { receiverL: 0.32, receiverH: 0.1, receiverW: 0.09, barrelL: 0.2 },
+      params: { receiverL: 0.32, receiverH: 0.1, receiverW: 0.09, barrelL: 0.33 },
     },
     material: "cast_iron_dark",
     mate: { type: "absolute", position: [-4.14, 0.16, 0.78] },
     source:
-      "MG 34 航向机枪机匣段（机匣 320 × 100 × 90，枪管 ф44 × 200）：枪口朝 -X，枪管穿过前装甲球座（L4 需开 ⌀100 球孔，球心 y 0.16 / z 0.78），枪口伸出车头外板 0.09m；整枪站在转向机壳体（半宽 0.66）之外侧，并抬到侧传动轴法兰（z 0.735、顶 0.11）上方 50mm。",
+      "MG 34 航向机枪机匣段（机匣 320 × 100 × 90，枪管 ф44 × 330）：枪口朝 -X，枪管穿过前装甲板（L4-a 已开 ⌀100 球孔，球心 y 0.16 / z 0.78；枪口 x -4.62，伸出车头外板 -4.50 共 0.12m，孔与枪管留 28mm 环缝）；枪管套（ф64，前端 -4.395）与板内表面 -4.40 留 5mm，球座 Kugelblende 50 随 L4-c。整枪站在转向机壳体（半宽 0.66）之外侧，并抬到侧传动轴法兰（z 0.735、顶 0.11）上方 50mm。",
   });
 
   add({
@@ -657,7 +657,7 @@ function buildInteriorParts(): PartDefinition[] {
       type: "merge",
       parts: [
         { type: "tube", rOuter: 0.062, rInner: 0.057, h: 0.03, at: [0, 0, 0], segments: 24 },
-        { type: "box", w: 0.03, h: 0.03, d: 0.016, at: [0, 0, -0.066], bevel: 0.003 },
+        { type: "box", w: 0.03, h: 0.03, d: 0.01, at: [0, 0, -0.063], bevel: 0.003 },
       ],
     },
     material: "steel",
@@ -665,7 +665,8 @@ function buildInteriorParts(): PartDefinition[] {
     indexed: true,
     instance_layout: INTERIOR_LAYOUTS.clamp,
     mate: { type: "absolute" },
-    source: "卡箍（内径 114，环抱 ф110 瓶体，径向 2mm）：两只（y -0.09 / +0.09），后侧耳板离侧板内表面 2mm。",
+    source:
+      "卡箍（内径 114，环抱 ф110 瓶体，径向 2mm）：两只（y -0.09 / +0.09），耳板外侧 -0.898 —— 离侧板内表面（L4-a 的 z -0.90）2mm、离瓶体表面（-0.885）3mm。",
   });
 
   add({
