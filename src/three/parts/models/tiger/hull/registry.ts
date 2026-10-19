@@ -708,6 +708,29 @@ function buildHullParts(): PartDefinition[] {
       "履带挡板（Kotflügel）：5.41 m × 0.94 m × 15mm 薄钢板 + 前后各一块 260mm 活页挡泥板（下折 35°）+ 内侧 5 道支撑肋（18 × 100 × 520，贴车体侧留 3mm）。内缘离车体侧壁 3mm（z ±0.9655），外缘到 z ±1.905（履带外缘 1.8525 外 52mm），板面 y 0.10（履带顶 −0.24 上方 340mm）。实车挡板挂在赞助板（z ±1.78）下缘、宽约 300mm；本模型上部车体尚未补，先按下部车体侧壁外伸的整块挡板做，L4-g 上部车体落地后缩到 300mm 并改挂 z ±1.78。",
   });
 
+  for (const side of [1, -1] as const) {
+    parts.push({
+      id: side > 0 ? "tiger.hull.sponson_shell_right" : "tiger.hull.sponson_shell_left",
+      name_cn: side > 0 ? "赞助板壳体（右）" : "赞助板壳体（左）",
+      name_en: side > 0 ? "Seitenvorbau (rechts)" : "Seitenvorbau (links)",
+      assembly: "hull",
+      build_layer: 4,
+      build_order: side > 0 ? 553 : 554,
+      geometry: {
+        type: "kit",
+        kit: "sponsonShell",
+        params: { side, len: 5.41, width: 0.8145, wallT: 0.06, floorT: 0.02, wallH: 0.895, deckT: 0.03 },
+      },
+      material: "armor_steel",
+      mate: {
+        type: "absolute",
+        position: [c.HULL_FRONT_INNER! - c.HULL_FRONT_T!, 0.13, side * 0.9655],
+      },
+      source:
+        "上部车体赞助板（Seitenvorbau）：外壁 z ±1.72 ~ ±1.78（厚 60）、地板 y 0.13 ~ 0.15（宽 0.8145，内缘离侧装甲 3mm）、顶板 y 1.045 ~ 1.075（与顶盖齐平，内缘离顶盖 3mm）、前后封板与首/尾板同面。实车上部车体宽 3.56、下部车体 1.925，赞助板正是这 0.9m 的悬挑；本件落地后车体侧面不再是「窄箱 + 外挂履带」。首板下段仍保持窄，让开主动轮（z ±1.49 / r 0.414）；后段顶板与发动机甲板（1.08 ~ 1.105）留 30mm 台阶，过渡段随下一片。",
+    });
+  }
+
   return parts;
 }
 

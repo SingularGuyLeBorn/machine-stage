@@ -434,6 +434,50 @@ const trackGuard: GeometryBuilder = (spec) => {
   return merged;
 };
 
+// ---------------------------------------------------------------------------
+// 赞助板壳体（上部车体外翼）：地板 + 外壁 + 顶板 + 前后封板，一件一侧
+// 局部系：原点 = 地板下表面·前端·内缘；+x 向后、y 上。侧别由 side = ±1 控制 z 方向
+// （所有块体关于自身 z 中心对称，不需要镜像矩阵，避免法线翻转）。
+// ---------------------------------------------------------------------------
+const sponsonShell: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const side = num(params, "side", 1) < 0 ? -1 : 1;
+  const len = num(params, "len", 5.41);
+  const width = num(params, "width", 0.8145);
+  const wallT = num(params, "wallT", 0.06);
+  const floorT = num(params, "floorT", 0.02);
+  const wallH = num(params, "wallH", 0.895);
+  const deckT = num(params, "deckT", 0.03);
+
+  const parts: THREE.BufferGeometry[] = [];
+
+  // 地板（z 0 ~ width）
+  const floor = bevelBoxGeometry(len, floorT, width, 0.003);
+  floor.translate(len / 2, floorT / 2, (side * width) / 2);
+  parts.push(floor);
+
+  // 外壁（外表面与 z = width 齐平）
+  const wall = bevelBoxGeometry(len, wallH, wallT, 0.003);
+  wall.translate(len / 2, floorT + wallH / 2, side * (width - wallT / 2));
+  parts.push(wall);
+
+  // 顶板（顶面 = 1.075，与顶盖齐平；内缘离顶盖 3mm）
+  const deck = bevelBoxGeometry(len, deckT, width, 0.003);
+  deck.translate(len / 2, floorT + wallH + deckT / 2, (side * width) / 2);
+  parts.push(deck);
+
+  // 前后封板（与首/尾板同平面，只占 z 0.9655 以外）
+  for (const x of [0.02, len - 0.02]) {
+    const cap = bevelBoxGeometry(0.04, wallH, width, 0.003);
+    cap.translate(x, floorT + wallH / 2, (side * width) / 2);
+    parts.push(cap);
+  }
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
 export const tigerHullKitBuilders: Record<string, GeometryBuilder> = {
   hullPlate,
   hatchLid,
@@ -444,4 +488,5 @@ export const tigerHullKitBuilders: Record<string, GeometryBuilder> = {
   mgBarrel,
   liftingEye,
   trackGuard,
+  sponsonShell,
 };
