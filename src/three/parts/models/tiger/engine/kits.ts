@@ -183,15 +183,23 @@ const cylinderHead: GeometryBuilder = (spec) => {
 
   // 气门导管/摇臂机构不在本层建模（M-C）：气门本体直接站在缸盖燃烧室孔内，
   // 因此这里只保留燃烧室孔、进排气法兰与缸盖螺栓，避免与气门几何互相插入。
+  // 进/排气各一口、各一个法兰与短管：上口进气（高）、下口排气（低）。
+  // 两口必须分开在缸盖侧面上——共用同一口时两根支管的起弯段必然互穿
+  // （判定树实测该零件对交线 1493mm · displaced）。
   const portW = num(p, "portW", 0.054);
+  const portInY = num(p, "portInY", h * 0.72);
+  const portExY = num(p, "portExY", h * 0.22);
+  const portStubR = num(p, "portStubR", 0.019);
   for (const sign of [-1, 1]) {
-    const flange = bevelBoxGeometry(portW, 0.032, 0.018, 0.002);
-    flange.translate(0, h * 0.45, sign * (d / 2 + 0.007));
-    parts.push(flange);
-    const stub = cylinderGeometry(0.024, 0.028, 0.024, 18, 0.0015);
-    stub.rotateX(Math.PI / 2);
-    stub.translate(0, h * 0.45, sign * (d / 2 + 0.024));
-    parts.push(stub);
+    for (const portY of [portInY, portExY]) {
+      const flange = bevelBoxGeometry(portW, 0.032, 0.018, 0.002);
+      flange.translate(0, portY, sign * (d / 2 + 0.007));
+      parts.push(flange);
+      const stub = cylinderGeometry(portStubR, 0.028, portStubR, 18, 0.0015);
+      stub.rotateX(Math.PI / 2);
+      stub.translate(0, portY, sign * (d / 2 + 0.024));
+      parts.push(stub);
+    }
   }
 
   const bolts = boltCircleGeometry(4, num(p, "boltRadius", w * 0.33), 0.011, 0.012);
@@ -298,6 +306,18 @@ const fanFrame: GeometryBuilder = (spec) => {
   const accBeamY = num(p, "accBeamY", 0.06);
   const accHalfSpan = num(p, "accHalfSpan", 0.26);
   const accBeamH = num(p, "accBeamH", 0.055);
+  // 右水管过孔参数（附件梁让位开口 + 管夹）
+  const pipeY = num(p, "pipeY", 0.04);
+  const pipeZ = num(p, "pipeZ", -0.18);
+  const pipeR = num(p, "pipeR", 0.02);
+  const clampBoreR = num(p, "clampBoreR", pipeR - 0.0005);
+  const clampX = num(p, "clampX", 0.013);
+  const clampLen = num(p, "clampLen", 0.05);
+  const clampSlant = num(p, "pipeSlantDeg", 10.4) * (Math.PI / 180);
+  // 风扇轴承座（压装孔）参数
+  const bearingX = num(p, "bearingX", 0.055);
+  const bearingBoreR = num(p, "bearingBoreR", 0.0326);
+  const bearingLen = num(p, "bearingLen", 0.05);
   /** 地脚后端面在局部系中的 x（= 正时盖前端面 + 单边间隙）；地脚/立撑/附件梁都从这里向前长。 */
   const mountX = num(p, "mountX", 0.019);
   /** 地脚与立撑的轴线 x：与上横梁、附件梁搭接，同时让开后方的正时盖。 */
@@ -308,11 +328,37 @@ const fanFrame: GeometryBuilder = (spec) => {
   beam.translate(beamX, beamY, 0);
   parts.push(beam);
 
-  // 下横梁（附件梁）：水泵 / 发电机装在其前端面；后端面退到正时盖前端面之前
+  // 下横梁（附件梁）：水泵 / 发电机装在其前端面；后端面退到正时盖前端面之前。
+  // 右水管从梁下穿过处开口让位（开口半宽 = 管径 + 15mm，底面抬到管顶上方 2mm）——
+  // 原为整根实心梁，管身上半直接插进梁体（判定树实测交线 112.6mm · suspect）。
   const beamFrontX = beamX + beamDepth / 2;
-  const accBeam = bevelBoxGeometry(beamFrontX - mountX, accBeamH, accHalfSpan * 2, 0.003);
-  accBeam.translate((mountX + beamFrontX) / 2, accBeamY, 0);
-  parts.push(accBeam);
+  const accBeamSpan = beamFrontX - mountX;
+  const accBeamCx = (mountX + beamFrontX) / 2;
+  const beamTopY = accBeamY + accBeamH / 2;
+  const notchHalf = pipeR + 0.015;
+  const notchTop = pipeY + pipeR + 0.002;
+  const notchH = Math.max(beamTopY - notchTop, 0.004);
+  const accBeamSegs: Array<{ z0: number; z1: number; y: number; h: number }> = [
+    { z0: -accHalfSpan, z1: pipeZ - notchHalf, y: accBeamY, h: accBeamH },
+    { z0: pipeZ - notchHalf, z1: pipeZ + notchHalf, y: (notchTop + beamTopY) / 2, h: notchH },
+    { z0: pipeZ + notchHalf, z1: accHalfSpan, y: accBeamY, h: accBeamH },
+  ];
+  for (const seg of accBeamSegs) {
+    const segLen = seg.z1 - seg.z0;
+    if (segLen <= 1e-4) continue;
+    const box = bevelBoxGeometry(accBeamSpan, seg.h, segLen, 0.003);
+    box.translate(accBeamCx, seg.y, (seg.z0 + seg.z1) / 2);
+    parts.push(box);
+  }
+
+  // 管夹：夹住穿过开口的那段右水管。孔半径比管面小 0.1mm（24 边形孔面 · 16 边形管面，
+  // 相位错开 → 孔面与管面互穿出一圈绕轴闭合的交线 = 压装配合面，实测深度 ~0.1mm）。
+  // 管夹轴与管的走向一致（z 向斜 10.4°），一端伸进附件梁里，与框架是一体件。
+  const clamp = tubeGeometry(clampBoreR + 0.005, clampBoreR, clampLen, 24);
+  clamp.rotateZ(-Math.PI / 2);
+  clamp.rotateY(clampSlant);
+  clamp.translate(clampX, pipeY, pipeZ);
+  parts.push(clamp);
 
   const topY = beamY - beamH / 2;
   for (const side of [-1, 1]) {
@@ -343,13 +389,22 @@ const fanFrame: GeometryBuilder = (spec) => {
     ring.translate(shroudX + shroudH / 2, beamY, side * fanZ);
     parts.push(ring);
 
-    // 罩环 → 横梁前端面的两条斜撑（在风扇圆盘平面上方/下方，避开风扇与带轮）
+    // 轴承座：风扇轴承压入本孔（孔比轴承外径小 0.4mm = 压装配合面，交线绕轴闭合）
+    const housing = tubeGeometry(bearingBoreR + 0.009, bearingBoreR, bearingLen, 32);
+    housing.rotateZ(-Math.PI / 2);
+    housing.translate(bearingX, beamY, side * fanZ);
+    parts.push(housing);
+
+    // 罩环 → 横梁前端面的两条斜撑（在风扇圆盘平面上方/下方，避开风扇与带轮）。
+    // 接到罩环**外缘半径**（shroudR+shroudWall）：接内缘时斜撑的 x 端部会伸进
+    // 风扇叶尖的扫掠圆盘（实测被叶尖切进 6.25mm · 未豁免）。
     for (const vs of [-1, 1]) {
       const a = new THREE.Vector3(beamFrontX, beamY + vs * (beamH / 2), side * fanZ);
-      const b = new THREE.Vector3(shroudX, beamY + vs * shroudR, side * fanZ);
+      const b = new THREE.Vector3(shroudX, beamY + vs * (shroudR + shroudWall), side * fanZ);
       const tabDelta = new THREE.Vector3().subVectors(b, a);
       const tabAngle = Math.atan2(tabDelta.y, tabDelta.x);
-      const tab = bevelBoxGeometry(tabDelta.length() + 0.01, 0.03, 0.024, 0.002);
+      // 端部断面 0.018 厚（原 0.03）：斜撑内缘到叶尖留 18mm，叶尖不再切进斜撑
+      const tab = bevelBoxGeometry(tabDelta.length() + 0.01, 0.018, 0.024, 0.002);
       tab.rotateZ(tabAngle);
       tab.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
       parts.push(tab);
@@ -409,7 +464,10 @@ const fanRotor: GeometryBuilder = (spec) => {
 
   const parts: THREE.BufferGeometry[] = [];
 
-  // 轮毂 + 前伸细轴 + 单槽凸脊带轮（带轮必须整体位于叶片弦长范围之前，否则皮带与叶片互插）
+  // 轮毂 + 前伸细轴 + 宽面平带轮。带面做成等高圆柱（不是尖脊）：
+  // 两条皮带各有自己的轴向平面（曲轴双槽带轮 ±PULLEY_OFF），带宽要同时罩住两条带面，
+  // 带在带面任意轴向位置都压在同一半径上（尖脊只有一条带能压在脊顶）。
+  // 带轮必须整体位于叶片弦长范围之前，否则皮带与叶片互插。
   const hub = latheGeometry(
     [
       [0, -hubWidth / 2],
@@ -417,11 +475,8 @@ const fanRotor: GeometryBuilder = (spec) => {
       [rHub * 0.72, hubWidth / 2],
       [shaftR, hubWidth / 2 + 0.004],
       [shaftR, pulleyX - pulleyW / 2],
-      [pulleyR - 0.012, pulleyX - pulleyW / 2],
-      [pulleyR - 0.004, pulleyX - pulleyW * 0.24],
-      [pulleyR, pulleyX],
-      [pulleyR - 0.004, pulleyX + pulleyW * 0.24],
-      [pulleyR - 0.012, pulleyX + pulleyW / 2],
+      [pulleyR, pulleyX - pulleyW / 2],
+      [pulleyR, pulleyX + pulleyW / 2],
       [shaftR, pulleyX + pulleyW / 2],
       [shaftR, pulleyX + pulleyW / 2 + 0.004],
       [0, pulleyX + pulleyW / 2 + 0.004],
@@ -436,7 +491,9 @@ const fanRotor: GeometryBuilder = (spec) => {
     const blade = airfoilGeometry(chord, span, 0.11, 10, 0.004);
     blade.rotateX(-Math.PI / 2); // 展向 → +Y（径向），弦长仍沿 +X（流向）
     blade.rotateY(THREE.MathUtils.degToRad(pitchDeg)); // 桨距角
-    blade.translate(0, rHub + span / 2, 0);
+    // 弦长以 hub 中心為準前后均分：airfoil 原点在弦线前缘，不后移会让整段弦长伸到带轮平面里
+    // （实测皮带 462 个三角形、1614mm 交线穿叶片）。后移半个弦长后带轮整段位于弦长范围之前。
+    blade.translate(-chord / 2, rHub + span / 2, 0);
     blade.rotateX((i / blades) * Math.PI * 2);
     parts.push(blade);
   }
@@ -484,6 +541,9 @@ const beltLoop: GeometryBuilder = (spec) => {
     depth: width,
     bevelEnabled: false,
     steps: 1,
+    // 皮带包角按每段 48 段离散：默认 12 段时被动轮包角的弦会切进带轮顶圆
+    // （内缘多边形的内切半径比带轮半径还小 → 视觉上是皮带啃进带轮）。
+    curveSegments: 48,
   });
   geometry.translate(0, 0, -width / 2);
   // rotateY(-90°)：(x,y,z) → (-z, y, x)：截面 X → +Z（主动轮 → 被动轮方向）
@@ -499,19 +559,43 @@ const manifold: GeometryBuilder = (spec) => {
   const mainFrom = tuple(p, "mainFrom");
   const mainTo = tuple(p, "mainTo");
   const mainR = num(p, "mainR", 0.03);
+  // 主管径向段数可调：排气下管承口故意用 13 段（与歧管主管的 20 段错开相位，
+  // 两个同心多边形的边互相穿越 → 交线绕轴闭合，测得出「压装配合面」而不是零接触）。
+  const mainSegments = Math.max(8, Math.round(num(p, "mainSegments", 20)));
   const runners = Array.isArray(p?.runners) ? (p!.runners as unknown[]) : [];
   const start = new THREE.Vector3(...mainFrom);
   const end = new THREE.Vector3(...mainTo);
   const parts: THREE.BufferGeometry[] = [
-    new THREE.TubeGeometry(new THREE.LineCurve3(start, end), 1, mainR, 20, false),
+    new THREE.TubeGeometry(new THREE.LineCurve3(start, end), 1, mainR, mainSegments, false),
   ];
 
-  const cap = cylinderGeometry(mainR, mainR * 0.24, mainR, 20, 0);
+  const axis = new THREE.Vector3().subVectors(end, start).normalize();
+  const capH = mainR * 0.24;
+  // capInset = 1：两端封盖都收进口内（外端面与管口齐平；默认是跨骑在管口上、外探 5mm）。
+  // 排气歧管管口外几毫米就是下管弯管的起点，默认封盖的外盘面会被弯管首段穿过，
+  // 多出一圈不绕轴的交线（实测 476mm 里约 210mm），形态被判成 displaced。
+  const capInset = num(p, "capInset", 0) > 0.5;
+
+  const cap = cylinderGeometry(mainR, capH, mainR, mainSegments, 0);
   cap.rotateZ(-Math.PI / 2);
-  cap.translate(end.x, end.y, end.z);
+  const capCenter = capInset ? end.clone().addScaledVector(axis, -capH / 2) : end.clone();
+  cap.translate(capCenter.x, capCenter.y, capCenter.z);
   parts.push(cap);
 
-  const axis = new THREE.Vector3().subVectors(end, start).normalize();
+  // capFrom = 1：近端也封盖（默认只封远端）。
+  // 判定树的「点在实体内」是射线奇偶判定：开口壳体让腔内点被误判成内部，
+  // 深度探针就会报出 30mm 级假深度（下管承口压装就是这样被打成未豁免的）。
+  if (num(p, "capFrom", 0) > 0.5) {
+    // 封盖半径收小 1.5mm：与主管等径的封盖会与管面叠出一圈重合三角面，
+    // 交线长度被放大成 1842mm 碎片（承口压装被打成 displaced）。
+    const plugR = mainR - 0.0015;
+    const near = cylinderGeometry(plugR, capH, plugR, mainSegments, 0);
+    near.rotateZ(-Math.PI / 2);
+    const nearCenter = capInset ? start.clone().addScaledVector(axis, capH / 2) : start.clone();
+    near.translate(nearCenter.x, nearCenter.y, nearCenter.z);
+    parts.push(near);
+  }
+
   for (const raw of runners) {
     const item = raw as { from?: unknown; to?: unknown; bend?: unknown; r?: unknown };
     const from = Array.isArray(item.from) ? (item.from as [number, number, number]) : null;

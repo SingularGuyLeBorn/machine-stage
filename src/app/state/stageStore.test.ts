@@ -8,7 +8,7 @@ import {
   filterReportsByProgress,
   formatReportMeasure,
   reportKey,
-  shapeLabel,
+  formLabel,
   useStageStore,
 } from "./stageStore";
 
@@ -383,7 +383,7 @@ describe("stageStore 布局自由化", () => {
   });
 });
 
-describe("报告卡片文案（交线法口径：深度不许冒充）", () => {
+describe("报告卡片文案（交线法口径：深度不许冒充 · 形态判定树）", () => {
   it("实测深度优先；测不出时给「交线 XXmm」+ 形态标签", () => {
     const measured = makeReport("tiger.a", "tiger.b", 7.61);
     expect(formatReportMeasure(measured)).toBe("7.61mm");
@@ -393,26 +393,28 @@ describe("报告卡片文案（交线法口径：深度不许冒充）", () => {
       depth_mm: null,
       estimated: true,
       intersection_mm: 1970.49,
-      shape: "face_contact",
+      form: "face_mate",
     };
     expect(formatReportMeasure(unmeasurable)).toBe("交线 1970.5mm");
-    expect(shapeLabel(unmeasurable.shape)).toBe("贴合面");
+    expect(formLabel(unmeasurable.form)).toBe("共面贴合");
 
-    const fit: ClippingReport = { ...unmeasurable, intersection_mm: 87.1, shape: "bearing_overlap" };
-    expect(shapeLabel(fit.shape)).toBe("绕轴闭合·配合面");
-    const displaced: ClippingReport = { ...unmeasurable, shape: "displaced" };
-    expect(shapeLabel(displaced.shape)).toBe("局部成团·错位穿透");
+    const fit: ClippingReport = { ...unmeasurable, intersection_mm: 87.1, form: "bearing_overlap" };
+    expect(formLabel(fit.form)).toBe("绕轴闭合·配合面");
+    const displaced: ClippingReport = { ...unmeasurable, form: "displaced" };
+    expect(formLabel(displaced.form)).toBe("局部成团·错位穿透");
+    const suspect: ClippingReport = { ...unmeasurable, intersection_mm: 112.56, form: "suspect" };
+    expect(formLabel(suspect.form)).toBe("成团·存疑穿透");
 
     // 连交线也没有（超预算早退）：只给形态词，绝不出现 AABB 假数字
     const bare: ClippingReport = { ...unmeasurable, intersection_mm: undefined };
     expect(formatReportMeasure(bare)).toBe("交线 —");
-    expect(shapeLabel(undefined)).toBe("形态未知");
+    expect(formLabel(undefined)).toBe("形态未知");
   });
 
   it("reportKey 用占位符区分 null 深度（不把 null 拼成 0，也不与实测 0 撞 key）", () => {
     const measured = makeReport("tiger.a", "tiger.b", 1);
     const unmeasurable: ClippingReport = { ...measured, depth_mm: null };
-    const otherShape: ClippingReport = { ...unmeasurable, shape: "bearing_overlap" };
+    const otherShape: ClippingReport = { ...unmeasurable, form: "bearing_overlap" };
 
     expect(reportKey(unmeasurable)).not.toContain("null");
     expect(reportKey(unmeasurable)).toBe(reportKey(otherShape));

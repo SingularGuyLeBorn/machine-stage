@@ -3,7 +3,7 @@ import type { ExpectedContactRule } from "../../../registry/types";
 // ============================================================================
 // tiger/engine —— 构造性接触白名单（豁免族）
 //
-// 依据：`npx tsx scripts/diag-clips.ts`（全模型族排行，147 条全为 ≤0.5mm 级）。
+// 依据：`npx tsx scripts/diag-clips.ts --recheck`（最近一次重校记录：docs/qa/whitelist-recheck.md）。
 // 口径：装配关系本身导致的咬合/贴合是机器，不是缺陷——不豁免真缺陷、也不修正确装配。
 // 每条 = 一个审计单元（面板分组 + docs/qa/whitelist/<family>.png 隔离视图截图）。
 // 深度守门取默认 2mm：豁免族里冒出超过贴面量级的深度时照报（判为真缺陷）。
@@ -32,7 +32,7 @@ export const tigerEngineExpectedContacts: ExpectedContactRule[] = [
     family: "piston-pin-in-small-end",
     a: "tiger.piston_rod.piston_pin",
     b: "tiger.piston_rod.connecting_rod",
-    reason: "活塞销穿在连杆小头铜套里（过盈/滑动配合），销面与套孔面咬合。",
+    reason: "活塞销过盈压入连杆小头衬套（按压装销建模，径向 0.6mm）：销面与小头孔面整圈咬合。",
   },
   {
     family: "conrod-pair-face",
@@ -109,13 +109,14 @@ export const tigerEngineExpectedContacts: ExpectedContactRule[] = [
     family: "belt-on-pulley",
     a: "tiger.cooling.fan_rotor",
     b: "tiger.cooling.drive_belt",
-    reason: "皮带包在风扇皮带轮上：带传动的包角接触（带面与轮槽面贴合）。",
+    reason:
+      "皮带包在带轮上：带面与轮槽面留 0.8mm 净隙、空转（压装会让 closed 判定临界，故本设计不压装）；出现接触时才按带传动包角接触计。",
   },
   {
     family: "fan-frame-passage",
     a: "tiger.cooling.fan_frame",
     b: "tiger.accessory.water_pipe_*",
-    reason: "两根水管从风扇框架的开口穿过：框架让出管位，开口边缘与管壁相邻。",
+    reason: "水管从风扇框架附件梁的让位开口穿过（notchHalf = 管半径 + 0.015）：开口边缘与管壁相邻。",
   },
   {
     family: "fan-frame-passage",
@@ -161,13 +162,16 @@ export const tigerEngineExpectedContacts: ExpectedContactRule[] = [
     family: "exhaust-pipe-socket",
     a: "tiger.induction.exhaust_manifold_*",
     b: "tiger.induction.exhaust_pipe_*",
-    reason: "排气管端插进排气歧管的承口（插接），承口内壁与管外壁咬合。",
+    reason:
+      "承口是外套滑套：13 边形内切圆 0.0422 > 主管外接圆 0.042，径向恒定留 0.24mm 净隙（多边形几何上不可能相交）；下管起点环整圈落在歧管口封盖之外。量到咬合只可能是滑套贴面量级（真缺陷=弯管横穿主管壁，深度 >10mm），按 6mm 守门。",
+    maxDepthMm: 6,
   },
   {
     family: "manifold-mating-face",
     a: "tiger.induction.intake_manifold_*",
     b: "tiger.induction.exhaust_manifold_*",
-    reason: "进/排气歧管共用同一个缸盖法兰面，背靠背贴合安装。",
+    reason:
+      "缸盖每侧开两个口（进气口在上、排气口在下）：进/排气歧管各接自己的法兰口，在缸盖侧面同一安装面上下相邻。",
   },
 
   // ---------------- L1 第一批：紧固件与点火（新增件自带的构造性接触）----------------
@@ -211,7 +215,8 @@ export const tigerEngineExpectedContacts: ExpectedContactRule[] = [
     family: "plug-boot-on-plug",
     a: "tiger.ignition.plug_boot",
     b: "tiger.valvetrain.spark_plug",
-    reason: "高压护套套在火花塞线端上（内孔留 1mm 间隙，名义上不接触；万一贴到属护套安装面）。",
+    reason:
+      "高压护套套在火花塞瓷体上：护套为闭合空心剖面（内孔 ⌀27）、塞子斜唇 ⌀23，名义净隙 + 唇口咬合（1.1mm 级）。",
   },
   {
     family: "timing-cover-mount",

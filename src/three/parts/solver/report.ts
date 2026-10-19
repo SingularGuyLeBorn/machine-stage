@@ -12,17 +12,23 @@ import type { PartHandle } from "../assembler/assembler";
 //   · depth_mm 只报「真实穿透深度」（落入对方实体的采样点到对方表面的最大距离）；
 //   · 测不出时 depth_mm = null + estimated=true，卡片改显示「交线 XXmm（形态）」——
 //     禁止再拿 AABB 交叠尺寸冒充深度（旧的 125.60mm 假数字）。
+//
+// 形态语义（form，判定树的形状分流）——null 不等于放行：
+//   · 相交判定（bvhcast）本身可信，要分类的是「相交之后」：共面贴合 / 同心配合面 / 存疑穿透；
+//   · 可靠尺子是交线（intersectsTriangle 截线）：贴合退化、绕轴闭合、还是成团横穿。
 // ============================================================================
 
 export type ClippingPhase = "static" | "animation" | "param_scan";
 
 /**
- * 相交形态（detect.ts 按交线几何分类）：
- *   · bearing_overlap：交线绕轴闭合（分布尺寸 ≈ 轴径量级）→ 配合面重叠（白名单候选）；
- *   · face_contact：交线成片、测不出穿透深度 → 贴合面（装配接触）；
- *   · displaced：局部成团且有实测深度 → 错位穿透（真缺陷候选）。
+ * 相交形态（detect.ts 按交线长度 + 分布尺寸分类；whitelist.ts 只认前两类为构造性接触）：
+ *   · face_mate：交线退化（≈ 0，共面贴合）→ 装配接触，可豁免；
+ *   · bearing_overlap：交线绕轴闭合、且由贴合壁对贡献（同心配合面）→ 可豁免；
+ *   · displaced：实测出深度且交线成团 → 错位穿透（未豁免，必报）；
+ *   · suspect：交线成团 / 超长 / 分布超标（横穿薄板、管路穿支架）→ 存疑穿透（未豁免，必报）。
+ * suspect / displaced 永不进豁免区：白名单守门对这两级无效。
  */
-export type OverlapShape = "bearing_overlap" | "face_contact" | "displaced";
+export type OverlapForm = "face_mate" | "bearing_overlap" | "suspect" | "displaced";
 
 export interface ClippingReport {
   type: "clipping";
@@ -39,8 +45,8 @@ export interface ClippingReport {
   intersection_mm?: number;
   /** 交线分布包围盒尺寸（毫米 [x, y, z]）。 */
   extent_mm?: [number, number, number];
-  /** 相交形态（见 OverlapShape）。 */
-  shape?: OverlapShape;
+  /** 相交形态（见 OverlapForm）。 */
+  form?: OverlapForm;
   /** 代表性穿透点（模型空间，米）。 */
   point: [number, number, number];
   /** 动画扫掠帧号（静态检测为 null）。 */

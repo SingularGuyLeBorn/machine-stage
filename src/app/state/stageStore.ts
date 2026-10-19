@@ -9,7 +9,7 @@ import {
   type AssembledModel,
   type ClippingReport,
   type ContactPartition,
-  type OverlapShape,
+  type OverlapForm,
   type PartHandle,
 } from "@/three/parts";
 import { findModel, type ViewKey } from "../catalog";
@@ -84,11 +84,12 @@ export function reportKey(report: ClippingReport): string {
   return `${report.a}|${report.b}|${report.frame ?? "s"}|${depth}`;
 }
 
-/** 相交形态的中文标签（卡片显示）。 */
-export function shapeLabel(shape?: OverlapShape): string {
-  if (shape === "bearing_overlap") return "绕轴闭合·配合面";
-  if (shape === "displaced") return "局部成团·错位穿透";
-  if (shape === "face_contact") return "贴合面";
+/** 相交形态的中文标签（卡片显示；判定树四类）。 */
+export function formLabel(form?: OverlapForm): string {
+  if (form === "bearing_overlap") return "绕轴闭合·配合面";
+  if (form === "face_mate") return "共面贴合";
+  if (form === "displaced") return "局部成团·错位穿透";
+  if (form === "suspect") return "成团·存疑穿透";
   return "形态未知";
 }
 

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { MeshBVH, type HitPointInfo } from "three-mesh-bvh";
 import type { AssembledModel, PartHandle } from "../assembler/assembler";
-import { buildHint, formatReportRef, sortReports, type ClippingReport, type OverlapShape } from "./report";
+import { buildHint, formatReportRef, sortReports, type ClippingReport, type OverlapForm } from "./report";
 
 // ============================================================================
 // solver/detect —— 穿模检测器（静态装配 + 动画扫掠）
@@ -13,17 +13,24 @@ import { buildHint, formatReportRef, sortReports, type ClippingReport, type Over
 //
 // 交线几何（三修之一：弃用「probeDepth 单打独斗 + AABB 冒充深度」）：
 //   · bvhcast 回调里累计 intersectsTriangle 输出线段的总长与分布包围盒；
-//   · 形态分类：交线绕轴闭合（分布尺寸 ≈ 轴径量级，含半环鞍座）→ bearing_overlap；
-//     局部成团且实测出深度 → displaced；其余（交线成片、测不出深度）→ face_contact。
+//   · 形态分类（判定树，交线总长 + 分布尺寸）：
+//       绕轴闭合 + 交线来自贴合壁对   → bearing_overlap（同心配合面）→ 可豁免；
+//       交线退化成薄面 + 全部来自近平行面 → face_mate（贴面接触）→ 装配接触，不报；
+//       交线退化（< 0.1mm）           → face_mate（共面贴合）→ 装配接触，不报；
+//       局部成团且实测出深度           → displaced（错位穿透）→ 未豁免，必报；
+//       其余（成团 / 超长交线 / 分布超标）→ suspect（存疑穿透）→ 未豁免，必报。
 //   · 贴合面修正（三修补丁）：共面板接触的「交线」其实是侧壁切面与贴合面的交线（三角面法向近垂直），
 //     同轴配合面（压装轴承/轴套/鞍座）的交线才来自近共面三角面对（法向近平行）。
-//     测不出深度时再要求「交线主要来自近共面对」，否则判 face_contact（0 间隙装配接触/擦碰不报）。
+//     测不出深度时再要求「交线主要来自近共面对」，否则不再当作贴合面放行，而是判 suspect 照报；
+//     但「交线云退化成薄面 + 交线全部来自近平行面」本身就是贴面接触的证据（长交线也一样），归 face_mate。
 //   · 深度 = 落入对方实体的采样点到对方表面的最大距离（只报真实穿透）；
 //     测不出时 depth = null（卡片显示「交线 XXmm（形态）」）。
 //     AABB 交叠尺寸不再参与深度（旧实现用它兜底，才会出现 125.60mm 假数字）。
 // 判定口径：实测深度 ≥ minDepthM（默认 0.5mm）报「真穿透」级；
+//           suspect 级不看 minDepthM（成团/横穿的证据本身就是要报的缺陷）；
 //           测不出深度但交线绕轴闭合（配合面）仍报，交给白名单分层（未豁免 / 已豁免）。
-// 早退模式（超出详细分析预算）只判相交不测深：depth = null + estimated（保守照报）。
+// 早退模式（超出详细分析预算）只判相交不测深：depth = null + estimated——
+// 形态仍由交线算出（不依赖深度），因此「报不报」与预算无关，只影响 depth 是否实测。
 // ============================================================================
 
 const bvhCache = new WeakMap<THREE.BufferGeometry, MeshBVH>();
@@ -201,8 +208,12 @@ const PARALLEL_FACE_DOT = 0.7;
 const PARALLEL_LINE_MIN_RATIO = 0.5;
 /** 交线最小厚度（米 = 0.1mm）：退化在一个平面上的交线（贴合面 / 擦切面）没有体积穿透证据。 */
 const PLANAR_LINE_EPS = 1e-4;
+/** 交线总长退化阈值（米 = 0.1mm）：低于此值 = 共面贴合（face_mate），交线本身已退化成一个点/线。 */
+const FACE_MATE_LINE_M = 1e-4;
 const SHAPE_SAMPLE_LIMIT = 480;
 const TRIANGLE_SAMPLE_LIMIT = 64;
+/** 详情预算外的交线采样点数：仍贴着交线取点，保证深度可测，只是密度低。 */
+const TRIANGLE_SAMPLE_MIN = 8;
 const GLOBAL_SAMPLE_BUDGET = 360;
 /** 低于该值（米 = 0.01mm）视为「测不出深度」：面贴合 / 同心配合面。 */
 const MIN_MEASURED_DEPTH_M = 1e-5;
@@ -217,8 +228,8 @@ interface PairContact {
   lineLength: number;
   /** 交线分布包围盒尺寸（米，A 局部空间；刚性变换下即世界尺寸）。 */
   extent: THREE.Vector3;
-  /** 相交形态：bearing_overlap（绕轴闭合）/ face_contact（贴合面）/ displaced（错位穿透）。 */
-  shape: OverlapShape;
+  /** 相交形态（判定树）：face_mate（共面贴合）/ bearing_overlap（同心配合面）/ suspect（存疑穿透）/ displaced（错位穿透）。 */
+  form: OverlapForm;
   /** 形态判据留档：交线点到质心距离的 min/max（0 = 不成环）。 */
   ringRatio: number;
   /** 形态判据留档：交线总长里来自近共面三角面对（贴合面切向）的占比。 */
@@ -254,12 +265,13 @@ function pushTrianglePoints(
  *   · 环状：交线点到质心的距离几乎相等（中空的圆/椭圆/方框闭合线）；
  *   · 半环鞍座：交线近似平面、双向铺开且尺寸达到「轴径量级」（≥ 小件最大尺寸的 45%）。
  * 局部成团（错位穿透的碎块）两条都不满足。
+ * 同时回报 `planar`（交线云退化成一张薄面）：配合面与贴面接触共用这个判据。
  */
 function analyzeShape(
   samples: readonly THREE.Vector3[],
   extent: THREE.Vector3,
   spreadRatio: number,
-): { closed: boolean; ringRatio: number } {
+): { closed: boolean; ringRatio: number; planar: boolean } {
   let ringRatio = 0;
   if (samples.length >= 8) {
     const center = new THREE.Vector3();
@@ -278,7 +290,7 @@ function analyzeShape(
   const planar = dims[0] > 1e-9 && dims[2] <= 0.4 * dims[0];
   const balanced = dims[1] >= 0.4 * dims[0];
   const closed = ringRatio >= RING_MIN_RATIO || (planar && balanced && spreadRatio >= 0.45);
-  return { closed, ringRatio };
+  return { closed, ringRatio, planar };
 }
 
 /** 两个三角面法向近平行（夹角 ≲45°）→ 该交线来自贴合面切向，而非侧壁切面。 */
@@ -339,7 +351,10 @@ export function analyzePair(bodyA: BodyInstance, bodyB: BodyInstance, detailed: 
       if (lineSamples.length < SHAPE_SAMPLE_LIMIT) {
         lineSamples.push(reusableLine.start.clone(), reusableLine.end.clone());
       }
-      if (detailed && trianglesSampled < TRIANGLE_SAMPLE_LIMIT) {
+      // 详情预算只影响「贴着交线的采样点数」（64 → 8）：全量预算下每对都测深度，
+      // 交线形态判定与预算无关（否则预算外的对测不出深度，会被误判成 suspect）。
+      const triangleLimit = detailed ? TRIANGLE_SAMPLE_LIMIT : TRIANGLE_SAMPLE_MIN;
+      if (trianglesSampled < triangleLimit) {
         trianglesSampled++;
         pushTrianglePoints(overlapPointsA, triangleA);
         // bvhcast 已把 B 的三角形变换到 A 局部空间：折回 B 自身空间再采样。
@@ -360,12 +375,13 @@ export function analyzePair(bodyA: BodyInstance, bodyB: BodyInstance, detailed: 
   const sizeB = bodyB.box.getSize(new THREE.Vector3());
   const smallerBody = Math.min(Math.max(sizeA.x, sizeA.y, sizeA.z), Math.max(sizeB.x, sizeB.y, sizeB.z));
   const spreadRatio = smallerBody > 1e-9 ? Math.max(extent.x, extent.y, extent.z) / smallerBody : 1;
-  const { closed, ringRatio } = analyzeShape(lineSamples, extent, spreadRatio);
+  const { closed, ringRatio, planar } = analyzeShape(lineSamples, extent, spreadRatio);
 
   let depth: number | null = null;
   let point: THREE.Vector3 | null = null;
-  if (detailed) {
+  {
     // 采样 = 相交三角形局部点（贴着交线，能抓到深埋点）+ 全域点（轴端/中部深埋兜底）。
+    // 无条件测深度：跑到的都是真有三角面相交的对，成本由「相交对数」而不是「候选对数」决定。
     const probeA = probeDepth(
       overlapPointsA.concat(samplePoints(bodyA.handle.geometry, GLOBAL_SAMPLE_BUDGET)),
       bodyA.matrix,
@@ -389,17 +405,26 @@ export function analyzePair(bodyA: BodyInstance, bodyB: BodyInstance, detailed: 
     }
   }
 
-  // 测得出深度 → 按「是否绕轴闭合」分配合面/错位；测不出深度 → 还要交线主要来自近共面对
-  // （贴合面切向）才算配合面重叠，否则是 0 间隙装配接触 / 擦碰，判 face_contact 不报。
+  // 判定树（交线几何，不看详情预算）：
+  //   1) 可测深度 → 绕轴闭合 = 同心配合面（深度由族的守门值 maxDepthMm 控制，默认 2mm）；
+  //      不成环 = 错位穿透（必报，且不进豁免区）。
+  //   2) 测不出深度 → 绕轴闭合且交线来自贴合壁对 = 同心配合面（压装轴套/轴承/鞍座）→ 可豁免；
+  //      贴面接触（交线云退化成薄面 + 交线全部来自近平行面，如翼片坐在立柱顶面、
+  //      两盒恰好接触）→ face_mate，不报；
+  //      交线退化（≈ 0）= 共面贴合（装配接触，不报）；
+  //      其余（成团 / 超长横穿交线，如「管横穿支架」）= suspect，必须报 —— null 不再等于放行。
   const parallelRatio = lineLength > 0 ? parallelLength / lineLength : 0;
-  const shape: OverlapShape =
+  const parallelFaces = parallelRatio >= PARALLEL_LINE_MIN_RATIO;
+  const form: OverlapForm =
     depth !== null
       ? closed
         ? "bearing_overlap"
         : "displaced"
-      : closed && parallelRatio >= PARALLEL_LINE_MIN_RATIO
+      : closed && parallelFaces
         ? "bearing_overlap"
-        : "face_contact";
+        : lineLength < FACE_MATE_LINE_M || (parallelFaces && planar)
+          ? "face_mate"
+          : "suspect";
   const fallback = firstPoint ?? lineBox.getCenter(new THREE.Vector3()).applyMatrix4(bodyA.matrix);
   return {
     depth,
@@ -408,21 +433,22 @@ export function analyzePair(bodyA: BodyInstance, bodyB: BodyInstance, detailed: 
     triCount,
     lineLength,
     extent,
-    shape,
+    form,
     ringRatio,
     parallelRatio,
   };
 }
 
 /**
- * 报告口径：实测穿透 ≥ minDepthM 报「真穿透」级；测不出深度但交线绕轴闭合（配合面）仍报，
- * 交给白名单分层。纯贴合面不再报（旧实现是拿 AABB 交叠冒充深度才把它们拖进报告的）。
- * 三修补丁：测不出深度时还要求交线是「三维曲线」——0 间隙面贴合、擦切面的交线退化在一个平面上
- * （某轴尺寸 = 0），没有体积穿透证据，一律不报（两盒刚好接触 / 翼片擦过立柱都属于这类）。
+ * 报告口径（判定树）：suspect（存疑穿透）一律报——null 深度不许再当放行条；
+ * 实测深度 ≥ minDepthM 报「真穿透」级；测不出深度但交线绕轴闭合（配合面）仍报，交给白名单分层；
+ * 纯共面贴合（face_mate，交线退化）不报：0 间隙装配接触、擦切面本来就没有体积穿透证据
+ * （两盒刚好接触 / 翼片擦过立柱都属于这类，报告会被它们淹没）。
  */
 export function isReportableContact(contact: PairContact, minDepthM: number): boolean {
+  if (contact.form === "suspect") return true;
   if (contact.depth !== null) return contact.depth >= minDepthM;
-  if (contact.shape !== "bearing_overlap") return false;
+  if (contact.form !== "bearing_overlap") return false;
   const minExtent = Math.min(contact.extent.x, contact.extent.y, contact.extent.z);
   return minExtent > PLANAR_LINE_EPS;
 }
@@ -449,7 +475,7 @@ function makeReport(
       Number((contact.extent.y * 1000).toFixed(2)),
       Number((contact.extent.z * 1000).toFixed(2)),
     ],
-    shape: contact.shape,
+    form: contact.form,
     point: [
       Number(contact.point.x.toFixed(5)),
       Number(contact.point.y.toFixed(5)),
@@ -507,7 +533,9 @@ export function planPairs(assembled: AssembledModel, options: ClippingOptions = 
 /** 静态装配检测：全量实例对。 */
 export function detectStatic(assembled: AssembledModel, options: ClippingOptions = {}): ClippingReport[] {
   const minDepthM = options.minDepthM ?? 0.0005;
-  const budget = options.analysisBudget ?? 1200;
+  // 详情预算只控制每对在交线上的采样密度（默认给足，让全部候选对都按高密度采样；
+  // 真正吃时间的只有「确有三角面相交」的对，数量由几何决定）。
+  const budget = options.analysisBudget ?? 20000;
   assembled.root.updateMatrixWorld(true);
   const plan = planPairs(assembled, options);
   const reports: ClippingReport[] = [];
@@ -515,8 +543,8 @@ export function detectStatic(assembled: AssembledModel, options: ClippingOptions
     const [left, right] = plan.pairs[index];
     const detailed = index < budget;
     const contact = analyzePair(left, right, detailed);
-    // 预算外只判相交不测深：保守照报（estimated），不放过真实缺陷。
-    if (contact && (isReportableContact(contact, minDepthM) || !detailed)) {
+    // 报不报由形态判定（与详情预算无关）：suspect 必报，共面贴合不报，其余按深度/配合面口径。
+    if (contact && isReportableContact(contact, minDepthM)) {
       reports.push(makeReport(assembled, left, right, contact, "static", null));
     }
     options.onProgress?.(index + 1, plan.pairs.length);
@@ -606,8 +634,8 @@ export function detectSweep(assembled: AssembledModel, options: SweepOptions): C
       const key = `${candidate.leftRef}\u0000${candidate.rightRef}`;
       const detailed = !seen.has(key) && reports.length < reportBudget;
       const contact = analyzePair(left, right, detailed);
-      // 扫掠是「动件撞静件」的入口：预算外只判相交不测深，同样保守照报。
-      if (contact && (isReportableContact(contact, minDepthM) || !detailed)) {
+      // 扫掠是「动件撞静件」的入口：口径与静态一致（suspect 必报；预算外只是采样密度降低）。
+      if (contact && isReportableContact(contact, minDepthM)) {
         if (!seen.has(key)) {
           seen.add(key);
           reports.push(makeReport(assembled, left, right, contact, "animation", frameIndex));
