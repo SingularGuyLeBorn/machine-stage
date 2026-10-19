@@ -835,7 +835,7 @@ function buildParts(): PartDefinition[] {
     indexed: true,
     instance_layout: RUNNING_LAYOUTS.swingArm,
     mate: { type: "absolute" },
-    source: "一侧前倾一侧后倾（驾驶员侧前倾）；臂长 280mm、静态下垂 50mm",
+    source: "一侧前倾一侧后倾（+Z 侧后倾 / -Z 侧前倾）；臂长 280mm、静态下垂 50mm",
   });
   add({
     id: "tiger.suspension.axle",
