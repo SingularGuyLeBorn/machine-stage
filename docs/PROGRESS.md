@@ -281,3 +281,41 @@ m-b-ui-drawer / isolation / rails / fault。
 `sump-bolt-seat` / `cover-bolt-seat` / `mount-bolt-seat` / `cam-cover-screw-seat` /
 `timing-cover-mount`.png，1801×1159 原尺寸），README 的逐族表同步扩到 23 行
 （21 族有命中 + 2 族预留 0 命中：`pipe-end-in-casting`、`plug-boot-on-plug`）。
+
+### B0 收尾：判定树补丁 + 门禁复核 + 构建层归一（2026-10-19）
+
+**判定树补丁**（`src/three/parts/solver/detect.ts` / `whitelist.ts`）：测不出深度时，
+旧实现按「交线超长」一律判 `suspect` 必报，会误报 0 间隙的装配贴合（测试夹具「翼片坐在
+立柱顶面」交线 464.6mm、y 向厚度 6e-9）。补丁加入第三条放行证据——**交线云退化成薄面
+（`planar`）且交线全部来自近平行面（`parallelRatio ≥ 0.5`）＝ 贴面接触（`face_mate`）**；
+真横穿的交线来自近垂直壁对（水管穿支架 112.56mm），仍判 `suspect`。白名单同步加形态守门：
+只有 `face_mate` / `bearing_overlap` 能进豁免区，`suspect` / `displaced` / 形态未知一律未豁免。
+
+本轮两处几何收尾（都写进族 reason）：
+
+1. 排气下管承口改**真外套滑套**（13 边形内切圆 0.0422 > 主管外接圆 0.042，径向恒定 0.24mm 净隙）；
+   下管起点 `from` 0.472 → 0.480——起点环垂直于近竖直管轴，x 展布 = ±管半径 22mm，
+   必须整圈落在歧管口封盖（x ≤ 0.456）之外。改前该对实测交线 105mm，全部来自这条起点环；
+   改后 `exhaust-pipe-socket` 归零转休眠（族条目保留）。
+2. 第 8 个非零命中族取**活塞销压装**：`ROD_SMALL_BORE` 0.8mm 净隙 → 0.6mm 过盈（按压装销建模），
+   命中 12 条。备选的缸套过盈会连带 `JACKET_R` / `GASKET_BORE_R` 收缩，风险更大，未采用。
+
+**门禁复核**（`npx tsx scripts/diag-clips.ts --recheck`，覆盖 `docs/qa/whitelist-recheck.md`；
+`docs/qa/whitelist/README.md` 逐族计数同步）：
+
+| 口径       | 结果                                                                                                                                                                                            |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 实例级报告 | 115（实例 398 → AABB 候选对 1284 → 报告 115 → 去重零件对 9 组）                                                                                                                                 |
+| 未豁免     | **0**（`expectedContacts.test.ts` 断言 `active = []`）                                                                                                                                          |
+| 深度口径   | 实测 115 / 测不出 0；形态 = 配合面 115 · 贴合 0 · 存疑 0 · 错位 0；>10mm 0 · 2–10mm 76 · ≤2mm 39                                                                                                |
+| 非零命中族 | **8**：piston-pin-in-small-end 12 / sump-bolt-seat 20 / cover-bolt-seat 24 / cam-cover-screw-seat 24 / plug-boot-on-plug 24 / mount-bolt-seat 8 / fan-bearing-press-fit 2 / fan-frame-passage 1 |
+| 扫描耗时   | 820 ms（性能哨兵：远低于 5min 上限）                                                                                                                                                            |
+| 门禁       | tsc ✓ / vitest 9 文件 105 tests ✓ / prettier ✓ / eslint 0 error（25 warning 为既有 no-console）/ build 3.44s ✓                                                                                  |
+
+**构建层归一**：发动机 68 件 `build_layer 1/2/3 → 1`（车辆五层口径 L1 核心机构），层内生长次序
+改由 `build_order` 表达并重排为 100..167（相对次序不变）；`validate.ts` 的 `LAYER_RANGE` 把 L1 扩到
+[100, 299]、其余层上移 100（testKit / assembler / stageStore 夹具同步）。零件树现在把整机挂在
+「曲轴箱总成 · 23 件 · L1」下，滑杆 L1 段逐件生长（截图停在 41/68 件）。
+
+**截图**：`docs/screenshots/m-b0-layer-l1.png`（零件树 L1 + 滑杆 41/68 件）、
+`docs/screenshots/m-b0-clips-whitelist.png`（未豁免报告 = 0，已豁免 76 条构造性接触）。

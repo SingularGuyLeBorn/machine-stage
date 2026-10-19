@@ -15,12 +15,15 @@ export interface ValidationIssue {
 
 const ID_PATTERN = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
 const NODE_PATTERN = /^[A-Za-z][A-Za-z0-9_]*$/;
+// 层号 → build_order 基调区间（校验用）：build_order 是全局单调整数，区间只要求每层占一段、
+// 不与相邻层重叠。L1 留 200 格是因为虎式整机的核心机构（HL230 全机约 110 个具名零件）全归 L1；
+// 其余层各留 100 格（车体/蒙皮等层以实例数取胜，具名零件不多）。
 const LAYER_RANGE: Record<number, [number, number]> = {
-  1: [100, 199],
-  2: [200, 299],
-  3: [300, 399],
-  4: [400, 499],
-  5: [500, 599],
+  1: [100, 299],
+  2: [300, 399],
+  3: [400, 499],
+  4: [500, 599],
+  5: [600, 699],
 };
 
 export const BUILD_LAYER_LABELS: Record<number, { name_cn: string; name_en: string }> = {
