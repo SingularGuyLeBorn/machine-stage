@@ -319,3 +319,44 @@ m-b-ui-drawer / isolation / rails / fault。
 
 **截图**：`docs/screenshots/m-b0-layer-l1.png`（零件树 L1 + 滑杆 41/68 件）、
 `docs/screenshots/m-b0-clips-whitelist.png`（未豁免报告 = 0，已豁免 76 条构造性接触）。
+
+### L1 第二批扩量：法兰/端板螺栓 + 传感器（2026-10-19）
+
+**新增 4 件 / 实例 +98**（68 → 72 件、398 → 496 实例；仍是只补真实存在的小件，不切大件凑数）：
+
+| 零件                               |    实例 | 落点与依据                                                                  |
+| ---------------------------------- | ------: | --------------------------------------------------------------------------- |
+| `cylinder.port_flange_bolt`        |      48 | 每缸 4 颗（进气高口 2 + 排气低口 2）：头坐在法兰外面、杆埋进 18mm 法兰 5mm  |
+| `crankcase.endplate_bolt`          |      24 | 前后端板各 12 颗，绕曲轴轴线 ⌀290 一圈（正时盖 ⌀260 之外、机体截面之内）    |
+| `crankcase.oil_pressure_sender`    |       1 | 机体右侧壁 x=−0.14 / y=0.05：外壳 ⌀32×42 坐在壁外，螺纹杆埋进 19mm 壁厚 6mm |
+| `cooling.coolant_temp_sender`      |       1 | 同壁 x=−0.28（避开 x=−0.212 加强肋），与机油压力传感器前后成对              |
+| `cylinder.cam_cover_screw`（加密） | 24 → 48 | 缸盖罩螺钉每罩 2 颗 → 4 颗（罩顶面沿 X 两对），既有族计数同步               |
+
+**几何整改**：缸盖进/排气法兰宽度按螺栓座需要加宽到 `HEAD_FLANGE_W = 78mm`（`kits.ts` 的
+`cylinderHead` 增 `flangeW` 参数：端口 ⌀38 两侧各留 12mm），螺栓落在距端口中心 33mm 处——
+既在法兰实体内、又让开 ⌀38 短管柱面（净隙 1.5mm）。
+
+**螺栓落点口径**（探针 `scripts/tmp-probe.ts` 实测，用完即删）：`boltGeometry()` 的原点是
+**头的外端面**、不是坐落面，故布局要再外移 10mm（沿用 `sump_bolt` 的 10mm 口径）。把原点放在
+法兰外表面（少算 9mm）时，头会整只埋进法兰、交线云退化成「六角形 + 杆」而判 `displaced`
+（48 条未豁免）；外移 10mm 后交线收成 14×15×5mm 的杆—法兰环，形态回到 `bearing_overlap`
+（实测 5.00mm）。同一探针核对安装面：左列缸心世界 z=−226mm、法兰螺栓 z=−345mm、进气歧管
+支管起点 z=−383mm（右列镜像），确认螺栓装在**歧管支管那一面**（左列缸列局部 −z、右列 +z）。
+
+**白名单**：新增 3 族 6 条规则（共 39 条），非零命中族 8 → **11**。守门值：`port-flange-bolt-seat`
+14mm、`endplate-bolt-seat` 14mm（端板螺栓穿端板后拧进机体端面螺孔，实测最深 10.28mm）、
+`sender-thread-seat` 10mm。
+
+**门禁**（`npx tsx scripts/diag-clips.ts --recheck`，覆盖 `docs/qa/whitelist-recheck.md`）：
+
+| 口径       | 结果                                                                                                                                                                                                                                                                       |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 实例级报告 | 227（实例 496 → AABB 候选对 1498 → 报告 227 → 去重零件对 15 组）                                                                                                                                                                                                           |
+| 未豁免     | **0**（`expectedContacts.test.ts` 断言 `active = []`）                                                                                                                                                                                                                     |
+| 深度口径   | 实测 227 / 测不出 0；形态 = 配合面 227 · 贴合 0 · 存疑 0 · 错位 0；>10mm 4 · 2–10mm 160 · ≤2mm 63                                                                                                                                                                          |
+| 非零命中族 | **11**：port-flange-bolt-seat 48 / cam-cover-screw-seat 48 / endplate-bolt-seat 38 / cover-bolt-seat 24 / plug-boot-on-plug 24 / sump-bolt-seat 20 / piston-pin-in-small-end 12 / mount-bolt-seat 8 / fan-bearing-press-fit 2 / sender-thread-seat 2 / fan-frame-passage 1 |
+| 扫描耗时   | 1110 ms（性能哨兵：远低于 5min 上限）                                                                                                                                                                                                                                      |
+| 门禁       | tsc ✓ / vitest 9 文件 105 tests ✓ / prettier ✓ / eslint 0 error（34 warning 为既有 no-console）/ build 4.25s ✓                                                                                                                                                             |
+
+**截图**：`docs/screenshots/m-b1-overview.png`（零件树 72 件、未豁免 0 / 豁免 227）、
+`docs/screenshots/m-b1-tree.png`（选中 `缸盖进排气法兰螺栓 ×48`、滑杆 72/72 件）。

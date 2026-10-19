@@ -1,7 +1,7 @@
 # 豁免规则复核清单（判定树口径）
 
 > 生成命令：`npx tsx scripts/diag-clips.ts --recheck`（本文件由脚本生成，不要手改）。
-> 本轮数据：总报告 115 / 未豁免 0 / 已豁免 115（含引擎模型全量实例对）。
+> 本轮数据：总报告 227 / 未豁免 0 / 已豁免 227（含引擎模型全量实例对）。
 
 ## 判定树口径
 
@@ -50,10 +50,16 @@
 | 27 | `cover-bolt-seat` | `tiger.crankcase.inspection_cover_bolt` ↔ `tiger.crankcase.inspection_cover` | 检查盖螺栓固定盖板：头露在盖外、杆埋进 8mm 盖板里。 | 14 | 16/16 | bearing_overlap×16 | ✔ 全部为配合面/贴合面 |
 | 28 | `cover-bolt-seat` | `tiger.crankcase.timing_cover_bolt` ↔ `tiger.crankcase.timing_cover` | 正时齿轮盖螺栓固定盖板：头露在盖外、杆埋进 20mm 盖板里。 | 14 | 8/8 | bearing_overlap×8 | ✔ 全部为配合面/贴合面 |
 | 29 | `mount-bolt-seat` | `tiger.crankcase.mount_bolt` ↔ `tiger.crankcase.mount` | 机脚螺栓把机脚固定在机架上：头在脚底、杆埋进 50mm 脚体里。 | 14 | 8/8 | bearing_overlap×8 | ✔ 全部为配合面/贴合面 |
-| 30 | `cam-cover-screw-seat` | `tiger.cylinder.cam_cover_screw` ↔ `tiger.cylinder.cam_cover` | 缸盖罩螺钉拧进罩顶板：头在罩外、杆埋进 8mm 顶板里。 | 14 | 24/24 | bearing_overlap×24 | ✔ 全部为配合面/贴合面 |
+| 30 | `cam-cover-screw-seat` | `tiger.cylinder.cam_cover_screw` ↔ `tiger.cylinder.cam_cover` | 缸盖罩螺钉拧进罩顶板：头在罩外、杆埋进 8mm 顶板里。 | 14 | 48/48 | bearing_overlap×48 | ✔ 全部为配合面/贴合面 |
 | 31 | `plug-boot-on-plug` | `tiger.ignition.plug_boot` ↔ `tiger.valvetrain.spark_plug` | 高压护套套在火花塞瓷体上：护套为闭合空心剖面（内孔 ⌀27）、塞子斜唇 ⌀23，名义净隙 + 唇口咬合（1.1mm 级）。 | 2 | 24/24 | bearing_overlap×24 | ✔ 全部为配合面/贴合面 |
 | 32 | `timing-cover-mount` | `tiger.crankcase.endplate_front` ↔ `tiger.crankcase.timing_cover` | 正时齿轮盖螺栓固定在端板正面：盖板背面与端板前面是贴合的安装面。 | 2 | 0/0 | — | — 未命中（族空转） |
 | 33 | `pipe-end-in-casting` | `tiger.accessory.water_pump` ↔ `tiger.accessory.water_pipe_*` | 水管端头埋在水泵铸件里（隐藏接口）：管端不外露，接口藏在铸件内部。 | 2 | 0/0 | — | — 未命中（族空转） |
+| 34 | `port-flange-bolt-seat` | `tiger.cylinder.port_flange_bolt` ↔ `tiger.cylinder.head` | 缸盖进/排气法兰螺栓拧进法兰螺孔：头坐在法兰外面、杆埋进 18mm 法兰板（埋入量 > 贴面量级，按 14mm 守门）。 | 14 | 48/48 | bearing_overlap×48 | ✔ 全部为配合面/贴合面 |
+| 35 | `endplate-bolt-seat` | `tiger.crankcase.endplate_bolt` ↔ `tiger.crankcase.endplate_front` | 前端板螺栓：头在端板外面、杆埋进端板板厚（⌀290 螺孔圈，让开正时盖 ⌀260）。 | 14 | 12/12 | bearing_overlap×12 | ✔ 全部为配合面/贴合面 |
+| 36 | `endplate-bolt-seat` | `tiger.crankcase.endplate_bolt` ↔ `tiger.crankcase.endplate_rear` | 后端板螺栓：与前端板同圈同规格，头在飞轮壳一侧外面。 | 14 | 12/12 | bearing_overlap×12 | ✔ 全部为配合面/贴合面 |
+| 37 | `endplate-bolt-seat` | `tiger.crankcase.endplate_bolt` ↔ `tiger.crankcase.shell` | 端板螺栓穿过端板后拧进机体端面螺孔（端板夹在中间）：同一杆同时咬合端板与机体，都是螺纹咬合。 | 14 | 14/14 | bearing_overlap×14 | ✔ 全部为配合面/贴合面 |
+| 38 | `sender-thread-seat` | `tiger.crankcase.oil_pressure_sender` ↔ `tiger.crankcase.shell` | 机油压力传感器螺纹杆拧进机体侧壁螺孔：外壳坐在壁外，杆只埋进 19mm 壁厚的 6mm。 | 10 | 1/1 | bearing_overlap×1 | ✔ 全部为配合面/贴合面 |
+| 39 | `sender-thread-seat` | `tiger.cooling.coolant_temp_sender` ↔ `tiger.crankcase.shell` | 水温传感器螺纹杆拧进机体侧壁螺孔（水套外壁），与机油压力传感器同壁前后各一。 | 10 | 1/1 | bearing_overlap×1 | ✔ 全部为配合面/贴合面 |
 
 ## 漏网清单（族内被判 suspect / displaced 的报告）
 

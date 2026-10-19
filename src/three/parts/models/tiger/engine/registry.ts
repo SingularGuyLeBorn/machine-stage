@@ -70,6 +70,8 @@ export const ENGINE_LAYOUTS = {
   timingBolt: "engine.timingBolt",
   mountBolt: "engine.mountBolt",
   coverScrew: "engine.coverScrew",
+  portFlangeBolt: "engine.portFlangeBolt",
+  endplateBolt: "engine.endplateBolt",
 } as const;
 
 /** 缸号（0..11）→ 曲柄销序号 / 所在侧 / 缸心 X / 缸列倾角（度）。 */
@@ -385,6 +387,23 @@ const CONSTANTS: Record<string, Expr> = {
   PORT_IN_Y: "HEAD_H*0.72",
   PORT_EX_Y: "HEAD_H*0.22",
   PORT_STUB_R: 0.019, // 缸盖进/排气短管半径；支管起点套在短管上（起点在短管柱面内）
+  // 缸盖进/排气法兰宽：端口 ⌀38 两侧各留 12mm 螺栓座（B1：port_flange_bolt ×4/缸）
+  HEAD_FLANGE_W: 0.078,
+  PORT_FLANGE_BOLT_DX: "HEAD_FLANGE_W/2-0.006", // 螺栓到端口中心 33mm：让开短管柱面 19mm
+  // 法兰盒外表面在 d/2+0.016；boltGeometry 原点 = 头的外端面，故再外移 10mm
+  // （沿用 sump_bolt 口径：头 9mm 坐在法兰面上、杆埋进法兰 5mm）
+  PORT_FLANGE_BOLT_Z: "BLOCK_D/2+0.026",
+  // 端板螺孔圈：落在正时盖 ⌀260 之外、机体截面之内（12 颗/端板）
+  ENDBOLT_R: 0.145,
+  ENDBOLT_COUNT: 12,
+  // 机油压力/水温传感器：外壳坐在机体侧壁外，螺纹杆只埋进 19mm 壁厚的 6mm
+  SENDER_STEM_R: 0.008,
+  SENDER_STEM_L: 0.006,
+  SENDER_BODY_R: 0.016,
+  SENDER_BODY_H: 0.042,
+  SENDER_X1: -0.14,
+  SENDER_X2: -0.28,
+  SENDER_Y: 0.05,
   PORT_Z: "BLOCK_D/2+0.04",
   EXHAUST_MAIN_Y: 0.055,
   // 排气主管再外移 22mm：进气支管起点（PORT_IN_Y）到主管轴心的净空
@@ -816,19 +835,56 @@ function makeLayouts(): Record<string, InstanceLayout> {
     );
   };
 
-  // 凸轮轴罩螺钉：每只罩 2 颗（罩顶面沿 X 前后各一）。头在上、杆向下（Rx 180°）
+  // 凸轮轴罩螺钉：每只罩 4 颗（罩顶面沿 X 两对，B1 从 2 颗加密到 4 颗）。
+  // 头在上、杆向下（Rx 180°）；B1 加密后计数 24 → 48。
   layouts[ENGINE_LAYOUTS.coverScrew] = ({ index, constants }) => {
-    const cover = Math.floor(index / 2);
-    const k = index % 2;
+    const cover = Math.floor(index / 4);
+    const k = index % 4;
+    const dx = (k < 2 ? -1 : 1) * (k % 2 === 0 ? constants.COVER_SCREW_DX : constants.COVER_SCREW_DX / 3);
     const { pin, side } = cylinderInfo(cover, constants);
     return bankMatrix(
       side,
-      constants.CYL_X1 - pin * constants.CYL_PITCH + (k === 0 ? -1 : 1) * constants.COVER_SCREW_DX,
+      constants.CYL_X1 - pin * constants.CYL_PITCH + dx,
       constants.COVER_SCREW_Y,
       0,
       0,
       constants,
     ).multiply(new THREE.Matrix4().makeRotationX(deg2rad(180)));
+  };
+
+  // 缸盖进/排气法兰螺栓：每缸 4 颗（进气口 2 + 排气口 2，同一法兰面上左右各 1）。
+  // index = 缸(0..11) × 口(0 进气高口 / 1 排气低口) × 左右(−x/+x)。
+  // 装在歧管支管起点的同一面：左列（side −1）在局部 −z、右列（side +1）在局部 +z
+  // （歧管支管起点同侧，见 intake_manifold_l/r 的 mainFrom 分支）。
+  // 头在法兰外、杆沿 ±z 指进法兰（Rx ∓90°，与 timingBolt/fanBearing 同一约定）。
+  layouts[ENGINE_LAYOUTS.portFlangeBolt] = ({ index, constants }) => {
+    const cylinder = Math.floor(index / 4);
+    const port = Math.floor(index / 2) % 2 === 0 ? constants.PORT_IN_Y : constants.PORT_EX_Y;
+    const dx = (index % 2 === 0 ? -1 : 1) * constants.PORT_FLANGE_BOLT_DX;
+    const { pin, side } = cylinderInfo(cylinder, constants);
+    return bankMatrix(
+      side,
+      constants.CYL_X1 - pin * constants.CYL_PITCH + dx,
+      constants.HEAD_BASE + port,
+      side * constants.PORT_FLANGE_BOLT_Z,
+      0,
+      constants,
+    ).multiply(new THREE.Matrix4().makeRotationX(deg2rad(side > 0 ? -90 : 90)));
+  };
+
+  // 端板螺栓：前后端板各 12 颗，绕曲轴轴线 ⌀290 一圈。
+  // 头在端板外面、杆沿 ∓x 指进端板（front: +Y→−X 用 Rz(+90)；rear: +Y→+X 用 Rz(−90)）。
+  layouts[ENGINE_LAYOUTS.endplateBolt] = ({ index, constants }) => {
+    const front = index < constants.ENDBOLT_COUNT;
+    const k = index % constants.ENDBOLT_COUNT;
+    const angle = deg2rad((k * 360) / constants.ENDBOLT_COUNT);
+    return new THREE.Matrix4()
+      .makeTranslation(
+        front ? constants.CASE_FRONT_X + 0.001 : constants.CASE_REAR_X - 0.001,
+        constants.ENDBOLT_R * Math.sin(angle),
+        constants.ENDBOLT_R * Math.cos(angle),
+      )
+      .multiply(new THREE.Matrix4().makeRotationZ(deg2rad(front ? 90 : -90)));
   };
 
   return layouts;
@@ -1510,6 +1566,8 @@ function buildParts(): PartDefinition[] {
         h: "HEAD_H",
         chamber: "HEAD_CHAMBER_R",
         portW: 0.054,
+        // 法兰宽单独给：端口两侧要留进/排气法兰螺栓座（B1）
+        flangeW: "HEAD_FLANGE_W",
         // 进/排气口高度与短管半径与歧管支管共用同一组常量（单一真值源）
         portInY: "PORT_IN_Y",
         portExY: "PORT_EX_Y",
@@ -1523,7 +1581,9 @@ function buildParts(): PartDefinition[] {
     instances: 12,
     indexed: true,
     instance_layout: ENGINE_LAYOUTS.bank,
-    source: "平板缸盖（真实为双涡流室半球盖）：燃烧室为通孔，气门共线装于孔内",
+    source:
+      "平板缸盖（真实为双涡流室半球盖）：燃烧室为通孔，气门共线装于孔内；" +
+      "进/排气法兰加宽到 HEAD_FLANGE_W（78mm）留出法兰螺栓座（L1 第二批）",
   });
   add({
     id: "tiger.cylinder.cam_cover",
@@ -2327,10 +2387,90 @@ function buildParts(): PartDefinition[] {
     geometry: boltGeometry(),
     material: "steel",
     mate: { type: "absolute" },
-    instances: 24,
+    instances: 48,
     indexed: true,
     instance_layout: ENGINE_LAYOUTS.coverScrew,
-    source: "**[新增]** 每只缸盖罩顶面 2 颗（沿罩长前后各一），12 只罩",
+    source: "**[新增]** 每只缸盖罩顶面 4 颗（沿罩长两对），12 只罩；B1 由 2 颗/罩加密到 4 颗/罩",
+  });
+  // ---- L1 第二批：紧固件密度（缸盖法兰螺栓 / 端板螺栓）+ 传感器（实例 +98）----
+  add({
+    id: "tiger.cylinder.port_flange_bolt",
+    name_cn: "缸盖进排气法兰螺栓",
+    name_en: "port flange bolt",
+    assembly: "cylinder",
+    build_layer: 1,
+    build_order: 168,
+    geometry: boltGeometry(),
+    material: "steel",
+    mate: { type: "absolute" },
+    instances: 48,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.portFlangeBolt,
+    source:
+      "**[新增]** 每缸两只法兰（进气高口 PORT_IN_Y、排气低口 PORT_EX_Y）各 2 颗，共 4 颗/缸（12 缸）" +
+      "；法兰宽由 HEAD_FLANGE_W 给出，螺栓到端口中心 33mm（让开 ⌀38 短管）",
+  });
+  add({
+    id: "tiger.crankcase.endplate_bolt",
+    name_cn: "端板螺栓",
+    name_en: "endplate bolt",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 169,
+    geometry: boltGeometry(),
+    material: "steel",
+    mate: { type: "absolute" },
+    instances: 24,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.endplateBolt,
+    source: "**[新增]** 前后端板各 12 颗，绕曲轴轴线 ⌀290 一圈（正时盖 ⌀260 之外、机体截面之内）",
+  });
+  add({
+    id: "tiger.crankcase.oil_pressure_sender",
+    name_cn: "机油压力传感器",
+    name_en: "oil pressure sender",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 170,
+    geometry: {
+      type: "lathe",
+      segments: 18,
+      profile: [
+        [0, 0],
+        ["SENDER_STEM_R", 0],
+        ["SENDER_STEM_R", "SENDER_STEM_L"],
+        ["SENDER_BODY_R", "SENDER_STEM_L"],
+        ["SENDER_BODY_R", "SENDER_STEM_L+SENDER_BODY_H"],
+        [0, "SENDER_STEM_L+SENDER_BODY_H"],
+      ],
+    },
+    material: "steel_worn",
+    // 杆轴指向壁内：+Y → −Z（Rx −90°），外壳坐在机体右侧壁外
+    mate: { type: "absolute", position: ["SENDER_X1", "SENDER_Y", "CASE_HALF_W"], rotation: [-90, 0, 0] },
+    source: "**[新增]** 主油道压力传感器：外壳 φ32×42mm 坐在机体侧壁，螺纹杆埋进 19mm 壁厚 6mm",
+  });
+  add({
+    id: "tiger.cooling.coolant_temp_sender",
+    name_cn: "水温传感器",
+    name_en: "coolant temperature sender",
+    assembly: "cooling",
+    build_layer: 1,
+    build_order: 171,
+    geometry: {
+      type: "lathe",
+      segments: 18,
+      profile: [
+        [0, 0],
+        ["SENDER_STEM_R", 0],
+        ["SENDER_STEM_R", "SENDER_STEM_L"],
+        ["SENDER_BODY_R", "SENDER_STEM_L"],
+        ["SENDER_BODY_R", "SENDER_STEM_L+SENDER_BODY_H*0.8"],
+        [0, "SENDER_STEM_L+SENDER_BODY_H*0.8"],
+      ],
+    },
+    material: "steel_worn",
+    mate: { type: "absolute", position: ["SENDER_X2", "SENDER_Y", "CASE_HALF_W"], rotation: [-90, 0, 0] },
+    source: "**[新增]** 冷却水套出水温度传感器（与机油压力传感器同壁前后各一，避开 x=-0.212 的加强肋）",
   });
   add({
     id: "tiger.ignition.plug_boot",
