@@ -107,6 +107,28 @@ export interface PartDefinition {
   source?: string;
 }
 
+/**
+ * 构造性接触豁免规则（白名单）。
+ *
+ * 装配关系本身就会让零件互相咬合/贴合：轴颈坐在轴瓦里、缸套过盈压入镗孔、
+ * 剖分面两边合起来才是一个整圆、管端插进铸件里、皮带包在带轮上……
+ * 这些 0.5mm 级（检测阈值下限）的报告是机器本身，不是缺陷。
+ * 真缺陷是「位置/尺寸算错导致本不该接触的零件叠在一起」——所以要修，不能豁免。
+ * 规则按「零件对」给（同族一条），不按深度一刀切：深度守门见 whitelist.ts。
+ */
+export interface ExpectedContactRule {
+  /** 豁免族：面板分组的审计单元，截图名对应 docs/qa/whitelist/<family>.png。 */
+  family: string;
+  /** 零件 id 模式：精确 id，或以 `*` 结尾的前缀（如 `tiger.valvetrain.camshaft_*`）。 */
+  a: string;
+  /** 同 a；匹配时忽略实例下标 `[n]`，A/B 顺序无关。 */
+  b: string;
+  /** 为什么这是构造性接触（写清物理装配语义，供面板与 QA 截图核对）。 */
+  reason: string;
+  /** 覆盖深度守门（mm）。省略 = 用 whitelist.ts 的 DEFAULT_MAX_DEPTH_MM。 */
+  maxDepthMm?: number;
+}
+
 export interface ModelRegistry {
   model: string;
   title: string;
@@ -119,6 +141,8 @@ export interface ModelRegistry {
   nodes: NodeDef[];
   materials: Record<string, MaterialSpec>;
   parts: PartDefinition[];
+  /** 构造性接触白名单（缺省 = 不豁免任何报告）。 */
+  expectedContacts?: ExpectedContactRule[];
 }
 
 /** 展开后的零件（dual 展开、instances 规范化）。 */

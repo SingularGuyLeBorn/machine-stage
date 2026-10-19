@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SideColumn } from "../App";
 import { findModel } from "../catalog";
-import { buildOrdersOf, useStageStore } from "../state/stageStore";
+import { buildOrdersOf, splitReports, useStageStore } from "../state/stageStore";
 import type { ClippingReport } from "@/three/parts";
 import { ActionPanel } from "./ActionPanel";
 import { BuildSlider } from "./BuildSlider";
@@ -33,6 +33,7 @@ const resetStore = () => {
     isolation: null,
     allReports: [],
     reports: [],
+    reportPartition: { active: [], expected: [] },
     scanPhase: "idle",
     scanKind: null,
     scanMs: null,
@@ -70,6 +71,17 @@ const sampleReports = (): ClippingReport[] => {
 
 beforeEach(resetStore);
 afterEach(cleanup);
+
+/** 写入一组报告：raw/reports/reportPartition 一起给（面板读的是分层后的派生值）。 */
+const withReports = (reports: ClippingReport[], modelId = "test") =>
+  useStageStore.setState({
+    modelId,
+    allReports: reports,
+    reports,
+    reportPartition: splitReports(modelId, reports),
+    scanPhase: "ready",
+    scanKind: "static",
+  });
 
 describe("ModelList", () => {
   it("已交付模型可点切换，计划模型禁用", () => {
@@ -155,9 +167,9 @@ describe("BuildSlider", () => {
 });
 
 describe("ClippingPanel", () => {
-  it("无报告时显示验收通过文案", () => {
+  it("无报告时显示未豁免 = 0 的验收通过文案", () => {
     render(<ClippingPanel />);
-    expect(screen.getByText(/实例级穿模报告为空/)).toBeDefined();
+    expect(screen.getByText(/未豁免报告 = 0/)).toBeDefined();
   });
 
   it("0 件时提示未开始构建", () => {
@@ -167,7 +179,7 @@ describe("ClippingPanel", () => {
   });
 
   it("报告按 partId 家族聚合，默认收起只显示族名与数量", () => {
-    useStageStore.setState({ reports: sampleReports(), scanPhase: "ready", scanKind: "static", scanMs: 9 });
+    withReports(sampleReports());
     render(<ClippingPanel />);
     // 家族名是零件级 ID（不含实例下标）
     expect(screen.getAllByText("test.frame.box").length).toBe(2);
@@ -178,7 +190,7 @@ describe("ClippingPanel", () => {
   });
 
   it("展开族后出现实例级卡片、hint 与可读常量链", () => {
-    useStageStore.setState({ reports: sampleReports(), scanPhase: "ready" });
+    withReports(sampleReports());
     render(<ClippingPanel />);
     fireEvent.click(screen.getAllByTitle("展开该族的逐条报告")[0]);
     expect(screen.getAllByText("test.frame.box[0]").length).toBeGreaterThan(0);
@@ -188,7 +200,7 @@ describe("ClippingPanel", () => {
   });
 
   it("工具条：全部展开 / 全部收起 / 按层过滤", () => {
-    useStageStore.setState({ reports: sampleReports(), scanPhase: "ready" });
+    withReports(sampleReports());
     render(<ClippingPanel />);
     fireEvent.click(screen.getByText("全部展开"));
     expect(screen.getAllByText("检查 GAP 常量").length).toBe(3);
@@ -201,7 +213,7 @@ describe("ClippingPanel", () => {
   });
 
   it("点「飞到穿透点」→ 选中 A 件 + 相机飞过去；点「隔离对比」→ 打开小视图", () => {
-    useStageStore.setState({ reports: sampleReports(), scanPhase: "ready" });
+    withReports(sampleReports());
     render(<ClippingPanel />);
     fireEvent.click(screen.getByText("全部展开"));
 
@@ -215,11 +227,66 @@ describe("ClippingPanel", () => {
     expect(state.isolation?.kind).toBe("pair");
     expect(state.activeReport).toBe(1);
   });
+
+  it("构造性接触走白名单：未豁免 = 0，已豁免收起可展开（带依据）", () => {
+    withReports(
+      [
+        {
+          type: "clipping",
+          phase: "static",
+          frame: null,
+          severity: "error",
+          a: "tiger.piston_rod.connecting_rod[0]",
+          b: "tiger.piston_rod.rod_cap[0]",
+          depth_mm: 0.5,
+          point: [0, 0, 0],
+          hint: "",
+          aLayer: 2,
+          bLayer: 2,
+        },
+      ],
+      "tiger",
+    );
+    render(<ClippingPanel />);
+    expect(screen.getByText(/未豁免报告 = 0/)).toBeDefined();
+    // 收起态只给计数，不摊理由
+    expect(screen.getByText(/已按白名单豁免/)).toBeDefined();
+    expect(screen.queryByText("conrod-split-face")).toBeNull();
+    fireEvent.click(screen.getByText("已豁免构造性接触"));
+    expect(screen.getByText("conrod-split-face")).toBeDefined();
+    expect(screen.getByText(/剖分面/)).toBeDefined();
+    expect(screen.getAllByTitle("在隔离小视图里对比这两件").length).toBe(1);
+  });
+
+  it("豁免族里注入 5mm 真重叠 → 计入未豁免（深度守门），不进已豁免区", () => {
+    withReports(
+      [
+        {
+          type: "clipping",
+          phase: "static",
+          frame: null,
+          severity: "error",
+          a: "tiger.piston_rod.connecting_rod[0]",
+          b: "tiger.piston_rod.rod_cap[0]",
+          depth_mm: 5,
+          point: [0, 0, 0],
+          hint: "",
+          aLayer: 2,
+          bLayer: 2,
+        },
+      ],
+      "tiger",
+    );
+    render(<ClippingPanel />);
+    expect(screen.queryByText(/未豁免报告 = 0/)).toBeNull();
+    expect(screen.queryByText("已豁免构造性接触")).toBeNull();
+    expect(screen.getAllByText(/5\.00mm/).length).toBeGreaterThan(0);
+  });
 });
 
 describe("ClippingDock", () => {
   it("收起态是带数量的边缘按钮，点开成抽屉，可关闭", () => {
-    useStageStore.setState({ reports: sampleReports() });
+    withReports(sampleReports());
     render(<ClippingDock />);
     const tab = screen.getByTitle("打开穿模报告抽屉");
     expect(tab.textContent).toContain("3");
@@ -228,12 +295,12 @@ describe("ClippingDock", () => {
   });
 
   it("展开态渲染面板并提供收起按钮", () => {
+    withReports(sampleReports());
     useStageStore.setState({
-      reports: sampleReports(),
       layout: { ...useStageStore.getState().layout, drawer: { open: true, width: 360 } },
     });
     render(<ClippingDock />);
-    expect(screen.getByText("穿模报告")).toBeDefined();
+    expect(screen.getByText(/未豁免报告/)).toBeDefined();
     fireEvent.click(screen.getByLabelText("收起报告抽屉"));
     expect(useStageStore.getState().layout.drawer.open).toBe(false);
   });

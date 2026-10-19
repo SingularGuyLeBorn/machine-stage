@@ -1085,6 +1085,114 @@
   font-size: 12px;
 }
 
+/* ---------- 已豁免（构造性接触，收起区）---------- */
+
+.clipexp {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.clipexp__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  text-align: left;
+}
+
+.clipexp__head:hover {
+  background: var(--panel-hover);
+}
+
+.clipexp__chevron {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--text-3);
+  transition: transform 0.14s ease;
+}
+
+.clipexp[data-open="true"] .clipexp__chevron {
+  transform: rotate(180deg);
+}
+
+.clipexp__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.clipexp__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+
+.clipexp__family {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.clipexp__familyhead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.clipexp__familyhead code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.clipexp__reason {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.clipexp__items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clipexp__items li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+.clipexp__items li .clipcard__actions {
+  margin-left: auto;
+}
+
 /* ---------- 隔离小视图 ---------- */
 
 .iso {

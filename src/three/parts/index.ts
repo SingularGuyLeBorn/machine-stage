@@ -6,6 +6,7 @@ export * from "./registry/testKit";
 export * from "./assembler/geometry";
 export * from "./assembler/assembler";
 export * from "./solver/report";
+export * from "./solver/whitelist";
 export * from "./solver/detect";
 export * from "./kernel/geometry";
 export * from "./kernel/textures";
