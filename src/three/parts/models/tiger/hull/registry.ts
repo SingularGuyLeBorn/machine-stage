@@ -41,6 +41,7 @@ export const HULL_LAYOUTS = {
   ringBolts: "hull.ringBolts",
   glacisSpare: "hull.glacisSpare",
   roofEyes: "hull.roofEyes",
+  trackGuard: "hull.trackGuard",
 } as const;
 
 const HULL_CONSTANTS: Record<string, number> = {
@@ -171,6 +172,14 @@ function makeLayouts(): Record<string, InstanceLayout> {
     else m.setPosition(HULL_CONSTANTS.HULL_EYE2_X! - HULL_CONSTANTS.HULL_EYE_X!, 0, 0);
     return m;
   };
+
+  // 履带挡板 ×2：右件直接外伸；左件绕 Y 转 180° 再平移（板件全对称，翻面后轮廓一致）
+  layouts[HULL_LAYOUTS.trackGuard] = ({ index }) =>
+    index === 0
+      ? new THREE.Matrix4().makeTranslation(0, 0, 0.9655)
+      : new THREE.Matrix4()
+          .makeTranslation(5.41, 0, -0.9655)
+          .multiply(new THREE.Matrix4().makeRotationY(Math.PI));
 
   return layouts;
 }
@@ -673,6 +682,30 @@ function buildHullParts(): PartDefinition[] {
     },
     source:
       "焊接吊环（Anschlagpunkt）×3：底板 100 × 70 × 12 + 两片立板 + ⌀16 横销，焊在战斗室顶甲板上表面（离面 3mm）——两个前角（x -4.15 / z ±0.85）+ 前段中央（x -2.62 / z 0）；吊环供吊装炮塔 / 车体、以及野战检修时起吊总成。实车虎 I 的吊点在车体四角与发动机舱两侧，本模型按「两前角 + 中前」三只简化，避让潜望镜窗框（x -4.043 起）与舱盖孔（z ±0.66）。",
+  });
+
+  parts.push({
+    id: "tiger.hull.track_guard",
+    name_cn: "履带挡板 / 前后挡泥板",
+    name_en: "Kotflügel",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 552,
+    geometry: {
+      type: "kit",
+      kit: "trackGuard",
+      params: { len: 5.41, width: 0.94, t: 0.015, flapLen: 0.26, flapAngle: 35, ribH: 0.1 },
+    },
+    material: "armor_steel",
+    instances: 2,
+    indexed: true,
+    instance_layout: HULL_LAYOUTS.trackGuard,
+    mate: {
+      type: "absolute",
+      position: [c.HULL_FRONT_INNER! - c.HULL_FRONT_T!, 0.1, 0],
+    },
+    source:
+      "履带挡板（Kotflügel）：5.41 m × 0.94 m × 15mm 薄钢板 + 前后各一块 260mm 活页挡泥板（下折 35°）+ 内侧 5 道支撑肋（18 × 100 × 520，贴车体侧留 3mm）。内缘离车体侧壁 3mm（z ±0.9655），外缘到 z ±1.905（履带外缘 1.8525 外 52mm），板面 y 0.10（履带顶 −0.24 上方 340mm）。实车挡板挂在赞助板（z ±1.78）下缘、宽约 300mm；本模型上部车体尚未补，先按下部车体侧壁外伸的整块挡板做，L4-g 上部车体落地后缩到 300mm 并改挂 z ±1.78。",
   });
 
   return parts;

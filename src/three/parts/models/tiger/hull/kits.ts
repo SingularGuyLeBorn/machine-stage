@@ -389,6 +389,51 @@ const liftingEye: GeometryBuilder = (spec) => {
   return merged;
 };
 
+// ---------------------------------------------------------------------------
+// 履带挡板 / 前后挡泥板（Kotflügel）
+// 局部系：原点 = 挡板下表面·前端·内缘；+x 向后、+z 向外。全长 5.41 / 全宽 0.94。
+// 挡板 15 厚 + 前后各一块 260 活页挡泥板（下折 35°）+ 内侧 5 道支撑肋（贴车体侧留 3mm）。
+// ---------------------------------------------------------------------------
+const trackGuard: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const len = num(params, "len", 5.41);
+  const width = num(params, "width", 0.94);
+  const t = num(params, "t", 0.015);
+  const flapLen = num(params, "flapLen", 0.26);
+  const flapAngle = num(params, "flapAngle", 35);
+  const ribH = num(params, "ribH", 0.1);
+
+  const parts: THREE.BufferGeometry[] = [];
+
+  // 挡板主体
+  const guard = bevelBoxGeometry(len, t, width, 0.003);
+  guard.translate(len / 2, t / 2, width / 2);
+  parts.push(guard);
+
+  // 前后挡泥板（绕端部铰线往下折 35°）
+  const a = THREE.MathUtils.degToRad(flapAngle);
+  const front = bevelBoxGeometry(flapLen, 0.012, width, 0.002);
+  front.translate(-flapLen / 2 + 0.005, 0.006, width / 2);
+  front.rotateZ(a);
+  parts.push(front);
+  const rear = bevelBoxGeometry(flapLen, 0.012, width, 0.002);
+  rear.translate(flapLen / 2 - 0.005, 0.006, width / 2);
+  rear.rotateZ(-a);
+  rear.translate(len, 0, 0);
+  parts.push(rear);
+
+  // 内侧支撑肋 ×5（每道 18 × 100 × 520）
+  for (let i = 0; i < 5; i++) {
+    const rib = bevelBoxGeometry(0.018, ribH, 0.52, 0.002);
+    rib.translate(0.25 + i * 1.2, -ribH / 2, 0.29);
+    parts.push(rib);
+  }
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
 export const tigerHullKitBuilders: Record<string, GeometryBuilder> = {
   hullPlate,
   hatchLid,
@@ -398,4 +443,5 @@ export const tigerHullKitBuilders: Record<string, GeometryBuilder> = {
   mgBall,
   mgBarrel,
   liftingEye,
+  trackGuard,
 };
