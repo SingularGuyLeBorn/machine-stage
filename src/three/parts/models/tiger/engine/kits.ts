@@ -187,12 +187,14 @@ const cylinderHead: GeometryBuilder = (spec) => {
   // 两口必须分开在缸盖侧面上——共用同一口时两根支管的起弯段必然互穿
   // （判定树实测该零件对交线 1493mm · displaced）。
   const portW = num(p, "portW", 0.054);
+  // 法兰宽 > 端口宽：短管两侧要留出法兰螺栓座（B1 密度补齐的 port_flange_bolt ×4/缸）
+  const flangeW = num(p, "flangeW", portW);
   const portInY = num(p, "portInY", h * 0.72);
   const portExY = num(p, "portExY", h * 0.22);
   const portStubR = num(p, "portStubR", 0.019);
   for (const sign of [-1, 1]) {
     for (const portY of [portInY, portExY]) {
-      const flange = bevelBoxGeometry(portW, 0.032, 0.018, 0.002);
+      const flange = bevelBoxGeometry(flangeW, 0.032, 0.018, 0.002);
       flange.translate(0, portY, sign * (d / 2 + 0.007));
       parts.push(flange);
       const stub = cylinderGeometry(portStubR, 0.028, portStubR, 18, 0.0015);

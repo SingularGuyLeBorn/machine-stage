@@ -232,4 +232,49 @@ export const tigerEngineExpectedContacts: ExpectedContactRule[] = [
     b: "tiger.accessory.water_pipe_*",
     reason: "水管端头埋在水泵铸件里（隐藏接口）：管端不外露，接口藏在铸件内部。",
   },
+
+  // ---------------- L1 第二批：法兰/端板螺栓 + 传感器（新增件自带的构造性接触）----------------
+  {
+    family: "port-flange-bolt-seat",
+    a: "tiger.cylinder.port_flange_bolt",
+    b: "tiger.cylinder.head",
+    reason:
+      "缸盖进/排气法兰螺栓拧进法兰螺孔：头坐在法兰外面、杆埋进 18mm 法兰板（埋入量 > 贴面量级，按 14mm 守门）。",
+    maxDepthMm: 14,
+  },
+  {
+    family: "endplate-bolt-seat",
+    a: "tiger.crankcase.endplate_bolt",
+    b: "tiger.crankcase.endplate_front",
+    reason: "前端板螺栓：头在端板外面、杆埋进端板板厚（⌀290 螺孔圈，让开正时盖 ⌀260）。",
+    maxDepthMm: 14,
+  },
+  {
+    family: "endplate-bolt-seat",
+    a: "tiger.crankcase.endplate_bolt",
+    b: "tiger.crankcase.endplate_rear",
+    reason: "后端板螺栓：与前端板同圈同规格，头在飞轮壳一侧外面。",
+    maxDepthMm: 14,
+  },
+  {
+    family: "endplate-bolt-seat",
+    a: "tiger.crankcase.endplate_bolt",
+    b: "tiger.crankcase.shell",
+    reason: "端板螺栓穿过端板后拧进机体端面螺孔（端板夹在中间）：同一杆同时咬合端板与机体，都是螺纹咬合。",
+    maxDepthMm: 14,
+  },
+  {
+    family: "sender-thread-seat",
+    a: "tiger.crankcase.oil_pressure_sender",
+    b: "tiger.crankcase.shell",
+    reason: "机油压力传感器螺纹杆拧进机体侧壁螺孔：外壳坐在壁外，杆只埋进 19mm 壁厚的 6mm。",
+    maxDepthMm: 10,
+  },
+  {
+    family: "sender-thread-seat",
+    a: "tiger.cooling.coolant_temp_sender",
+    b: "tiger.crankcase.shell",
+    reason: "水温传感器螺纹杆拧进机体侧壁螺孔（水套外壁），与机油压力传感器同壁前后各一。",
+    maxDepthMm: 10,
+  },
 ];
