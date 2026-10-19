@@ -11,8 +11,13 @@ const model = buildModel(registry, {
   warnMissingLayout: false,
 });
 
-const reports = detectStatic(model, { minDepthM: 0.0005 });
-console.log("总报告数:", reports.length);
+// 可选参数：只统计 buildLayer ≤ N 的零件对（任务书 §3.4「该层穿模验收」口径）
+const layerLimit = Number(process.argv[2] ?? 0);
+const reports = detectStatic(model, {
+  minDepthM: 0.0005,
+  ...(layerLimit > 0 ? { filter: (h: { buildLayer: number }) => h.buildLayer <= layerLimit } : {}),
+});
+console.log(`总报告数: ${reports.length}${layerLimit > 0 ? `（仅 L1..L${layerLimit} 零件对）` : "（全部）"}`);
 
 // 按深度分层（字段口径修正：ClippingReport.depth_mm 本就是毫米；旧稿误读 depthM 米制，导致分层恒为 0）
 const deep = reports.filter((r) => r.depth_mm > 10);
@@ -38,4 +43,11 @@ for (const r of reports) {
 console.log("--- 报告家族 TOP10 ---");
 for (const [k, v] of [...fam.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)) {
   console.log(`${v}  ${k}`);
+}
+
+console.log("--- 报告家族（全部，数量降序；含家族最大深度） ---");
+for (const [k, v] of [...fam.entries()].sort((a, b) => b[1] - a[1])) {
+  const famReports = reports.filter((r) => `${r.a.split("[")[0]} ↔ ${r.b.split("[")[0]}` === k);
+  const maxDepth = Math.max(...famReports.map((r) => r.depth_mm));
+  console.log(`${String(v).padStart(3)}  max ${maxDepth.toFixed(1).padStart(6)}mm  ${k}`);
 }

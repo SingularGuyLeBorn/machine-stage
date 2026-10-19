@@ -104,7 +104,14 @@ const BUILTIN: Record<string, GeometryBuilder> = {
   },
   merge: (spec, ctx) => {
     const s = spec as { parts: GeometrySpec[] };
-    const geometries = s.parts.map((child) => buildGeometry(child, ctx));
+    const geometries = s.parts.map((child) => {
+      const geometry = buildGeometry(child, ctx);
+      // 可选相对偏移：让 merge 的子件按装配关系摆放（如油底壳碗体落在法兰下方），
+      // 纯数值（不走表达式解析）——merge 子件本就在同一局部坐标系里。
+      const at = (child as { at?: [number, number, number] }).at;
+      if (Array.isArray(at) && at.length === 3) geometry.translate(at[0], at[1], at[2]);
+      return geometry;
+    });
     const merged = mergeGeometries(geometries);
     for (const geometry of geometries) geometry.dispose();
     return merged;

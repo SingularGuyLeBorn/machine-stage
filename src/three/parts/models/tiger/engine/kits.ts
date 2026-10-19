@@ -34,6 +34,9 @@ import { beltGeometry } from "./kinematics";
 
 type Params = Record<string, unknown>;
 
+/** sin(60°)：V 角 60° 时缸轴与竖直方向成 30°，径向坐标 r = 0.5y + sin60°·z。 */
+const SIN_HV = Math.sin(Math.PI / 3);
+
 function num(params: Params | undefined, key: string, fallback?: number): number {
   const value = params?.[key];
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -79,10 +82,11 @@ function circleHole(radius: number, target: THREE.Path): THREE.Path {
 /** 沿 +Y 挤出：截面在 XY，挤出后原点落在底面中心，截面 X→X、Y→-Z（对称件无影响）。 */
 function extrudeUpAlongY(shape: THREE.Shape, height: number, bevel: number): THREE.BufferGeometry {
   const h = Math.max(height, 0.002);
-  const b = Math.max(Math.min(bevel, h * 0.3), 0.0004);
+  // bevel ≤ 0 = 不要倒角：截面 = 名义轮廓（尺寸精确件，如受缸心距限制的连体缸壁）
+  const b = bevel > 0 ? Math.max(Math.min(bevel, h * 0.3), 0.0004) : 0;
   const geometry = new THREE.ExtrudeGeometry(shape, {
     depth: Math.max(h - 2 * b, 0.001),
-    bevelEnabled: true,
+    bevelEnabled: b > 0,
     bevelThickness: b,
     bevelSize: b,
     bevelSegments: 2,
@@ -107,8 +111,10 @@ const borePlate: GeometryBuilder = (spec) => {
   const corner = num(p, "corner", 0.03);
   const bevel = num(p, "bevel", 0.003);
   const axis = typeof p?.axis === "string" ? (p.axis as string) : "y";
-  const shape = roundedRectPath(w, d, corner, new THREE.Shape());
-  shape.holes.push(circleHole(bore, new THREE.Path()));
+  // extrudeUpAlongY 的 bevel 会把截面整体外扩 bevel（镗孔随之缩小），
+  // 因此形状线预先内缩 / 孔预先放大，让实体落在声明尺寸上。
+  const shape = roundedRectPath(w - 2 * bevel, d - 2 * bevel, corner, new THREE.Shape());
+  shape.holes.push(circleHole(bore + bevel, new THREE.Path()));
   const geometry = extrudeUpAlongY(shape, h, bevel);
   if (axis === "y") return geometry;
   // 换轴：把「挤出方向 = +Y、截面 X/Y」的板转成「挤出方向 = +X、截面 Z/Y」，原点居中
@@ -129,9 +135,12 @@ const siameseBlock: GeometryBuilder = (spec) => {
   const h = num(p, "h");
   const jacket = num(p, "jacket");
   const corner = num(p, "corner", 0.012);
-  const shape = roundedRectPath(w, d, corner, new THREE.Shape());
-  shape.holes.push(circleHole(jacket, new THREE.Path()));
-  const body = extrudeUpAlongY(shape, h, 0.002);
+  // 同 borePlate：截面内缩 bevel、镗孔放大 bevel，实体才等于 w×d / jacket。
+  // bevel = 0 = 精确件：实体严格等于 w×d（相邻连体缸只剩缸心距的 2mm 间隙，不会被倒角外扩插爆）。
+  const bodyBevel = num(p, "bevel", 0.002);
+  const shape = roundedRectPath(w - 2 * bodyBevel, d - 2 * bodyBevel, corner, new THREE.Shape());
+  shape.holes.push(circleHole(jacket + bodyBevel, new THREE.Path()));
+  const body = extrudeUpAlongY(shape, h, bodyBevel);
 
   const parts: THREE.BufferGeometry[] = [body];
 
@@ -165,9 +174,11 @@ const cylinderHead: GeometryBuilder = (spec) => {
   const d = num(p, "d", w);
   const h = num(p, "h", 0.085);
   const chamber = num(p, "chamber", 0.066);
-  const shape = roundedRectPath(w, d, 0.014, new THREE.Shape());
-  shape.holes.push(circleHole(chamber, new THREE.Path()));
-  const body = extrudeUpAlongY(shape, h, 0.003);
+  // 同连体缸壁：bevel = 0 = 精确件（相邻缸盖只剩缸心距间隙，且燃烧室孔不被倒角收小）
+  const headBevel = num(p, "bevel", 0.003);
+  const shape = roundedRectPath(w - 2 * headBevel, d - 2 * headBevel, 0.014, new THREE.Shape());
+  shape.holes.push(circleHole(chamber + headBevel, new THREE.Path()));
+  const body = extrudeUpAlongY(shape, h, headBevel);
   const parts: THREE.BufferGeometry[] = [body];
 
   // 气门导管/摇臂机构不在本层建模（M-C）：气门本体直接站在缸盖燃烧室孔内，
@@ -184,7 +195,8 @@ const cylinderHead: GeometryBuilder = (spec) => {
   }
 
   const bolts = boltCircleGeometry(4, num(p, "boltRadius", w * 0.33), 0.011, 0.012);
-  bolts.translate(0, h, 0);
+  // 螺栓头沉入缸盖顶面之下：凸轮轴罩直接坐在缸盖顶面上，露头的螺栓会插进罩壁
+  bolts.translate(0, h - 0.012, 0);
   parts.push(bolts);
 
   const merged = mergeGeometries(parts);
@@ -687,7 +699,8 @@ const gearRing: GeometryBuilder = (spec) => {
     bevelThickness: 0.0012,
     bevelSize: 0.0012,
     bevelSegments: 1,
-    curveSegments: 8,
+    // 孔是 96 齿环的内圆：段数太少时多边形内接边会切进飞轮外圆
+    curveSegments: 24,
   });
   geometry.translate(0, 0, -width / 2);
   geometry.rotateY(Math.PI / 2); // 挤出方向 → X，截面 X → -Z（左右对称，无影响）
@@ -739,9 +752,19 @@ const bearingSupport: GeometryBuilder = (spec) => {
 };
 
 /**
- * 曲轴箱壳体：把 (Y,Z) 截面沿 X 挤出，中间挖出「曲轴腔 + 左右缸孔槽」。
+ * 曲轴箱壳体：把 (Y,Z) 截面沿 X 挤出。
+ *
+ * 壳体（trough = 1）截面 = 「U 形主体」+ 两个「甲板外缘唇」三角形：
+ *   两侧壁的顶面切在活塞扫掠净空面 r = ±(PISTON_R + 1.7mm) 上（r 为缸轴径向坐标），
+ *   让出活塞裙部在 BDC 的扫掠空间；槽口由机体缸孔座面（BLOCK_BASE）从上方封住。
+ *   甲板斜面整条沿法线内移 deckDrop 后，甲板顶面仍低于缸体基面 BLOCK_BASE，
+ *   只把外缘一小段甲板板（rim 到活塞净空面）作为独立四边形保留。
+ *   没有零厚度收敛点、没有自交边，earcut 不会退化出壳体内的虚假材料。
+ *
+ * 端板（trough = 0）是带曲轴孔的整块端盖：外轮廓在「净空面 × 甲板斜面」交点处转折，
+ * 侧壁升到 top，阀谷由端盖封住，充当槽两端的端盖。
  * 这样缸心距、V 角、缸壁宽都是同一组常量派生，不会与缸套/活塞打架。
- * 截面坐标：(y, z)，z 左右对称。
+ * 截面坐标：(y, z)，z 左右对称；径向 r = 0.5y + sin(60°)z（V 角 60°）。
  */
 const caseShell: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
@@ -755,57 +778,137 @@ const caseShell: GeometryBuilder = (spec) => {
   const deckOuterZ = num(p, "deckOuterZ", 0.1828);
   const deckInnerY = num(p, "deckInnerY", 0.2297);
   const deckInnerZ = num(p, "deckInnerZ", 0.0322);
-  const ridgeBottomY = num(p, "ridgeBottomY", 0.1197);
   const rim = num(p, "rim", 0.004);
   const bevel = num(p, "bevel", 0.004);
   const bore = num(p, "bore", 0);
+  const deckDrop = num(p, "deckDrop", 0.0045);
+  const trough = num(p, "trough", 0);
+  /** 活塞扫掠净空半径：PISTON_R(0.0628) + 1.7mm 装配间隙。 */
+  const clearance = num(p, "pistonClearance", 0.0645);
   const cavityHalf = halfWidth - wall;
+  // ExtrudeGeometry 的 bevel 把整个挤出体沿轮廓法线斜接外扩 bevel，
+  // 所以想落在标称面上的外部特征（侧壁外表面 ±halfWidth、底面 bottom、
+  // 甲板外缘面 deckOuterZ+rim）在形状线里必须先各内缩一个 bevel；
+  // 否则外表面比标称大 4mm，会压进肋板/机脚/检查盖/油尺等贴装件。
+  const wallOuter = halfWidth - bevel;
+  const bottomOuter = bottom + bevel;
 
-  const outer: Array<[number, number]> = [
-    [deckInnerY, -deckInnerZ],
-    [deckOuterY, -(deckOuterZ + rim)],
-    [top, -halfWidth],
-    [bottom, -halfWidth],
-    [bottom, halfWidth],
-    [top, halfWidth],
-    [deckOuterY, deckOuterZ + rim],
-    [deckInnerY, deckInnerZ],
+  // ---------------------------------------------------------------------
+  // deck 斜面整体沿其法线向腔内平移 deckDrop。
+  // 每 bank 的 deck 楔形板位于「机体基面（沿缸轴 u=BLOCK_BASE）」之上 1.2mm，
+  // 且活塞在 BDC 会扫到楔形板；下移后楔形板主体让出 ≥3.3mm 净空，
+  // 外轮廓内侧「视觉轮廓」不变（楔厚不变，只是整条内移）。
+  // ---------------------------------------------------------------------
+  const faceInner: [number, number] = [deckInnerY, -deckInnerZ];
+  const faceOuter: [number, number] = [deckOuterY, -(deckOuterZ + rim)];
+  const faceLen = Math.hypot(faceOuter[0] - faceInner[0], faceOuter[1] - faceInner[1]) || 1;
+  const faceDir: [number, number] = [
+    (faceOuter[0] - faceInner[0]) / faceLen,
+    (faceOuter[1] - faceInner[1]) / faceLen,
   ];
-  const cavity: Array<[number, number]> = [
-    [bottom + floor, -cavityHalf],
-    [top, -cavityHalf],
-    [deckOuterY, -deckOuterZ],
-    [deckInnerY, -deckInnerZ],
-    [ridgeBottomY, -deckInnerZ],
-    [ridgeBottomY, deckInnerZ],
-    [deckInnerY, deckInnerZ],
-    [deckOuterY, deckOuterZ],
-    [top, cavityHalf],
-    [bottom + floor, cavityHalf],
+  let normalY = faceDir[1];
+  let normalZ = -faceDir[0];
+  const midY = (faceInner[0] + faceOuter[0]) / 2;
+  const midZ = (faceInner[1] + faceOuter[1]) / 2;
+  if (normalY * midY + normalZ * midZ < 0) {
+    normalY = -normalY;
+    normalZ = -normalZ;
+  }
+  const dropY = -deckDrop * normalY;
+  const dropZ = -deckDrop * normalZ;
+  const dropDeck = ([y, z]: [number, number]): [number, number] => [y + dropY, z + dropZ];
+  const mirrorZ = ([y, z]: [number, number]): [number, number] => [y, -z];
+  /** 对称下移：+z 侧先镜像到 −z 侧，下移后再镜像回来。 */
+  const dropDeckSide = (point: [number, number], mirrored: boolean): [number, number] =>
+    mirrored ? mirrorZ(dropDeck(mirrorZ(point))) : dropDeck(point);
+
+  const toShape = (points: Array<[number, number]>): THREE.Shape => {
+    const shape = new THREE.Shape();
+    points.forEach(([y, z], index) => {
+      if (index === 0) shape.moveTo(z, y);
+      else shape.lineTo(z, y);
+    });
+    shape.closePath();
+    return shape;
+  };
+
+  // 下移后的关键点（−z 侧定义，+z 侧镜像）：甲板内角 I′、甲板外缘面外角 faceOut′、
+  // 甲板顶面外角（rim 上沿）deckTop
+  const innerCorner = dropDeckSide(faceInner, false);
+  const rimOuter = dropDeckSide(faceOuter, false);
+  const deckTop = dropDeckSide([deckOuterY, -deckOuterZ], false);
+
+  // 活塞扫掠净空：挤出体沿轮廓法线外扩 bevel，因此形状线要多让一个 bevel。
+  const radialOf = ([y, z]: [number, number]): number => 0.5 * y + SIN_HV * z;
+  const shapeClearance = clearance + bevel;
+  /** 净空面与竖直线 |z| 的交点高度（左右对称）。 */
+  const wallTopY = (z: number): number => (-shapeClearance + SIN_HV * Math.abs(z)) / 0.5;
+  /** 线段 ab 上 r = −shapeClearance 的分点（−z 侧）。 */
+  const cutAtClearance = (a: [number, number], b: [number, number]): [number, number] => {
+    const ra = radialOf(a);
+    const rb = radialOf(b);
+    const t = (ra + shapeClearance) / (ra - rb || 1);
+    return [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])];
+  };
+  /** 线段 ab 在 z = 常数 处的 y（用于把甲板边投到侧壁面上）。 */
+  const yOnSegmentAtZ = (a: [number, number], b: [number, number], z: number): number =>
+    a[0] + ((z - a[1]) / (b[1] - a[1] || 1)) * (b[0] - a[0]);
+
+  // 甲板外缘（形状线，已内缩一个 bevel）：上边=甲板顶面（flank），外边=rim 外缘。
+  // 全部顶点 u ≤ 甲板顶面高度，恒低于缸体基面 BLOCK_BASE / 缸套底。
+  const deckTopShape: [number, number] = [
+    yOnSegmentAtZ(deckTop, innerCorner, deckTop[1] + bevel),
+    deckTop[1] + bevel,
   ];
+  const rimOuterShape: [number, number] = [deckTopShape[0], rimOuter[1] + bevel];
 
-  const shape = new THREE.Shape();
-  outer.forEach(([y, z], index) => {
-    if (index === 0) shape.moveTo(z, y);
-    else shape.lineTo(z, y);
-  });
-  shape.closePath();
-
-  if (bore > 0) {
-    shape.holes.push(circleHole(bore, new THREE.Path()));
+  let shapes: THREE.Shape[];
+  if (trough > 0.5) {
+    // 壳体：U 形主体（两侧壁 + 谷底）+ 两个甲板外缘板。
+    const mainOutline: Array<[number, number]> = [
+      [bottomOuter, -wallOuter],
+      [bottomOuter, wallOuter],
+      [wallTopY(wallOuter), wallOuter],
+      [wallTopY(cavityHalf), cavityHalf],
+      [bottomOuter + floor, cavityHalf],
+      [bottomOuter + floor, -cavityHalf],
+      [wallTopY(-cavityHalf), -cavityHalf],
+      [wallTopY(-wallOuter), -wallOuter],
+    ];
+    // 甲板外缘板：上边=甲板顶面（flank），内下边=活塞净空面，外边=rim 外缘。
+    const lip: Array<[number, number]> = [
+      deckTopShape,
+      cutAtClearance(deckTopShape, innerCorner),
+      [wallTopY(-wallOuter), -wallOuter],
+      rimOuterShape,
+    ];
+    shapes = [toShape(mainOutline), toShape(lip), toShape(lip.map(mirrorZ).reverse())];
   } else {
-    const hole = new THREE.Path();
-    // 反向（顺时针）保证孔方向与外形相反
-    for (let i = cavity.length - 1; i >= 0; i--) {
-      const [y, z] = cavity[i];
-      if (i === cavity.length - 1) hole.moveTo(z, y);
-      else hole.lineTo(z, y);
-    }
-    hole.closePath();
-    shape.holes.push(hole);
+    // 端板：整块端盖（侧壁升到 top，阀谷封死，仅在净空面 × 斜面处转折）+ 曲轴孔。
+    const flankAtHalf = yOnSegmentAtZ(rimOuter, innerCorner, -wallOuter);
+    const flankAtCavity = yOnSegmentAtZ(rimOuter, innerCorner, -cavityHalf);
+    const outline: Array<[number, number]> = [
+      [bottomOuter, -wallOuter],
+      [bottomOuter, wallOuter],
+      [flankAtHalf, wallOuter],
+      mirrorZ(rimOuterShape),
+      [top, wallOuter],
+      [top, cavityHalf],
+      [flankAtCavity, cavityHalf],
+      mirrorZ(innerCorner),
+      innerCorner,
+      [flankAtCavity, -cavityHalf],
+      [top, -cavityHalf],
+      [top, -wallOuter],
+      rimOuterShape,
+      [flankAtHalf, -wallOuter],
+    ];
+    const shape = toShape(outline);
+    if (bore > 0) shape.holes.push(circleHole(bore, new THREE.Path()));
+    shapes = [shape];
   }
 
-  const geometry = new THREE.ExtrudeGeometry(shape, {
+  const geometry = new THREE.ExtrudeGeometry(shapes, {
     depth: Math.max(length - 2 * bevel, 0.002),
     bevelEnabled: true,
     bevelThickness: bevel,
