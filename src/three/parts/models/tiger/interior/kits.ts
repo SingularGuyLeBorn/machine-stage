@@ -112,8 +112,8 @@ const bowMg: GeometryBuilder = (spec) => {
   jacket.translate(-receiverL / 2 - 0.045, 0.004, 0);
   parts.push(jacket);
 
-  // 准星
-  box(parts, 0.022, 0.05, 0.012, [-receiverL / 2 - barrelL + 0.09, 0.045, 0], 0.002);
+  // 准星（落在枪管裸露段顶部；偏移量按「距枪口 0.11」给，避免落到首装甲板厚度区内）
+  box(parts, 0.022, 0.05, 0.012, [-receiverL / 2 - barrelL + 0.12, 0.045, 0], 0.002);
   // 后板（机匣后端）
   box(parts, 0.02, receiverH + 0.01, receiverW - 0.004, [receiverL / 2 + 0.01, 0, 0], 0.003);
   // 托肩

@@ -577,12 +577,12 @@ function buildInteriorParts(): PartDefinition[] {
     geometry: {
       type: "kit",
       kit: "bowMg",
-      params: { receiverL: 0.32, receiverH: 0.1, receiverW: 0.09, barrelL: 0.33 },
+      params: { receiverL: 0.32, receiverH: 0.1, receiverW: 0.09, barrelL: 0.2 },
     },
     material: "cast_iron_dark",
     mate: { type: "absolute", position: [-4.14, 0.16, 0.78] },
     source:
-      "MG 34 航向机枪机匣段（机匣 320 × 100 × 90，枪管 ф44 × 330）：枪口朝 -X，枪管穿过前装甲板（L4-a 已开 ⌀100 球孔，球心 y 0.16 / z 0.78；枪口 x -4.62，伸出车头外板 -4.50 共 0.12m，孔与枪管留 28mm 环缝）；枪管套（ф64，前端 -4.395）与板内表面 -4.40 留 5mm，球座 Kugelblende 50 随 L4-c。整枪站在转向机壳体（半宽 0.66）之外侧，并抬到侧传动轴法兰（z 0.735、顶 0.11）上方 50mm。",
+      "MG 34 航向机枪机匣段（机匣 320 × 100 × 90，枪管 ф44 × 200）：枪口朝 -X，枪管穿入前装甲板 ⌀100 球孔（L4-a 开孔，球心 y 0.16 / z 0.78）；枪口 x -4.49（孔内，距板外面 4mm、距 L4-e 球座底面 13mm），孔与枪管留 28mm 环缝。车外可见的球座与枪管由 L4-e（tiger.hull.mg_mount / mg34_barrel）负责，本件只做车内机匣段。枪管套（ф64，前端 -4.395）与板内表面 -4.40 留 5mm。整枪站在转向机壳体（半宽 0.66）之外侧，并抬到侧传动轴法兰（z 0.735、顶 0.11）上方 50mm。",
   });
 
   add({
