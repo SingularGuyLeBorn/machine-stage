@@ -6,9 +6,7 @@
 //   npx tsx scripts/diag-clips.ts --recheck    # 追加：33 条豁免规则复核 → docs/qa/whitelist-recheck.md
 import { writeFileSync } from "node:fs";
 import { buildModel } from "../src/three/parts/assembler/assembler";
-import { tigerEngineExpectedContacts } from "../src/three/parts/models/tiger/engine/expectedContacts";
-import { tigerKitBuilders } from "../src/three/parts/models/tiger/engine/kits";
-import { makeEngineLayouts, makeEngineRegistry } from "../src/three/parts/models/tiger/engine/registry";
+import { makeTigerLayouts, makeTigerRegistry, tigerBuilders } from "../src/three/parts/models/tiger/registry";
 import { detectStatic, planPairs } from "../src/three/parts/solver/detect";
 import type { ClippingReport } from "../src/three/parts/solver/report";
 import {
@@ -17,10 +15,11 @@ import {
   partitionExpectedContacts,
 } from "../src/three/parts/solver/whitelist";
 
-const registry = makeEngineRegistry();
+const registry = makeTigerRegistry();
+const expectedContacts = registry.expectedContacts ?? [];
 const model = buildModel(registry, {
-  builders: tigerKitBuilders,
-  instanceLayouts: makeEngineLayouts(),
+  builders: tigerBuilders,
+  instanceLayouts: makeTigerLayouts(),
   warnMissingLayout: false,
 });
 
@@ -109,7 +108,7 @@ for (const [k, v] of [...fam.entries()].sort((a, b) => b[1].length - a[1].length
 }
 
 // ---- 白名单分层：未豁免 = 真缺陷候选（验收口径「未豁免报告 = 0」） ----
-const split = partitionExpectedContacts(reports, tigerEngineExpectedContacts);
+const split = partitionExpectedContacts(reports, expectedContacts);
 console.log(`--- 白名单分层: 未豁免 ${split.active.length} / 已豁免 ${split.expected.length} ---`);
 if (split.active.length > 0) {
   console.log("--- 未豁免（真缺陷候选，按深度降序） ---");
@@ -123,7 +122,7 @@ if (split.active.length > 0) {
 const famTally = new Map<string, number>();
 for (const hit of split.expected) famTally.set(hit.rule.family, (famTally.get(hit.rule.family) ?? 0) + 1);
 console.log("--- 已豁免族计数（docs/qa/whitelist/README.md 表格口径） ---");
-for (const rule of tigerEngineExpectedContacts) {
+for (const rule of expectedContacts) {
   console.log(`${String(famTally.get(rule.family) ?? 0).padStart(3)}  ${rule.family}`);
 }
 
@@ -131,13 +130,13 @@ for (const rule of tigerEngineExpectedContacts) {
 // 口径：规则先按零件 id 模式匹配（不看形态/深度），再看这些报告落到哪个形态——
 //   凡落 suspect / displaced 的，判定树已把它们从豁免区挪出（这就是「藏着的真穿透」清单）。
 if (process.argv.includes("--recheck")) {
-  const pairMatches = (rule: (typeof tigerEngineExpectedContacts)[number], report: ClippingReport) =>
+  const pairMatches = (rule: (typeof expectedContacts)[number], report: ClippingReport) =>
     (matchesPartId(rule.a, report.a) && matchesPartId(rule.b, report.b)) ||
     (matchesPartId(rule.a, report.b) && matchesPartId(rule.b, report.a));
   const formOrder = ["bearing_overlap", "face_mate", "suspect", "displaced"] as const;
   const rows: string[] = [];
   const leaks: string[] = [];
-  tigerEngineExpectedContacts.forEach((rule, index) => {
+  expectedContacts.forEach((rule, index) => {
     const matched = reports.filter((report) => pairMatches(rule, report));
     const exempted = split.expected.filter((hit) => hit.rule === rule);
     const forms = new Map<string, number>();
