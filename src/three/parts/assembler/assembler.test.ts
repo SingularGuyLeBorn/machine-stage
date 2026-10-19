@@ -81,7 +81,7 @@ describe("assembler 装配器", () => {
       name_en: "fender",
       assembly: "frame",
       build_layer: 4,
-      build_order: 401,
+      build_order: 501,
       geometry: { type: "plate", w: 0.6, h: 0.2, t: 0.01 },
       material: "probe",
       dual: true,

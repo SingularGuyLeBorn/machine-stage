@@ -75,7 +75,7 @@ describe("stageStore 构建滑杆", () => {
   beforeEach(resetStore);
 
   it("buildOrdersOf 去重升序", () => {
-    expect(buildOrdersOf("test")).toEqual([101, 201, 202]);
+    expect(buildOrdersOf("test")).toEqual([101, 301, 302]);
   });
 
   it("0 件 / 中间件 / 全部：按 build_order 逐件展开", () => {
