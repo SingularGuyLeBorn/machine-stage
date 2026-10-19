@@ -1,6 +1,7 @@
 dist
 coverage
 node_modules
+scripts/_attic
 docs/展示台项目总体设计.md
 docs/零件化建模框架.md
 docs/MACHINE_STYLE.md

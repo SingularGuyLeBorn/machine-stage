@@ -52,7 +52,8 @@ export const tigerEngineExpectedContacts: ExpectedContactRule[] = [
     family: "liner-press-fit",
     a: "tiger.cylinder.block",
     b: "tiger.cylinder.liner",
-    reason: "湿式缸套过盈压入缸体镗孔、下端坐在缸体肩面上：压装面本来就是咬合的（径向 4mm 水套环隙在镗孔内侧，不参与接触）。",
+    reason:
+      "湿式缸套过盈压入缸体镗孔、下端坐在缸体肩面上：压装面本来就是咬合的（径向 4mm 水套环隙在镗孔内侧，不参与接触）。",
   },
   {
     family: "valve-on-seat",
@@ -167,6 +168,56 @@ export const tigerEngineExpectedContacts: ExpectedContactRule[] = [
     a: "tiger.induction.intake_manifold_*",
     b: "tiger.induction.exhaust_manifold_*",
     reason: "进/排气歧管共用同一个缸盖法兰面，背靠背贴合安装。",
+  },
+
+  // ---------------- L1 第一批：紧固件与点火（新增件自带的构造性接触）----------------
+  {
+    family: "sump-bolt-seat",
+    a: "tiger.crankcase.sump_bolt",
+    b: "tiger.crankcase.sump",
+    reason:
+      "油底壳螺栓拧进法兰螺孔：头坐在法兰下面、杆埋进 12mm 法兰板里（埋入量 > 贴面量级，按 14mm 守门）。",
+    maxDepthMm: 14,
+  },
+  {
+    family: "cover-bolt-seat",
+    a: "tiger.crankcase.inspection_cover_bolt",
+    b: "tiger.crankcase.inspection_cover",
+    reason: "检查盖螺栓固定盖板：头露在盖外、杆埋进 8mm 盖板里。",
+    maxDepthMm: 14,
+  },
+  {
+    family: "cover-bolt-seat",
+    a: "tiger.crankcase.timing_cover_bolt",
+    b: "tiger.crankcase.timing_cover",
+    reason: "正时齿轮盖螺栓固定盖板：头露在盖外、杆埋进 20mm 盖板里。",
+    maxDepthMm: 14,
+  },
+  {
+    family: "mount-bolt-seat",
+    a: "tiger.crankcase.mount_bolt",
+    b: "tiger.crankcase.mount",
+    reason: "机脚螺栓把机脚固定在机架上：头在脚底、杆埋进 50mm 脚体里。",
+    maxDepthMm: 14,
+  },
+  {
+    family: "cam-cover-screw-seat",
+    a: "tiger.cylinder.cam_cover_screw",
+    b: "tiger.cylinder.cam_cover",
+    reason: "缸盖罩螺钉拧进罩顶板：头在罩外、杆埋进 8mm 顶板里。",
+    maxDepthMm: 14,
+  },
+  {
+    family: "plug-boot-on-plug",
+    a: "tiger.ignition.plug_boot",
+    b: "tiger.valvetrain.spark_plug",
+    reason: "高压护套套在火花塞线端上（内孔留 1mm 间隙，名义上不接触；万一贴到属护套安装面）。",
+  },
+  {
+    family: "timing-cover-mount",
+    a: "tiger.crankcase.endplate_front",
+    b: "tiger.crankcase.timing_cover",
+    reason: "正时齿轮盖螺栓固定在端板正面：盖板背面与端板前面是贴合的安装面。",
   },
 
   // ---------------- 附件（当前 0 条命中，防后续扫描冒头） ----------------

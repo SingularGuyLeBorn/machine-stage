@@ -9,7 +9,13 @@ import {
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { BUILD_LAYER_LABELS, expectedContactFamilies, parseInstanceRef, resolveConstants, type ClippingReport } from "@/three/parts";
+import {
+  BUILD_LAYER_LABELS,
+  expectedContactFamilies,
+  parseInstanceRef,
+  resolveConstants,
+  type ClippingReport,
+} from "@/three/parts";
 import { findModel } from "../catalog";
 import { reportKey, reportPartIds, useStageStore } from "../state/stageStore";
 
