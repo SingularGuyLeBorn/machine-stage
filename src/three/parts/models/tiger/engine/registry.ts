@@ -1,7 +1,14 @@
 import * as THREE from "three";
 import type { InstanceLayout } from "../../../assembler/assembler";
 import { evaluateExpression } from "../../../registry/expression";
-import type { Expr, ExprVec3, ModelRegistry, NodeDef, PartDefinition } from "../../../registry/types";
+import type {
+  Expr,
+  ExprVec3,
+  GeometrySpec,
+  ModelRegistry,
+  NodeDef,
+  PartDefinition,
+} from "../../../registry/types";
 import { tigerEngineExpectedContacts } from "./expectedContacts";
 
 // ============================================================================
@@ -57,6 +64,11 @@ export const ENGINE_LAYOUTS = {
   driveBelt: "engine.driveBelt",
   carburetor: "engine.carburetor",
   airFilter: "engine.airFilter",
+  sumpBolt: "engine.sumpBolt",
+  inspectionBolt: "engine.inspectionBolt",
+  timingBolt: "engine.timingBolt",
+  mountBolt: "engine.mountBolt",
+  coverScrew: "engine.coverScrew",
 } as const;
 
 /** 缸号（0..11）→ 曲柄销序号 / 所在侧 / 缸心 X / 缸列倾角（度）。 */
@@ -379,6 +391,33 @@ const CONSTANTS: Record<string, Expr> = {
   MAGNETO_X: "TIMING_COVER_X+0.112",
   MAGNETO_Y: 0.1,
   MAGNETO_Z: 0.09,
+
+  // ---- L1 第一批：紧固件（实例 +112）----
+  // 螺栓 = 「六角头 + 短杆」，原点 = 头的外端面，头沿 +Y 埋进基体、杆再伸出 6mm：
+  // 压装/螺纹咬合是构造性接触（白名单登记），不允许把杆伸穿基体到下一层零件。
+  BOLT_HEAD_R: 0.0125, // 对边 ≈21.6mm（M14 级）
+  BOLT_HEAD_H: 0.009,
+  BOLT_SHANK_R: 0.0075,
+  BOLT_SHANK_L: 0.006,
+  SUMP_BOLT_XA: -0.23, // 油底壳法兰 0.5×0.3 → 长边各 9 颗 + 短边中 1 颗
+  SUMP_BOLT_XB: 0.23,
+  SUMP_BOLT_Z: 0.13,
+  SUMP_BOLT_Y: "SUMP_FLANGE_Y-0.010", // 头在法兰下、杆进法兰 11mm（板厚 12mm）
+  COVER_BOLT_DX: 0.038, // 检查盖 0.11×0.09 的四角
+  COVER_BOLT_DY: 0.03,
+  COVER_BOLT_Z: "COVER_Z+0.012", // 头露在盖外 8mm、杆埋进盖板 6mm
+  TIMING_BOLT_R: 0.105, // 正时盖 ⌀260 圆角板、镗孔 ⌀100 → 螺孔圈居中
+  TIMING_BOLT_X: "TIMING_COVER_X+0.018",
+  MOUNT_BOLT_DX: 0.032, // 机脚底面（0.1×0.09）两颗
+  MOUNT_BOLT_Y: "MOUNT_Y-0.029",
+  COVER_SCREW_DX: "CAM_COVER_LEN*0.3",
+  COVER_SCREW_Y: "COVER_BASE+COVER_H+0.008",
+  PLUG_TWIN_DX: 0.045, // 双点火：第二只火花塞同侧、沿缸盖长度前后错开 45mm
+  // （山谷侧被进气道/空滤占住，塞子装不进——见 source 说明）
+  BOOT_IN_R: 0.0135, // 护套内孔 > 塞子外径（1mm 间隙，不接触）
+  BOOT_R: 0.017,
+  BOOT_LEN: 0.03,
+  BOOT_Y0: 0.062, // 护套底口位置（火花塞高 0.09，罩住线端）
   FUELPUMP_R: 0.03,
   FUELPUMP_LEN: 0.062,
   FUELPUMP_X: 0.183,
@@ -621,11 +660,14 @@ function makeLayouts(): Record<string, InstanceLayout> {
     );
   };
 
+  // 火花塞：每缸 2 只（HL230 双点火）。index 0..11 = 前位、12..23 = 后位（同侧错开）；
+  // 护套 plug_boot 共用本布局（几何自带 62mm 底口偏移），坐标只在这里写一遍。
   layouts[ENGINE_LAYOUTS.sparkPlug] = ({ index, constants }) => {
-    const { pin, side } = cylinderInfo(index, constants);
+    const twin = index >= 12;
+    const { pin, side } = cylinderInfo(index % 12, constants);
     return bankMatrix(
       side,
-      constants.CYL_X1 - pin * constants.CYL_PITCH,
+      constants.CYL_X1 - pin * constants.CYL_PITCH + (twin ? constants.PLUG_TWIN_DX : 0),
       constants.PLUG_BASE,
       side * constants.PLUG_Z,
       0,
@@ -673,6 +715,82 @@ function makeLayouts(): Record<string, InstanceLayout> {
   layouts[ENGINE_LAYOUTS.carburetor] = ({ index, constants }) => bankPairOf("CARB_BASE_Y", index, constants);
   layouts[ENGINE_LAYOUTS.airFilter] = ({ index, constants }) => bankPairOf("FILTER_BASE_Y", index, constants);
 
+  // ---- L1 第一批：紧固件布局（全部由 constants 派生，位置不手写）----
+
+  // 油底壳螺栓圈：0..8 = −z 长边、9..17 = +z 长边、18 = −x 短边中、19 = +x 短边中
+  layouts[ENGINE_LAYOUTS.sumpBolt] = ({ index, constants }) => {
+    if (index >= 18) {
+      const sign = index === 18 ? -1 : 1;
+      return new THREE.Matrix4().makeTranslation(sign * constants.SUMP_BOLT_XB, constants.SUMP_BOLT_Y, 0);
+    }
+    const row = Math.floor(index / 9);
+    const k = index % 9;
+    const span = constants.SUMP_BOLT_XB - constants.SUMP_BOLT_XA;
+    return new THREE.Matrix4().makeTranslation(
+      constants.SUMP_BOLT_XA + (k * span) / 8,
+      constants.SUMP_BOLT_Y,
+      row === 0 ? -constants.SUMP_BOLT_Z : constants.SUMP_BOLT_Z,
+    );
+  };
+
+  // 检查盖螺栓：index = 盖(0/1) × 面(−z/+z) × 四角(0..3)。
+  // 头在盖外、杆沿 ±z 指进盖板：旋转写进布局（与 fuelPump/fanBearing 同一约定）。
+  layouts[ENGINE_LAYOUTS.inspectionBolt] = ({ index, constants }) => {
+    const cover = Math.floor(index / 8);
+    const side: 1 | -1 = Math.floor((index % 8) / 4) === 0 ? -1 : 1;
+    const slot = index % 4;
+    const dx = slot % 2 === 0 ? -constants.COVER_BOLT_DX : constants.COVER_BOLT_DX;
+    const dy = slot < 2 ? constants.COVER_BOLT_DY : -constants.COVER_BOLT_DY;
+    return new THREE.Matrix4()
+      .makeTranslation(
+        (cover === 0 ? constants.COVER_X1 : constants.COVER_X2) + dx,
+        constants.COVER_Y + dy,
+        side * constants.COVER_BOLT_Z,
+      )
+      .multiply(new THREE.Matrix4().makeRotationX(deg2rad(-90 * side)));
+  };
+
+  // 正时齿轮盖螺栓圈：8 颗沿 ⌀0.21 均布，轴向沿 X（头在外、杆指进盖板）。
+  // 上半天被铭牌（y≥0.075）与风扇支架附件梁（y≈0.033..0.087）占住，螺孔圈压在下半。
+  layouts[ENGINE_LAYOUTS.timingBolt] = ({ index, constants }) => {
+    const angle = deg2rad(190 + (index * 160) / 7);
+    return new THREE.Matrix4()
+      .makeTranslation(
+        constants.TIMING_BOLT_X,
+        constants.TIMING_BOLT_R * Math.sin(angle),
+        constants.TIMING_BOLT_R * Math.cos(angle),
+      )
+      .multiply(new THREE.Matrix4().makeRotationZ(deg2rad(90)));
+  };
+
+  // 机脚螺栓：每只机脚 2 颗（index = 机脚 × 2，布局与 caseMount 同源）
+  layouts[ENGINE_LAYOUTS.mountBolt] = ({ index, constants }) => {
+    const mount = Math.floor(index / 2);
+    const k = index % 2;
+    const slot = Math.floor(mount / 2);
+    const side = mount % 2 === 0 ? -1 : 1;
+    return new THREE.Matrix4().makeTranslation(
+      (slot === 0 ? constants.MOUNT_X2 : constants.MOUNT_X) + (k === 0 ? -1 : 1) * constants.MOUNT_BOLT_DX,
+      constants.MOUNT_BOLT_Y,
+      side * constants.MOUNT_Z,
+    );
+  };
+
+  // 凸轮轴罩螺钉：每只罩 2 颗（罩顶面沿 X 前后各一）。头在上、杆向下（Rx 180°）
+  layouts[ENGINE_LAYOUTS.coverScrew] = ({ index, constants }) => {
+    const cover = Math.floor(index / 2);
+    const k = index % 2;
+    const { pin, side } = cylinderInfo(cover, constants);
+    return bankMatrix(
+      side,
+      constants.CYL_X1 - pin * constants.CYL_PITCH + (k === 0 ? -1 : 1) * constants.COVER_SCREW_DX,
+      constants.COVER_SCREW_Y,
+      0,
+      0,
+      constants,
+    ).multiply(new THREE.Matrix4().makeRotationX(deg2rad(180)));
+  };
+
   return layouts;
 }
 
@@ -700,6 +818,26 @@ function bankPairOf(
 
 export function makeEngineLayouts(): Record<string, InstanceLayout> {
   return makeLayouts();
+}
+
+/**
+ * 六角头短杆螺栓（L1 第一批紧固件共用几何）。
+ * 局部系：原点 = 头的外端面，头沿 +Y 占 [0, H]，杆从 H 再伸 L。
+ * 尺寸由 constants 派生（BOLT_HEAD_R / BOLT_HEAD_H / BOLT_SHANK_R / BOLT_SHANK_L）。
+ */
+function boltGeometry(): GeometrySpec {
+  return {
+    type: "lathe",
+    segments: 6,
+    profile: [
+      [0, 0],
+      ["BOLT_HEAD_R", 0],
+      ["BOLT_HEAD_R", "BOLT_HEAD_H"],
+      ["BOLT_SHANK_R", "BOLT_HEAD_H"],
+      ["BOLT_SHANK_R", "BOLT_HEAD_H+BOLT_SHANK_L"],
+      [0, "BOLT_HEAD_H+BOLT_SHANK_L"],
+    ],
+  };
 }
 
 export function makeEngineRegistry(): ModelRegistry {
@@ -765,7 +903,8 @@ function buildParts(): PartDefinition[] {
     },
     material: "cast_iron",
     mate: { type: "absolute", position: ["CASE_X", 0, 0] },
-    source: "隧道式曲轴箱：V 型机体截面沿 X 挤出，甲板整条打通为槽（槽口由机体缸孔座面封闭），谷底开口腔（RIDGE_BOTTOM_Y 避开连杆扫掠）",
+    source:
+      "隧道式曲轴箱：V 型机体截面沿 X 挤出，甲板整条打通为槽（槽口由机体缸孔座面封闭），谷底开口腔（RIDGE_BOTTOM_Y 避开连杆扫掠）",
   });
   add({
     id: "tiger.crankcase.endplate_front",
@@ -1573,10 +1712,12 @@ function buildParts(): PartDefinition[] {
     },
     material: "bakelite",
     mate: { type: "absolute" },
-    instances: 12,
+    instances: 24,
     indexed: true,
     instance_layout: ENGINE_LAYOUTS.sparkPlug,
-    source: "火花塞位于排气侧外侧（每缸 1 只），座面略高于缸盖顶面",
+    source:
+      "HL230 双点火：每缸 2 只，12 缸共 24 只；受模型进气道布置（山谷内进气/空滤）限制，" +
+      "第二只与第一只同侧、沿缸盖长度前后错开 45mm（真实机两塞分列进排气两侧）",
   });
 
   // ================= L3 冷却 =================
@@ -1983,6 +2124,111 @@ function buildParts(): PartDefinition[] {
     indexed: true,
     instance_layout: ENGINE_LAYOUTS.magneto,
     source: "两台磁电机（每 6 缸一台）挂在正时齿轮盖前面；高压线 M-C",
+  });
+
+  // ================= L1 第一批：紧固件与点火（实例 +112）=================
+  // 只补真实存在的小件（不切大件凑数）。螺栓几何统一走 boltGeometry()：
+  // 头在座面外、杆埋进基体 ≤6mm —— 螺纹咬合是构造性接触，登记进白名单，
+  // 杆不能伸穿基体碰到下一层零件（薄壁件用短杆就是为这个）。
+  add({
+    id: "tiger.crankcase.sump_bolt",
+    name_cn: "油底壳螺栓",
+    name_en: "oil sump bolt",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 135,
+    geometry: boltGeometry(),
+    material: "steel",
+    mate: { type: "absolute" },
+    instances: 20,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.sumpBolt,
+    source: "**[新增]** 油底壳法兰（0.5×0.3m）长边各 9 颗、短边中各 1 颗",
+  });
+  add({
+    id: "tiger.crankcase.inspection_cover_bolt",
+    name_cn: "检查盖螺栓",
+    name_en: "inspection cover bolt",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 136,
+    geometry: boltGeometry(),
+    material: "steel",
+    mate: { type: "absolute" },
+    instances: 16,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.inspectionBolt,
+    source: "**[新增]** 每只检查盖 4 颗（0.11×0.09 板四角），两侧各两只盖",
+  });
+  add({
+    id: "tiger.crankcase.timing_cover_bolt",
+    name_cn: "正时齿轮盖螺栓",
+    name_en: "timing cover bolt",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 137,
+    geometry: boltGeometry(),
+    material: "steel",
+    mate: { type: "absolute" },
+    instances: 8,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.timingBolt,
+    source: "**[新增]** ⌀260 圆角盖板螺孔圈 8 颗（镗孔 ⌀100 外侧）",
+  });
+  add({
+    id: "tiger.crankcase.mount_bolt",
+    name_cn: "机脚螺栓",
+    name_en: "engine mount bolt",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 138,
+    geometry: boltGeometry(),
+    material: "steel",
+    mate: { type: "absolute" },
+    instances: 8,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.mountBolt,
+    source: "**[新增]** 每只机脚底面 2 颗（前后各一），共 4 只机脚",
+  });
+  add({
+    id: "tiger.cylinder.cam_cover_screw",
+    name_cn: "凸轮轴罩螺钉",
+    name_en: "camshaft cover screw",
+    assembly: "cylinder",
+    build_layer: 1,
+    build_order: 139,
+    geometry: boltGeometry(),
+    material: "steel",
+    mate: { type: "absolute" },
+    instances: 24,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.coverScrew,
+    source: "**[新增]** 每只缸盖罩顶面 2 颗（沿罩长前后各一），12 只罩",
+  });
+  add({
+    id: "tiger.ignition.plug_boot",
+    name_cn: "火花塞高压护套",
+    name_en: "spark plug boot",
+    assembly: "ignition",
+    build_layer: 1,
+    build_order: 140,
+    geometry: {
+      type: "lathe",
+      segments: 16,
+      // 内孔 ⌀27 > 塞子外径 ⌀25（1mm 间隙，不接触）；底口与火花塞共用布局
+      profile: [
+        ["BOOT_IN_R", "BOOT_Y0"],
+        ["BOOT_R", "BOOT_Y0+0.003"],
+        ["BOOT_R", "BOOT_Y0+BOOT_LEN-0.003"],
+        ["BOOT_IN_R", "BOOT_Y0+BOOT_LEN"],
+      ],
+    },
+    material: "bakelite",
+    mate: { type: "absolute" },
+    instances: 24,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.sparkPlug,
+    source: "**[新增]** 与 24 只火花塞一一对应；高压线束本身 M-C（同磁电机注记）",
   });
 
   // ================= L3 附件 =================

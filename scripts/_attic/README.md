@@ -12,6 +12,9 @@
   ```
 
 - 脚本内的相对引用已改为 `../../src/...`，可以继续从仓库根目录运行。
+- 注意：其中若干文件在当年写盘时中文标点被替换成 U+FFFD（字符串引号断掉），
+  已经**无法解析**——冻结现状、不修不跑，只作历史参考；因此 `prettier` / `eslint`
+  不再检查本目录（见 `.prettierignore` 与 `eslint.config.js` 的 ignores）。
 - 后续"穿模"不再以"清零"为目标：构造性接触（轴承配合/贴面/分面/过盈压装）走
   白名单豁免，见 `src/three/parts/solver/whitelist.ts` 与
   `src/three/parts/models/tiger/engine/expectedContacts.ts`。

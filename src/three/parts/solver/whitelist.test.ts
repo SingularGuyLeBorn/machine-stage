@@ -51,8 +51,12 @@ describe("solver/whitelist 命中与分层", () => {
   });
 
   it("通配规则命中左右件", () => {
-    expect(matchExpectedContact(report("x.cylinder.block", "x.valvetrain.camshaft_l"), rules)?.family).toBe("cams");
-    expect(matchExpectedContact(report("x.valvetrain.camshaft_r", "x.cylinder.block[0]"), rules)?.family).toBe("cams");
+    expect(matchExpectedContact(report("x.cylinder.block", "x.valvetrain.camshaft_l"), rules)?.family).toBe(
+      "cams",
+    );
+    expect(
+      matchExpectedContact(report("x.valvetrain.camshaft_r", "x.cylinder.block[0]"), rules)?.family,
+    ).toBe("cams");
   });
 
   it("未登记的零件对 = 未豁免（真缺陷候选）", () => {
@@ -60,7 +64,9 @@ describe("solver/whitelist 命中与分层", () => {
   });
 
   it("深度守门：豁免族里超过贴面量级的深度照报", () => {
-    expect(matchExpectedContact(report("x.piston_rod.rod", "x.piston_rod.cap", DEFAULT_MAX_DEPTH_MM), rules)).not.toBeNull();
+    expect(
+      matchExpectedContact(report("x.piston_rod.rod", "x.piston_rod.cap", DEFAULT_MAX_DEPTH_MM), rules),
+    ).not.toBeNull();
     expect(matchExpectedContact(report("x.piston_rod.rod", "x.piston_rod.cap", 5), rules)).toBeNull();
     // 逐条规则可以放宽（如过盈压装本身就有几毫米咬合）
     expect(matchExpectedContact(report("x.wide.a", "x.wide.b", 5), rules)?.family).toBe("wide");
