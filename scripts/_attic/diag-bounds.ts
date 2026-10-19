@@ -1,13 +1,11 @@
-// 诊断：装配 tiger 发动机，输出整机包围盒 + 找离群/漂浮零件（监工脚本，持续维护）
-// 用法：npx tsx scripts/diag-bounds.ts
-// 判定：
-//   离群   —— 零件中心距整机中心 > 1.5m
-//   超大   —— 零件对角线 > 2m
-//   漂浮   —— 实例盒到「其余所有实例盒」的最小距离 > 8mm（逐实例判定，能抓到叠错位的实例）
+﻿// 璇婃柇锛氳閰?tiger 鍙戝姩鏈猴紝杈撳嚭鏁存満鍖呭洿鐩?+ 鎵剧缇?婕傛诞闆朵欢锛堢洃宸ヨ剼鏈紝鎸佺画缁存姢锛?// 鐢ㄦ硶锛歯px tsx scripts/diag-bounds.ts
+// 鍒ゅ畾锛?//   绂荤兢   鈥斺€?闆朵欢涓績璺濇暣鏈轰腑蹇?> 1.5m
+//   瓒呭ぇ   鈥斺€?闆朵欢瀵硅绾?> 2m
+//   婕傛诞   鈥斺€?瀹炰緥鐩掑埌銆屽叾浣欐墍鏈夊疄渚嬬洅銆嶇殑鏈€灏忚窛绂?> 8mm锛堥€愬疄渚嬪垽瀹氾紝鑳芥姄鍒板彔閿欎綅鐨勫疄渚嬶級
 import * as THREE from "three";
-import { makeEngineRegistry, makeEngineLayouts } from "../src/three/parts/models/tiger/engine/registry";
-import { tigerKitBuilders } from "../src/three/parts/models/tiger/engine/kits";
-import { buildModel } from "../src/three/parts/assembler/assembler";
+import { makeEngineRegistry, makeEngineLayouts } from "../../src/three/parts/models/tiger/engine/registry";
+import { tigerKitBuilders } from "../../src/three/parts/models/tiger/engine/kits";
+import { buildModel } from "../../src/three/parts/assembler/assembler";
 
 const registry = makeEngineRegistry();
 const model = buildModel(registry, {
@@ -16,7 +14,7 @@ const model = buildModel(registry, {
   warnMissingLayout: false,
 });
 
-/** 一个零件的世界包围盒（实例级展开；矩阵列主序手算，不依赖 Box3 实例）。 */
+/** 涓€涓浂浠剁殑涓栫晫鍖呭洿鐩掞紙瀹炰緥绾у睍寮€锛涚煩闃靛垪涓诲簭鎵嬬畻锛屼笉渚濊禆 Box3 瀹炰緥锛夈€?*/
 interface PartBox {
   name: string;
   min: [number, number, number];
@@ -31,7 +29,7 @@ const mul = (m: ArrayLike<number>, p: [number, number, number]): [number, number
 
 model.root.updateMatrixWorld(true);
 const partBoxes: PartBox[] = [];
-/** 逐实例盒（单实例零件就是零件盒本身）：漂浮检测的判定单位。 */
+/** 閫愬疄渚嬬洅锛堝崟瀹炰緥闆朵欢灏辨槸闆朵欢鐩掓湰韬級锛氭紓娴娴嬬殑鍒ゅ畾鍗曚綅銆?*/
 const floatBoxes: PartBox[] = [];
 model.root.traverse((o) => {
   const mesh = o as THREE.Mesh & { count?: number };
@@ -101,29 +99,25 @@ const perPart = partBoxes.map((b) => {
   };
 });
 
-// 极值件：整机包围盒由谁撑出来（低位/前位最可疑，多半是错位零件）
-const lowest = [...partBoxes].sort((a, b) => a.min[1] - b.min[1]).slice(0, 5);
+// 鏋佸€间欢锛氭暣鏈哄寘鍥寸洅鐢辫皝鎾戝嚭鏉ワ紙浣庝綅/鍓嶄綅鏈€鍙枒锛屽鍗婃槸閿欎綅闆朵欢锛?const lowest = [...partBoxes].sort((a, b) => a.min[1] - b.min[1]).slice(0, 5);
 const frontmost = [...partBoxes].sort((a, b) => b.max[0] - a.max[0]).slice(0, 5);
-console.log("--- 最低 5 件:");
+console.log("--- 鏈€浣?5 浠?");
 for (const b of lowest) console.log(`  ${b.name}  minY=${b.min[1].toFixed(3)}`);
-console.log("--- 最前（+X）5 件:");
+console.log("--- 鏈€鍓嶏紙+X锛? 浠?");
 for (const b of frontmost) console.log(`  ${b.name}  maxX=${b.max[0].toFixed(3)}`);
 
-// 离群零件：中心距原点 > 1.5m（发动机本身约 1.3m）
-const outliers = perPart.filter((p) => p.dist > 1.5).sort((a, b) => b.dist - a.dist);
-console.log("--- 离群零件（中心距 > 1.5m）:", outliers.length);
+// 绂荤兢闆朵欢锛氫腑蹇冭窛鍘熺偣 > 1.5m锛堝彂鍔ㄦ満鏈韩绾?1.3m锛?const outliers = perPart.filter((p) => p.dist > 1.5).sort((a, b) => b.dist - a.dist);
+console.log("--- 绂荤兢闆朵欢锛堜腑蹇冭窛 > 1.5m锛?", outliers.length);
 for (const p of outliers.slice(0, 15)) {
   console.log(`  ${p.name}  center=(${p.c.map((v) => v.toFixed(2)).join(",")})  dist=${p.dist.toFixed(2)}`);
 }
-// 超大零件：尺寸 > 2m（异常拉伸也会撑爆包围盒）
-const giants = perPart.filter((p) => p.size > 2).sort((a, b) => b.size - a.size);
-console.log("--- 超大零件（对角线 > 2m）:", giants.length);
+// 瓒呭ぇ闆朵欢锛氬昂瀵?> 2m锛堝紓甯告媺浼镐篃浼氭拺鐖嗗寘鍥寸洅锛?const giants = perPart.filter((p) => p.size > 2).sort((a, b) => b.size - a.size);
+console.log("--- 瓒呭ぇ闆朵欢锛堝瑙掔嚎 > 2m锛?", giants.length);
 for (const p of giants.slice(0, 15)) {
   console.log(`  ${p.name}  size=${p.size.toFixed(2)}`);
 }
 
-// 漂浮实例：与「最近的其它实例」也隔着空隙（阈值 8mm）
-const gap = (a: PartBox, b: PartBox): number => {
+// 婕傛诞瀹炰緥锛氫笌銆屾渶杩戠殑鍏跺畠瀹炰緥銆嶄篃闅旂潃绌洪殭锛堥槇鍊?8mm锛?const gap = (a: PartBox, b: PartBox): number => {
   let s = 0;
   for (let k = 0; k < 3; k++) {
     const g = Math.max(b.min[k] - a.max[k], a.min[k] - b.max[k]);
@@ -146,11 +140,11 @@ for (let i = 0; i < floatBoxes.length; i++) {
   if (best > 0.008) floats.push({ name: floatBoxes[i].name, gap_mm: +(best * 1000).toFixed(1), nearest });
 }
 floats.sort((a, b) => b.gap_mm - a.gap_mm);
-console.log("--- 漂浮实例（与最近实例仍有 > 8mm 空隙）:", floats.length);
+console.log("--- 婕傛诞瀹炰緥锛堜笌鏈€杩戝疄渚嬩粛鏈?> 8mm 绌洪殭锛?", floats.length);
 for (const f of floats.slice(0, 20)) {
-  console.log(`  ${f.name}  空隙=${f.gap_mm}mm  最近=${f.nearest}`);
+  console.log(`  ${f.name}  绌洪殭=${f.gap_mm}mm  鏈€杩?${f.nearest}`);
 }
 
 if (outliers.length || giants.length || floats.length) {
-  process.exitCode = 1; // 供 CI/监工脚本判定
+  process.exitCode = 1; // 渚?CI/鐩戝伐鑴氭湰鍒ゅ畾
 }

@@ -226,9 +226,10 @@ const CONSTANTS: Record<string, Expr> = {
   BEARING_R_IN: "JOURNAL_R+0.0035",
   BEARING_R_OUT: 0.112,
   BEARING_W: 0.03,
-  BEARING_REACH_Z: 0.135,
+  // 侧臂到 z=0.130：壳体挤出体的 bevel 把内腔面推进到 |z|=0.132，臂再长就插进壁里
+  BEARING_REACH_Z: 0.13,
   BEARING_REACH_UP: 0.117,
-  BEARING_REACH_DOWN: 0.157,
+  BEARING_REACH_DOWN: 0.148,
   RIB_T: 0.025,
   RIB_W_X: 0.02,
   RIB_H: 0.17,
@@ -237,22 +238,29 @@ const CONSTANTS: Record<string, Expr> = {
   RIB_PITCH: 0.158,
   RIB_COUNT: 6,
   RIB_Y: -0.075,
-  MOUNT_X: 0.395,
+  // 机脚在肋板之间：肋板在 x=0.42 / 0.262（±0.01），机脚 0.1 宽 → 只能落在两者的空档中心
+  // 空档中心 = 缸位 0.341 / 0.183 / 0.025 / -0.133 / -0.291 / -0.449：负 x 侧两侧对称需要第二组
+  MOUNT_X: 0.341,
+  MOUNT_X2: -0.291,
   MOUNT_Y: -0.155,
   MOUNT_Z: "CASE_HALF_W+0.0455",
   COVER_X1: 0.183,
-  COVER_X2: -0.291,
+  // 检查盖同样只能落在空档中心：0.025 空档两侧（机油泵/油管/油尺/滤清器都在 x<-0.1）无附件，
+  // -0.291 会被右机油管端环切到，-0.449 会撞油尺与滤清器
+  COVER_X2: 0.025,
   COVER_Z: "CASE_HALF_W+0.005",
   COVER_Y: -0.075,
-  SUMP_FLANGE_Y: -0.178,
-  // 放油塞顶面嵌入油底壳 6mm（油底壳底 -0.209），露出约 18mm
-  DRAIN_PLUG_Y: "SUMP_FLANGE_Y-0.037",
+  SUMP_FLANGE_Y: -0.177,
+  // 放油塞顶面在碗体底面之下 1mm（碗底 -0.245）
+  DRAIN_PLUG_Y: "SUMP_FLANGE_Y-0.081",
   BREATHER_Y: "DECK_INNER_Y+0.0355",
   DIPSTICK_X: -0.5,
   DIPSTICK_Y: 0.02,
   DIPSTICK_Z: "-(CASE_HALF_W+0.01)",
-  OIL_FILLER_X: "CASE_FRONT_X+0.045",
-  OIL_FILLER_Y: 0.09,
+  // 加油口沿 +X 起于前端板前脸之外（前端板 x∈[0.446,0.468]，加油口 x∈[0.470,0.520]）
+  OIL_FILLER_X: "CASE_FRONT_X+0.049",
+  // 抬到正时齿轮盖轮廓（y ≤ 0.16）之上，否则加油口插进正时盖本体
+  OIL_FILLER_Y: 0.2,
   OIL_FILLER_Z: -0.11,
   OIL_PUMP_Y: -0.09,
   OIL_PUMP_Z: "-(CASE_HALF_W+0.05)",
@@ -262,9 +270,11 @@ const CONSTANTS: Record<string, Expr> = {
   OIL_FILTER_LEN: 0.13,
   OIL_FILTER_R: 0.06,
   NAMEPLATE_X: "TIMING_COVER_X+0.013",
-  NAMEPLATE_Y: 0.06,
+  // 抬到曲轴前端（NOSE_R=0.036）扫掠半径之外，避免铭牌被轴穿过
+  NAMEPLATE_Y: 0.1,
   NAMEPLATE_Z: -0.04,
-  HOUSING_X: "CASE_REAR_X-0.056",
+  // 飞轮壳前端面留在后端板后脸之外 1mm（后端板 x∈[-0.576,-0.554]）
+  HOUSING_X: "CASE_REAR_X-0.073",
   HOUSING_R_OUT: 0.285,
   HOUSING_R_IN: 0.27,
   HOUSING_W: 0.1,
@@ -297,7 +307,7 @@ const CONSTANTS: Record<string, Expr> = {
   FLYWHEEL_R: 0.23,
   FLYWHEEL_T: 0.045,
   FLYWHEEL_X: "CASE_REAR_X-0.066",
-  RINGGEAR_R_IN: 0.232,
+  RINGGEAR_R_IN: 0.236,
   RINGGEAR_R_OUT: 0.247,
   RINGGEAR_W: 0.022,
   RINGGEAR_TEETH: 96,
@@ -306,8 +316,9 @@ const CONSTANTS: Record<string, Expr> = {
   FLYWHEEL_BOLT_CIRCLE: 0.2,
   FLYWHEEL_BOLT_X: "FLYWHEEL_X-FLYWHEEL_T/2-0.005",
   TAIL_R: 0.04,
-  TAIL_LEN: 0.15,
-  TAIL_X: "CASE_REAR_X-0.075",
+  // 尾轴只做飞轮后面的输出段：不能穿过实心飞轮，末端也不能捅穿飞轮壳后端面
+  TAIL_LEN: 0.032,
+  TAIL_X: "FLYWHEEL_X-FLYWHEEL_T/2-TAIL_LEN/2-0.001",
 
   // ===== 冷却 =====
   FAN_R: 0.235,
@@ -369,8 +380,9 @@ const CONSTANTS: Record<string, Expr> = {
   MAGNETO_Z: 0.09,
   FUELPUMP_R: 0.03,
   FUELPUMP_LEN: 0.062,
-  FUELPUMP_X: 0.24,
+  FUELPUMP_X: 0.183,
   FUELPUMP_Y: 0.075,
+  // 泵体基座面在侧壁外 1.5mm（原先直接嵌在壁里：CASE_HALF_W+0.0015 是「中心」不是基座面）
   FUELPUMP_Z: "CASE_HALF_W+0.0015",
   STARTER_R: 0.075,
   STARTER_LEN: 0.28,
@@ -536,13 +548,16 @@ function makeLayouts(): Record<string, InstanceLayout> {
       .makeTranslation(constants.JOURNAL_X0 - index * constants.CYL_PITCH, 0, 0)
       .multiply(new THREE.Matrix4().makeRotationZ(deg2rad(-90)));
 
-  // 曲柄销：绕曲轴轴线转到 60k 相位后抬到曲柄半径处
+  // 曲柄销：绕曲轴轴线转到 60k 相位后抬到曲柄半径处。
+  // 末尾的 rotateZ(-90°) 把圆柱管轴由局部 +Y 倒到 +X（曲柄销轴必须平行曲轴），
+  // 与主轴颈同法；写在最后 = 作用在几何上，不会把 CRANK_R 偏移也一起转走。
   layouts[ENGINE_LAYOUTS.crankPin] = ({ index, constants }) => {
     const k = index;
     return new THREE.Matrix4()
       .makeTranslation(constants.CYL_X1 - k * constants.CYL_PITCH, 0, 0)
       .multiply(new THREE.Matrix4().makeRotationX(deg2rad(k * 60)))
-      .multiply(new THREE.Matrix4().makeTranslation(0, constants.CRANK_R, 0));
+      .multiply(new THREE.Matrix4().makeTranslation(0, constants.CRANK_R, 0))
+      .multiply(new THREE.Matrix4().makeRotationZ(deg2rad(-90)));
   };
 
   // 曲柄臂：曲柄销两侧各一片，相位与所属销一致
@@ -568,7 +583,7 @@ function makeLayouts(): Record<string, InstanceLayout> {
     const slot = Math.floor(index / 2);
     const sign = index % 2 === 0 ? -1 : 1;
     return new THREE.Matrix4().makeTranslation(
-      slot === 0 ? -constants.MOUNT_X : constants.MOUNT_X,
+      slot === 0 ? constants.MOUNT_X2 : constants.MOUNT_X,
       constants.MOUNT_Y,
       sign * constants.MOUNT_Z,
     );
@@ -624,6 +639,8 @@ function makeLayouts(): Record<string, InstanceLayout> {
       (index === 0 ? -1 : 1) * constants.MAGNETO_Z,
     );
 
+  // 输油泵：泵轴必须指向壁外（±Z），所以布局 = 平移 · Rx(±90°)（lathe 的 +Y → ±Z）。
+  // 原为 Rz(∓90°)：泵轴被拧成沿 X，泵体半边嵌进曲轴箱侧壁（59.4mm 穿透）。
   layouts[ENGINE_LAYOUTS.fuelPump] = ({ index, constants }) =>
     new THREE.Matrix4()
       .makeTranslation(
@@ -631,7 +648,7 @@ function makeLayouts(): Record<string, InstanceLayout> {
         constants.FUELPUMP_Y,
         (index === 0 ? -1 : 1) * constants.FUELPUMP_Z,
       )
-      .multiply(new THREE.Matrix4().makeRotationZ(index === 0 ? deg2rad(-90) : deg2rad(90)));
+      .multiply(new THREE.Matrix4().makeRotationX(deg2rad(index === 0 ? -90 : 90)));
 
   // 风扇轴承：位移写在世界方位上，管轴倒向 X（AXIS_X）放在布局里 ——
   // 若把它写进 mate.rotation，位移会连同 (x,y) 一起被旋转，零件甩到机体下方
@@ -740,12 +757,12 @@ function buildParts(): PartDefinition[] {
         deckInnerZ: "DECK_INNER_Z",
         ridgeBottomY: "RIDGE_BOTTOM_Y",
         rim: "DECK_RIM",
-        cavity: 1,
+        trough: 1,
       },
     },
     material: "cast_iron",
     mate: { type: "absolute", position: ["CASE_X", 0, 0] },
-    source: "隧道式曲轴箱：V 型机体截面沿 X 挤出，谷底开口腔（RIDGE_BOTTOM_Y 避开连杆扫掠）",
+    source: "隧道式曲轴箱：V 型机体截面沿 X 挤出，甲板整条打通为槽（槽口由机体缸孔座面封闭），谷底开口腔（RIDGE_BOTTOM_Y 避开连杆扫掠）",
   });
   add({
     id: "tiger.crankcase.endplate_front",
@@ -770,7 +787,6 @@ function buildParts(): PartDefinition[] {
         deckInnerZ: "DECK_INNER_Z",
         ridgeBottomY: "RIDGE_BOTTOM_Y",
         rim: "DECK_RIM",
-        cavity: 0,
         bore: "FRONT_BORE_R",
       },
     },
@@ -800,7 +816,6 @@ function buildParts(): PartDefinition[] {
         deckInnerZ: "DECK_INNER_Z",
         ridgeBottomY: "RIDGE_BOTTOM_Y",
         rim: "DECK_RIM",
-        cavity: 0,
         bore: "REAR_BORE_R",
       },
     },
@@ -887,7 +902,8 @@ function buildParts(): PartDefinition[] {
       type: "merge",
       parts: [
         { type: "plate", w: 0.5, h: 0.012, t: 0.3, bevel: 0.002 },
-        { type: "box", w: 0.44, h: 0.062, d: 0.26, bevel: 0.004 },
+        // 碗体下移「半个法兰厚 + 半个碗高」：法兰顶面贴曲轴箱底面，碗体挂在法兰下面
+        { type: "box", w: 0.44, h: 0.062, d: 0.26, bevel: 0.004, at: [0, -0.037, 0] },
       ],
     },
     material: "cast_iron_dark",
@@ -947,7 +963,8 @@ function buildParts(): PartDefinition[] {
     build_order: 112,
     geometry: { type: "cylinder", r: 0.045, h: 0.055, bevel: 0.003 },
     material: "cast_iron_dark",
-    mate: { type: "absolute", position: [-0.2, "OIL_PUMP_Y", "OIL_PUMP_Z"], rotation: AXIS_X },
+    // x 落在肋板空档（肋板在 x=-0.212 / -0.054，±0.01）中间，避免泵体插进肋板
+    mate: { type: "absolute", position: [-0.133, "OIL_PUMP_Y", "OIL_PUMP_Z"], rotation: AXIS_X },
   });
   add({
     id: "tiger.crankcase.oil_filter",
@@ -968,9 +985,11 @@ function buildParts(): PartDefinition[] {
     build_layer: 1,
     build_order: 114,
     geometry: {
+      // 从机油泵端面外侧起步（泵体 x∈[-0.1605,-0.1055]），径向朝 −z 侧壁走；
+      // 起点/终点都留在壁面与肋板之外，管端环面倾斜量已计入 2mm 以上余量。
       type: "weld",
-      from: [-0.3, -0.14, "-OIL_PUMP_Z"],
-      to: [-0.22, -0.115, "-CASE_HALF_W"],
+      from: [-0.176, -0.1, "-(CASE_HALF_W+0.045)"],
+      to: [-0.185, -0.12, "-(CASE_HALF_W+0.01)"],
       radius: 0.012,
       seed: 11,
     },
@@ -985,9 +1004,11 @@ function buildParts(): PartDefinition[] {
     build_layer: 1,
     build_order: 115,
     geometry: {
+      // 起点插在机油滤清器内腔（滤清器为 rOuter 0.06 / rInner 0.05 的管件），
+      // 沿 X 走到 +z 侧壁；全程 y=-0.10，从机脚（y≤-0.13）上方通过。
       type: "weld",
-      from: [-0.41, -0.12, "OIL_FILTER_Z"],
-      to: [-0.3, -0.145, "CASE_HALF_W"],
+      from: [-0.42, -0.1, "OIL_FILTER_Z"],
+      to: [-0.3, -0.1, "CASE_HALF_W+0.016"],
       radius: 0.014,
       seed: 12,
     },
@@ -1029,7 +1050,8 @@ function buildParts(): PartDefinition[] {
       params: { w: 0.26, d: 0.26, h: 0.02, bore: "TIMING_COVER_BORE", corner: 0.05, axis: "x" },
     },
     material: "cast_iron",
-    mate: { type: "absolute", position: ["TIMING_COVER_X", 0.03, 0] },
+    // y 必须为 0：正时齿轮盖的镗孔要与曲轴轴线同心（原来 +0.03 让曲轴前端插进盖板本体）
+    mate: { type: "absolute", position: ["TIMING_COVER_X", 0, 0] },
   });
 
   // ================= L1 曲轴 =================
@@ -1232,6 +1254,7 @@ function buildParts(): PartDefinition[] {
         corner: 0.012,
         deckH: 0.014,
         ribH: 0.011,
+        bevel: 0,
       },
     },
     material: "cast_iron",
@@ -1274,6 +1297,7 @@ function buildParts(): PartDefinition[] {
         corner: 0.012,
         deckH: 0,
         ribH: 0,
+        bevel: 0,
       },
     },
     material: "cast_iron_dark",
@@ -1299,6 +1323,7 @@ function buildParts(): PartDefinition[] {
         chamber: "HEAD_CHAMBER_R",
         portW: 0.054,
         boltRadius: 0.045,
+        bevel: 0,
       },
     },
     material: "cast_iron",
@@ -2021,8 +2046,10 @@ function buildParts(): PartDefinition[] {
     build_order: 332,
     geometry: {
       type: "weld",
-      from: ["WATERPUMP_X-0.05", "ACC_Y+0.03", "-ACC_Z-0.03"],
-      to: [0.421, "DECK_OUTER_Y+0.001", "-DECK_OUTER_Z"],
+      // 起点埋在泵体铸件里（隐藏接口），管身全程在侧壁外平行走，管端环面离壁 0.8mm
+      // （原端点落在甲板外缘板内部：壳体穿透 23.5mm）
+      from: [0.5, "ACC_Y+0.04", "-(CASE_HALF_W+0.035)"],
+      to: [0.421, "ACC_Y+0.04", "-(CASE_HALF_W+0.0205)"],
       radius: 0.02,
       seed: 41,
     },
@@ -2038,8 +2065,9 @@ function buildParts(): PartDefinition[] {
     build_order: 333,
     geometry: {
       type: "weld",
-      from: ["WATERPUMP_X-0.05", "ACC_Y+0.03", "-ACC_Z+0.03"],
-      to: [0.421, "DECK_OUTER_Y-0.055", "-DECK_OUTER_Z+0.02"],
+      // 与左管同侧并行，y 相差 80mm（两支 r=0.02 不打架）；同样不穿壁
+      from: [0.5, "ACC_Y-0.04", "-(CASE_HALF_W+0.035)"],
+      to: [0.421, "ACC_Y-0.04", "-(CASE_HALF_W+0.0205)"],
       radius: 0.02,
       seed: 42,
     },

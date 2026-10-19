@@ -41,7 +41,7 @@ export type GeometrySpec =
   | { type: "boltCircle"; count: number; radius: Expr; boltR?: Expr; boltH?: Expr }
   | { type: "louver"; count: number; w: Expr; h: Expr; slantDeg?: number; t?: Expr }
   | { type: "weld"; from: ExprVec3; to: ExprVec3; radius?: Expr; seed?: number }
-  | { type: "merge"; parts: GeometrySpec[] }
+  | { type: "merge"; parts: Array<GeometrySpec & { at?: ExprVec3 }> }
   | { type: "kit"; kit: string; params?: Record<string, KitParam> };
 
 /** 装配关系：位置从被引用对象派生，改常量时自动传播。 */
