@@ -1,5 +1,11 @@
 import * as THREE from "three";
-import { bevelBoxGeometry, cylinderGeometry, mergeGeometries } from "../../../kernel/geometry";
+import {
+  bevelBoxGeometry,
+  cylinderGeometry,
+  latheGeometry,
+  mergeGeometries,
+  tubeGeometry,
+} from "../../../kernel/geometry";
 import type { GeometryBuilder } from "../../../assembler/geometry";
 
 // ============================================================================
@@ -228,10 +234,168 @@ const visorPlate: GeometryBuilder = (spec) => {
   return merged;
 };
 
+// ============================================================================
+// L4-e 起补充的三个 kit：球形枪座 / 机枪枪管 / 焊接吊环
+// ============================================================================
+
+/**
+ * 航向机枪球形枪座（Kugelblende 50）：座圈 + 球冠 + 一圈六角头螺栓。
+ * 局部：轴线沿 -X（车头方向），原点在首装甲板外面（局部 x = 0 即板面），几何全部在 x ≤ -3mm。
+ * 球冠的「球心」落在板厚之内（数学球心），但几何只建到球冠底面为止——底面离板面 3mm，
+ * 不会与开孔板发生穿透。
+ */
+const mgBall: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const rOuter = num(params, "rOuter", 0.14);
+  const rInner = num(params, "rInner", 0.085);
+  const t = num(params, "t", 0.03);
+  const gap = num(params, "gap", 0.003);
+  const rBall = num(params, "rBall", 0.115);
+  const protrude = num(params, "protrude", 0.1);
+  const boltR = num(params, "boltR", 0.011);
+  const boltRing = num(params, "boltRing", 0.115);
+  const bolts = Math.max(3, Math.round(num(params, "bolts", 8)));
+
+  const parts: THREE.BufferGeometry[] = [];
+
+  // 座圈：后端面（贴板面一侧）在 gap，前端面倒角。
+  // 回转体剖面绕 Y 旋转，rotateZ(90°) 后剖面的 +y 成为世界 -X（车头方向）。
+  const collar: [number, number][] = [
+    [rInner, gap],
+    [rOuter, gap],
+    [rOuter, gap + t * 0.7],
+    [rOuter - 0.01, gap + t],
+    [rInner + 0.021, gap + t],
+    [rInner, gap + t * 0.84],
+    [rInner, gap],
+  ];
+  const collarGeo = latheGeometry(collar, 40);
+  collarGeo.rotateZ(Math.PI / 2);
+  parts.push(collarGeo);
+
+  // 球冠：底面在 gap（离板面 3mm）、顶点在 gap + protrude
+  const yBase = gap;
+  const yApex = gap + protrude;
+  const yCenter = yApex - rBall;
+  const cosT = Math.min(Math.max((yBase - yCenter) / rBall, -1), 1);
+  const t0 = Math.acos(cosT);
+  const dome: [number, number][] = [
+    [0.0005, yBase],
+    [rBall * Math.sin(t0), yBase],
+  ];
+  const steps = 10;
+  for (let i = 1; i <= steps; i++) {
+    const th = t0 * (1 - i / steps);
+    dome.push([Math.max(rBall * Math.sin(th), 0.0005), yCenter + rBall * Math.cos(th)]);
+  }
+  const domeGeo = latheGeometry(dome, 40);
+  domeGeo.rotateZ(Math.PI / 2);
+  parts.push(domeGeo);
+
+  // 座圈螺栓：沿前端面圆周均布，头高 8mm
+  for (let i = 0; i < bolts; i++) {
+    const a = (Math.PI * 2 * i) / bolts;
+    const head = cylinderGeometry(boltR, 0.008, boltR * 0.88, 6, 0.0015);
+    head.rotateZ(Math.PI / 2);
+    head.translate(-(gap + t + 0.004), boltRing * Math.cos(a), boltRing * Math.sin(a));
+    parts.push(head);
+  }
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+/**
+ * 航向机枪枪管（MG34）：枪管 + 散热套（含前后箍）+ 枪口助退器 + 准星座。
+ * 局部：轴线沿 -X，原点在枪管尾端（装配时落在球座球冠顶点前方 3mm）。
+ */
+const mgBarrel: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const r = num(params, "r", 0.012);
+  const len = num(params, "len", 0.3);
+  const jacketR = num(params, "jacketR", 0.027);
+  const jacketL = num(params, "jacketL", 0.16);
+  const jacketX = num(params, "jacketX", 0.03);
+
+  const parts: THREE.BufferGeometry[] = [];
+
+  const barrel = cylinderGeometry(r, len, r * 0.95, 20, 0.0015);
+  barrel.rotateZ(Math.PI / 2);
+  barrel.translate(-len / 2, 0, 0);
+  parts.push(barrel);
+
+  const jacket = tubeGeometry(jacketR, r + 0.005, jacketL, 28);
+  jacket.rotateZ(Math.PI / 2);
+  jacket.translate(-(jacketX + jacketL / 2), 0, 0);
+  parts.push(jacket);
+
+  for (const dx of [jacketX, jacketX + jacketL]) {
+    const ring = tubeGeometry(jacketR + 0.004, r + 0.004, 0.016, 28);
+    ring.rotateZ(Math.PI / 2);
+    ring.translate(-dx, 0, 0);
+    parts.push(ring);
+  }
+
+  const muzzle = cylinderGeometry(0.018, 0.036, 0.016, 18, 0.002);
+  muzzle.rotateZ(Math.PI / 2);
+  muzzle.translate(-(len + 0.018), 0, 0);
+  parts.push(muzzle);
+
+  const tip = cylinderGeometry(0.013, 0.026, 0.012, 18, 0.0015);
+  tip.rotateZ(Math.PI / 2);
+  tip.translate(-(len + 0.049), 0, 0);
+  parts.push(tip);
+
+  const sight = bevelBoxGeometry(0.012, 0.03, 0.012, 0.0015, 1);
+  sight.translate(-(len * 0.86), 0.023, 0);
+  parts.push(sight);
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+/**
+ * 焊接吊环（Anschlagpunkt）：底板 + 两片立板 + 横销。
+ * 局部：+Y = 安装面法线（安装面在 y = 0），几何全部在 y ≥ 3mm；横销轴沿 Z。
+ */
+const liftingEye: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const gap = num(params, "gap", 0.003);
+  const w = num(params, "w", 0.1);
+  const d = num(params, "d", 0.07);
+  const t = num(params, "t", 0.012);
+
+  const parts: THREE.BufferGeometry[] = [];
+
+  const base = bevelBoxGeometry(w, t, d, 0.002, 1);
+  base.translate(0, gap + t / 2, 0);
+  parts.push(base);
+
+  for (const sz of [-1, 1]) {
+    const plate = bevelBoxGeometry(0.024, 0.05, 0.014, 0.0015, 1);
+    plate.translate(0, gap + t + 0.024, sz * 0.021);
+    parts.push(plate);
+  }
+
+  const pin = cylinderGeometry(0.008, 0.063, 0.008, 14, 0.0012);
+  pin.rotateX(Math.PI / 2);
+  pin.translate(0, gap + t + 0.044, 0);
+  parts.push(pin);
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
 export const tigerHullKitBuilders: Record<string, GeometryBuilder> = {
   hullPlate,
   hatchLid,
   rectBezel,
   visorPlate,
   hexBolt,
+  mgBall,
+  mgBarrel,
+  liftingEye,
 };

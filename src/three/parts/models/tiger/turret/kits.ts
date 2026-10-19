@@ -1,5 +1,12 @@
 import * as THREE from "three";
-import { bevelBoxGeometry, cylinderGeometry, latheGeometry, mergeGeometries } from "../../../kernel/geometry";
+import {
+  bevelBoxGeometry,
+  cylinderGeometry,
+  latheGeometry,
+  mergeGeometries,
+  sphereGeometry,
+  tubeGeometry,
+} from "../../../kernel/geometry";
 import type { GeometryBuilder } from "../../../assembler/geometry";
 
 // ============================================================================
@@ -321,6 +328,66 @@ const radialPort: GeometryBuilder = (spec) => {
   return merged;
 };
 
+/**
+ * 烟雾弹发射器（Nebelwurfgerät）：管体 + 球形脚 + 锥形立柱 + 卡箍。
+ * 局部：管轴沿 -X（车头方向）、+Z = 车外（安装面在 z = 0 平面），原点 = 安装面上的名义点。
+ *
+ * 净空要点：球形脚（球心 z = footR、半径 footR）的极点正好落在原点——实例布局把整件
+ * 转了任意角度之后，脚面离安装面的最近点仍然正好是原点（= 3mm 名义缝），不会因为外张角
+ * 而插进壁里；锥形立柱底面留 22mm 高（26° 外张时最里侧仍有 8.8mm）。
+ */
+const smokeTube: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const rOut = num(params, "rOut", 0.045);
+  const wall = num(params, "wall", 0.006);
+  const len = num(params, "len", 0.15);
+  const axisZ = num(params, "axisZ", 0.075);
+  const footR = num(params, "footR", 0.03);
+  const postR = num(params, "postR", 0.03);
+  const rear = num(params, "rear", 0.012);
+
+  const parts: THREE.BufferGeometry[] = [];
+
+  // 管体：尾底封闭（底厚 26mm）、前端开口。剖面的 +y → 世界 -X（rotateZ(90°)），
+  // 所以「管尾世界 x = +rear」的剖面 y = -rear，「管口世界 x = -（len - rear）」的剖面 y = +（len - rear）。
+  const yRear = -rear;
+  const yFront = len - rear;
+  const profile: [number, number][] = [
+    [0.0005, yRear],
+    [rOut, yRear],
+    [rOut, yFront - 0.012],
+    [rOut - wall, yFront],
+    [rOut - wall, yRear + 0.026],
+    [0.0005, yRear + 0.026],
+  ];
+  const tube = latheGeometry(profile, 36);
+  tube.rotateZ(Math.PI / 2);
+  tube.translate(0, 0, axisZ);
+  parts.push(tube);
+
+  // 球形脚（⌀60 铸球座）：极点 = 原点
+  const foot = sphereGeometry(footR, 22, 16);
+  foot.translate(0, 0, footR);
+  parts.push(foot);
+
+  // 锥形立柱（球头 ⌀60 → 管底 ⌀42）：从球头内 8mm 起，到管轴（x = 0 = 管尾底中央）
+  const postZ0 = footR - 0.008;
+  const post = cylinderGeometry(postR, axisZ - postZ0, postR * 0.7, 20, 0.002);
+  post.rotateX(Math.PI / 2);
+  post.translate(0, 0, (postZ0 + axisZ) / 2);
+  parts.push(post);
+
+  // 卡箍（管身中段的箍环）
+  const band = tubeGeometry(rOut + 0.004, rOut, 0.014, 28);
+  band.rotateZ(Math.PI / 2);
+  band.translate(rear - len * 0.62, 0, axisZ);
+  parts.push(band);
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
 export const tigerTurretKitBuilders: Record<string, GeometryBuilder> = {
   turretShell,
   turretCupola,
@@ -329,4 +396,5 @@ export const tigerTurretKitBuilders: Record<string, GeometryBuilder> = {
   hatchDisc,
   curvedPanel,
   radialPort,
+  smokeTube,
 };

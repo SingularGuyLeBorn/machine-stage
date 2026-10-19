@@ -22,10 +22,11 @@ import type { ModelRegistry, PartDefinition } from "../../../registry/types";
 //   3. 发动机隔板（Motorschott）把后置发动机舱与战斗室分开，传动轴经隔板孔进入发动机
 //      飞轮——本批开 ⌀180 过孔（万向节 ⌀150 与孔留 15mm 环缝）。
 //
-// 建模口径（简化记录，M-C / L4-e / L5 待补）：
+// 建模口径（简化记录，M-C / L4-f / L5 待补）：
 //   1. 已完成：地板 / 侧板 / 前后装甲板 / 隔板（L4-a）、顶甲板 + 发动机舱盖 + 座圈（L4-b）、
-//      驾驶员-无线电员舱盖盖板（打开 90°）/ 潜望镜窗框 / 驾驶员观察窗 / 座圈螺栓圈（L4-d）。
-//   2. 本批不含：航向机枪球形枪座（Kugelblende 50，L4-e）、翼子板与挡泥板（L4-e）、
+//      驾驶员-无线电员舱盖盖板（打开 90°）/ 潜望镜窗框 / 驾驶员观察窗 / 座圈螺栓圈（L4-d）、
+//      航向机枪球形枪座 + MG34 枪管 / 首上备用履带板 ×3 / 焊接吊环 ×3（L4-e）。
+//   2. 本批不含：翼子板与前后挡泥板（L4-f）、近防武器与随车工具（L5）、
 //      焊缝与暗黄涂装（L5）。
 //   2. 下部车体（腹板 + 扭杆通道 + 车底侧裙）未建：扭杆（y -0.585）与摆臂枢轴（z ±1.10）
 //      在实车位于车体侧壁之内，本模型 L2 把它们放在「地板之下、侧板之外」，
@@ -38,6 +39,8 @@ export const HULL_LAYOUTS = {
   engineCoaming: "hull.engineCoaming",
   mirrorZ: "hull.mirrorZ",
   ringBolts: "hull.ringBolts",
+  glacisSpare: "hull.glacisSpare",
+  roofEyes: "hull.roofEyes",
 } as const;
 
 const HULL_CONSTANTS: Record<string, number> = {
@@ -95,6 +98,22 @@ const HULL_CONSTANTS: Record<string, number> = {
   HULL_RING_BOLT_R: 0.8425,
   HULL_RING_BOLT_HEAD_R: 0.012,
   HULL_RING_BOLT_COUNT: 24,
+
+  // —— 航向机枪球座 / 随车履带板 / 吊环（L4-e）——
+  HULL_MG_BALL_RO: 0.14,
+  HULL_MG_BALL_RI: 0.085,
+  HULL_MG_BALL_T: 0.03,
+  HULL_MG_BALL_RB: 0.115,
+  HULL_MG_BALL_PROTRUDE: 0.1,
+  HULL_MG_BARREL_R: 0.012,
+  HULL_MG_BARREL_L: 0.3,
+  HULL_SPARE_X: -4.535,
+  HULL_SPARE_Y: 0.55,
+  HULL_SPARE_COUNT: 3,
+  HULL_SPARE_W: 0.3625,
+  HULL_EYE_X: -4.15,
+  HULL_EYE_Z: 0.85,
+  HULL_EYE2_X: -2.62,
 };
 
 function sideOf(index: number): 1 | -1 {
@@ -128,6 +147,29 @@ function makeLayouts(): Record<string, InstanceLayout> {
     return new THREE.Matrix4()
       .makeRotationY(-a)
       .multiply(new THREE.Matrix4().makeTranslation(HULL_CONSTANTS.HULL_RING_BOLT_R!, 0, 0));
+  };
+
+  // 首装甲板备用履带板 ×3：板面贴板面（触地面朝车体）、导向齿朝车头（-X），三块上下叠成一列。
+  // 局部系 → 世界：履带板 +X（节距方向）→ +Y；+Y（触地面）→ +X（朝车体）；+Z（板宽）→ -Z（板宽对称，居中即 z 0）。
+  layouts[HULL_LAYOUTS.glacisSpare] = ({ index, constants }) => {
+    const pitch = constants.TRACK_PIN_PITCH ?? 0.13;
+    const basis = new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(0, 0, -1),
+    );
+    basis.setPosition(HULL_CONSTANTS.HULL_SPARE_X!, HULL_CONSTANTS.HULL_SPARE_Y! + index * pitch, 0);
+    return basis;
+  };
+
+  // 顶部吊环 ×3：两个前角（z ±0.85）+ 一个前段中央
+  layouts[HULL_LAYOUTS.roofEyes] = ({ index }) => {
+    const z = HULL_CONSTANTS.HULL_EYE_Z!;
+    const m = new THREE.Matrix4();
+    if (index === 0) m.setPosition(0, 0, z);
+    else if (index === 1) m.setPosition(0, 0, -z);
+    else m.setPosition(HULL_CONSTANTS.HULL_EYE2_X! - HULL_CONSTANTS.HULL_EYE_X!, 0, 0);
+    return m;
   };
 
   return layouts;
@@ -234,7 +276,7 @@ function buildHullParts(): PartDefinition[] {
       rotation: [0, -90, 0],
     },
     source:
-      "前装甲板（Bugplatte，厚 100；实车 9° 倾角，本模型垂直）：内表面 x -4.40（L3 仪表板 / 踏板 / 机枪球孔基准）、外表面 -4.50，z ±0.9625（贯通全宽）、y -0.335 ~ 1.045。⌀100 航向机枪球孔（y 0.16、z 0.78）：枪管 ⌀44 自孔中穿出车头外板 0.12m；Kugelblende 50 球形枪座、驾驶员观察窗、手枪孔随 L4-c。",
+      "前装甲板（Bugplatte，厚 100；实车 9° 倾角，本模型垂直）：内表面 x -4.40（L3 仪表板 / 踏板 / 机枪球孔基准）、外表面 -4.50，z ±0.9625（贯通全宽）、y -0.335 ~ 1.045。⌀100 航向机枪球孔（y 0.16、z 0.78）：车内枪管段穿入孔内 90mm（枪口 -4.49），车外由 L4-e 的 Kugelblende 50 球座 + MG34 枪管接出；驾驶员观察窗见 L4-d。",
   });
 
   // ===================== 后装甲板 =====================
@@ -525,6 +567,114 @@ function buildHullParts(): PartDefinition[] {
       "座圈螺栓圈（Turmdrehkranz-Schrauben，六角头 ⌀24 × 10）：沿 r 0.8425 的圆周均布 24 颗（周向间距 221mm），落在座圈内孔（r 0.825）与炮塔内壁（r 0.86）之间的环形台阶上，离座圈顶面 3mm、离炮塔内壁 5.5mm。实车座圈螺栓为 M20 级、连接炮塔防盾与座圈滚道；装配状态下被炮塔壳体覆盖，仅拆解 / 隔离时可见——与 L1/L2 的箱内零件同一处理口径。",
   });
 
+  // ===================== L4-e：航向机枪球座 / 备用履带板 / 吊环 =====================
+  const frontOut = c.HULL_FRONT_INNER! - c.HULL_FRONT_T!; // -4.50
+
+  add({
+    id: "tiger.hull.mg_mount",
+    name_cn: "航向机枪球形枪座",
+    name_en: "Kugelblende 50",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 540,
+    geometry: {
+      type: "kit",
+      kit: "mgBall",
+      params: {
+        rOuter: c.HULL_MG_BALL_RO!,
+        rInner: c.HULL_MG_BALL_RI!,
+        t: c.HULL_MG_BALL_T!,
+        rBall: c.HULL_MG_BALL_RB!,
+        protrude: c.HULL_MG_BALL_PROTRUDE!,
+        gap: c.HULL_JOINT!,
+      },
+    },
+    material: "armor_steel",
+    mate: {
+      type: "absolute",
+      position: [frontOut, c.HULL_MG_HOLE_Y!, c.HULL_MG_HOLE_Z!],
+    },
+    source:
+      "航向机枪球形枪座（Kugelblende 50）：座圈 ⌀280 / 内孔 ⌀170 × 30 + 球冠 ⌀230（凸出 100，底 φ229 止于板面前 3mm）+ 座圈螺栓 8 颗；与首装甲板 ⌀100 机枪球孔同心（y 0.16 / z 0.78）。实车 Kugelblende 50 是 50mm 厚的球形防盾，MG34 经球座万向转动、由无线电员操作；座圈外缘到驾驶员观察窗（z -0.67）的净空 1.20m。球冠顶点 x -4.605。",
+  });
+
+  add({
+    id: "tiger.hull.mg34_barrel",
+    name_cn: "航向机枪枪管",
+    name_en: "MG34 Lauf (Bug-MG)",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 541,
+    geometry: {
+      type: "kit",
+      kit: "mgBarrel",
+      params: { r: c.HULL_MG_BARREL_R!, len: c.HULL_MG_BARREL_L! },
+    },
+    material: "steel",
+    mate: {
+      type: "absolute",
+      position: [
+        frontOut - c.HULL_MG_BALL_PROTRUDE! - 2 * c.HULL_JOINT!,
+        c.HULL_MG_HOLE_Y!,
+        c.HULL_MG_HOLE_Z!,
+      ],
+    },
+    source:
+      "航向机枪枪管（MG34）：枪管 ⌀24 × 300 + 散热套 ⌀54 × 160（前后两道箍）+ 枪口助退器（⌀36 / ⌀26 两级）+ 准星座，自球冠顶点前 3mm 起（x -4.606 ~ -4.968）。实车 MG34 全长 1.22m，车装机枪枪管伸出车头约 0.4m；枪口比首装甲板外表面前伸 0.468m。",
+  });
+
+  add({
+    id: "tiger.hull.spare_track",
+    name_cn: "备用履带板",
+    name_en: "Ersatzkette (Bug)",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 542,
+    geometry: {
+      type: "kit",
+      kit: "trackLink",
+      params: {
+        pitch: "TRACK_PIN_PITCH",
+        halfWidth: "TRACK_HALF_W",
+        hornInner: "TRACK_HORN_INNER",
+        hornOuter: "TRACK_HORN_OUTER",
+        hornDepth: "TRACK_HORN_DEPTH",
+        holeR: "TRACK_PIN_HOLE_R",
+      },
+    },
+    material: "steel_worn",
+    instances: c.HULL_SPARE_COUNT!,
+    indexed: true,
+    instance_layout: HULL_LAYOUTS.glacisSpare,
+    mate: { type: "absolute" },
+    source:
+      "随车备用履带板 ×3（Ersatzkette）：复用 L2 履带板 kit（Kgs 63/725/130 同一块板），板面贴首装甲板外面 3mm、触地面朝车体、导向齿朝车头，3 块沿竖直方向叠成一列（列心 x -4.535、y 0.557 ~ 0.933、车宽中段）。实车虎 I 在首上装甲与炮塔侧壁都挂备用履带板（725 × 130、约 60kg / 块）：既备损件、又给正面加一层「附加装甲」。",
+  });
+
+  add({
+    id: "tiger.hull.lifting_eye",
+    name_cn: "焊接吊环",
+    name_en: "Anschlagpunkt",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 543,
+    geometry: {
+      type: "kit",
+      kit: "liftingEye",
+      params: { w: 0.1, d: 0.07, t: 0.012 },
+    },
+    material: "steel",
+    instances: 3,
+    indexed: true,
+    instance_layout: HULL_LAYOUTS.roofEyes,
+    mate: {
+      type: "absolute",
+      position: [c.HULL_EYE_X!, c.HULL_ROOF_UNDER! + c.HULL_ROOF_T! + c.HULL_JOINT!, 0],
+    },
+    source:
+      "焊接吊环（Anschlagpunkt）×3：底板 100 × 70 × 12 + 两片立板 + ⌀16 横销，焊在战斗室顶甲板上表面（离面 3mm）——两个前角（x -4.15 / z ±0.85）+ 前段中央（x -2.62 / z 0）；吊环供吊装炮塔 / 车体、以及野战检修时起吊总成。实车虎 I 的吊点在车体四角与发动机舱两侧，本模型按「两前角 + 中前」三只简化，避让潜望镜窗框（x -4.043 起）与舱盖孔（z ±0.66）。",
+  });
+
   return parts;
 }
 
@@ -538,7 +688,7 @@ export function makeHullRegistry(): ModelRegistry {
       "本模型口径（与 L1/L2/L3 接口一致）：地板顶面 -0.305、侧板内表面 ±0.90 / 外表面 ±0.9625、前装甲板内表面 -4.40、战斗室顶下表面 1.05、板顶 1.045；车体箱 x -4.50 ~ 0.91、z ±0.9625、y -0.335 ~ 1.105（发动机舱盖顶）。",
       "开孔（对外契约）：侧板 ⌀110 ×2（侧传动轴，x -4.05、y 0）、前板 ⌀100 ×1（航向机枪球孔，y 0.16、z 0.78）、发动机隔板 ⌀180 ×1（传动轴，y 0、z 0）、顶甲板 ⌀1650 ×1（炮塔座圈，x -1.65、z 0）+ ⌀440 舱盖孔 ×2（x -3.32、z ±0.66）+ 170 × 130 潜望镜窗 ×2（x -3.95、z ±0.66）。",
       "阶梯甲板：发动机舱盖（下表面 1.08 / 上表面 1.105）比战斗室顶（1.05 / 1.075）高 30mm，为 L1 空滤（顶 1.056）与卡箍（顶 1.053）让高；台阶立板在隔板上方、两侧用发动机舱侧围封边。",
-      "简化记录（待补）：炮塔壳体与防盾、舱盖盖板 / 铰链 / 观察窗、手枪孔、Kugelblende 50 球形枪座、翼子板（L4-c/d）；焊缝、暗黄涂装、铁十字与战术编号（L5）；下部车体（腹板 + 扭杆通道 + 车底侧裙）与内饰面象牙白内衬板（M-C）。",
+      "简化记录（待补）：焊接吊环 ×3（L4-e）、首上备用履带板（L4-e）、翼子板与挡泥板（L4-e）、焊缝、暗黄涂装、铁十字与战术编号（L5）；下部车体（腹板 + 扭杆通道 + 车底侧裙）与内饰面象牙白内衬板（M-C）。",
     ].join("\n"),
     constants: HULL_CONSTANTS,
     assemblies: [{ id: "hull", name_cn: "车体外壳", name_en: "hull shell", explode: [0, 1.5, 0] }],

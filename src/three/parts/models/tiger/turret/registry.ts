@@ -19,11 +19,12 @@ import type { ModelRegistry, PartDefinition } from "../../../registry/types";
 //   4. 炮塔后段悬在发动机舱盖前段上方（实车同样如此）：壳体下沿 1.111 离舱盖顶面 1.105
 //      只有 6mm，但两者不接触——吃完这一 6mm 余量之前不要抬发动机舱盖。
 //
-// 建模口径（简化记录，L4-e / L5 待补）：
+// 建模口径（简化记录，L4-f / L5 待补）：
 //   1. 已完成：壳体 + 指挥塔 + 炮盾 + 炮管（L4-c）、装填手舱口 / 车长塔顶盖 / 后部逃生门 /
-//      手枪孔 ×2 / 抛壳窗 / 同轴机枪球座 + 枪管 / 炮长瞄准镜开口（L4-d）。
-//   2. 本批不含：焊接吊环（L4-e）、塔内潜望镜与顶盖内侧锁扣（L4-e）、炮管抽烟装置与
-//      俯仰耳轴 / 后坐复进机（L4-e）、焊缝与暗黄涂装（L5）。
+//      手枪孔 ×2 / 抛壳窗 / 同轴机枪球座 + 枪管 / 炮长瞄准镜开口（L4-d）、
+//      烟雾弹发射器 ×6 / 左壁备用履带板 ×5 / 顶盖吊环 ×2（L4-e）。
+//   2. 本批不含：塔内潜望镜与顶盖内侧锁扣（L4-f）、炮管抽烟装置与俯仰耳轴 / 后坐复进机
+//      （L4-f）、车顶 MG34 防空枪架（L4-f）、焊缝与暗黄涂装（L5）。
 //   3. 炮塔内壁（r 0.86）与座圈内孔（r 0.825）之间留 35mm 环形台阶——战斗舱内饰（弹药架 /
 //      炮闩 / 吊篮，L3 第二批）按内壁 r 0.86、顶盖下表面 1.811 定位。
 //   4. 炮盾 / 炮管按静止姿态建模（炮管水平、俯仰角 0）；俯仰耳轴与后坐复进机随 L4-e。
@@ -85,10 +86,26 @@ const TURRET_CONSTANTS: Record<string, number> = {
   TR_COAX_BARREL_L: 0.3,
   TR_SIGHT_Z: -0.24,
   TR_SIGHT_Y: 1.58,
+
+  // —— 烟雾弹发射器 / 备用履带板 / 吊环（L4-e）——
+  TR_SMOKE_X: -2.6,
+  TR_SMOKE_Y1: 1.66,
+  TR_SMOKE_DY: 0.11,
+  TR_SMOKE_R: 0.045,
+  TR_SMOKE_LEN: 0.15,
+  TR_SMOKE_AXIS_Z: 0.075,
+  TR_SPARE_X: -2.15,
+  TR_SPARE_Y1: 1.2,
+  TR_SPARE_COUNT: 4,
+  TR_EYE_X: -2.55,
+  TR_EYE_Z: 0.7,
 };
 
 export const TURRET_LAYOUTS = {
   pistolPort: "turret.pistolPort",
+  smokeDischarger: "turret.smokeDischarger",
+  spareTrack: "turret.spareTrack",
+  roofEyes: "turret.roofEyes",
 } as const;
 
 function makeLayouts(): Record<string, InstanceLayout> {
@@ -101,6 +118,52 @@ function makeLayouts(): Record<string, InstanceLayout> {
     return new THREE.Matrix4()
       .makeRotationY(-a)
       .multiply(new THREE.Matrix4().makeTranslation(TURRET_CONSTANTS.TR_PORT_RMID!, 0, 0));
+  };
+
+  // 烟雾弹发射器 ×6：每侧 3 具挂在炮塔前侧壁（x -2.60 由 mate 装配位给出），扇形张开——
+  // 上管近水平、中管俯 12° / 外张 15°、下管俯 24° / 外张 26°（实车「上管朝前、下管逐级下俯外张」）。
+  // 左侧按 rotX(180°) 镜像（kit 关于局部 XY 面对称，镜像不可察觉），保证球形脚仍在车外一侧；
+  // 镜像会翻转仰角符号，所以左侧的俯仰角改用 +pitch 抵消。
+  layouts[TURRET_LAYOUTS.smokeDischarger] = ({ index }) => {
+    const side = index < 3 ? 1 : -1;
+    const k = index % 3;
+    const elev = [0, -12, -24][k];
+    const out = [5, 15, 26][k];
+    const y = TURRET_CONSTANTS.TR_SMOKE_Y1! - k * TURRET_CONSTANTS.TR_SMOKE_DY!;
+    const z = side * (TURRET_CONSTANTS.TR_R_OUT! + TURRET_CONSTANTS.TR_JOINT!);
+    const yaw = THREE.MathUtils.degToRad(out);
+    const pitch = THREE.MathUtils.degToRad(elev);
+    const m = new THREE.Matrix4();
+    if (side > 0) m.makeRotationY(yaw);
+    else m.makeRotationX(Math.PI).multiply(new THREE.Matrix4().makeRotationY(yaw));
+    m.multiply(new THREE.Matrix4().makeRotationZ(side > 0 ? -pitch : pitch));
+    // 平移只给 y / z——x 由 mate 的装配位（TR_SMOKE_X）提供，避免复合两次
+    m.setPosition(0, y, z);
+    return m;
+  };
+
+  // 备用履带板 ×4：挂在炮塔左壁（z -0.94）——板面贴壁、导向齿朝外，4 块沿竖直方向叠成一列。
+  // 含铰接耳的总高 = 4 × 节距 + 0.182 ≈ 574mm（壁高 700，上下各留 63mm），不会顶到顶盖 / 座圈。
+  // 局部系 → 世界：+X（节距方向）→ +Y；+Y（触地面）→ +Z（朝壁）；+Z（板宽）→ +X。
+  layouts[TURRET_LAYOUTS.spareTrack] = ({ index, constants }) => {
+    const pitch = constants.TRACK_PIN_PITCH ?? 0.13;
+    const basis = new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(0, 0, 1),
+      new THREE.Vector3(1, 0, 0),
+    );
+    basis.setPosition(
+      TURRET_CONSTANTS.TR_SPARE_X!,
+      TURRET_CONSTANTS.TR_SPARE_Y1! + index * pitch,
+      -(TURRET_CONSTANTS.TR_R_OUT! + TURRET_CONSTANTS.TR_JOINT! + 0.032),
+    );
+    return basis;
+  };
+
+  // 顶部吊环 ×2：炮塔顶盖前段两角（z ±0.70）
+  layouts[TURRET_LAYOUTS.roofEyes] = ({ index }) => {
+    const z = TURRET_CONSTANTS.TR_EYE_Z!;
+    return new THREE.Matrix4().makeTranslation(0, 0, index === 0 ? z : -z);
   };
 
   return layouts;
@@ -393,6 +456,84 @@ function buildTurretParts(): PartDefinition[] {
     },
     source:
       "炮长瞄准镜开口（Zielfernrohröffnung）：300 × 90 × 180 镜框，装在炮盾前面 z -0.24 / y 1.58（主炮轴线左上，炮长位于火炮左侧），离盾面 3mm。实车为 TZF 9b 双目瞄准镜的防危板开口；镜筒与防危板随 L4-e。",
+  });
+
+  // ===================== L4-e：烟雾弹发射器 / 备用履带板 / 吊环 =====================
+  add({
+    id: "tiger.turret.smoke_discharger",
+    name_cn: "烟雾弹发射器",
+    name_en: "Nebelwurfgerät",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 544,
+    geometry: {
+      type: "kit",
+      kit: "smokeTube",
+      params: {
+        rOut: c.TR_SMOKE_R!,
+        len: c.TR_SMOKE_LEN!,
+        axisZ: c.TR_SMOKE_AXIS_Z!,
+      },
+    },
+    material: "steel",
+    instances: 6,
+    indexed: true,
+    instance_layout: TURRET_LAYOUTS.smokeDischarger,
+    mate: { type: "absolute", position: [c.TR_SMOKE_X!, 0, 0] },
+    source:
+      "烟雾弹发射器（Nebelwurfgerät）×6：每侧 3 具（管 ⌀90 × 150、内径 ⌀78、尾底厚 26）挂在炮塔前侧壁的安装柱上（柱底铸球座 ⌀60，球极点落在壁面外 3mm；锥形立柱 ⌀60→⌀42，管轴离壁 75mm）。扇形布置：上管近水平、中管俯 12°/外张 15°、下管俯 24°/外张 26°。实车 1942-08 起在炮塔两侧各装三具（Brackets 先焊、1942-10 起整机装），1943-06 因「被弹片点燃后烟雾罩住本车」而撤装；每具管长 150、口径 90，发射 Schnellnebelkerze 39 发烟弹。",
+  });
+
+  add({
+    id: "tiger.turret.spare_track",
+    name_cn: "备用履带板",
+    name_en: "Ersatzkette (Turm)",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 545,
+    geometry: {
+      type: "kit",
+      kit: "trackLink",
+      params: {
+        pitch: "TRACK_PIN_PITCH",
+        halfWidth: "TRACK_HALF_W",
+        hornInner: "TRACK_HORN_INNER",
+        hornOuter: "TRACK_HORN_OUTER",
+        hornDepth: "TRACK_HORN_DEPTH",
+        holeR: "TRACK_PIN_HOLE_R",
+      },
+    },
+    material: "steel_worn",
+    instances: c.TR_SPARE_COUNT!,
+    indexed: true,
+    instance_layout: TURRET_LAYOUTS.spareTrack,
+    mate: { type: "absolute" },
+    source:
+      "随车备用履带板 ×4（Ersatzkette）：复用 L2 履带板 kit（同一块 Kgs 63/725/130），挂在炮塔左壁外侧——板面贴壁 3mm、导向齿朝外，4 块沿竖直方向叠成一列（列心 x -2.15、贴壁面 z -0.943、含铰接耳总高 y 1.174 ~ 1.748，上下各留 63mm 板边）。实车 1942-05 就定了「把备用履带挂到炮塔两侧」，1943-04 起改为止动销＋挂钩的正式支架，多数照片是每侧 4 块；右侧壁被抛壳窗（x -2.10）占位，故只挂左侧。",
+  });
+
+  add({
+    id: "tiger.turret.lifting_eye",
+    name_cn: "焊接吊环",
+    name_en: "Anschlagpunkt (Turm)",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 546,
+    geometry: {
+      type: "kit",
+      kit: "liftingEye",
+      params: { w: 0.1, d: 0.07, t: 0.012 },
+    },
+    material: "steel",
+    instances: 2,
+    indexed: true,
+    instance_layout: TURRET_LAYOUTS.roofEyes,
+    mate: {
+      type: "absolute",
+      position: [c.TR_EYE_X!, roofTop + c.TR_JOINT!, 0],
+    },
+    source:
+      "焊接吊环（Anschlagpunkt）×2：底板 100 × 70 × 12 + 两片立板 + ⌀16 横销，焊在炮塔顶盖前段两角（x -2.55 / z ±0.70，离顶面 3mm），供吊装炮塔总成。避让车长塔（-1.30 / -0.42）、装填手舱口（-1.25 / +0.50）与炮盾（z ±0.43）；到顶盖前缘（x -2.78）留 230mm、到侧壁外缘（z ±0.94）留 240mm。",
   });
 
   return parts;
