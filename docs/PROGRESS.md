@@ -188,23 +188,23 @@ m-b-ui-drawer / isolation / rails / fault。
 
 任务书 §2「L1 发动机补全」的第一批：**只补真实存在的小件，不切大件凑数**。
 
-| 指标     | 前     | 后         | 增量       |
-| -------- | ------ | ---------- | ---------- |
-| 命名零件 | 62     | **68**     | +6         |
-| 实例零件 | 286    | **398**    | **+112**   |
-| 三角面   | —      | 303,206    | 含精确件改动 |
+| 指标     | 前  | 后      | 增量         |
+| -------- | --- | ------- | ------------ |
+| 命名零件 | 62  | **68**  | +6           |
+| 实例零件 | 286 | **398** | **+112**     |
+| 三角面   | —   | 303,206 | 含精确件改动 |
 
 新增零件（全部实例化，位置一律由 constants 派生，不手写坐标）：
 
-| 零件                                  | 件             | 实例  | 说明                                                             |
-| ------------------------------------- | -------------- | ----- | ---------------------------------------------------------------- |
-| `tiger.crankcase.sump_bolt`           | 油底壳螺栓     | 20    | 0.5×0.3m 法兰：长边各 9 颗 + 短边中各 1 颗                        |
-| `tiger.crankcase.inspection_cover_bolt` | 检查盖螺栓   | 16    | 每盖 4 颗（0.11×0.09 四角），两块盖 × 两侧                        |
-| `tiger.crankcase.timing_cover_bolt`   | 正时齿轮盖螺栓 | 8     | ⌀260 圆角盖板螺孔圈（上半被铭牌 + 风扇支架附件梁占住 → 压在下半） |
-| `tiger.crankcase.mount_bolt`          | 机脚螺栓       | 8     | 每只机脚底面 2 颗，共 4 只                                        |
-| `tiger.cylinder.cam_cover_screw`      | 凸轮轴罩螺钉   | 24    | 每只罩顶面 2 颗                                                  |
-| `tiger.ignition.plug_boot`            | 火花塞高压护套 | 24    | 与 24 只火花塞一一对应（内孔留 1mm 间隙，不接触）                |
-| `tiger.valvetrain.spark_plug`         | 火花塞         | 12→**24** | HL230 双点火：每缸 2 只                                      |
+| 零件                                    | 件             | 实例      | 说明                                                              |
+| --------------------------------------- | -------------- | --------- | ----------------------------------------------------------------- |
+| `tiger.crankcase.sump_bolt`             | 油底壳螺栓     | 20        | 0.5×0.3m 法兰：长边各 9 颗 + 短边中各 1 颗                        |
+| `tiger.crankcase.inspection_cover_bolt` | 检查盖螺栓     | 16        | 每盖 4 颗（0.11×0.09 四角），两块盖 × 两侧                        |
+| `tiger.crankcase.timing_cover_bolt`     | 正时齿轮盖螺栓 | 8         | ⌀260 圆角盖板螺孔圈（上半被铭牌 + 风扇支架附件梁占住 → 压在下半） |
+| `tiger.crankcase.mount_bolt`            | 机脚螺栓       | 8         | 每只机脚底面 2 颗，共 4 只                                        |
+| `tiger.cylinder.cam_cover_screw`        | 凸轮轴罩螺钉   | 24        | 每只罩顶面 2 颗                                                   |
+| `tiger.ignition.plug_boot`              | 火花塞高压护套 | 24        | 与 24 只火花塞一一对应（内孔留 1mm 间隙，不接触）                 |
+| `tiger.valvetrain.spark_plug`           | 火花塞         | 12→**24** | HL230 双点火：每缸 2 只                                           |
 
 两处被几何逼出来的设计决定（都写进了 `source` 与白名单 reason）：
 
@@ -216,15 +216,20 @@ m-b-ui-drawer / isolation / rails / fault。
 
 验收（新增 89 条构造性接触全部登记豁免族，未豁免仍为 0）：
 
-| 项         | 结果                                                                 |
-| ---------- | -------------------------------------------------------------------- |
-| 全模型报告 | 224 条（前 147 + 本轮 77），全部 ≤0.5mm（检测阈值下限）；>2mm 为 0     |
-| 未豁免     | **0**（`expectedContacts.test.ts` 断言 `active = []`）                |
+| 项         | 结果                                                                                                                                                              |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 全模型报告 | 224 条（前 147 + 本轮 77），全部 ≤0.5mm（检测阈值下限）；>2mm 为 0                                                                                                |
+| 未豁免     | **0**（`expectedContacts.test.ts` 断言 `active = []`）                                                                                                            |
 | 已豁免     | 224（新增族：`sump-bolt-seat` 20 / `cover-bolt-seat` 24 / `mount-bolt-seat` 8 / `cam-cover-screw-seat` 24 / `plug-boot-on-plug` 0 命中 / `timing-cover-mount` 1） |
-| 注入守门   | 油尺推进曲轴箱壁 5mm → 仍只多报那一条（其余 224 不动）                |
-| 门禁       | format ✓ / lint 0 error（8 warning 为既有 no-console）/ tsc ✓ / vitest 9 文件 101 tests ✓ / build ✓ |
-| 截图       | `docs/qa/expansion/L1-fasteners-front.png`（正面：盖螺栓、歧管螺栓、塞子+护套）、`L1-fasteners-under.png`（下方：油底壳螺栓排、检查盖四角螺栓） |
+| 注入守门   | 油尺推进曲轴箱壁 5mm → 仍只多报那一条（其余 224 不动）                                                                                                            |
+| 门禁       | format ✓ / lint 0 error（8 warning 为既有 no-console）/ tsc ✓ / vitest 9 文件 101 tests ✓ / build ✓                                                               |
+| 截图       | `docs/qa/expansion/L1-fasteners-front.png`（正面：盖螺栓、歧管螺栓、塞子+护套）、`L1-fasteners-under.png`（下方：油底壳螺栓排、检查盖四角螺栓）                   |
 
 顺带把门禁口径修干净：`scripts/_attic/` 当年写盘时中文标点被替换成 U+FFFD（字符串
 引号断掉、无法解析），现在 prettier / eslint 都不再检查该冻结目录（活代码
 `scripts/diag-clips.ts` 仍受检）；README 已注明冻结原因。
+
+新增的 5 个命中族补上了各自的隔离视图截图（`docs/qa/whitelist/` 下
+`sump-bolt-seat` / `cover-bolt-seat` / `mount-bolt-seat` / `cam-cover-screw-seat` /
+`timing-cover-mount`.png，1801×1159 原尺寸），README 的逐族表同步扩到 23 行
+（21 族有命中 + 2 族预留 0 命中：`pipe-end-in-casting`、`plug-boot-on-plug`）。
