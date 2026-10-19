@@ -22,9 +22,11 @@ import type { ModelRegistry, PartDefinition } from "../../../registry/types";
 //   3. 发动机隔板（Motorschott）把后置发动机舱与战斗室分开，传动轴经隔板孔进入发动机
 //      飞轮——本批开 ⌀180 过孔（万向节 ⌀150 与孔留 15mm 环缝）。
 //
-// 建模口径（简化记录，M-C / L4-b / L5 待补）：
-//   1. 本批不含：顶甲板与炮塔座圈（L4-b）、炮塔壳体（L4-c）、舱盖 / 观察窗 / 手枪孔 /
-//      Kugelblende 50 球形枪座 / 翼子板（L4-c/d）、焊缝与暗黄涂装（L5）。
+// 建模口径（简化记录，M-C / L4-e / L5 待补）：
+//   1. 已完成：地板 / 侧板 / 前后装甲板 / 隔板（L4-a）、顶甲板 + 发动机舱盖 + 座圈（L4-b）、
+//      驾驶员-无线电员舱盖盖板（打开 90°）/ 潜望镜窗框 / 驾驶员观察窗 / 座圈螺栓圈（L4-d）。
+//   2. 本批不含：航向机枪球形枪座（Kugelblende 50，L4-e）、翼子板与挡泥板（L4-e）、
+//      焊缝与暗黄涂装（L5）。
 //   2. 下部车体（腹板 + 扭杆通道 + 车底侧裙）未建：扭杆（y -0.585）与摆臂枢轴（z ±1.10）
 //      在实车位于车体侧壁之内，本模型 L2 把它们放在「地板之下、侧板之外」，
 //      底板落地时需一并重排（M-C）。
@@ -34,6 +36,8 @@ import type { ModelRegistry, PartDefinition } from "../../../registry/types";
 export const HULL_LAYOUTS = {
   sidePlate: "hull.sidePlate",
   engineCoaming: "hull.engineCoaming",
+  mirrorZ: "hull.mirrorZ",
+  ringBolts: "hull.ringBolts",
 } as const;
 
 const HULL_CONSTANTS: Record<string, number> = {
@@ -81,6 +85,16 @@ const HULL_CONSTANTS: Record<string, number> = {
   HULL_PERI_Z: 0.66,
   HULL_PERI_W: 0.17,
   HULL_PERI_H: 0.13,
+
+  // —— 舱盖 / 观察窗 / 座圈螺栓（L4-d）——
+  HULL_HATCH_LID_R: 0.215,
+  HULL_HATCH_LID_T: 0.022,
+  HULL_PERI_BEZEL: 0.008,
+  HULL_VISOR_X: -4.5205,
+  HULL_VISOR_Y: 0.93,
+  HULL_RING_BOLT_R: 0.8425,
+  HULL_RING_BOLT_HEAD_R: 0.012,
+  HULL_RING_BOLT_COUNT: 24,
 };
 
 function sideOf(index: number): 1 | -1 {
@@ -100,6 +114,20 @@ function makeLayouts(): Record<string, InstanceLayout> {
   layouts[HULL_LAYOUTS.engineCoaming] = ({ index }) => {
     const z = HULL_CONSTANTS.HULL_SIDE_INNER + HULL_CONSTANTS.HULL_SIDE_T / 2;
     return new THREE.Matrix4().makeTranslation(0, 0, sideOf(index) * z);
+  };
+
+  // 左右对称件（驾驶员 / 无线电员舱盖、潜望镜窗框）：按 z ±0.66 平移
+  layouts[HULL_LAYOUTS.mirrorZ] = ({ index }) => {
+    const z = HULL_CONSTANTS.HULL_HATCH_Z!;
+    return new THREE.Matrix4().makeTranslation(0, 0, index === 0 ? z : -z);
+  };
+
+  // 座圈螺栓圈 ×24：绕座圈圆心均布，螺栓头随圆周转向
+  layouts[HULL_LAYOUTS.ringBolts] = ({ index, count }) => {
+    const a = (index / Math.max(count, 1)) * Math.PI * 2;
+    return new THREE.Matrix4()
+      .makeRotationY(-a)
+      .multiply(new THREE.Matrix4().makeTranslation(HULL_CONSTANTS.HULL_RING_BOLT_R!, 0, 0));
   };
 
   return layouts;
@@ -397,7 +425,104 @@ function buildHullParts(): PartDefinition[] {
     material: "steel",
     mate: { type: "absolute", position: [c.HULL_TURRET_X!, roofTop + c.HULL_JOINT! + c.HULL_RING_T! / 2, 0] },
     source:
-      "炮塔座圈（Turmdrehkranz，⌀1750 / ⌀1650 × 30）：坐在顶甲板上方 3mm（y 1.078 ~ 1.108），圆心 x -1.65 / z 0；外径 1.75 比座圈孔大 50mm 形成压边，两侧各留 22mm 顶甲板板边。滚道 / 座圈螺栓 / 炮塔防盾随 L4-c。",
+      "炮塔座圈（Turmdrehkranz，⌀1750 / ⌀1650 × 30）：坐在顶甲板上方 3mm（y 1.078 ~ 1.108），圆心 x -1.65 / z 0；外径 1.75 比座圈孔大 50mm 形成压边，两侧各留 22mm 顶甲板板边。滚道 / 炮塔防盾随 L4-c，座圈螺栓圈见下（L4-d）。",
+  });
+
+  // ===================== 顶甲板附件（L4-d） =====================
+  const ringTop = roofTop + c.HULL_JOINT! + c.HULL_RING_T!; // 1.108
+
+  add({
+    id: "tiger.hull.hatch_lid",
+    name_cn: "驾驶员 / 无线电员舱盖盖板",
+    name_en: "Fahrer- und Funkerluke (Deckel)",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 520,
+    geometry: {
+      type: "kit",
+      kit: "hatchLid",
+      params: { r: c.HULL_HATCH_LID_R!, t: c.HULL_HATCH_LID_T! },
+    },
+    material: "armor_steel",
+    instances: 2,
+    indexed: true,
+    instance_layout: HULL_LAYOUTS.mirrorZ,
+    mate: {
+      type: "absolute",
+      position: [c.HULL_HATCH_X! - c.HULL_HATCH_R!, roofTop + c.HULL_JOINT!, 0],
+      rotation: [0, 0, 90],
+    },
+    source:
+      "驾驶员 / 无线电员舱盖盖板（Fahrer- und Funkerluke）：⌀430 × 22 圆盘 + 隆起 + 铰链节（⌀30）+ 把手 + 锁扣，按「打开 90°（立起）」姿态摆放——铰链线在舱口前缘（x -3.54）、离顶甲板 3mm，盖板立起后最高点 y 1.508，离炮塔前壁（x -2.78）无干涉。打开姿态同时保留 L3 座席的俯视可见性。盖板内侧的锁扣 / 密封圈随 L5。",
+  });
+
+  add({
+    id: "tiger.hull.periscope_bezel",
+    name_cn: "潜望镜窗框",
+    name_en: "Periskopfenster (Rahmen)",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 521,
+    geometry: {
+      type: "kit",
+      kit: "rectBezel",
+      params: {
+        wo: c.HULL_PERI_W! + 2 * 0.008,
+        ho: c.HULL_PERI_H! + 2 * 0.008,
+        wi: c.HULL_PERI_W!,
+        hi: c.HULL_PERI_H!,
+        t: c.HULL_PERI_BEZEL!,
+      },
+    },
+    material: "steel",
+    instances: 2,
+    indexed: true,
+    instance_layout: HULL_LAYOUTS.mirrorZ,
+    mate: {
+      type: "absolute",
+      position: [c.HULL_PERI_X!, roofTop + c.HULL_JOINT! + c.HULL_PERI_BEZEL! / 2, 0],
+    },
+    source:
+      "潜望镜窗框（Periskopfenster）：186 × 146 外廓、170 × 130 内口、8 高，落在潜望镜窗四周（窗比 L3 潜望镜体 160 × 120 每边放大 5mm，窗框再压 8mm 边）。离顶甲板上表面 3mm——窗框是薄框，俯视时正好把开孔的板边盖住。",
+  });
+
+  add({
+    id: "tiger.hull.driver_visor",
+    name_cn: "驾驶员观察窗",
+    name_en: "Fahrersehklappe",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 522,
+    geometry: {
+      type: "kit",
+      kit: "visorPlate",
+      params: { w: 0.035, h: 0.16, d: 0.36 },
+    },
+    material: "armor_steel",
+    mate: { type: "absolute", position: [c.HULL_VISOR_X!, c.HULL_VISOR_Y!, -0.67] },
+    source:
+      "驾驶员观察窗（Fahrersehklappe）：360 × 160 × 35 装甲块 + 上部压条 + 下部遮光檐，装在前装甲板外面（x -4.503 ~ -4.553，离板面 3mm），中心高 y 0.93（L3 驾驶员座面 0.57 + 坐姿视线高）。z -0.67 与驾驶员座对齐；右侧 z +0.78 是航向机枪球孔（Kugelblende 50，随 L4-e）。",
+  });
+
+  add({
+    id: "tiger.hull.ring_bolts",
+    name_cn: "座圈螺栓圈",
+    name_en: "Turmdrehkranz-Schrauben",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 523,
+    geometry: {
+      type: "kit",
+      kit: "hexBolt",
+      params: { r: c.HULL_RING_BOLT_HEAD_R!, h: 0.01 },
+    },
+    material: "steel",
+    instances: c.HULL_RING_BOLT_COUNT!,
+    indexed: true,
+    instance_layout: HULL_LAYOUTS.ringBolts,
+    mate: { type: "absolute", position: [c.HULL_TURRET_X!, ringTop + c.HULL_JOINT!, 0] },
+    source:
+      "座圈螺栓圈（Turmdrehkranz-Schrauben，六角头 ⌀24 × 10）：沿 r 0.8425 的圆周均布 24 颗（周向间距 221mm），落在座圈内孔（r 0.825）与炮塔内壁（r 0.86）之间的环形台阶上，离座圈顶面 3mm、离炮塔内壁 5.5mm。实车座圈螺栓为 M20 级、连接炮塔防盾与座圈滚道；装配状态下被炮塔壳体覆盖，仅拆解 / 隔离时可见——与 L1/L2 的箱内零件同一处理口径。",
   });
 
   return parts;

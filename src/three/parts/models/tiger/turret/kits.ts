@@ -207,9 +207,126 @@ const turretGunBarrel: GeometryBuilder = (spec) => {
   return geometry;
 };
 
+// ============================================================================
+// L4-d 起补充的三个 kit：闭式舱盖盘 / 曲面壁板（逃生门）/ 径向凸起（手枪孔）
+// ============================================================================
+
+/**
+ * 闭式舱盖（装填手舱口 / 车长塔顶盖）：底面在局部 y = 0（装配位 y = 顶面 + 3mm）。
+ * 含：盖板盘 + 隆起 + 铰链座（+X 侧）+ 铰链节 + 两个锁扣。
+ */
+const hatchDisc: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const r = num(params, "r", 0.2);
+  const t = num(params, "t", 0.022);
+
+  const parts: THREE.BufferGeometry[] = [];
+
+  const lid = cylinderGeometry(r, t, r, 36, 0.004);
+  lid.translate(0, t / 2, 0);
+  parts.push(lid);
+
+  const dome = cylinderGeometry(r * 0.84, 0.012, r * 0.88, 32, 0.003);
+  dome.translate(0, t + 0.006, 0);
+  parts.push(dome);
+
+  const hingeBlock = bevelBoxGeometry(0.07, 0.04, 0.1, 0.003, 2);
+  hingeBlock.translate(r + 0.02, 0.02, 0);
+  parts.push(hingeBlock);
+
+  const knuckle = cylinderGeometry(0.017, 0.12, 0.017, 16, 0.002);
+  knuckle.rotateX(Math.PI / 2);
+  knuckle.translate(r + 0.05, 0.036, 0);
+  parts.push(knuckle);
+
+  for (const z of [-0.07, 0.07]) {
+    const latch = bevelBoxGeometry(0.05, 0.016, 0.05, 0.002, 1);
+    latch.translate(-r * 0.82, t + 0.008, z);
+    parts.push(latch);
+  }
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+/**
+ * 曲面壁板（炮塔后部逃生门）：绕竖直轴（局部原点 = 炮塔回转中心）的环扇形板。
+ * 内层 rIn ~ rIn+t1（角宽 a1Deg）、外层再叠 t2（角宽 a2Deg、竖直居中）——门框 + 门板两级。
+ * 装配位 y = 门板底面；几何 y ∈ [0, h1]。
+ */
+const curvedPanel: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const rIn = num(params, "rIn", 0.943);
+  const t1 = num(params, "t1", 0.012);
+  const t2 = num(params, "t2", 0.01);
+  const h1 = num(params, "h1", 0.44);
+  const h2 = num(params, "h2", 0.4);
+  const a1 = num(params, "a1Deg", 24.5);
+  const a2 = num(params, "a2Deg", 21.5);
+  const b = Math.min(0.002, t1 * 0.2, t2 * 0.2);
+
+  const layer = (r0: number, th: number, hh: number, aDeg: number): THREE.BufferGeometry => {
+    const half = THREE.MathUtils.degToRad(aDeg / 2);
+    const inset = b / r0;
+    const shape = new THREE.Shape();
+    // 外弧 → 径向线 → 内弧（反向）→ 径向线闭合；倒角补回后半径与角宽精确等于名义值
+    shape.absarc(0, 0, r0 + th - b, -half + inset, half - inset, false);
+    shape.absarc(0, 0, r0 + b, half - inset, -half + inset, true);
+    shape.closePath();
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      depth: Math.max(hh - 2 * b, 0.001),
+      bevelEnabled: true,
+      bevelThickness: b,
+      bevelSize: b,
+      bevelSegments: 1,
+      steps: 1,
+      curveSegments: 24,
+    });
+    geo.rotateX(-Math.PI / 2); // 平面 XY → 世界 XZ，挤出 +Z → 世界 +Y
+    geo.translate(0, b, 0);
+    geo.computeVertexNormals();
+    return geo;
+  };
+
+  const base = layer(rIn, t1, h1, a1);
+  const outer = layer(rIn + t1, t2, h2, a2);
+  outer.translate(0, (h1 - h2) / 2, 0);
+
+  const merged = mergeGeometries([base, outer]);
+  base.dispose();
+  outer.dispose();
+  return merged;
+};
+
+/** 径向凸起（手枪孔 / 观察镜筒）：圆柱轴沿 +X，含靠壁一侧的凸缘。原点在零件几何中心。 */
+const radialPort: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const r = num(params, "r", 0.045);
+  const h = num(params, "h", 0.022);
+
+  const parts: THREE.BufferGeometry[] = [];
+
+  const plug = cylinderGeometry(r, h, r * 0.92, 24, 0.002);
+  plug.rotateZ(-Math.PI / 2);
+  parts.push(plug);
+
+  const rim = cylinderGeometry(r * 1.3, 0.008, r * 1.32, 24, 0.0015);
+  rim.rotateZ(-Math.PI / 2);
+  rim.translate(-h / 2 + 0.004, 0, 0);
+  parts.push(rim);
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
 export const tigerTurretKitBuilders: Record<string, GeometryBuilder> = {
   turretShell,
   turretCupola,
   turretMantlet,
   turretGunBarrel,
+  hatchDisc,
+  curvedPanel,
+  radialPort,
 };
