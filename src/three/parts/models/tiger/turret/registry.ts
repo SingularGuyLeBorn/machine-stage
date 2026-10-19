@@ -99,6 +99,18 @@ const TURRET_CONSTANTS: Record<string, number> = {
   TR_SPARE_COUNT: 4,
   TR_EYE_X: -2.55,
   TR_EYE_Z: 0.7,
+
+  // —— 顶盖附件：对空 MG34 / 近防武器管 / 装填手潜望镜 / 排烟风扇罩（L4-f）——
+  TR_AA_X: -1.95,
+  TR_AA_Z: -0.1,
+  TR_AA_PIVOT_Y: 0.287,
+  TR_AA_PITCH: 10,
+  TR_CD_X: -0.95,
+  TR_CD_Z: 0.35,
+  TR_LP_X: -1.35,
+  TR_LP_Z: 0.5,
+  TR_VENT_X: -0.92,
+  TR_VENT_Z: -0.2,
 };
 
 export const TURRET_LAYOUTS = {
@@ -534,6 +546,115 @@ function buildTurretParts(): PartDefinition[] {
     },
     source:
       "焊接吊环（Anschlagpunkt）×2：底板 100 × 70 × 12 + 两片立板 + ⌀16 横销，焊在炮塔顶盖前段两角（x -2.55 / z ±0.70，离顶面 3mm），供吊装炮塔总成。避让车长塔（-1.30 / -0.42）、装填手舱口（-1.25 / +0.50）与炮盾（z ±0.43）；到顶盖前缘（x -2.78）留 230mm、到侧壁外缘（z ±0.94）留 240mm。",
+  });
+
+  // ---------------------------------------------------------------------------
+  // L4-f：顶盖附件（对空 MG34 / 近防武器管 / 装填手潜望镜 / 排烟风扇罩）
+  // ---------------------------------------------------------------------------
+
+  parts.push({
+    id: "tiger.turret.aa_mg_mount",
+    name_cn: "对空机枪枪架",
+    name_en: "Flieger-MG-Drehkranz",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 547,
+    geometry: {
+      type: "kit",
+      kit: "aaMgMount",
+      params: { baseR: 0.085, baseT: 0.012, postR: 0.026, pivotY: c.TR_AA_PIVOT_Y!, cradleHalf: 0.0475 },
+    },
+    material: "steel",
+    mate: {
+      type: "absolute",
+      position: [c.TR_AA_X!, roofTop + c.TR_JOINT!, c.TR_AA_Z!],
+    },
+    source:
+      "车顶对空机枪枪架（Flieger-MG-Drehkranz 的立柱式）：底座盘 ⌀170 × 12 + 4 颗地脚螺栓 + ⌀52 立柱 + 俯仰加强环 + 两片耳轴托架（内距 90，⌀18 横销）。装在炮塔顶盖前右（x -1.95 / z -0.10），离车长塔外缘 377mm、离顶盖前缘 830mm；耳轴中心高出顶盖 290mm。实车对空枪座为车长塔顶的环形枪座，本模型改为立柱式以便俯仰展示，位置仍贴塔旁。",
+  });
+
+  parts.push({
+    id: "tiger.turret.aa_mg",
+    name_cn: "车顶 MG34 机枪",
+    name_en: "MG 34 (Flieger-MG)",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 548,
+    geometry: {
+      type: "kit",
+      kit: "aaMg",
+      params: { barrelLen: 0.44, pitch: c.TR_AA_PITCH! },
+    },
+    material: "steel",
+    mate: {
+      type: "absolute",
+      position: [c.TR_AA_X!, roofTop + c.TR_JOINT! + c.TR_AA_PIVOT_Y!, c.TR_AA_Z!],
+    },
+    source:
+      "车顶 MG34（含 Gurttrommel 34 双联弹鼓）：机匣 260 × 80 × 75 + 供弹盖 + 枪管 ⌀39 × 440（⌀66 散热套带前后两道箍）+ 双室枪口 ⌀56 × 50 + 木质枪托 240 + 握把 / 扳机护圈 / 准星 / 照门；弹鼓两只 ⌀176 × 52、轴沿枪宽方向、中间留 3mm、总宽 110，箍带 ⌀188 + 中央轴 ⌀24。以耳轴为原点抬头 10°，枪口朝车头前上方，枪尾离车长塔顶 196mm。",
+  });
+
+  parts.push({
+    id: "tiger.turret.close_defense",
+    name_cn: "近防武器管",
+    name_en: "Nahverteidigungswaffe",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 549,
+    geometry: {
+      type: "kit",
+      kit: "closeDefense",
+      params: { baseR: 0.078, baseT: 0.014, tubeR: 0.045, tubeL: 0.13 },
+    },
+    material: "armor_steel",
+    mate: {
+      type: "absolute",
+      position: [c.TR_CD_X!, roofTop + c.TR_JOINT!, c.TR_CD_Z!],
+    },
+    source:
+      "近防武器管（Nahverteidigungswaffe）：底座圈 ⌀156 × 14 + 6 颗螺栓 + ⌀90 短管（壁厚 6 / 长 130）+ 铰链顶盖 ⌀104 × 18（离管口 3mm）。装在炮塔顶盖右后（x -0.95 / z +0.35），离车长塔外缘 335mm、离装填手舱口 340mm、离顶盖后缘 79mm。实车 1943 年起装于炮塔顶，发射 92mm 破片弹 / 烟幕弹，用于近距离自卫。",
+  });
+
+  parts.push({
+    id: "tiger.turret.loader_periscope",
+    name_cn: "装填手潜望镜",
+    name_en: "Winkelspiegel (Ladeschütze)",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 550,
+    geometry: {
+      type: "kit",
+      kit: "loaderPeriscope",
+      params: { baseR: 0.054, baseT: 0.028 },
+    },
+    material: "armor_steel",
+    mate: {
+      type: "absolute",
+      position: [c.TR_LP_X!, loaderHatchY + c.TR_LOADER_HATCH_T! + 0.012 + c.TR_JOINT!, c.TR_LP_Z!],
+    },
+    source:
+      "装填手舱盖潜望镜（Winkelspiegel）：底座转盘 ⌀108 × 28 + 转头 90 × 64 × 72（前壁 45° 斜切）+ 前窗 64 × 32 × 12 + 提手。装在装填手舱盖隆起顶面（y 1.873）上方 3mm，位于舱盖中心前 100mm（x -1.35 / z +0.50），转头可水平旋转，前窗朝向车头。实车装填手舱盖带旋转潜望镜，用于不开舱观察。",
+  });
+
+  parts.push({
+    id: "tiger.turret.vent_cowl",
+    name_cn: "排烟风扇罩",
+    name_en: "Entlüftungshaube",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 551,
+    geometry: {
+      type: "kit",
+      kit: "ventCowl",
+      params: { r: 0.15, h: 0.038, wall: 0.008 },
+    },
+    material: "armor_steel",
+    mate: {
+      type: "absolute",
+      position: [c.TR_VENT_X!, roofTop + c.TR_JOINT!, c.TR_VENT_Z!],
+    },
+    source:
+      "顶盖排烟风扇罩：⌀300 罩圈（壁厚 8 / 高 38）+ 蘑菇顶盖 ⌀324 × 10（离罩圈 3mm，4 根支撑爪）。装在顶盖后部（x -0.92 / z -0.20），离车长塔外缘 5mm、离顶盖后缘 21mm。实车炮塔顶后部有排烟风扇，抽除火炮发射后的硝烟（KwK 36 炮管无抽烟装置，故本批不设炮管抽烟装置）。",
   });
 
   return parts;

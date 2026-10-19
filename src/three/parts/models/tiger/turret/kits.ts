@@ -388,6 +388,252 @@ const smokeTube: GeometryBuilder = (spec) => {
   return merged;
 };
 
+// ---------------------------------------------------------------------------
+// 对空机枪枪架（Flieger-MG-Drehkranz）：底座盘 + 立柱 + 耳轴托架
+// 世界向（轴沿 Y），原点 = 底座底面中心；耳轴中心在 (0, pivotY, 0)。
+// 净空：底座盘落在顶盖上 3mm；立柱与托架全在盘上方；耳轴销沿 Z 贯穿两片托架。
+// ---------------------------------------------------------------------------
+const aaMgMount: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const baseR = num(params, "baseR", 0.085);
+  const baseT = num(params, "baseT", 0.012);
+  const postR = num(params, "postR", 0.026);
+  const pivotY = num(params, "pivotY", 0.287);
+  const cradleHalf = num(params, "cradleHalf", 0.045);
+
+  const parts: THREE.BufferGeometry[] = [];
+
+  // 底座盘 + 4 颗地脚螺栓（沿圆周均布，45° 起）
+  const base = cylinderGeometry(baseR, baseT, baseR, 28, 0.002);
+  base.translate(0, baseT / 2, 0);
+  parts.push(base);
+  for (let i = 0; i < 4; i++) {
+    const bolt = cylinderGeometry(0.009, 0.007, 0.009, 12, 0.001);
+    bolt.translate(baseR - 0.02, baseT + 0.0035, 0);
+    bolt.rotateY(Math.PI / 4 + (i * Math.PI) / 2);
+    parts.push(bolt);
+  }
+
+  // 立柱 + 中部加强环（顶面停在耳轴下方 8mm；枪身抬头 10° 时立柱边缘最近点仍有 3.5mm）
+  const post = cylinderGeometry(postR, pivotY - baseT - 0.008, postR, 20, 0.002);
+  post.translate(0, baseT + (pivotY - baseT - 0.008) / 2, 0);
+  parts.push(post);
+  const collar = cylinderGeometry(0.04, 0.03, 0.04, 20, 0.002);
+  collar.translate(0, baseT + 0.18, 0);
+  parts.push(collar);
+
+  // 耳轴托架：两片侧板 + 两侧短销（销端离机匣 3mm，不穿进枪身）
+  for (const sign of [-1, 1]) {
+    const plate = bevelBoxGeometry(0.06, 0.068, 0.014, 0.002);
+    plate.translate(0, pivotY, sign * cradleHalf);
+    parts.push(plate);
+    const pinLen = 0.014;
+    const pin = cylinderGeometry(0.009, pinLen, 0.009, 12, 0.001);
+    pin.rotateX(Math.PI / 2);
+    pin.translate(0, pivotY, sign * (cradleHalf + 0.004));
+    parts.push(pin);
+    const head = cylinderGeometry(0.014, 0.007, 0.014, 14, 0.001);
+    head.rotateX(Math.PI / 2);
+    head.translate(0, pivotY, sign * (cradleHalf + 0.0145));
+    parts.push(head);
+  }
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
+// 车顶 MG34（含 Gurttrommel 34 双联弹鼓）
+// 世界向：原点 = 耳轴中心（落在枪管轴线上），枪口朝 -X、枪托朝 +X。
+// 枪身自原点起左右各展开：机匣 -0.11 ~ +0.15、枪管到 -0.59、枪托到 +0.50。
+// ---------------------------------------------------------------------------
+const aaMg: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const barrelLen = num(params, "barrelLen", 0.44);
+
+  const parts: THREE.BufferGeometry[] = [];
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number, bevel = 0.002) => {
+    const g = bevelBoxGeometry(w, h, d, bevel);
+    g.translate(x, y, z);
+    parts.push(g);
+  };
+
+  // 机匣 + 供弹盖（鼓座）
+  box(0.26, 0.08, 0.075, 0.02, 0, 0);
+  box(0.16, 0.022, 0.062, 0.02, 0.051, 0);
+  // 机匣尾部 + 木质枪托 + 托底板
+  box(0.24, 0.06, 0.042, 0.37, -0.004, 0);
+  box(0.012, 0.078, 0.05, 0.496, -0.004, 0);
+  // 枪管 + 散热套（前后两道箍）+ 枪口
+  const barrel = cylinderGeometry(0.0195, barrelLen, 0.0195, 18, 0.002);
+  barrel.rotateZ(Math.PI / 2);
+  barrel.translate(-0.11 - barrelLen / 2, 0, 0);
+  parts.push(barrel);
+  const jacket = cylinderGeometry(0.033, 0.17, 0.03, 20, 0.002);
+  jacket.rotateZ(Math.PI / 2);
+  jacket.translate(-0.195, 0, 0);
+  parts.push(jacket);
+  for (const x of [-0.125, -0.265]) {
+    const ring = cylinderGeometry(0.036, 0.014, 0.036, 20, 0.002);
+    ring.rotateZ(Math.PI / 2);
+    ring.translate(x, 0, 0);
+    parts.push(ring);
+  }
+  const muzzle = cylinderGeometry(0.028, 0.05, 0.022, 18, 0.002);
+  muzzle.rotateZ(Math.PI / 2);
+  muzzle.translate(-0.11 - barrelLen - 0.02, 0, 0);
+  parts.push(muzzle);
+  // 准星 / 照门
+  box(0.014, 0.03, 0.01, -0.11 - barrelLen + 0.04, 0.042, 0);
+  box(0.05, 0.012, 0.03, 0.09, 0.074, 0);
+  box(0.008, 0.02, 0.026, 0.072, 0.09, 0);
+  // 握把（后倾 15°）+ 扳机护圈
+  const grip = bevelBoxGeometry(0.032, 0.09, 0.034, 0.003);
+  grip.translate(0, -0.078, 0);
+  grip.rotateZ(0.26);
+  grip.translate(0.15, 0, 0);
+  parts.push(grip);
+  box(0.056, 0.008, 0.03, 0.178, -0.048, 0);
+  // 双联弹鼓：两只 ⌀176 × 52，轴沿 Z，中间留 3mm；箍带 + 中央轴
+  for (const sign of [-1, 1]) {
+    const drum = cylinderGeometry(0.088, 0.052, 0.088, 28, 0.003);
+    drum.rotateX(Math.PI / 2);
+    drum.translate(0.02, 0.165, sign * 0.0275);
+    parts.push(drum);
+  }
+  const band = tubeGeometry(0.094, 0.086, 0.022, 28);
+  band.rotateX(Math.PI / 2);
+  band.translate(0.02, 0.165, 0);
+  parts.push(band);
+  const hub = cylinderGeometry(0.012, 0.11, 0.012, 14, 0.001);
+  hub.rotateX(Math.PI / 2);
+  hub.translate(0.02, 0.165, 0);
+  parts.push(hub);
+
+  // 枪身整体上移 40mm：耳轴（原点）落在机匣底面，枪管轴线在原点上方 40mm；
+  // 再按 pitch 抬头（固定展示姿态，默认 10°）
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  merged.translate(0, 0.04, 0);
+  merged.rotateZ(-THREE.MathUtils.degToRad(num(params, "pitch", 10)));
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
+// 近防武器管（Nahverteidigungswaffe）：底座圈 + ⌀90 短管 + 顶盖
+// 世界向，原点 = 底座底面中心（落在顶盖上 3mm）。
+// ---------------------------------------------------------------------------
+const closeDefense: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const baseR = num(params, "baseR", 0.078);
+  const baseT = num(params, "baseT", 0.014);
+  const tubeR = num(params, "tubeR", 0.045);
+  const tubeL = num(params, "tubeL", 0.13);
+
+  const parts: THREE.BufferGeometry[] = [];
+
+  // 底座圈 + 6 颗螺栓
+  const base = cylinderGeometry(baseR, baseT, baseR - 0.004, 26, 0.002);
+  base.translate(0, baseT / 2, 0);
+  parts.push(base);
+  for (let i = 0; i < 6; i++) {
+    const bolt = cylinderGeometry(0.007, 0.006, 0.007, 10, 0.001);
+    bolt.translate(baseR - 0.018, baseT + 0.003, 0);
+    bolt.rotateY((i * Math.PI) / 3);
+    parts.push(bolt);
+  }
+
+  // 管体（壁厚 6mm）+ 顶盖（离管口 3mm，铰链侧）
+  const tube = tubeGeometry(tubeR, tubeR - 0.006, tubeL, 30);
+  tube.translate(0, baseT + tubeL / 2, 0);
+  parts.push(tube);
+  const cap = cylinderGeometry(0.052, 0.018, 0.05, 26, 0.003);
+  cap.translate(0, baseT + tubeL + 0.003 + 0.009, 0);
+  parts.push(cap);
+  // 铰链座 + 销
+  const hinge = bevelBoxGeometry(0.03, 0.024, 0.022, 0.002);
+  hinge.translate(0, baseT + tubeL + 0.004, -0.052);
+  parts.push(hinge);
+  const hingePin = cylinderGeometry(0.005, 0.05, 0.005, 10, 0.001);
+  hingePin.rotateZ(Math.PI / 2);
+  hingePin.translate(0, baseT + tubeL + 0.008, -0.055);
+  parts.push(hingePin);
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
+// 装填手舱盖潜望镜（Winkelspiegel）：底座转盘 + 45° 头 + 前窗 + 提手
+// 世界向，原点 = 舱盖面上方 3mm 的底座底面中心。
+// ---------------------------------------------------------------------------
+const loaderPeriscope: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const baseR = num(params, "baseR", 0.054);
+  const baseT = num(params, "baseT", 0.028);
+
+  const parts: THREE.BufferGeometry[] = [];
+
+  const base = cylinderGeometry(baseR, baseT, baseR - 0.006, 24, 0.002);
+  base.translate(0, baseT / 2, 0);
+  parts.push(base);
+  // 转头：底面 ⌀100 → 顶面略小，前壁斜 45°
+  const head = bevelBoxGeometry(0.09, 0.064, 0.072, 0.005);
+  head.translate(0, baseT + 0.032, -0.004);
+  parts.push(head);
+  // 前窗（45° 斜面小块，朝前下）
+  const window = bevelBoxGeometry(0.064, 0.032, 0.012, 0.002);
+  window.rotateX(-0.62);
+  window.translate(0, baseT + 0.038, -0.04);
+  parts.push(window);
+  // 顶部提手（两根立柱 + 横杆）
+  for (const sign of [-1, 1]) {
+    const post = cylinderGeometry(0.004, 0.024, 0.004, 8, 0.001);
+    post.translate(sign * 0.026, baseT + 0.075, 0.008);
+    parts.push(post);
+  }
+  const grip = cylinderGeometry(0.005, 0.06, 0.005, 8, 0.001);
+  grip.rotateZ(Math.PI / 2);
+  grip.translate(0, baseT + 0.086, 0.008);
+  parts.push(grip);
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
+// 顶盖排烟风扇罩：⌀300 罩圈 + 蘑菇顶盖 + 4 根支撑爪
+// 世界向，原点 = 罩圈底面中心（落在顶盖上 3mm）。
+// ---------------------------------------------------------------------------
+const ventCowl: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const r = num(params, "r", 0.15);
+  const h = num(params, "h", 0.038);
+  const wall = num(params, "wall", 0.008);
+
+  const parts: THREE.BufferGeometry[] = [];
+
+  const skirt = tubeGeometry(r, r - wall, h, 32);
+  skirt.translate(0, h / 2, 0);
+  parts.push(skirt);
+  const cap = cylinderGeometry(r + 0.012, 0.01, r + 0.006, 32, 0.003);
+  cap.translate(0, h + 0.003 + 0.005, 0);
+  parts.push(cap);
+  for (let i = 0; i < 4; i++) {
+    const arm = bevelBoxGeometry(0.046, 0.01, 0.026, 0.002);
+    arm.translate(r - 0.008, h + 0.008, 0);
+    arm.rotateY(Math.PI / 4 + (i * Math.PI) / 2);
+    parts.push(arm);
+  }
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
 export const tigerTurretKitBuilders: Record<string, GeometryBuilder> = {
   turretShell,
   turretCupola,
@@ -397,4 +643,9 @@ export const tigerTurretKitBuilders: Record<string, GeometryBuilder> = {
   curvedPanel,
   radialPort,
   smokeTube,
+  aaMgMount,
+  aaMg,
+  closeDefense,
+  loaderPeriscope,
+  ventCowl,
 };
