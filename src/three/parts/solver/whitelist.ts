@@ -7,10 +7,13 @@ import type { ClippingReport } from "./report";
 // 目标函数是「未豁免报告 = 0」，不是「总报告 = 0」：
 //   · 已豁免 = 构造性接触（轴承配合/过盈压装/剖分贴合/管端插接…），是正确装配；
 //   · 未豁免 = 真缺陷候选（不该接触的零件叠在一起 = 位置或尺寸算错）。
-// 深度守门：豁免族里若冒出「明显超过贴面量级」的实测深度，判为真缺陷照报——
-// 所以往豁免族里注入 5mm 真重叠时，只报那一条。
-// depth_mm = null（面贴合 / 同心配合面，测不出深度）不参与守门：
-// 这类报告本身就是「配合接触」级，规模由交线总长/分布尺寸展示，人工可审。
+// 两道守门（形态 + 深度），缺一不可：
+//   · 形态守门：只豁免 face_mate（共面贴合）/ bearing_overlap（同心配合面）两类；
+//     suspect（成团 / 超长横穿交线）与 displaced（错位穿透）无视豁免规则，永远进未豁免区。
+//   · 深度守门：豁免族里若冒出「明显超过贴面量级」的实测深度，判为真缺陷照报——
+//     所以往豁免族里注入 5mm 真重叠时，只报那一条。
+//   · depth_mm = null 不再等于放行：null 必须过形态分流，分不出的一律进未豁免区人工审。
+//     旧实现拿「测不出深度」当放行条，水管横穿支架（交线 112.56mm）就是这么漏掉的。
 // ============================================================================
 
 /** 豁免族允许的最大深度（mm）：超过即不再豁免（0.5mm 是检测阈值下限）。 */
@@ -40,17 +43,19 @@ export function matchesPartId(pattern: string, ref: string): boolean {
   return partId === pattern;
 }
 
-/** 单条报告 → 命中规则（A/B 顺序无关；深度超过守门值视为真缺陷，不豁免）。 */
+/** 单条报告 → 命中规则（A/B 顺序无关）。形态守门 + 深度守门，两道都过才豁免。 */
 export function matchExpectedContact(
   report: ClippingReport,
   rules: readonly ExpectedContactRule[],
 ): ExpectedContactRule | null {
+  // 形态守门：豁免区只收 face_mate / bearing_overlap；suspect / displaced / 形态未知一律不放行。
+  if (report.form !== "face_mate" && report.form !== "bearing_overlap") return null;
   for (const rule of rules) {
     const forward = matchesPartId(rule.a, report.a) && matchesPartId(rule.b, report.b);
     const backward = matchesPartId(rule.a, report.b) && matchesPartId(rule.b, report.a);
     if (!forward && !backward) continue;
     const limit = rule.maxDepthMm ?? DEFAULT_MAX_DEPTH_MM;
-    // 测不出深度（null）不做守门：配合面/贴合面本来就是接触，交给家族依据。
+    // 深度守门：可测深度必须落在族限内；测不出（null）由上面的形态分类兜底。
     if (report.depth_mm !== null && report.depth_mm > limit) continue;
     return rule;
   }

@@ -17,13 +17,7 @@ import {
   type ClippingReport,
 } from "@/three/parts";
 import { findModel } from "../catalog";
-import {
-  formatReportMeasure,
-  reportKey,
-  reportPartIds,
-  shapeLabel,
-  useStageStore,
-} from "../state/stageStore";
+import { formatReportMeasure, reportKey, reportPartIds, formLabel, useStageStore } from "../state/stageStore";
 
 // ============================================================================
 // ClippingPanel —— 穿模报告（浮层抽屉内容）
@@ -309,8 +303,8 @@ export function ClippingPanel() {
                             >
                               {formatReportMeasure(report)}
                             </span>
-                            {report.shape ? (
-                              <span className="badge badge--plain">{shapeLabel(report.shape)}</span>
+                            {report.form ? (
+                              <span className="badge badge--plain">{formLabel(report.form)}</span>
                             ) : null}
                             {report.aLayer ? (
                               <span className="badge badge--plain">
@@ -413,8 +407,8 @@ export function ClippingPanel() {
                           {item.report.b}
                         </span>
                         <span className="badge badge--plain num">{formatReportMeasure(item.report)}</span>
-                        {item.report.shape ? (
-                          <span className="badge badge--plain">{shapeLabel(item.report.shape)}</span>
+                        {item.report.form ? (
+                          <span className="badge badge--plain">{formLabel(item.report.form)}</span>
                         ) : null}
                         <div className="clipcard__actions">
                           <button

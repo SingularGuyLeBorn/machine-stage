@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ClippingReport, ExpectedContactRule } from "@/three/parts";
+import type { ClippingReport, ExpectedContactRule, OverlapForm } from "@/three/parts";
 import {
   DEFAULT_MAX_DEPTH_MM,
   expectedContactFamilies,
@@ -12,12 +12,18 @@ import {
 // 报告分层：构造性接触豁免（未豁免 = 0 是终点，总报告 = 0 不是）
 // ============================================================================
 
-const report = (a: string, b: string, depth_mm = 0.5): ClippingReport => ({
+const report = (
+  a: string,
+  b: string,
+  depth_mm: number | null = 0.5,
+  form: OverlapForm | undefined = "bearing_overlap",
+): ClippingReport => ({
   type: "clipping",
   phase: "static",
   a,
   b,
   depth_mm,
+  form,
   point: [0, 0, 0],
   frame: null,
   severity: "error",
@@ -71,6 +77,27 @@ describe("solver/whitelist 命中与分层", () => {
     // 逐条规则可以放宽（如过盈压装本身就有几毫米咬合）
     expect(matchExpectedContact(report("x.wide.a", "x.wide.b", 5), rules)?.family).toBe("wide");
     expect(matchExpectedContact(report("x.wide.a", "x.wide.b", 9), rules)).toBeNull();
+  });
+
+  it("形态守门：suspect / displaced / 形态未知 永不进豁免区（守门规则对它们无效）", () => {
+    // 水管横穿支架的形态：即便零件对登记过豁免族，交线成团/超长也不放行。
+    expect(
+      matchExpectedContact(report("x.piston_rod.rod", "x.piston_rod.cap", 0.5, "suspect"), rules),
+    ).toBeNull();
+    expect(matchExpectedContact(report("x.wide.a", "x.wide.b", 1, "displaced"), rules)).toBeNull();
+    // 形态没标出来（旧报告 / 预算外）也不放行：显式构造 form === undefined 的报告。
+    const unknownForm: ClippingReport = { ...report("x.wide.a", "x.wide.b", 1), form: undefined };
+    expect(matchExpectedContact(unknownForm, rules)).toBeNull();
+  });
+
+  it("null 深度不再等于放行：过形态分流，只有贴合/配合面才豁免", () => {
+    expect(matchExpectedContact(report("x.wide.a", "x.wide.b", null, "face_mate"), rules)?.family).toBe(
+      "wide",
+    );
+    expect(matchExpectedContact(report("x.wide.a", "x.wide.b", null, "bearing_overlap"), rules)?.family).toBe(
+      "wide",
+    );
+    expect(matchExpectedContact(report("x.wide.a", "x.wide.b", null, "suspect"), rules)).toBeNull();
   });
 
   it("分层保留原始下标，且总数守恒", () => {

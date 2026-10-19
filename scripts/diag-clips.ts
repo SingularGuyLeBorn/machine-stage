@@ -1,15 +1,21 @@
 // 诊断：静态穿模报告构成分析 + 零件对展开口径（唯一保留的门禁脚本，见 scripts/README）
 //
 // 用法：
-//   npx tsx scripts/diag-clips.ts        # 全模型
-//   npx tsx scripts/diag-clips.ts 1      # 只统计 buildLayer ≤ 1 的零件对（层验收口径）
+//   npx tsx scripts/diag-clips.ts              # 全模型
+//   npx tsx scripts/diag-clips.ts 1            # 只统计 buildLayer ≤ 1 的零件对（层验收口径）
+//   npx tsx scripts/diag-clips.ts --recheck    # 追加：33 条豁免规则复核 → docs/qa/whitelist-recheck.md
+import { writeFileSync } from "node:fs";
 import { buildModel } from "../src/three/parts/assembler/assembler";
 import { tigerEngineExpectedContacts } from "../src/three/parts/models/tiger/engine/expectedContacts";
 import { tigerKitBuilders } from "../src/three/parts/models/tiger/engine/kits";
 import { makeEngineLayouts, makeEngineRegistry } from "../src/three/parts/models/tiger/engine/registry";
 import { detectStatic, planPairs } from "../src/three/parts/solver/detect";
 import type { ClippingReport } from "../src/three/parts/solver/report";
-import { partitionExpectedContacts } from "../src/three/parts/solver/whitelist";
+import {
+  DEFAULT_MAX_DEPTH_MM,
+  matchesPartId,
+  partitionExpectedContacts,
+} from "../src/three/parts/solver/whitelist";
 
 const registry = makeEngineRegistry();
 const model = buildModel(registry, {
@@ -42,15 +48,16 @@ console.log(
 
 // ---- 深度口径：只统计实测深度；null = 测不出（贴合 / 同心配合面），不参与数值分层 ----
 const depthOf = (report: ClippingReport) => report.depth_mm ?? -1;
-const shapeTally = { bearing_overlap: 0, face_contact: 0, displaced: 0 } as Record<string, number>;
+const formTally = { bearing_overlap: 0, face_mate: 0, suspect: 0, displaced: 0 } as Record<string, number>;
 let measured = 0;
 for (const report of reports) {
-  shapeTally[report.shape ?? "unknown"] = (shapeTally[report.shape ?? "unknown"] ?? 0) + 1;
+  formTally[report.form ?? "unknown"] = (formTally[report.form ?? "unknown"] ?? 0) + 1;
   if (report.depth_mm !== null) measured++;
 }
 console.log(
   `深度口径: 实测 ${measured} / 测不出 ${reports.length - measured}；` +
-    `形态: 绕轴闭合(配合面) ${shapeTally.bearing_overlap} · 贴合面 ${shapeTally.face_contact} · 局部成团(错位) ${shapeTally.displaced}`,
+    `形态: 配合面 ${formTally.bearing_overlap} · 贴合 ${formTally.face_mate} · ` +
+    `存疑穿透 ${formTally.suspect} · 错位穿透 ${formTally.displaced}`,
 );
 
 const deep = reports.filter((r) => depthOf(r) > 10);
@@ -67,7 +74,7 @@ const pointText = (report: ClippingReport) =>
   `@(${report.point.map((v) => (v * 1000).toFixed(0)).join(",")})mm`;
 for (const r of byDepth.slice(0, 12)) {
   console.log(
-    `${r.depth_mm!.toFixed(2).padStart(7)}mm  [${r.shape}] 交线 ${(r.intersection_mm ?? 0).toFixed(1)}mm  ${pointText(r)}  ${r.a}  ↔  ${r.b}`,
+    `${r.depth_mm!.toFixed(2).padStart(7)}mm  [${r.form}] 交线 ${(r.intersection_mm ?? 0).toFixed(1)}mm  ${pointText(r)}  ${r.a}  ↔  ${r.b}`,
   );
 }
 
@@ -78,7 +85,7 @@ const byLine = [...reports]
 if (byLine.length > 0) {
   console.log("--- 未测出深度 · 交线 TOP8（配合面尺度） ---");
   for (const r of byLine.slice(0, 8)) {
-    console.log(`${(r.intersection_mm ?? 0).toFixed(1).padStart(7)}mm  [${r.shape}]  ${r.a}  ↔  ${r.b}`);
+    console.log(`${(r.intersection_mm ?? 0).toFixed(1).padStart(7)}mm  [${r.form}]  ${r.a}  ↔  ${r.b}`);
   }
 }
 
@@ -97,8 +104,8 @@ console.log("--- 报告家族（全部，数量降序；max = 家族内最深实
 for (const [k, v] of [...fam.entries()].sort((a, b) => b[1].length - a[1].length)) {
   const depths = v.map((r) => r.depth_mm).filter((d): d is number => d !== null);
   const maxDepth = depths.length > 0 ? `${Math.max(...depths).toFixed(2)}mm` : "—（测不出）";
-  const shape = v[0].shape ?? "?";
-  console.log(`${String(v.length).padStart(3)}  max ${maxDepth.padStart(12)}  [${shape}]  ${k}`);
+  const form = v[0].form ?? "?";
+  console.log(`${String(v.length).padStart(3)}  max ${maxDepth.padStart(12)}  [${form}]  ${k}`);
 }
 
 // ---- 白名单分层：未豁免 = 真缺陷候选（验收口径「未豁免报告 = 0」） ----
@@ -110,7 +117,7 @@ if (split.active.length > 0) {
   for (const item of activeSorted) {
     const r = item.report;
     const depth = r.depth_mm === null ? "  未测出" : `${r.depth_mm.toFixed(2)}mm`;
-    console.log(`${depth.padStart(10)}  [${r.shape}]  ${pointText(r)}  ${r.a}  ↔  ${r.b}`);
+    console.log(`${depth.padStart(10)}  [${r.form}]  ${pointText(r)}  ${r.a}  ↔  ${r.b}`);
   }
 }
 const famTally = new Map<string, number>();
@@ -118,6 +125,96 @@ for (const hit of split.expected) famTally.set(hit.rule.family, (famTally.get(hi
 console.log("--- 已豁免族计数（docs/qa/whitelist/README.md 表格口径） ---");
 for (const rule of tigerEngineExpectedContacts) {
   console.log(`${String(famTally.get(rule.family) ?? 0).padStart(3)}  ${rule.family}`);
+}
+
+// ---- 豁免规则复核（判定树口径）→ docs/qa/whitelist-recheck.md ----
+// 口径：规则先按零件 id 模式匹配（不看形态/深度），再看这些报告落到哪个形态——
+//   凡落 suspect / displaced 的，判定树已把它们从豁免区挪出（这就是「藏着的真穿透」清单）。
+if (process.argv.includes("--recheck")) {
+  const pairMatches = (rule: (typeof tigerEngineExpectedContacts)[number], report: ClippingReport) =>
+    (matchesPartId(rule.a, report.a) && matchesPartId(rule.b, report.b)) ||
+    (matchesPartId(rule.a, report.b) && matchesPartId(rule.b, report.a));
+  const formOrder = ["bearing_overlap", "face_mate", "suspect", "displaced"] as const;
+  const rows: string[] = [];
+  const leaks: string[] = [];
+  tigerEngineExpectedContacts.forEach((rule, index) => {
+    const matched = reports.filter((report) => pairMatches(rule, report));
+    const exempted = split.expected.filter((hit) => hit.rule === rule);
+    const forms = new Map<string, number>();
+    for (const report of matched)
+      forms.set(report.form ?? "unknown", (forms.get(report.form ?? "unknown") ?? 0) + 1);
+    const formText =
+      formOrder
+        .filter((form) => (forms.get(form) ?? 0) > 0)
+        .map((form) => `${form}×${forms.get(form)}`)
+        .join(" · ") || "—";
+    const bad = (forms.get("suspect") ?? 0) + (forms.get("displaced") ?? 0);
+    const verdict =
+      matched.length === 0
+        ? "— 未命中（族空转）"
+        : bad > 0
+          ? `✘ ${bad} 条 suspect/displaced（真穿透，已挪出豁免区）`
+          : "✔ 全部为配合面/贴合面";
+    rows.push(
+      `| ${index + 1} | \`${rule.family}\` | \`${rule.a}\` ↔ \`${rule.b}\` | ${rule.reason} | ` +
+        `${rule.maxDepthMm ?? DEFAULT_MAX_DEPTH_MM} | ${exempted.length}/${matched.length} | ${formText} | ${verdict} |`,
+    );
+    if (bad > 0) {
+      for (const report of matched.filter((r) => r.form === "suspect" || r.form === "displaced")) {
+        leaks.push(
+          `- \`${report.a}\` ↔ \`${report.b}\`：形态 **${report.form}**，` +
+            `交线 ${(report.intersection_mm ?? 0).toFixed(2)}mm，` +
+            `${report.depth_mm === null ? "深度测不出" : `深度 ${report.depth_mm.toFixed(2)}mm`}` +
+            `（族 \`${rule.family}\`）`,
+        );
+      }
+    }
+  });
+  const doc = [
+    "# 豁免规则复核清单（判定树口径）",
+    "",
+    "> 生成命令：`npx tsx scripts/diag-clips.ts --recheck`（本文件由脚本生成，不要手改）。",
+    `> 本轮数据：总报告 ${reports.length} / 未豁免 ${split.active.length} / 已豁免 ${split.expected.length}` +
+      `（含引擎模型全量实例对）。`,
+    "",
+    "## 判定树口径",
+    "",
+    "```",
+    "相交对（bvhcast 命中）",
+    " ├─ 绕轴闭合 且 交线来自贴合壁对（法向近平行） → bearing_overlap（同心配合面）  → 配合接触，可豁免",
+    " ├─ 其余且 depth_mm 可测（≥ 0.5mm）          → displaced（错位穿透）           → 未豁免，报",
+    " └─ 其余且 depth_mm = null                    → 交线退化(<0.1mm) = face_mate（共面贴合）→ 可豁免",
+    "                                                否则 = suspect（存疑穿透）      → 未豁免，报",
+    "```",
+    "",
+    "- 形态与深度是**两道守门**：`suspect` / `displaced` 无视豁免规则（守门值对它们无效）；",
+    "- `depth_mm = null` 不再等于放行：null 必须过形态分流，分不出的一律进未豁免区；",
+    "- 「命中」列 = 按零件 id 模式匹配到的报告数，括号外为**仍在豁免区**的条数。",
+    "",
+    "## 复核表",
+    "",
+    "| # | 豁免族 | 零件对（规则） | 依据 | 守门值(mm) | 豁免/命中 | 形态分布 | 结论 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...rows,
+    "",
+    "## 漏网清单（族内被判 suspect / displaced 的报告）",
+    "",
+    ...(leaks.length > 0 ? leaks : ["（空：复核表里没有族落进 suspect / displaced）"]),
+    "",
+    "## 未豁免清单（本轮，验收口径：未豁免 = 0）",
+    "",
+    ...(split.active.length > 0
+      ? split.active.map(
+          (item) =>
+            `- \`${item.report.a}\` ↔ \`${item.report.b}\`：形态 **${item.report.form ?? "unknown"}**，` +
+            `交线 ${(item.report.intersection_mm ?? 0).toFixed(2)}mm，` +
+            `${item.report.depth_mm === null ? "深度测不出" : `深度 ${item.report.depth_mm.toFixed(2)}mm`}`,
+        )
+      : ["（空：未豁免 = 0）"]),
+    "",
+  ].join("\n");
+  writeFileSync("docs/qa/whitelist-recheck.md", doc, "utf8");
+  console.log(`--- 豁免规则复核已写入 docs/qa/whitelist-recheck.md（漏网 ${leaks.length} 条） ---`);
 }
 
 model.dispose();

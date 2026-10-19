@@ -150,7 +150,9 @@ const CONSTANTS: Record<string, Expr> = {
   ROD_BIG_R: 0.052,
   ROD_BIG_BORE: "PIN_R+0.001",
   ROD_SMALL_R: 0.026,
-  ROD_SMALL_BORE: "PISTON_PIN_R+0.0008",
+  // 小头衬套按压装销建模（过盈 0.6mm）：活塞销压进连杆小头是常见构造，
+  // 静态报告里这条真实压装面必须看得见（径向 0.6mm，远低于 2mm 深度守门）。
+  ROD_SMALL_BORE: "PISTON_PIN_R-0.0006",
   ROD_SHANK_W: 0.036,
   ROD_SHANK_T: 0.026,
   /** 同一曲柄销上左右列连杆沿轴向各让一侧：销宽 54 = 2*26 + 2*1mm 间隙 */
@@ -338,7 +340,9 @@ const CONSTANTS: Record<string, Expr> = {
   TAIL_X: "FLYWHEEL_X-FLYWHEEL_T/2-TAIL_LEN/2-0.001",
 
   // ===== 冷却 =====
-  FAN_R: 0.235,
+  // 叶尖半径：导风罩内孔 = shroudR−shroudWall = 0.227，叶尖必须留 3mm 间隙。
+  // 原 0.235 会让叶尖切进罩壁 6.8mm（fan_rotor ↔ fan_frame · bearing_overlap · 未豁免）。
+  FAN_R: 0.224,
   FAN_HUB_R: 0.062,
   FAN_HUB_W: 0.07,
   FAN_BLADES: 8,
@@ -349,11 +353,13 @@ const CONSTANTS: Record<string, Expr> = {
   FAN_Z: 0.3,
   FAN_DIST: "sqrt(FAN_Y^2+FAN_Z^2)",
   FAN_PULLEY_R: 0.0792,
-  FAN_PULLEY_W: 0.021,
+  // 带面宽 45mm：曲轴带轮是双槽（±PULLEY_OFF = 0.6875/0.7125 两个皮带平面），
+  // 风扇带轮做成整段等高圆柱面带，两条皮带各自压在同一半径上（尖脊只有一条能压住）
+  FAN_PULLEY_W: 0.045,
   FAN_PULLEY_X: "0.069",
   FAN_SHAFT_R: 0.032,
   FAN_FRAME_X: "CASE_FRONT_X+0.024",
-  FAN_BEARING_R_OUT: 0.042,
+  FAN_BEARING_R_OUT: 0.033, // 外径按框架下斜撑净空收敛（φ84 → φ66：原尺寸会与斜撑相交 5.3mm）
   FAN_BEARING_R_IN: 0.026,
   FAN_BEARING_W: 0.06,
   FAN_BEARING_X: "FAN_X-0.069",
@@ -372,14 +378,24 @@ const CONSTANTS: Record<string, Expr> = {
   PLENUM_Y: 0.356,
   PLENUM_Z: 0.1534,
   INTAKE_MAIN_R: 0.036,
-  INTAKE_RUNNER_R: 0.024,
-  PORT_Y: "HEAD_H*0.45",
+  INTAKE_RUNNER_R: 0.018,
+  // 进/排气口高度：同一缸盖侧面上分成上口（进气）与下口（排气）。
+  // 两口的分开是构造性要求：支管起弯段的净空 = 两段半径之和（0.018+0.018），
+  // 共用同一口时两根 ⌀48 支管的起弯段必然互穿（实测交线 1493mm · displaced）。
+  PORT_IN_Y: "HEAD_H*0.72",
+  PORT_EX_Y: "HEAD_H*0.22",
+  PORT_STUB_R: 0.019, // 缸盖进/排气短管半径；支管起点套在短管上（起点在短管柱面内）
   PORT_Z: "BLOCK_D/2+0.04",
   EXHAUST_MAIN_Y: 0.055,
-  EXHAUST_MAIN_Z: "BLOCK_D/2+0.088",
+  // 排气主管再外移 22mm：进气支管起点（PORT_IN_Y）到主管轴心的净空
+  // = √(0.006² + 0.077²) ≈ 77mm > 主管半径+支管半径 60mm（原 0.088 时只有 55mm · 互穿）
+  EXHAUST_MAIN_Z: "BLOCK_D/2+0.11",
   EXHAUST_MAIN_R: 0.042,
-  EXHAUST_RUNNER_R: 0.024,
+  EXHAUST_RUNNER_R: 0.018,
   EXHAUST_PIPE_R: 0.022,
+  // 排气下管承口：13 边形套筒的内切圆 0.0435×cos(π/13)=0.0422 > 主管外接圆 0.042，
+  // 与主管壁面径向留隙、不再产生轴向长交线；接触 = 承口端盖面横切主管壁的整圈交线（bearing_overlap）。
+  EXHAUST_SOCKET_R: "EXHAUST_MAIN_R+0.0015",
   // 化油器坐在进气歧管主管（plenum）正上方。注意：歧管局部系原点在缸盖底面（HEAD_BASE），
   // 而化油器经 bankMatrix 以曲轴箱轴（y=0）为高度零点，故必须补上 HEAD_BASE——
   // 原式漏了这一项，化油器落到 y≈0.28（≈缸盖进气道法兰高度），⌀95 底座侧壁插进法兰 13.5mm。
@@ -423,8 +439,12 @@ const CONSTANTS: Record<string, Expr> = {
   COVER_SCREW_Y: "COVER_BASE+COVER_H+0.008",
   PLUG_TWIN_DX: 0.045, // 双点火：第二只火花塞同侧、沿缸盖长度前后错开 45mm
   // （山谷侧被进气道/空滤占住，塞子装不进——见 source 说明）
-  BOOT_IN_R: 0.0135, // 护套内孔 > 塞子外径（1mm 间隙，不接触）
+  // 护套底口内孔 ⌀21 略小于塞子 ⌀23 段（0.5mm 径向过盈）：底口锥面在塞子柱面上
+  // 切出一圈闭合交线 = 包裹/压装接触。原 ⌀23.6 大于塞子 ⌀23 → 底口整圈悬在塞子外侧，
+  // 一个三角面都不相交（plug-boot-on-plug 实测 0 条）。
+  BOOT_IN_R: 0.0105,
   BOOT_R: 0.017,
+  BOOT_BORE: 0.0135, // 护套内孔 ⌀27：让开塞子 ⌀25 段 1mm；只有底口斜唇切进塞子
   BOOT_LEN: 0.03,
   BOOT_Y0: 0.062, // 护套底口位置（火花塞高 0.09，罩住线端）
   FUELPUMP_R: 0.03,
@@ -1490,6 +1510,10 @@ function buildParts(): PartDefinition[] {
         h: "HEAD_H",
         chamber: "HEAD_CHAMBER_R",
         portW: 0.054,
+        // 进/排气口高度与短管半径与歧管支管共用同一组常量（单一真值源）
+        portInY: "PORT_IN_Y",
+        portExY: "PORT_EX_Y",
+        portStubR: "PORT_STUB_R",
         boltRadius: 0.045,
         bevel: 0,
       },
@@ -1837,6 +1861,19 @@ function buildParts(): PartDefinition[] {
         accBeamH: 0.028,
         // 地脚/立撑/附件梁后端面 = 正时盖前端面（TIMING_COVER_X + 10mm）+ 1mm 间隙
         mountX: "TIMING_COVER_X+0.010+0.001-FAN_FRAME_X",
+        // 右水管过孔：管心高度 = 右水管 y；管夹中心 = 附件梁后端面 + 15mm（管夹长 50mm）。
+        // 管夹中心的世界 x = TIMING_COVER_X+0.026 = 0.504，管心 z 必须取水管轴线在该 x 处的值：
+        // z = -(CASE_HALF_W+0.035) + (0.5-0.504)·0.0145/0.079 = -(CASE_HALF_W+0.0357342)。
+        // 原 0.0318 与轴线差 2.5mm → 管夹内孔单侧切线切割（实测 displaced 2.44mm）
+        pipeY: "ACC_Y-0.02",
+        pipeZ: "-(CASE_HALF_W+0.0357342)",
+        pipeR: 0.02,
+        clampX: "TIMING_COVER_X+0.010+0.001-FAN_FRAME_X+0.015",
+        clampLen: 0.05,
+        // 轴承座：中心 = 风扇轴承中心；孔比轴承外径（FAN_BEARING_R_OUT）小 0.4mm
+        bearingX: "FAN_BEARING_X-FAN_FRAME_X",
+        bearingBoreR: "FAN_BEARING_R_OUT-0.0004",
+        bearingLen: 0.05,
       },
     },
     material: "cast_iron",
@@ -1855,7 +1892,9 @@ function buildParts(): PartDefinition[] {
       kit: "beltLoop",
       params: {
         rDriving: "PULLEY_R-BELT_T/2",
-        rDriven: "FAN_PULLEY_R+BELT_T/2",
+        // 被动侧半径 +0.8mm：带面与带轮凸脊原为切线贴合，多边形近似下带面内缘切进轮面
+        // （判定树实测交线 1618mm · suspect）——留 0.8mm 净隙，视觉上看不出
+        rDriven: "FAN_PULLEY_R+BELT_T/2+0.0008",
         d: "FAN_DIST",
         width: "BELT_WIDTH",
         halfThickness: "BELT_T/2",
@@ -1989,7 +2028,7 @@ function buildParts(): PartDefinition[] {
         runners: [0, 1, 2, 3, 4, 5].map((k) => {
           const x = -(0.079 + 0.158 * k) + 0.0;
           return {
-            from: [x, "PORT_Y", "-(BLOCK_D/2+0.033)"],
+            from: [x, "PORT_IN_Y", "-(BLOCK_D/2+0.033)"],
             to: [x, "PLENUM_Y-0.02", "-PLENUM_Z"],
             r: "INTAKE_RUNNER_R",
             bend: 0.05,
@@ -2022,7 +2061,7 @@ function buildParts(): PartDefinition[] {
         runners: [0, 1, 2, 3, 4, 5].map((k) => {
           const x = -(0.079 + 0.158 * k) + 0.0;
           return {
-            from: [x, "PORT_Y", "BLOCK_D/2+0.033"],
+            from: [x, "PORT_IN_Y", "BLOCK_D/2+0.033"],
             to: [x, "PLENUM_Y-0.02", "PLENUM_Z"],
             r: "INTAKE_RUNNER_R",
             bend: 0.05,
@@ -2048,13 +2087,24 @@ function buildParts(): PartDefinition[] {
       type: "kit",
       kit: "manifold",
       params: {
-        mainFrom: [0.07, "EXHAUST_MAIN_Y", "-EXHAUST_MAIN_Z"],
+        // 主管前端再前伸 45mm（0.07 → 0.115，世界 0.411 → 0.456）：
+        // 让下管承口能在「正时箱加强肋前方」套在主管外壁上（肋的前端面在 x≈0.410，
+        // 承口若后伸到肋的范围内会撞肋——实测 displace 14.5mm）
+        mainFrom: [0.115, "EXHAUST_MAIN_Y", "-EXHAUST_MAIN_Z"],
         mainTo: [-0.86, "EXHAUST_MAIN_Y", "-EXHAUST_MAIN_Z"],
         mainR: "EXHAUST_MAIN_R",
+        // 近端（管口）也封盖：歧管外包着承口，口是开的话腔内采样点会被奇偶判定误判成
+        // 「在实体内」 → 承口压装报出 31mm 假深度
+        capFrom: 1,
+        // 封盖收进口内（外端面与管口齐平）：下管弯管起点在口外 6mm，
+        // 外探 5mm 的默认封盖会被弯管首段穿过，多出一圈不绕轴的交线（形态→displaced）
+        capInset: 1,
         runners: [0, 1, 2, 3, 4, 5].map((k) => {
           const x = -(0.079 + 0.158 * k) + 0.0;
           return {
-            from: [x, "PORT_Y", "-(BLOCK_D/2+0.033)"],
+            // 起点比进气支管低 30mm：两条支管共用缸盖法兰口时起弯段互穿
+            // （判定树实测交线 1970mm · suspect）——按「上进气 / 下排气」分开口
+            from: [x, "PORT_EX_Y", "-(BLOCK_D/2+0.033)"],
             to: [x, "EXHAUST_MAIN_Y", "-EXHAUST_MAIN_Z"],
             r: "EXHAUST_RUNNER_R",
             bend: 0.03,
@@ -2080,13 +2130,21 @@ function buildParts(): PartDefinition[] {
       type: "kit",
       kit: "manifold",
       params: {
-        mainFrom: [0.07, "EXHAUST_MAIN_Y", "EXHAUST_MAIN_Z"],
+        // 与左列同理：主管前伸让承口避开工件前后端的加强肋
+        mainFrom: [0.115, "EXHAUST_MAIN_Y", "EXHAUST_MAIN_Z"],
         mainTo: [-0.86, "EXHAUST_MAIN_Y", "EXHAUST_MAIN_Z"],
         mainR: "EXHAUST_MAIN_R",
+        // 近端（管口）也封盖：歧管外包着承口，口是开的话腔内采样点会被奇偶判定误判成
+        // 「在实体内」 → 承口压装报出 31mm 假深度
+        capFrom: 1,
+        // 封盖收进口内（外端面与管口齐平）：下管弯管起点在口外 6mm，
+        // 外探 5mm 的默认封盖会被弯管首段穿过，多出一圈不绕轴的交线（形态→displaced）
+        capInset: 1,
         runners: [0, 1, 2, 3, 4, 5].map((k) => {
           const x = -(0.079 + 0.158 * k) + 0.0;
           return {
-            from: [x, "PORT_Y", "BLOCK_D/2+0.033"],
+            // 起点比进气支管低 30mm（上进气 / 下排气分开口，避免两条起弯段互穿）
+            from: [x, "PORT_EX_Y", "BLOCK_D/2+0.033"],
             to: [x, "EXHAUST_MAIN_Y", "EXHAUST_MAIN_Z"],
             r: "EXHAUST_RUNNER_R",
             bend: 0.03,
@@ -2101,6 +2159,11 @@ function buildParts(): PartDefinition[] {
       rotation: ["HALF_V", 0, 0],
     },
   });
+  // 排气歧管主管轴（世界坐标，取 y/z 分量）：下管要与主管同轴插接。
+  // 注意必须带 HEAD_BASE 偏移：歧管局部系原点在缸盖底面（GASKET_BOTTOM+GASKET_T+0.0006=0.4511），
+  // 漏掉它承口会落到 y≈−0.04（曲轴箱前脸那层），插不到歧管还会撞上前端加强肋。
+  const exhaustAxisL = bankPos("CYL_X1", "HEAD_BASE+EXHAUST_MAIN_Y", "-EXHAUST_MAIN_Z", -1);
+  const exhaustAxisR = bankPos("CYL_X1", "HEAD_BASE+EXHAUST_MAIN_Y", "EXHAUST_MAIN_Z", 1);
   add({
     id: "tiger.induction.exhaust_pipe_l",
     name_cn: "排气下管（左）",
@@ -2109,11 +2172,26 @@ function buildParts(): PartDefinition[] {
     build_layer: 3,
     build_order: 316,
     geometry: {
-      type: "weld",
-      from: [0.4, 0.35, "-0.405"],
-      to: [0.5, 0.1, "-0.37"],
-      radius: "EXHAUST_PIPE_R",
-      seed: 31,
+      // 短承口是外套滑套：13 边形内切圆 0.0435×cos(π/13)=0.0422 > 主管外接圆 0.042，
+      // 径向恒定留 0.24mm 净隙（多边形几何上不可能相交）；轴向与主管重叠 4mm 只为外观套住管口。
+      // 关键约束：下管起点环垂直于管轴（近竖直），其 x 展布 = ±管半径 22mm；
+      // 起点 x ≥ 0.478 才能让整个环落在歧管口封盖（x≤0.456）之外，否则环会从封盖里穿过去。
+      type: "kit",
+      kit: "manifold",
+      params: {
+        mainFrom: [0.452, exhaustAxisL[1], exhaustAxisL[2]],
+        mainTo: [0.466, exhaustAxisL[1], exhaustAxisL[2]],
+        mainR: "EXHAUST_SOCKET_R",
+        mainSegments: 13,
+        runners: [
+          {
+            from: [0.48, exhaustAxisL[1], exhaustAxisL[2]],
+            to: [0.5, 0.1, "-0.37"],
+            r: "EXHAUST_PIPE_R",
+            bend: 0,
+          },
+        ],
+      },
     },
     material: "cast_iron_dark",
     mate: { type: "absolute" },
@@ -2126,11 +2204,23 @@ function buildParts(): PartDefinition[] {
     build_layer: 3,
     build_order: 317,
     geometry: {
-      type: "weld",
-      from: [0.4, 0.35, 0.405],
-      to: [0.5, 0.1, 0.37],
-      radius: "EXHAUST_PIPE_R",
-      seed: 32,
+      // 同左管：外套滑套径向留 0.24mm 净隙，下管起点环（x 展布 ±22mm）整圈落在歧管口封盖之外。
+      type: "kit",
+      kit: "manifold",
+      params: {
+        mainFrom: [0.452, exhaustAxisR[1], exhaustAxisR[2]],
+        mainTo: [0.466, exhaustAxisR[1], exhaustAxisR[2]],
+        mainR: "EXHAUST_SOCKET_R",
+        mainSegments: 13,
+        runners: [
+          {
+            from: [0.48, exhaustAxisR[1], exhaustAxisR[2]],
+            to: [0.5, 0.1, "0.37"],
+            r: "EXHAUST_PIPE_R",
+            bend: 0,
+          },
+        ],
+      },
     },
     material: "cast_iron_dark",
     mate: { type: "absolute" },
@@ -2252,12 +2342,17 @@ function buildParts(): PartDefinition[] {
     geometry: {
       type: "lathe",
       segments: 16,
-      // 内孔 ⌀27 > 塞子外径 ⌀25（1mm 间隙，不接触）；底口与火花塞共用布局
+      // 闭合剖面（壁厚 3.5mm 的罩壳）：底口内孔 ⌀21 < 塞子 ⌀23 段，斜唇切进塞子成一圈交线；
+      // 内孔壁 ⌀27 让开塞子 ⌀25 段 1mm。
+      // 剖面必须闭合：开口薄壳在做「点在实体内」射线奇偶判定时会整片误判成内部，
+      // 深度探针于是报出 14.67mm 假深度（plug-boot-on-plug 24 条全被这条假深度顶出豁免）。
       profile: [
-        ["BOOT_IN_R", "BOOT_Y0"],
-        ["BOOT_R", "BOOT_Y0+0.003"],
-        ["BOOT_R", "BOOT_Y0+BOOT_LEN-0.003"],
-        ["BOOT_IN_R", "BOOT_Y0+BOOT_LEN"],
+        ["BOOT_IN_R", "BOOT_Y0"], // 底口内孔下缘（过盈面）
+        ["BOOT_R", "BOOT_Y0"], // 底口环形端面
+        ["BOOT_R", "BOOT_Y0+BOOT_LEN"], // 外壁
+        ["BOOT_BORE", "BOOT_Y0+BOOT_LEN"], // 顶面环形
+        ["BOOT_BORE", "BOOT_Y0+0.004"], // 内孔壁（让开 ⌀25 段）
+        ["BOOT_IN_R", "BOOT_Y0"], // 斜唇回到起点（闭合）
       ],
     },
     material: "bakelite",
@@ -2331,16 +2426,26 @@ function buildParts(): PartDefinition[] {
     build_layer: 3,
     build_order: 332,
     geometry: {
-      type: "weld",
+      // 成形钢管（光滑回转体），不再用焊道几何：焊道的蛇形摆动（±4mm）与每环半径
+      // 0.82–1.18 波动让管夹孔面与管面忽接忽离，交线形态/深度都不可复现。
       // 管端朝前悬空（软管接散热器用），管身全程在箱体侧壁外平行走，尾端环面离壁 0.8mm
       // （原端点落在甲板外缘板内部：壳体穿透 23.5mm）
-      from: [0.5, "ACC_Y+0.04", "-(CASE_HALF_W+0.035)"],
-      to: [0.421, "ACC_Y+0.04", "-(CASE_HALF_W+0.0205)"],
-      radius: 0.02,
-      seed: 41,
+      type: "tube",
+      rOuter: 0.02,
+      rInner: 0.015,
+      segments: 16,
+      // 管长 = √(0.079² + 0.0145²)：端点 (0.5, …, -(CASE_HALF_W+0.035))
+      // → (0.421, …, -(CASE_HALF_W+0.0205))
+      h: "sqrt(0.079^2+0.0145^2)",
     },
     material: "steel",
-    mate: { type: "absolute" },
+    mate: {
+      type: "absolute",
+      // 管轴中点；局部 +Y 经 Rz(90°)（+Y→−X）再 Ry(10.4°)（−X 朝 +Z 倾 10.4°）
+      // 后正好指向「起点 → 终点」方向
+      position: ["(0.5+0.421)/2", "ACC_Y+0.04", "-(CASE_HALF_W+0.02775)"],
+      rotation: ["0", "10.4", "90"],
+    },
   });
   add({
     id: "tiger.accessory.water_pipe_r",
@@ -2350,17 +2455,25 @@ function buildParts(): PartDefinition[] {
     build_layer: 3,
     build_order: 333,
     geometry: {
-      type: "weld",
       // 与左管同侧并行（间距 60mm，两支 r=0.02 不打架）；同样不穿壁
       // 抬高 20mm：原位（ACC_Y-0.04，管底 y=0）被曲轴箱加强肋顶（y=10mm）穿 8.27mm，
       // 抬后管底 y=20mm > 肋顶；左管不动（再抬高会顶到上甲板/端板：实测 7.15mm）
-      from: [0.5, "ACC_Y-0.02", "-(CASE_HALF_W+0.035)"],
-      to: [0.421, "ACC_Y-0.02", "-(CASE_HALF_W+0.0205)"],
-      radius: 0.02,
-      seed: 42,
+      // 成形钢管（同左管）：管夹孔面与光滑管面互穿出绕轴闭合交线（压装配合面）。
+      // 管端不越过 x=0.5：再前伸 40mm 会插进水泵体（实测 8.78mm）；
+      // 管端落在夹孔里、与夹体重叠 21mm 就够形成闭合配合面。
+      type: "tube",
+      rOuter: 0.02,
+      rInner: 0.015,
+      segments: 16,
+      h: "sqrt(0.079^2+0.0145^2)",
     },
     material: "steel",
-    mate: { type: "absolute" },
+    mate: {
+      type: "absolute",
+      // 同左管：中点 + Rz(90°) 后 Ry(10.4°) 对齐管轴
+      position: ["(0.5+0.421)/2", "ACC_Y-0.02", "-(CASE_HALF_W+0.02775)"],
+      rotation: ["0", "10.4", "90"],
+    },
   });
 
   return parts;
