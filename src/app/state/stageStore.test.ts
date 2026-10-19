@@ -6,7 +6,9 @@ import {
   buildOrdersOf,
   faultFromError,
   filterReportsByProgress,
+  formatReportMeasure,
   reportKey,
+  shapeLabel,
   useStageStore,
 } from "./stageStore";
 
@@ -378,6 +380,43 @@ describe("stageStore 布局自由化", () => {
     expect(useStageStore.getState().layout.drawer.width).toBe(620);
     useStageStore.getState().setDrawerWidth(100);
     expect(useStageStore.getState().layout.drawer.width).toBe(288);
+  });
+});
+
+describe("报告卡片文案（交线法口径：深度不许冒充）", () => {
+  it("实测深度优先；测不出时给「交线 XXmm」+ 形态标签", () => {
+    const measured = makeReport("tiger.a", "tiger.b", 7.61);
+    expect(formatReportMeasure(measured)).toBe("7.61mm");
+
+    const unmeasurable: ClippingReport = {
+      ...makeReport("tiger.a", "tiger.b"),
+      depth_mm: null,
+      estimated: true,
+      intersection_mm: 1970.49,
+      shape: "face_contact",
+    };
+    expect(formatReportMeasure(unmeasurable)).toBe("交线 1970.5mm");
+    expect(shapeLabel(unmeasurable.shape)).toBe("贴合面");
+
+    const fit: ClippingReport = { ...unmeasurable, intersection_mm: 87.1, shape: "bearing_overlap" };
+    expect(shapeLabel(fit.shape)).toBe("绕轴闭合·配合面");
+    const displaced: ClippingReport = { ...unmeasurable, shape: "displaced" };
+    expect(shapeLabel(displaced.shape)).toBe("局部成团·错位穿透");
+
+    // 连交线也没有（超预算早退）：只给形态词，绝不出现 AABB 假数字
+    const bare: ClippingReport = { ...unmeasurable, intersection_mm: undefined };
+    expect(formatReportMeasure(bare)).toBe("交线 —");
+    expect(shapeLabel(undefined)).toBe("形态未知");
+  });
+
+  it("reportKey 用占位符区分 null 深度（不把 null 拼成 0，也不与实测 0 撞 key）", () => {
+    const measured = makeReport("tiger.a", "tiger.b", 1);
+    const unmeasurable: ClippingReport = { ...measured, depth_mm: null };
+    const otherShape: ClippingReport = { ...unmeasurable, shape: "bearing_overlap" };
+
+    expect(reportKey(unmeasurable)).not.toContain("null");
+    expect(reportKey(unmeasurable)).toBe(reportKey(otherShape));
+    expect(reportKey(unmeasurable)).not.toBe(reportKey(makeReport("tiger.a", "tiger.b", 0)));
   });
 });
 
