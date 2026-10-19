@@ -72,6 +72,9 @@ export const ENGINE_LAYOUTS = {
   coverScrew: "engine.coverScrew",
   portFlangeBolt: "engine.portFlangeBolt",
   endplateBolt: "engine.endplateBolt",
+  htConduit: "engine.htConduit",
+  htLead: "engine.htLead",
+  magnetoBus: "engine.magnetoBus",
 } as const;
 
 /** 缸号（0..11）→ 曲柄销序号 / 所在侧 / 缸心 X / 缸列倾角（度）。 */
@@ -466,6 +469,39 @@ const CONSTANTS: Record<string, Expr> = {
   BOOT_BORE: 0.0135, // 护套内孔 ⌀27：让开塞子 ⌀25 段 1mm；只有底口斜唇切进塞子
   BOOT_LEN: 0.03,
   BOOT_Y0: 0.062, // 护套底口位置（火花塞高 0.09，罩住线端）
+  // ---- 点火高压线束（双点火：每缸 2 根，共 24 根）--------------------------------
+  // 导管中心高出护套顶 90mm：护套顶（bank 局部）= PLUG_BASE+BOOT_Y0+BOOT_LEN = 0.6289，
+  // 净隙（BVH 实测）：缸盖罩顶外角 28.0mm、进气歧管 42.9mm。
+  CONDUIT_R_OUT: 0.011,
+  CONDUIT_R_IN: 0.008,
+  CONDUIT_X_FRONT: 0.455,
+  CONDUIT_X_REAR: -0.5, // 后端止于进气歧管后缘之内（前端留 20mm 让开风扇框 x=0.475）
+  CONDUIT_LEN: "CONDUIT_X_FRONT-CONDUIT_X_REAR",
+  CONDUIT_X: "(CONDUIT_X_FRONT+CONDUIT_X_REAR)/2",
+  CONDUIT_LIFT: 0.09,
+  CONDUIT_Y: "PLUG_BASE+BOOT_Y0+BOOT_LEN+CONDUIT_LIFT",
+  // 导管轴线换到模型坐标：y 与 |z| 对两列同值（符号由缸列侧给，见 layout）
+  CONDUIT_Y_W: "CONDUIT_Y*COS_HV-PLUG_Z*SIN_HV",
+  CONDUIT_Z_W: "CONDUIT_Y*SIN_HV+PLUG_Z*COS_HV",
+  // 高压线：护套顶面下 1.2mm 起、导管柱面下 0.8mm 止（垂直段，两端都是净隙不是接触）
+  HT_LEAD_R_OUT: 0.0045,
+  HT_LEAD_R_IN: 0.0025,
+  HT_LEAD_BOTTOM: "PLUG_BASE+BOOT_Y0+BOOT_LEN-0.0012",
+  HT_LEAD_TOP: "CONDUIT_Y-CONDUIT_R_OUT-0.0008",
+  HT_LEAD_LEN: "HT_LEAD_TOP-HT_LEAD_BOTTOM",
+  HT_LEAD_MID: "(HT_LEAD_TOP+HT_LEAD_BOTTOM)/2",
+  // 磁电机干线：⌀16 管从磁电机前端面（x=-0.100 的 ⌀96 平盖）正前 9mm 起，沿径向外接导管。
+  // 起点 y = 磁电机轴线高度 0.59；终端停在导管柱面外 1mm：端面平面距导管轴线 12mm，
+  // 端面上任一点到轴线 ≥ 12mm > 导管半径 11mm ⇒ 整面不侵入（实测端面净隙 1.0mm）。
+  // 不走正面走廊（x∈[0.475,0.675] 被风扇框占死），也不垂插导管柱面（垂插必相交）。
+  MAGNETO_BUS_R_OUT: 0.008,
+  MAGNETO_BUS_R_IN: 0.005,
+  MAGNETO_BUS_X: -0.091,
+  MAGNETO_BUS_Y: 0.59,
+  MAGNETO_BUS_Z0: 0.09,
+  MAGNETO_BUS_Z1: "CONDUIT_Z_W-CONDUIT_R_OUT-0.001",
+  MAGNETO_BUS_LEN: "MAGNETO_BUS_Z1-MAGNETO_BUS_Z0",
+  MAGNETO_BUS_ZC: "(MAGNETO_BUS_Z0+MAGNETO_BUS_Z1)/2",
   FUELPUMP_R: 0.03,
   FUELPUMP_LEN: 0.062,
   FUELPUMP_X: 0.183,
@@ -887,6 +923,43 @@ function makeLayouts(): Record<string, InstanceLayout> {
       .multiply(new THREE.Matrix4().makeRotationZ(deg2rad(front ? 90 : -90)));
   };
 
+  // 点火高压线导管：每列 1 根横置在缸列上方（几何沿 +Y，布局末乘 Rz(-90°) 把它倒向 +X）。
+  // 与 crankJournalAxis / pistonPin 同一约定：旋转必须写在布局里，
+  // 若写进 mate.rotation，布局位移会连同 (x,y) 一起被旋转（磁电机就是这样被甩到机体后上方的）。
+  layouts[ENGINE_LAYOUTS.htConduit] = ({ index, constants }) => {
+    const side: 1 | -1 = index === 0 ? -1 : 1;
+    return bankMatrix(
+      side,
+      constants.CONDUIT_X,
+      constants.CONDUIT_Y,
+      side * constants.PLUG_Z,
+      0,
+      constants,
+    ).multiply(new THREE.Matrix4().makeRotationZ(deg2rad(-90)));
+  };
+
+  // 高压线：24 根与 24 只火花塞一一对应，x 与护套口同源（sparkPlug 布局 + 导管抬高）。
+  layouts[ENGINE_LAYOUTS.htLead] = ({ index, constants }) => {
+    const twin = index >= 12;
+    const { pin, side } = cylinderInfo(index % 12, constants);
+    return bankMatrix(
+      side,
+      constants.CYL_X1 - pin * constants.CYL_PITCH + (twin ? constants.PLUG_TWIN_DX : 0),
+      constants.HT_LEAD_MID,
+      side * constants.PLUG_Z,
+      0,
+      constants,
+    );
+  };
+
+  // 磁电机干线：从磁电机前端面正前 9mm 沿 ±Z 横接到导管侧壁（几何沿 +Y，布局末乘 Rx(±90°)）。
+  layouts[ENGINE_LAYOUTS.magnetoBus] = ({ index, constants }) => {
+    const side: 1 | -1 = index === 0 ? -1 : 1;
+    return new THREE.Matrix4()
+      .makeTranslation(constants.MAGNETO_BUS_X, constants.MAGNETO_BUS_Y, side * constants.MAGNETO_BUS_ZC)
+      .multiply(new THREE.Matrix4().makeRotationX(deg2rad(side * 90)));
+  };
+
   return layouts;
 }
 
@@ -949,6 +1022,9 @@ export function makeEngineRegistry(): ModelRegistry {
       "公开资料：缸径 130 × 行程 145 mm，排量 23095 cc，6.8:1，700 PS @ 3000 r/min，1850 N·m @ 2100 r/min，干重 1200 kg。",
       "简化记录（M-C 待补）：张紧轮/正时齿轮组/调速器不建模；气缸盖不做气门导管座（气门直接站在燃烧室孔内）；活塞销座省略；飞轮壳不做起动机让位口。",
       "配气随动件（气门弹簧/挺杆/摇臂）：缸盖顶面到凸轮基圆只剩 25.8mm、罩壳底面距缸盖顶面 1.8mm，而凸轮升程扫掠半径 33mm 覆盖凸轮轴心下方 0~33mm 整条带；静态件要么与凸轮叶片相交（按缺陷必报）、要么退到 50mm 外成假件（HL230 实为 SOHC + 摇臂）——留到凸轮按相位运动的扫掠感知批次再补。",
+      "点火线束（本轮新增）：24 根高压线按「每塞一根」建模（HL230 双点火 = 每缸 2 只火花塞 / 2 只护套），任务书写的高压线束 ×12 是每列一支点的算法；导管中心高出护套顶 90mm，两端都是净隙（护套顶面 1.2mm、导管柱面 0.8mm，对周边缸盖罩 28.0mm、进气歧管 42.9mm），不新增豁免族。",
+      "磁电机实测位置：机体后上、两列缸列之间（x∈[-0.200,-0.100]，y≈0.59，z=±0.09）。原注「挂在正时齿轮盖前面」的位置（TIMING_COVER_X+0.112, y=0.1）与 ⌀104 减振器实测重叠 17.5mm，且正面走廊 x∈[0.475,0.675] 被风扇框占死，故维持现位；距最近缸盖 35.9mm，支架留待后续批次。",
+      "磁电机干线走法：正面走廊（风扇框/减振器/皮带轮）插不进，垂插导管柱面又必然产生相交面（圆柱对圆柱垂交）；实测走「贴磁电机前端盖正前 9mm 沿 ±Z 横接导管」——端面平面距导管轴线 12mm（> 导管半径 11mm，整面不侵入），实测端面与端盖净隙 1.0mm。",
       "缸列坐标系：+Y 沿缸轴，+Z 右列朝外；进排气法兰面取 BLOCK_D/2 外侧，气门共线 ±6° 倾角相对缸轴。",
     ].join("\n"),
     constants: CONSTANTS,
@@ -2502,6 +2578,71 @@ function buildParts(): PartDefinition[] {
     indexed: true,
     instance_layout: ENGINE_LAYOUTS.sparkPlug,
     source: "**[新增]** 与 24 只火花塞一一对应；高压线束本身 M-C（同磁电机注记）",
+  });
+
+  add({
+    id: "tiger.ignition.ht_conduit",
+    name_cn: "高压线导管",
+    name_en: "HT ignition conduit",
+    assembly: "ignition",
+    build_layer: 1,
+    build_order: 172,
+    geometry: {
+      type: "tube",
+      rOuter: "CONDUIT_R_OUT",
+      rInner: "CONDUIT_R_IN",
+      h: "CONDUIT_LEN",
+    },
+    material: "bakelite",
+    mate: { type: "absolute" },
+    instances: 2,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.htConduit,
+    source:
+      "**[新增]** 每列 1 根（⌀22×955）收口在护套顶上方 90mm；净隙：缸盖罩顶外角 28.0mm、进气歧管 42.9mm",
+  });
+  add({
+    id: "tiger.ignition.ht_lead",
+    name_cn: "火花塞高压线",
+    name_en: "HT ignition lead",
+    assembly: "ignition",
+    build_layer: 1,
+    build_order: 173,
+    geometry: {
+      type: "tube",
+      rOuter: "HT_LEAD_R_OUT",
+      rInner: "HT_LEAD_R_IN",
+      h: "HT_LEAD_LEN",
+    },
+    material: "rubber_belt",
+    mate: { type: "absolute" },
+    instances: 24,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.htLead,
+    source:
+      "**[新增]** HL230 双点火 24 根（与 24 只火花塞/护套一一对应，任务书「线束 ×12」按每列一支点算）：" +
+      "护套顶面上 1.2mm 起、导管柱面下 0.8mm 止，两端都是净隙",
+  });
+  add({
+    id: "tiger.ignition.magneto_bus",
+    name_cn: "磁电机高压干线",
+    name_en: "magneto HT bus",
+    assembly: "ignition",
+    build_layer: 1,
+    build_order: 174,
+    geometry: {
+      type: "tube",
+      rOuter: "MAGNETO_BUS_R_OUT",
+      rInner: "MAGNETO_BUS_R_IN",
+      h: "MAGNETO_BUS_LEN",
+    },
+    material: "rubber_belt",
+    mate: { type: "absolute" },
+    instances: 2,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.magnetoBus,
+    source:
+      "**[新增]** 每台磁电机 1 根（⌀16）：贴前端盖正前 9mm 沿±Z横接到导管，端面净隙 1.0mm；导管布满 955mm 长，干线只做前段",
   });
 
   // ================= L3 附件 =================
