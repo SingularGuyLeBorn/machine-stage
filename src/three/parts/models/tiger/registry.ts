@@ -7,6 +7,8 @@ import { makeRunningLayouts, makeRunningRegistry } from "./running/registry";
 import { tigerRunningKitBuilders } from "./running/kits";
 import { makeTransmissionLayouts, makeTransmissionRegistry } from "./transmission/registry";
 import { tigerTransmissionKitBuilders } from "./transmission/kits";
+import { makeInteriorLayouts, makeInteriorRegistry } from "./interior/registry";
+import { tigerInteriorKitBuilders } from "./interior/kits";
 
 // ============================================================================
 // models/tiger —— 虎式 I 整机注册表（分层合并）
@@ -21,33 +23,61 @@ export function makeTigerRegistry(): ModelRegistry {
   const engine = makeEngineRegistry();
   const running = makeRunningRegistry();
   const transmission = makeTransmissionRegistry();
+  const interior = makeInteriorRegistry();
   return {
     ...engine,
     title: "虎式坦克 Tiger I",
     subtitle:
-      "L1 发动机（HL230 P45）+ L2 行动装置（履带 / 负重轮 / 扭杆悬挂）+ L2 传动装置（Olvar 变速箱 / 传动轴 / L 600 C 转向机）",
-    source_notes: [engine.source_notes ?? "", running.source_notes ?? "", transmission.source_notes ?? ""]
+      "L1 发动机（HL230 P45）+ L2 行动装置（履带 / 负重轮 / 扭杆悬挂）+ L2 传动装置（Olvar 变速箱 / 传动轴 / L 600 C 转向机）+ L3 内衬内饰（驾驶舱 / 无线电员席）",
+    source_notes: [
+      engine.source_notes ?? "",
+      running.source_notes ?? "",
+      transmission.source_notes ?? "",
+      interior.source_notes ?? "",
+    ]
       .filter(Boolean)
       .join("\n"),
-    constants: { ...engine.constants, ...running.constants, ...transmission.constants },
-    assemblies: [...engine.assemblies, ...running.assemblies, ...transmission.assemblies],
+    constants: {
+      ...engine.constants,
+      ...running.constants,
+      ...transmission.constants,
+      ...interior.constants,
+    },
+    assemblies: [
+      ...engine.assemblies,
+      ...running.assemblies,
+      ...transmission.assemblies,
+      ...interior.assemblies,
+    ],
     nodes: [...engine.nodes, ...running.nodes],
-    materials: { ...engine.materials, ...running.materials, ...transmission.materials },
-    parts: [...engine.parts, ...running.parts, ...transmission.parts],
+    materials: {
+      ...engine.materials,
+      ...running.materials,
+      ...transmission.materials,
+      ...interior.materials,
+    },
+    parts: [...engine.parts, ...running.parts, ...transmission.parts, ...interior.parts],
     expectedContacts: [
       ...(engine.expectedContacts ?? []),
       ...(running.expectedContacts ?? []),
       ...(transmission.expectedContacts ?? []),
+      ...(interior.expectedContacts ?? []),
     ],
   };
 }
 
 export function makeTigerLayouts(): Record<string, InstanceLayout> {
-  return { ...makeEngineLayouts(), ...makeRunningLayouts(), ...makeTransmissionLayouts() };
+  return {
+    ...makeEngineLayouts(),
+    ...makeRunningLayouts(),
+    ...makeTransmissionLayouts(),
+    ...makeInteriorLayouts(),
+  };
 }
 
 export const tigerBuilders: Record<string, GeometryBuilder> = {
   ...tigerKitBuilders,
   ...tigerRunningKitBuilders,
   ...tigerTransmissionKitBuilders,
+  ...tigerInteriorKitBuilders,
 };
