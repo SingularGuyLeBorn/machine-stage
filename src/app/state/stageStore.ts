@@ -9,6 +9,7 @@ import {
   type AssembledModel,
   type ClippingReport,
   type ContactPartition,
+  type OverlapShape,
   type PartHandle,
 } from "@/three/parts";
 import { findModel, type ViewKey } from "../catalog";
@@ -79,7 +80,26 @@ export function faultFromError(scope: string, error: unknown): StageFault {
 
 /** 报告稳定标识（跨过滤/重扫保持同一张卡片可被追踪）。 */
 export function reportKey(report: ClippingReport): string {
-  return `${report.a}|${report.b}|${report.frame ?? "s"}|${report.depth_mm.toFixed(3)}`;
+  const depth = report.depth_mm === null ? "c" : report.depth_mm.toFixed(3);
+  return `${report.a}|${report.b}|${report.frame ?? "s"}|${depth}`;
+}
+
+/** 相交形态的中文标签（卡片显示）。 */
+export function shapeLabel(shape?: OverlapShape): string {
+  if (shape === "bearing_overlap") return "绕轴闭合·配合面";
+  if (shape === "displaced") return "局部成团·错位穿透";
+  if (shape === "face_contact") return "贴合面";
+  return "形态未知";
+}
+
+/**
+ * 报告度量文案：实测深度优先；测不出（depth_mm = null）时给「交线 XXmm」，
+ * 绝不拿 AABB 交叠尺寸冒充深度（旧卡片会出现 125.60mm 假数字）。
+ */
+export function formatReportMeasure(report: ClippingReport): string {
+  if (report.depth_mm !== null) return `${report.depth_mm.toFixed(2)}mm`;
+  const line = report.intersection_mm;
+  return line === undefined ? "交线 —" : `交线 ${line.toFixed(1)}mm`;
 }
 
 /** 报告涉及的零件 ID 集合（家族聚合与进度过滤都用它）。 */

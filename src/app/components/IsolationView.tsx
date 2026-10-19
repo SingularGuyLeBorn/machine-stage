@@ -4,7 +4,13 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { type AssembledModel, type ClippingReport, type PartHandle } from "@/three/parts";
-import { reportKey, reportPartIds, useStageStore } from "../state/stageStore";
+import {
+  formatReportMeasure,
+  reportKey,
+  reportPartIds,
+  shapeLabel,
+  useStageStore,
+} from "../state/stageStore";
 
 // ============================================================================
 // IsolationView —— 隔离小视图（一对穿透零件对比 / 单件聚焦）
@@ -151,7 +157,11 @@ function PenetrationMarker({ report, radius }: { report: ClippingReport; radius:
           <strong>
             {partA} ↔ {partB}
           </strong>
-          <span className="num">穿透深度 {report.depth_mm.toFixed(2)} mm</span>
+          <span className="num">
+            {report.depth_mm !== null
+              ? `穿透深度 ${report.depth_mm.toFixed(2)} mm`
+              : `${formatReportMeasure(report)}（${shapeLabel(report.shape)}）`}
+          </span>
         </div>
       </Html>
     </group>

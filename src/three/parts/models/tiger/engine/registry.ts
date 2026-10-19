@@ -56,6 +56,7 @@ export const ENGINE_LAYOUTS = {
   caseMount: "engine.caseMount",
   inspectionCover: "engine.inspectionCover",
   pistonRing: "engine.pistonRing",
+  pistonPin: "engine.pistonPin",
   valve: "engine.valve",
   sparkPlug: "engine.sparkPlug",
   magneto: "engine.magneto",
@@ -152,6 +153,8 @@ const CONSTANTS: Record<string, Expr> = {
   ROD_SMALL_BORE: "PISTON_PIN_R+0.0008",
   ROD_SHANK_W: 0.036,
   ROD_SHANK_T: 0.026,
+  /** 同一曲柄销上左右列连杆沿轴向各让一侧：销宽 54 = 2*26 + 2*1mm 间隙 */
+  ROD_SIDE_OFFSET: 0.014,
 
   // ===== 活塞 =====
   PISTON_R: 0.0628,
@@ -274,7 +277,8 @@ const CONSTANTS: Record<string, Expr> = {
   OIL_FILLER_X: "CASE_FRONT_X+0.049",
   // 抬到正时齿轮盖轮廓（y ≤ 0.16）之上，否则加油口插进正时盖本体
   OIL_FILLER_Y: 0.2,
-  OIL_FILLER_Z: -0.11,
+  // z 让开风扇支架的左地脚/立撑（z∈[-0.133,-0.067]）：加油口管壁 [-0.06,-0.01]
+  OIL_FILLER_Z: -0.035,
   OIL_PUMP_Y: -0.09,
   OIL_PUMP_Z: "-(CASE_HALF_W+0.05)",
   OIL_FILTER_X: -0.455,
@@ -355,7 +359,9 @@ const CONSTANTS: Record<string, Expr> = {
   FAN_BEARING_X: "FAN_X-0.069",
   WATERPUMP_R: 0.055,
   WATERPUMP_LEN: 0.08,
-  WATERPUMP_X: "TIMING_COVER_X+0.047",
+  // 泵体 x∈[X, X+0.08]，前端面对风扇支架下横梁前脸（x≈533.5mm）：留 3mm 垫片间隙。
+  // 原位 +0.047（前端 525mm）插进横梁 8.5mm，检测器报 face_contact 未豁免（共面接触测不出深度）
+  WATERPUMP_X: "TIMING_COVER_X+0.059",
   ACC_Y: 0.06,
   ACC_Z: 0.16,
   GEN_R: 0.055,
@@ -374,7 +380,10 @@ const CONSTANTS: Record<string, Expr> = {
   EXHAUST_MAIN_R: 0.042,
   EXHAUST_RUNNER_R: 0.024,
   EXHAUST_PIPE_R: 0.022,
-  CARB_BASE_Y: "PLENUM_Y+INTAKE_MAIN_R+0.0015",
+  // 化油器坐在进气歧管主管（plenum）正上方。注意：歧管局部系原点在缸盖底面（HEAD_BASE），
+  // 而化油器经 bankMatrix 以曲轴箱轴（y=0）为高度零点，故必须补上 HEAD_BASE——
+  // 原式漏了这一项，化油器落到 y≈0.28（≈缸盖进气道法兰高度），⌀95 底座侧壁插进法兰 13.5mm。
+  CARB_BASE_Y: "HEAD_BASE+PLENUM_Y+INTAKE_MAIN_R+0.0015",
   CARB_H: 0.135,
   CARB_R: 0.0475,
   CARB_X_A: -0.158,
@@ -507,7 +516,13 @@ function buildNodes(): NodeDef[] {
     nodes.push({
       name: rodNodeName(i + 1),
       parent: "root",
-      pivot: [x, `CRANK_R*cos(${pin * 60})`, `CRANK_R*sin(${pin * 60})`],
+      // 同一曲柄销上的左右列连杆沿轴向分列两侧（±14mm）：销宽 54mm 容纳 2*26mm 杆宽。
+      // 不分列时两根连杆/杆盖在同一销位上重叠（实测 8.7mm）。
+      pivot: [
+        side === 1 ? `${x}+ROD_SIDE_OFFSET` : `${x}-ROD_SIDE_OFFSET`,
+        `CRANK_R*cos(${pin * 60})`,
+        `CRANK_R*sin(${pin * 60})`,
+      ],
       rest_rotation: [`${side === 1 ? "HALF_V" : "-HALF_V"}+${rodSwing0(pin, side)}`, 0, 0],
       motion: "rotate",
       axis: "x",
@@ -643,6 +658,11 @@ function makeLayouts(): Record<string, InstanceLayout> {
     const slot = index % RING_COUNT;
     return new THREE.Matrix4().makeTranslation(0, constants.RING_Y1 - slot * constants.RING_STEP, 0);
   };
+
+  // 活塞销：几何沿 +Y 建模，销轴要转到曲轴轴向 X。instance_nodes 驱动的零件由节点矩阵定位，
+  // assembler 会忽略 mate.rotation（同 fanBearing），所以旋转只能写在布局里。
+  // 若漏掉，活塞销会顺着缸轴立着穿过连杆小头（实测 7.99mm 穿透）。
+  layouts[ENGINE_LAYOUTS.pistonPin] = () => new THREE.Matrix4().makeRotationZ(deg2rad(-90));
 
   // 气门：每缸 2 只（index 偶 = 进气 / 奇 = 排气），坐标随列侧镜像
   layouts[ENGINE_LAYOUTS.valve] = ({ index, constants }) => {
@@ -794,7 +814,11 @@ function makeLayouts(): Record<string, InstanceLayout> {
   return layouts;
 }
 
-/** 化油器 / 空滤的缸列定位（每列 2 只：前组 x = CARB_X_A，后组 x = CARB_X_B）。 */
+/**
+ * 化油器 / 空滤的缸列定位（每列 2 只：前组 x = CARB_X_A，后组 x = CARB_X_B）。
+ * lateral 取 side*PLENUM_Z：与进气歧管主管同一法向侧（歧管局部 z 即缸列法向），
+ * 原为 -side*PLENUM_Z，化油器被摆到歧管对面一侧，与主管相距 307mm。
+ */
 function bankPairOf(
   heightKey: "CARB_BASE_Y" | "FILTER_BASE_Y",
   index: number,
@@ -806,7 +830,7 @@ function bankPairOf(
     side,
     constants.CYL_X1 + localX,
     constants[heightKey],
-    -side * constants.PLENUM_Z,
+    side * constants.PLENUM_Z,
     0,
     constants,
   );
@@ -1072,7 +1096,9 @@ function buildParts(): PartDefinition[] {
     build_order: 109,
     geometry: { type: "cylinder", r: 0.026, h: 0.07, bevel: 0.003 },
     material: "cast_iron",
-    mate: { type: "absolute", position: ["ENDPLATE_FRONT_X", "BREATHER_Y", 0] },
+    // x 前移 17mm：通风器（r=26）原中心在端板前脸 x=457mm，与风扇支架上横梁
+    // （x≥477.5mm）在 y≈300mm 处相交 3.33mm；前移后左缘 466mm，让开 11.5mm
+    mate: { type: "absolute", position: ["ENDPLATE_FRONT_X-0.017", "BREATHER_Y", 0] },
   });
   add({
     id: "tiger.crankcase.dipstick",
@@ -1490,6 +1516,8 @@ function buildParts(): PartDefinition[] {
         halfZ: "CAM_HALF_Z",
         height: "COVER_H",
         wall: 0.008,
+        axisY: "CAM_BASE-COVER_BASE",
+        journalBoreR: "CAM_JOURNAL_R+0.0015",
         filler: 0,
       },
     },
@@ -1564,10 +1592,14 @@ function buildParts(): PartDefinition[] {
     build_order: 202,
     geometry: { type: "cylinder", r: "PISTON_PIN_R", h: "PISTON_PIN_LEN", bevel: 0.0015 },
     material: "steel",
-    mate: { type: "absolute", rotation: AXIS_X },
+    // 销轴转 X 不能用 mate.rotation：instance_nodes 零件由节点矩阵定位，assembler 忽略 mate
+    //（同 fanBearing），旋转放在 instance_layout（engine.pistonPin）。
+    mate: { type: "absolute" },
     instances: 12,
     indexed: true,
     instance_nodes: Array.from({ length: 12 }, (_, i) => pistonNodeName(i + 1)),
+    instance_layout: ENGINE_LAYOUTS.pistonPin,
+    source: "简化：活塞销座省略（销直接穿过活塞内腔），销轴沿曲轴 X",
   });
   add({
     id: "tiger.piston_rod.connecting_rod",
@@ -1644,7 +1676,9 @@ function buildParts(): PartDefinition[] {
     geometry: { type: "kit", kit: "camshaft", params: camParams(lobePhaseLeft) },
     material: "steel",
     node: "Cam_L",
-    mate: { type: "absolute", rotation: AXIS_X },
+    // 凸轮轴 kit 自身已把轴线摆到 +X（见 kits.ts 的 shaft.rotateZ），
+    // 这里再加 AXIS_X 会二次旋转成竖直轴（旧检测器 0.5mm 夹取把 15.8mm 穿透显示成"轻微接触"）。
+    mate: { type: "absolute" },
     source: "SOHC：单根凸轮轴位于缸列中线上方，凸轮相位按 30° 等分（摇臂机构 M-C）",
   });
   add({
@@ -1657,7 +1691,7 @@ function buildParts(): PartDefinition[] {
     geometry: { type: "kit", kit: "camshaft", params: camParams(lobePhaseRight) },
     material: "steel",
     node: "Cam_R",
-    mate: { type: "absolute", rotation: AXIS_X },
+    mate: { type: "absolute" },
   });
   add({
     id: "tiger.valvetrain.valve",
@@ -1799,7 +1833,10 @@ function buildParts(): PartDefinition[] {
         shroudX: 0.115,
         accBeamY: "ACC_Y",
         accHalfSpan: 0.26,
-        accBeamH: 0.055,
+        // 附件梁高度只留 28mm：梁底必须高于曲轴前端（r=36），梁顶让开铭牌下缘（y=75）
+        accBeamH: 0.028,
+        // 地脚/立撑/附件梁后端面 = 正时盖前端面（TIMING_COVER_X + 10mm）+ 1mm 间隙
+        mountX: "TIMING_COVER_X+0.010+0.001-FAN_FRAME_X",
       },
     },
     material: "cast_iron",
@@ -2295,7 +2332,7 @@ function buildParts(): PartDefinition[] {
     build_order: 332,
     geometry: {
       type: "weld",
-      // 起点埋在泵体铸件里（隐藏接口），管身全程在侧壁外平行走，管端环面离壁 0.8mm
+      // 管端朝前悬空（软管接散热器用），管身全程在箱体侧壁外平行走，尾端环面离壁 0.8mm
       // （原端点落在甲板外缘板内部：壳体穿透 23.5mm）
       from: [0.5, "ACC_Y+0.04", "-(CASE_HALF_W+0.035)"],
       to: [0.421, "ACC_Y+0.04", "-(CASE_HALF_W+0.0205)"],
@@ -2314,9 +2351,11 @@ function buildParts(): PartDefinition[] {
     build_order: 333,
     geometry: {
       type: "weld",
-      // 与左管同侧并行，y 相差 80mm（两支 r=0.02 不打架）；同样不穿壁
-      from: [0.5, "ACC_Y-0.04", "-(CASE_HALF_W+0.035)"],
-      to: [0.421, "ACC_Y-0.04", "-(CASE_HALF_W+0.0205)"],
+      // 与左管同侧并行（间距 60mm，两支 r=0.02 不打架）；同样不穿壁
+      // 抬高 20mm：原位（ACC_Y-0.04，管底 y=0）被曲轴箱加强肋顶（y=10mm）穿 8.27mm，
+      // 抬后管底 y=20mm > 肋顶；左管不动（再抬高会顶到上甲板/端板：实测 7.15mm）
+      from: [0.5, "ACC_Y-0.02", "-(CASE_HALF_W+0.035)"],
+      to: [0.421, "ACC_Y-0.02", "-(CASE_HALF_W+0.0205)"],
       radius: 0.02,
       seed: 42,
     },
