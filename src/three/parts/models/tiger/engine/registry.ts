@@ -75,6 +75,8 @@ export const ENGINE_LAYOUTS = {
   htConduit: "engine.htConduit",
   htLead: "engine.htLead",
   magnetoBus: "engine.magnetoBus",
+  waterHoseClamp: "engine.waterHoseClamp",
+  airFilterClamp: "engine.airFilterClamp",
 } as const;
 
 /** 缸号（0..11）→ 曲柄销序号 / 所在侧 / 缸心 X / 缸列倾角（度）。 */
@@ -118,6 +120,20 @@ function bankPos(x: Expr, y: Expr, z: Expr, side: 1 | -1): ExprVec3 {
   const yExpr = side === 1 ? `(${y})*COS_HV-(${z})*SIN_HV` : `(${y})*COS_HV+(${z})*SIN_HV`;
   const zExpr = side === 1 ? `(${y})*SIN_HV+(${z})*COS_HV` : `-(${y})*SIN_HV+(${z})*COS_HV`;
   return [x, yExpr, zExpr];
+}
+
+/**
+ * 环件（卡箍/端环）布局：局部 +Y = 管轴 axis，局部 +Z 尽量朝 out（收紧块朝外）。
+ * 与 bankMatrix 同理——旋转必须写在布局里，写进 mate.rotation 会连位移一起转。
+ */
+function ringMatrix(center: THREE.Vector3, axis: THREE.Vector3, out: THREE.Vector3): THREE.Matrix4 {
+  const zAxis = out.clone().sub(axis.clone().multiplyScalar(out.dot(axis)));
+  if (zAxis.lengthSq() < 1e-9) zAxis.set(0, 0, 1).sub(axis.clone().multiplyScalar(axis.z));
+  zAxis.normalize();
+  const xAxis = new THREE.Vector3().crossVectors(axis, zAxis).normalize();
+  const matrix = new THREE.Matrix4().makeBasis(xAxis, axis, zAxis);
+  matrix.setPosition(center);
+  return matrix;
 }
 
 // ---------------------------------------------------------------------------
@@ -502,6 +518,40 @@ const CONSTANTS: Record<string, Expr> = {
   MAGNETO_BUS_Z1: "CONDUIT_Z_W-CONDUIT_R_OUT-0.001",
   MAGNETO_BUS_LEN: "MAGNETO_BUS_Z1-MAGNETO_BUS_Z0",
   MAGNETO_BUS_ZC: "(MAGNETO_BUS_Z0+MAGNETO_BUS_Z1)/2",
+  // ---- 细节补齐：机油滤端盖 / 卡箍 ------------------------------------------------
+  // 机油滤端盖：法兰 r 与罐体外圆齐平（⌀120），止口 ⌀98 伸进 ⌀100 内孔（1mm 径向净隙）。
+  // 只做后端（−x）；前端（+x）被 oil_line_r 穿进罐内占住（实测端盖面与管线重叠）。
+  OIL_FILTER_CAP_X: "OIL_FILTER_X-OIL_FILTER_LEN/2-0.005", // 法兰背面 = 罐体端面外 5mm（法兰 4 + 净隙 1）
+  OIL_FILTER_CAP_R: "OIL_FILTER_R-0.011",
+  OIL_FILTER_CAP_T: 0.004,
+  // 端盖中心凸台：端面外 4mm、⌀40（可读性：法兰与罐体同径时看不出是端盖）
+  OIL_FILTER_CAP_HUB: 0.004,
+  OIL_FILTER_CAP_HUB_R: 0.02,
+  OIL_FILTER_CAP_SPIGOT: 0.008,
+  // 卡箍 = 环带 + 收紧块（同零件 merge）。带宽 14mm、块 28×18×12（径向，骑在带外表面）。
+  CLAMP_BAND_T: 0.004,
+  CLAMP_BLOCK_W: 0.028,
+  CLAMP_BLOCK_H: 0.018,
+  CLAMP_BLOCK_D: 0.012,
+  // 机油管（右）端点提升为常量：管线几何与卡箍布局同源。
+  OIL_LINE_R_FROM_X: -0.42,
+  OIL_LINE_R_FROM_Y: -0.1,
+  OIL_LINE_R_FROM_Z: "OIL_FILTER_Z",
+  OIL_LINE_R_TO_X: -0.3,
+  OIL_LINE_R_TO_Y: -0.1,
+  OIL_LINE_R_TO_Z: "CASE_HALF_W+0.016",
+  // 水管端点提升为常量（左右两根同侧并行，仅 y 不同）。
+  WATER_PIPE_X_FRONT: 0.5,
+  WATER_PIPE_X_REAR: 0.421,
+  WATER_PIPE_OFFSET: 0.035,
+  WATER_PIPE_OFFSET_REAR: 0.0205,
+  WATER_PIPE_Y_L: "ACC_Y+0.04",
+  WATER_PIPE_Y_R: "ACC_Y-0.02",
+  WATER_PIPE_CLAMP_T: 0.5,
+  WATER_PIPE_CLAMP_BORE: "0.02+0.001",
+  // 空滤卡箍：罐体顶下 12mm（盖口下沿），孔 = R + 1.5mm（罐体 28 段多边形的内切半径 0.1143）
+  AIR_FILTER_CLAMP_Y: "FILTER_BASE_Y+FILTER_NECK_H+0.01+FILTER_H-0.012",
+  AIR_FILTER_CLAMP_BORE: "FILTER_R+0.0015",
   FUELPUMP_R: 0.03,
   FUELPUMP_LEN: 0.062,
   FUELPUMP_X: 0.183,
@@ -960,6 +1010,27 @@ function makeLayouts(): Record<string, InstanceLayout> {
       .multiply(new THREE.Matrix4().makeRotationX(deg2rad(side * 90)));
   };
 
+  // 水管卡箍：两根冷却水管同侧并行，仅 y 不同；卡在管长 0.5 处，收紧块朝 −Z（列外侧）。
+  layouts[ENGINE_LAYOUTS.waterHoseClamp] = ({ index, constants }) => {
+    const y = index === 0 ? constants.WATER_PIPE_Y_L : constants.WATER_PIPE_Y_R;
+    const from = new THREE.Vector3(
+      constants.WATER_PIPE_X_FRONT,
+      y,
+      -(constants.CASE_HALF_W + constants.WATER_PIPE_OFFSET),
+    );
+    const to = new THREE.Vector3(
+      constants.WATER_PIPE_X_REAR,
+      y,
+      -(constants.CASE_HALF_W + constants.WATER_PIPE_OFFSET_REAR),
+    );
+    const center = from.clone().lerp(to, constants.WATER_PIPE_CLAMP_T);
+    return ringMatrix(center, to.clone().sub(from).normalize(), new THREE.Vector3(0, 0, -1));
+  };
+
+  // 空滤卡箍：与空滤罐同轴（缸列坐标），局部 +Z = 列外上方（收紧块朝外）。
+  layouts[ENGINE_LAYOUTS.airFilterClamp] = ({ index, constants }) =>
+    bankPairOf("AIR_FILTER_CLAMP_Y", index, constants);
+
   return layouts;
 }
 
@@ -969,7 +1040,7 @@ function makeLayouts(): Record<string, InstanceLayout> {
  * 原为 -side*PLENUM_Z，化油器被摆到歧管对面一侧，与主管相距 307mm。
  */
 function bankPairOf(
-  heightKey: "CARB_BASE_Y" | "FILTER_BASE_Y",
+  heightKey: "CARB_BASE_Y" | "FILTER_BASE_Y" | "AIR_FILTER_CLAMP_Y",
   index: number,
   constants: Record<string, number>,
 ): THREE.Matrix4 {
@@ -1327,9 +1398,10 @@ function buildParts(): PartDefinition[] {
     geometry: {
       // 起点插在机油滤清器内腔（滤清器为 rOuter 0.06 / rInner 0.05 的管件），
       // 沿 X 走到 +z 侧壁；全程 y=-0.10，从机脚（y≤-0.13）上方通过。
+      // 端点用常量：卡箍布局从同一组常量取轴线，改端点时卡箍自动跟随。
       type: "weld",
-      from: [-0.42, -0.1, "OIL_FILTER_Z"],
-      to: [-0.3, -0.1, "CASE_HALF_W+0.016"],
+      from: ["OIL_LINE_R_FROM_X", "OIL_LINE_R_FROM_Y", "OIL_LINE_R_FROM_Z"],
+      to: ["OIL_LINE_R_TO_X", "OIL_LINE_R_TO_Y", "OIL_LINE_R_TO_Z"],
       radius: 0.014,
       seed: 12,
     },
@@ -2718,14 +2790,18 @@ function buildParts(): PartDefinition[] {
       segments: 16,
       // 管长 = √(0.079² + 0.0145²)：端点 (0.5, …, -(CASE_HALF_W+0.035))
       // → (0.421, …, -(CASE_HALF_W+0.0205))
-      h: "sqrt(0.079^2+0.0145^2)",
+      h: "sqrt((WATER_PIPE_X_FRONT-WATER_PIPE_X_REAR)^2+(WATER_PIPE_OFFSET-WATER_PIPE_OFFSET_REAR)^2)",
     },
     material: "steel",
     mate: {
       type: "absolute",
       // 管轴中点；局部 +Y 经 Rz(90°)（+Y→−X）再 Ry(10.4°)（−X 朝 +Z 倾 10.4°）
-      // 后正好指向「起点 → 终点」方向
-      position: ["(0.5+0.421)/2", "ACC_Y+0.04", "-(CASE_HALF_W+0.02775)"],
+      // 后正好指向「起点 → 终点」方向（卡箍布局用同一组端点常量）
+      position: [
+        "(WATER_PIPE_X_FRONT+WATER_PIPE_X_REAR)/2",
+        "WATER_PIPE_Y_L",
+        "-(CASE_HALF_W+(WATER_PIPE_OFFSET+WATER_PIPE_OFFSET_REAR)/2)",
+      ],
       rotation: ["0", "10.4", "90"],
     },
   });
@@ -2747,15 +2823,127 @@ function buildParts(): PartDefinition[] {
       rOuter: 0.02,
       rInner: 0.015,
       segments: 16,
-      h: "sqrt(0.079^2+0.0145^2)",
+      h: "sqrt((WATER_PIPE_X_FRONT-WATER_PIPE_X_REAR)^2+(WATER_PIPE_OFFSET-WATER_PIPE_OFFSET_REAR)^2)",
     },
     material: "steel",
     mate: {
       type: "absolute",
       // 同左管：中点 + Rz(90°) 后 Ry(10.4°) 对齐管轴
-      position: ["(0.5+0.421)/2", "ACC_Y-0.02", "-(CASE_HALF_W+0.02775)"],
+      position: [
+        "(WATER_PIPE_X_FRONT+WATER_PIPE_X_REAR)/2",
+        "WATER_PIPE_Y_R",
+        "-(CASE_HALF_W+(WATER_PIPE_OFFSET+WATER_PIPE_OFFSET_REAR)/2)",
+      ],
       rotation: ["0", "10.4", "90"],
     },
+  });
+
+  // ---- 细节补齐：机油滤端盖 / 卡箍 ------------------------------------------------
+  add({
+    id: "tiger.crankcase.oil_filter_cap",
+    name_cn: "机油滤清器端盖",
+    name_en: "oil filter end cap",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 178,
+    geometry: {
+      // 法兰 ⌀120（与罐体外圆齐平，坐在端面外 1mm）+ 止口 ⌀98 伸进 ⌀100 内孔（1mm 径向净隙）。
+      // 只做后端（−x）：前端（+x）罐口被 oil_line_r 穿进内腔占住，端盖面与管线重叠（实测）。
+      type: "lathe",
+      segments: 28,
+      // 轮廓（局部 +Y 朝罐内）：中心凸台 ⌀40×4 在端面外 → 法兰 ⌀124×4（比罐体大 2mm，
+      // 端盖才有可读的边缘）→ 止口 ⌀98×8 伸进管内。
+      profile: [
+        [0, "-OIL_FILTER_CAP_HUB"],
+        ["OIL_FILTER_CAP_HUB_R", "-OIL_FILTER_CAP_HUB"],
+        ["OIL_FILTER_CAP_HUB_R", 0],
+        ["OIL_FILTER_R+0.002", 0],
+        ["OIL_FILTER_R+0.002", "OIL_FILTER_CAP_T"],
+        ["OIL_FILTER_CAP_R", "OIL_FILTER_CAP_T"],
+        ["OIL_FILTER_CAP_R", "OIL_FILTER_CAP_T+OIL_FILTER_CAP_SPIGOT"],
+        [0, "OIL_FILTER_CAP_T+OIL_FILTER_CAP_SPIGOT"],
+      ],
+    },
+    material: "steel",
+    mate: {
+      type: "absolute",
+      // 局部 +Y 经 Rz(−90°) 指向 +X（止口朝罐内）
+      position: ["OIL_FILTER_CAP_X", "OIL_FILTER_Y", "OIL_FILTER_Z"],
+      rotation: [0, 0, -90],
+    },
+  });
+  add({
+    id: "tiger.accessory.water_hose_clamp",
+    name_cn: "冷却水管卡箍",
+    name_en: "coolant hose clamp",
+    assembly: "accessory",
+    build_layer: 1,
+    build_order: 176,
+    geometry: {
+      // 光滑钢管 ⌀40 → 孔 ⌀42（1mm 径向净隙）；40 段多边形内切 0.9969×21 = 20.94mm > 20mm。
+      type: "merge",
+      parts: [
+        {
+          type: "tube",
+          rOuter: "WATER_PIPE_CLAMP_BORE+CLAMP_BAND_T",
+          rInner: "WATER_PIPE_CLAMP_BORE",
+          h: 0.014,
+          segments: 40,
+        },
+        {
+          type: "box",
+          w: "CLAMP_BLOCK_W",
+          h: "CLAMP_BLOCK_H",
+          d: "CLAMP_BLOCK_D",
+          bevel: 0.0015,
+          // 孔 0.021 + 带厚 0.004 + 块厚/2 0.004 − 2mm 重叠
+          at: [0, 0, 0.029],
+        },
+      ],
+    },
+    material: "steel_worn",
+    mate: { type: "absolute" },
+    instances: 2,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.waterHoseClamp,
+    source:
+      "**[新增]** 两根冷却水管各 1 只，卡在管长 0.5 处：向前夹在端板旁的管夹座上，收紧块朝 −Z（列外侧）",
+  });
+  add({
+    id: "tiger.induction.air_filter_clamp",
+    name_cn: "空滤卡箍",
+    name_en: "air filter clamp band",
+    assembly: "induction",
+    build_layer: 1,
+    build_order: 175,
+    geometry: {
+      // 罐体 ⌀230（28 段多边形内切半径 0.1143）→ 孔 ⌀233（1.5mm 净隙），卡在盖口下沿 12mm。
+      type: "merge",
+      parts: [
+        {
+          type: "tube",
+          rOuter: "AIR_FILTER_CLAMP_BORE+CLAMP_BAND_T",
+          rInner: "AIR_FILTER_CLAMP_BORE",
+          h: 0.02,
+          segments: 40,
+        },
+        {
+          type: "box",
+          w: "CLAMP_BLOCK_W",
+          h: "CLAMP_BLOCK_H",
+          d: "CLAMP_BLOCK_D",
+          bevel: 0.0015,
+          // 孔 0.1165 + 带厚 0.004 + 块厚/2 0.004 − 2mm 重叠
+          at: [0, 0, 0.1245],
+        },
+      ],
+    },
+    material: "steel",
+    mate: { type: "absolute" },
+    instances: 4,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.airFilterClamp,
+    source: "**[新增]** 四只空滤罐各 1 只：盖体接口处的夹紧带（盖口下沿 12mm），收紧块朝列外上方",
   });
 
   return parts;
