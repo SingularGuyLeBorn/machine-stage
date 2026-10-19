@@ -31,7 +31,7 @@ export function makeTigerRegistry(): ModelRegistry {
     ...engine,
     title: "虎式坦克 Tiger I",
     subtitle:
-      "L1 发动机（HL230 P45）+ L2 行动装置（履带 / 负重轮 / 扭杆悬挂）+ L2 传动装置（Olvar 变速箱 / 传动轴 / L 600 C 转向机）+ L3 内衬内饰（驾驶舱 / 无线电员席）+ L4 车体外壳（地板 / 侧板 / 前后装甲板 / 发动机隔板）",
+      "L1 发动机（HL230 P45）+ L2 行动装置（履带 / 负重轮 / 扭杆悬挂）+ L2 传动装置（Olvar 变速箱 / 传动轴 / L 600 C 转向机）+ L3 内衬内饰（驾驶舱 / 无线电员席）+ L4 车体外壳（地板 / 侧板 / 前后装甲板 / 隔板 / 顶甲板 / 座圈）",
     source_notes: [
       engine.source_notes ?? "",
       running.source_notes ?? "",

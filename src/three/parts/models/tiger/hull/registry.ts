@@ -33,6 +33,7 @@ import type { ModelRegistry, PartDefinition } from "../../../registry/types";
 
 export const HULL_LAYOUTS = {
   sidePlate: "hull.sidePlate",
+  engineCoaming: "hull.engineCoaming",
 } as const;
 
 const HULL_CONSTANTS: Record<string, number> = {
@@ -63,6 +64,23 @@ const HULL_CONSTANTS: Record<string, number> = {
   HULL_SHAFT_Y: 0,
   HULL_SHAFT_HOLE_R: 0.055,
   HULL_PROP_HOLE_R: 0.09,
+
+  // —— 顶甲板 / 发动机舱盖 / 炮塔座圈（L4-b）——
+  HULL_ROOF_UNDER: 1.05,
+  HULL_ROOF_T: 0.025,
+  HULL_DECK_UNDER: 1.08,
+  HULL_DECK_T: 0.025,
+  HULL_TURRET_X: -1.65,
+  HULL_TURRET_R: 0.825,
+  HULL_RING_RO: 0.875,
+  HULL_RING_T: 0.03,
+  HULL_HATCH_X: -3.32,
+  HULL_HATCH_Z: 0.66,
+  HULL_HATCH_R: 0.22,
+  HULL_PERI_X: -3.95,
+  HULL_PERI_Z: 0.66,
+  HULL_PERI_W: 0.17,
+  HULL_PERI_H: 0.13,
 };
 
 function sideOf(index: number): 1 | -1 {
@@ -74,6 +92,12 @@ function makeLayouts(): Record<string, InstanceLayout> {
 
   // 左右侧板同一几何（板上过孔同心于侧传动轴），只按 z 平移
   layouts[HULL_LAYOUTS.sidePlate] = ({ index }) => {
+    const z = HULL_CONSTANTS.HULL_SIDE_INNER + HULL_CONSTANTS.HULL_SIDE_T / 2;
+    return new THREE.Matrix4().makeTranslation(0, 0, sideOf(index) * z);
+  };
+
+  // 发动机舱侧围同理：左右同几何、按 z 平移
+  layouts[HULL_LAYOUTS.engineCoaming] = ({ index }) => {
     const z = HULL_CONSTANTS.HULL_SIDE_INNER + HULL_CONSTANTS.HULL_SIDE_T / 2;
     return new THREE.Matrix4().makeTranslation(0, 0, sideOf(index) * z);
   };
@@ -186,6 +210,8 @@ function buildHullParts(): PartDefinition[] {
   });
 
   // ===================== 后装甲板 =====================
+  // 发动机舱段的后板一直顶到舱盖下表面（3mm 缝），否则舱盖与后板之间会露出 35mm 高的通缝
+  const rearTop = c.HULL_DECK_UNDER! - c.HULL_JOINT!;
   add({
     id: "tiger.hull.rear_plate",
     name_cn: "后装甲板",
@@ -193,11 +219,20 @@ function buildHullParts(): PartDefinition[] {
     assembly: "hull",
     build_layer: 4,
     build_order: 503,
-    geometry: { type: "box", w: c.HULL_REAR_T!, h: shellH, d: sideOuter * 2, bevel: 0.004 },
+    geometry: {
+      type: "box",
+      w: c.HULL_REAR_T!,
+      h: rearTop - floorBottom,
+      d: sideOuter * 2,
+      bevel: 0.004,
+    },
     material: "armor_steel",
-    mate: { type: "absolute", position: [(c.HULL_REAR_INNER! + rearOuter) / 2, shellCY, 0] },
+    mate: {
+      type: "absolute",
+      position: [(c.HULL_REAR_INNER! + rearOuter) / 2, (floorBottom + rearTop) / 2, 0],
+    },
     source:
-      "后装甲板（Heckplatte，厚 80）：内表面 x 0.83、外表面 0.91，z ±0.9625、y -0.335 ~ 1.045；离发动机风扇后端（x 0.726）104mm。排气管 / 尾灯 / 逃生门随 L5 表面附件。",
+      "后装甲板（Heckplatte，厚 80）：内表面 x 0.83、外表面 0.91，z ±0.9625、y -0.335 ~ 1.077（发动机舱段顶到舱盖下表面 1.08 留 3mm，避免舱盖与后板之间露 35mm 通缝）；离发动机风扇后端（x 0.726）104mm。排气管 / 尾灯 / 逃生门随 L5 表面附件。",
   });
 
   // ===================== 发动机隔板 =====================
@@ -224,6 +259,147 @@ function buildHullParts(): PartDefinition[] {
       "发动机隔板（Motorschott，厚 60）：x -0.78 ~ -0.72、z ±0.897、y -0.302 ~ 1.045（离地板顶面 3mm 名义缝）；⌀180 传动轴过孔（轴心 y 0、z 0）：万向节 ⌀150 与孔留 15mm 环缝、隔板后面离发动机飞轮端（x -0.677）43mm。隔板上方的走线 / 油管穿套随 M-C。",
   });
 
+  // ===================== 战斗室顶甲板（L4-b） =====================
+  // 顶甲板盖住四壁上缘（前后板 / 侧板顶面），所以外廓取满车体箱：x -4.50 ~ -0.783、z ±0.9625
+  const roofX1 = c.HULL_FRONT_INNER! - c.HULL_FRONT_T!;
+  const roofX2 = c.HULL_SCHOTT_X2! - c.HULL_JOINT!;
+  const roofUnder = c.HULL_ROOF_UNDER!;
+  const roofTop = roofUnder + c.HULL_ROOF_T!;
+  const roofW = roofX2 - roofX1;
+  const roofCX = (roofX1 + roofX2) / 2;
+
+  // 发动机舱盖比战斗室顶高 30mm（阶梯甲板）：台阶立板占隔板前半厚度，舱盖从立板后缘起
+  const stepX1 = c.HULL_SCHOTT_X2!;
+  const stepX2 = stepX1 + 0.036;
+  const deckUnder = c.HULL_DECK_UNDER!;
+  const deckTop = deckUnder + c.HULL_DECK_T!;
+  const deckX1 = stepX2 + c.HULL_JOINT!;
+  const deckX2 = rearOuter;
+  const deckW = deckX2 - deckX1;
+  const deckCX = (deckX1 + deckX2) / 2;
+  const stepY1 = c.HULL_PLATE_TOP! + c.HULL_JOINT!;
+
+  // 顶甲板局部系（装配位 rotX(90°)：局部 x → 世界 x，局部 y → 世界 z，厚度 → 世界 y）
+  const roofLocalX = (worldX: number) => worldX - roofCX;
+
+  add({
+    id: "tiger.hull.fighting_roof",
+    name_cn: "战斗室顶甲板",
+    name_en: "Dachplatte",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 505,
+    geometry: {
+      type: "kit",
+      kit: "hullPlate",
+      params: {
+        w: roofW,
+        h: sideOuter * 2,
+        t: c.HULL_ROOF_T!,
+        holes: [
+          [roofLocalX(c.HULL_TURRET_X!), 0, c.HULL_TURRET_R!],
+          [roofLocalX(c.HULL_HATCH_X!), c.HULL_HATCH_Z!, c.HULL_HATCH_R!],
+          [roofLocalX(c.HULL_HATCH_X!), -c.HULL_HATCH_Z!, c.HULL_HATCH_R!],
+        ],
+        rects: [
+          [roofLocalX(c.HULL_PERI_X!), c.HULL_PERI_Z!, c.HULL_PERI_W!, c.HULL_PERI_H!],
+          [roofLocalX(c.HULL_PERI_X!), -c.HULL_PERI_Z!, c.HULL_PERI_W!, c.HULL_PERI_H!],
+        ],
+      },
+    },
+    material: "armor_steel",
+    mate: { type: "absolute", position: [roofCX, (roofUnder + roofTop) / 2, 0], rotation: [90, 0, 0] },
+    source:
+      "战斗室顶甲板（Dachplatte，厚 25）：下表面 y 1.05（L3 潜望镜法兰顶 1.048 留 2mm、吊灯杆顶 1.045 留 5mm）、上表面 1.075，x -4.50 ~ -0.783、z ±0.9625 —— 边线取满车体箱、盖住前板与侧板上缘（各留 5mm 板缝），避免板边与墙顶之间露通缝。开炮塔座圈孔 ⌀1650（圆心 x -1.65 / z 0）：后缘离顶甲板后边 42mm、两侧到侧板外面各留 137.5mm；开驾驶员 / 无线电员舱盖孔 ⌀440 ×2（x -3.32、z ±0.66）；开潜望镜窗 170 × 130 ×2（x -3.95、z ±0.66，比潜望镜体 160 × 120 每边放大 5mm）。舱盖盖板 / 铰链 / 观察窗随 L4-d。",
+  });
+
+  // ===================== 发动机舱盖（阶梯甲板，L4-b） =====================
+  add({
+    id: "tiger.hull.engine_deck",
+    name_cn: "发动机舱盖",
+    name_en: "Motorabdeckung",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 506,
+    geometry: { type: "box", w: deckW, h: c.HULL_DECK_T!, d: sideOuter * 2, bevel: 0.004 },
+    material: "armor_steel",
+    mate: { type: "absolute", position: [deckCX, (deckUnder + deckTop) / 2, 0] },
+    source:
+      "发动机舱盖（Motorabdeckung，厚 25）：下表面 y 1.08、上表面 1.105，x -0.741 ~ 0.91，z 取满宽 ±0.9625（后缘盖住后装甲板顶面、两侧盖住发动机舱侧围，俯视无透缝；后边线与车尾外面齐平）。抬高 30mm 的原因：L1 空滤顶 1.056 / 卡箍顶 1.053 高于战斗室顶下表面 1.05，整体抬高后留 24mm（阶梯甲板，对应实车发动机舱盖高出车体顶面的做法）。散热格栅 / 风扇盖 / 排气口随 L5。",
+  });
+
+  add({
+    id: "tiger.hull.deck_step",
+    name_cn: "甲板台阶立板",
+    name_en: "Deckabsatz",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 507,
+    geometry: {
+      type: "box",
+      w: stepX2 - stepX1,
+      h: deckTop - stepY1,
+      d: sideOuter * 2,
+      bevel: 0.003,
+    },
+    material: "armor_steel",
+    mate: {
+      type: "absolute",
+      position: [(stepX1 + stepX2) / 2, (stepY1 + deckTop) / 2, 0],
+    },
+    source:
+      "甲板台阶立板（厚 36）：x -0.780 ~ -0.744、y 1.048 ~ 1.105、z ±0.9625 —— 封住战斗室顶（1.075）与发动机舱盖（1.105）之间 30mm 高差；下缘离隔板顶（1.045）3mm、前面离顶甲板后缘（-0.783）3mm、后面离舱盖前缘（-0.741）3mm。",
+  });
+
+  const coamingTop = deckUnder - c.HULL_JOINT!;
+  // 侧围只到侧板后端（innerX2），后端与后板内表面留 3mm —— 舱盖才盖到车尾外面（rearOuter）
+  const coamingW = innerX2 - deckX1;
+  const coamingCX = (deckX1 + innerX2) / 2;
+
+  add({
+    id: "tiger.hull.engine_coaming",
+    name_cn: "发动机舱侧围",
+    name_en: "Motorraumbrüstung",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 508,
+    geometry: {
+      type: "box",
+      w: coamingW,
+      h: coamingTop - stepY1,
+      d: c.HULL_SIDE_T!,
+      bevel: 0.003,
+    },
+    material: "armor_steel",
+    instances: 2,
+    indexed: true,
+    instance_layout: HULL_LAYOUTS.engineCoaming,
+    mate: { type: "absolute", position: [coamingCX, (stepY1 + coamingTop) / 2, 0] },
+    source:
+      "发动机舱侧围（厚 62.5 ×2）：z ±0.90 ~ ±0.9625、x -0.741 ~ 0.827、y 1.048 ~ 1.077 —— 侧装甲板顶（1.045）到发动机舱盖下表面（1.08）之间的侧壁；顶面被舱盖盖住（留 3mm），所以俯视看不到缝，侧面是「侧板 / 侧围 / 舱盖边」三层叠合的板缝。左右同几何、按 z ±0.93125 平移。",
+  });
+
+  // ===================== 炮塔座圈（L4-b） =====================
+  add({
+    id: "tiger.hull.turret_ring",
+    name_cn: "炮塔座圈",
+    name_en: "Turmdrehkranz",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 509,
+    geometry: {
+      type: "tube",
+      rOuter: c.HULL_RING_RO!,
+      rInner: c.HULL_TURRET_R!,
+      h: c.HULL_RING_T!,
+      segments: 64,
+    },
+    material: "steel",
+    mate: { type: "absolute", position: [c.HULL_TURRET_X!, roofTop + c.HULL_JOINT! + c.HULL_RING_T! / 2, 0] },
+    source:
+      "炮塔座圈（Turmdrehkranz，⌀1750 / ⌀1650 × 30）：坐在顶甲板上方 3mm（y 1.078 ~ 1.108），圆心 x -1.65 / z 0；外径 1.75 比座圈孔大 50mm 形成压边，两侧各留 22mm 顶甲板板边。滚道 / 座圈螺栓 / 炮塔防盾随 L4-c。",
+  });
+
   return parts;
 }
 
@@ -231,12 +407,13 @@ export function makeHullRegistry(): ModelRegistry {
   return {
     model: "tiger",
     title: "虎式 I 车体外壳（L4）",
-    subtitle: "地板 / 侧装甲板 / 前后装甲板 / 发动机隔板",
+    subtitle: "地板 / 侧装甲板 / 前后装甲板 / 发动机隔板 / 战斗室顶甲板 / 发动机舱盖 / 炮塔座圈",
     source_notes: [
       "公开资料：虎式 I 车体为焊接箱型结构，前装甲 100mm、侧装甲 60mm、后装甲 80mm、地板 26mm、顶甲板 25mm；首上装甲 9° 倾角；发动机舱在后、战斗室居中、驾驶舱在前，传动轴沿车体中线穿过发动机隔板。",
-      "本模型口径（与 L1/L2/L3 接口一致）：地板顶面 -0.305、侧板内表面 ±0.90 / 外表面 ±0.9625、前装甲板内表面 -4.40、板顶 1.045（顶甲板下表面 1.05，L4-b）；车体箱 x -4.50 ~ 0.91、z ±0.9625、y -0.335 ~ 1.045。",
-      "开孔（对外契约）：侧板 ⌀110 ×2（侧传动轴，x -4.05、y 0）、前板 ⌀100 ×1（航向机枪球孔，y 0.16、z 0.78）、发动机隔板 ⌀180 ×1（传动轴，y 0、z 0）。",
-      "简化记录（待补）：顶甲板 / 座圈 / 舱盖 / 观察窗 / 手枪孔 / Kugelblende 50 球座 / 翼子板（L4-b~d）；焊缝、暗黄涂装、铁十字与战术编号（L5）；下部车体（腹板 + 扭杆通道 + 车底侧裙）与内饰面象牙白内衬板（M-C）。",
+      "本模型口径（与 L1/L2/L3 接口一致）：地板顶面 -0.305、侧板内表面 ±0.90 / 外表面 ±0.9625、前装甲板内表面 -4.40、战斗室顶下表面 1.05、板顶 1.045；车体箱 x -4.50 ~ 0.91、z ±0.9625、y -0.335 ~ 1.105（发动机舱盖顶）。",
+      "开孔（对外契约）：侧板 ⌀110 ×2（侧传动轴，x -4.05、y 0）、前板 ⌀100 ×1（航向机枪球孔，y 0.16、z 0.78）、发动机隔板 ⌀180 ×1（传动轴，y 0、z 0）、顶甲板 ⌀1650 ×1（炮塔座圈，x -1.65、z 0）+ ⌀440 舱盖孔 ×2（x -3.32、z ±0.66）+ 170 × 130 潜望镜窗 ×2（x -3.95、z ±0.66）。",
+      "阶梯甲板：发动机舱盖（下表面 1.08 / 上表面 1.105）比战斗室顶（1.05 / 1.075）高 30mm，为 L1 空滤（顶 1.056）与卡箍（顶 1.053）让高；台阶立板在隔板上方、两侧用发动机舱侧围封边。",
+      "简化记录（待补）：炮塔壳体与防盾、舱盖盖板 / 铰链 / 观察窗、手枪孔、Kugelblende 50 球形枪座、翼子板（L4-c/d）；焊缝、暗黄涂装、铁十字与战术编号（L5）；下部车体（腹板 + 扭杆通道 + 车底侧裙）与内饰面象牙白内衬板（M-C）。",
     ].join("\n"),
     constants: HULL_CONSTANTS,
     assemblies: [{ id: "hull", name_cn: "车体外壳", name_en: "hull shell", explode: [0, 1.5, 0] }],
