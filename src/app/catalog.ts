@@ -6,8 +6,11 @@ import {
   type ModelRegistry,
 } from "@/three/parts";
 import type { GeometryBuilder } from "@/three/parts/assembler/geometry";
-import { makeEngineLayouts, makeEngineRegistry } from "@/three/parts/models/tiger/engine/registry";
-import { tigerKitBuilders } from "@/three/parts/models/tiger/engine/kits";
+import {
+  makeTigerLayouts,
+  makeTigerRegistry,
+  tigerBuilders,
+} from "@/three/parts/models/tiger/registry";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -116,12 +119,12 @@ export const CATALOG: StageModel[] = [
   {
     id: "tiger",
     title: "虎式坦克 Tiger I",
-    subtitle: "M-B 进行中：HL230 发动机（曲轴箱已可见）",
+    subtitle: "M-B 进行中：HL230 发动机 + 行动装置（L2）",
     milestone: "M-B",
     status: "ready",
-    registry: makeEngineRegistry(),
-    layouts: makeEngineLayouts(),
-    builders: tigerKitBuilders,
+    registry: makeTigerRegistry(),
+    layouts: makeTigerLayouts(),
+    builders: tigerBuilders,
     states: [
       { id: "idle", label: "停机", hint: "发动机静止，可拖构建滑杆看装配" },
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
