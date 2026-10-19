@@ -7,8 +7,10 @@ import type { ClippingReport } from "./report";
 // 目标函数是「未豁免报告 = 0」，不是「总报告 = 0」：
 //   · 已豁免 = 构造性接触（轴承配合/过盈压装/剖分贴合/管端插接…），是正确装配；
 //   · 未豁免 = 真缺陷候选（不该接触的零件叠在一起 = 位置或尺寸算错）。
-// 深度守门：豁免族里若冒出「明显超过贴面量级」的深度，判为真缺陷照报——
+// 深度守门：豁免族里若冒出「明显超过贴面量级」的实测深度，判为真缺陷照报——
 // 所以往豁免族里注入 5mm 真重叠时，只报那一条。
+// depth_mm = null（面贴合 / 同心配合面，测不出深度）不参与守门：
+// 这类报告本身就是「配合接触」级，规模由交线总长/分布尺寸展示，人工可审。
 // ============================================================================
 
 /** 豁免族允许的最大深度（mm）：超过即不再豁免（0.5mm 是检测阈值下限）。 */
@@ -48,7 +50,8 @@ export function matchExpectedContact(
     const backward = matchesPartId(rule.a, report.b) && matchesPartId(rule.b, report.a);
     if (!forward && !backward) continue;
     const limit = rule.maxDepthMm ?? DEFAULT_MAX_DEPTH_MM;
-    if (report.depth_mm > limit) continue;
+    // 测不出深度（null）不做守门：配合面/贴合面本来就是接触，交给家族依据。
+    if (report.depth_mm !== null && report.depth_mm > limit) continue;
     return rule;
   }
   return null;

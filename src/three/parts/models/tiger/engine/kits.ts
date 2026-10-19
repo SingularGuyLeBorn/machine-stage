@@ -195,6 +195,8 @@ const cylinderHead: GeometryBuilder = (spec) => {
   }
 
   const bolts = boltCircleGeometry(4, num(p, "boltRadius", w * 0.33), 0.011, 0.012);
+  // 螺栓圈转 45° 到四角：气门杆沿 z 方向偏摆 ±6°，落在 (0, ±45) 位置会插进缸盖螺栓头（实测 7.59mm）
+  bolts.rotateY(Math.PI / 4);
   // 螺栓头沉入缸盖顶面之下：凸轮轴罩直接坐在缸盖顶面上，露头的螺栓会插进罩壁
   bolts.translate(0, h - 0.012, 0);
   parts.push(bolts);
@@ -214,6 +216,10 @@ const camCover: GeometryBuilder = (spec) => {
   const halfZ = num(p, "halfZ", 0.048);
   const height = num(p, "height", 0.082);
   const wall = num(p, "wall", 0.008);
+  /** 凸轮轴轴线在罩局部系中的高度（= CAM_BASE-COVER_BASE），端壁轴孔以此为中心。 */
+  const axisY = num(p, "axisY", 0.041);
+  /** 端壁轴孔半径（= 轴颈 + 单边间隙）。 */
+  const boreR = num(p, "journalBoreR", 0.025);
   const parts: THREE.BufferGeometry[] = [];
 
   const top = bevelBoxGeometry(length, wall, halfZ * 2, 0.0025);
@@ -230,8 +236,19 @@ const camCover: GeometryBuilder = (spec) => {
     parts.push(rib);
   }
   for (const sign of [-1, 1]) {
-    const end = bevelBoxGeometry(wall, height - wall, (halfZ - wall) * 2, 0.0025);
-    end.translate(sign * (length / 2 - wall / 2), (height - wall) / 2, 0);
+    // 端壁 = 带凸轮轴轴孔的板：凸轮轴轴颈从孔中穿过，孔 = 轴颈 + 单边间隙。
+    // 无孔端壁会把整根凸轮轴埋进壁厚（实测 12.8mm 穿透）。
+    const endShape = roundedRectPath((halfZ - wall) * 2, height - wall, 0.008, new THREE.Shape());
+    const bore = new THREE.Path();
+    bore.absarc(0, axisY - (height - wall) / 2, boreR, 0, Math.PI * 2, true);
+    endShape.holes.push(bore);
+    const end = new THREE.ExtrudeGeometry(endShape, {
+      depth: wall,
+      bevelEnabled: false,
+      curveSegments: 20,
+    });
+    end.rotateY(Math.PI / 2); // 截面 XY → 世界 ZY，挤出方向 +Z → +X
+    end.translate(sign * (length / 2 - wall / 2) - wall / 2, (height - wall) / 2, 0);
     parts.push(end);
   }
 
@@ -281,23 +298,27 @@ const fanFrame: GeometryBuilder = (spec) => {
   const accBeamY = num(p, "accBeamY", 0.06);
   const accHalfSpan = num(p, "accHalfSpan", 0.26);
   const accBeamH = num(p, "accBeamH", 0.055);
+  /** 地脚后端面在局部系中的 x（= 正时盖前端面 + 单边间隙）；地脚/立撑/附件梁都从这里向前长。 */
+  const mountX = num(p, "mountX", 0.019);
+  /** 地脚与立撑的轴线 x：与上横梁、附件梁搭接，同时让开后方的正时盖。 */
+  const strutX = mountX + 0.03;
 
   const parts: THREE.BufferGeometry[] = [];
   const beam = bevelBoxGeometry(beamDepth, beamH, halfSpan * 2, 0.003);
   beam.translate(beamX, beamY, 0);
   parts.push(beam);
 
-  // 下横梁（附件梁）：水泵 / 发电机装在其前端面
-  const accBeam = bevelBoxGeometry(beamDepth, accBeamH, accHalfSpan * 2, 0.003);
-  accBeam.translate(beamX, accBeamY, 0);
+  // 下横梁（附件梁）：水泵 / 发电机装在其前端面；后端面退到正时盖前端面之前
+  const beamFrontX = beamX + beamDepth / 2;
+  const accBeam = bevelBoxGeometry(beamFrontX - mountX, accBeamH, accHalfSpan * 2, 0.003);
+  accBeam.translate((mountX + beamFrontX) / 2, accBeamY, 0);
   parts.push(accBeam);
 
   const topY = beamY - beamH / 2;
-  const beamFrontX = beamX + beamDepth / 2;
   for (const side of [-1, 1]) {
     // 斜撑（上横梁 → 机脚）+ 立撑（机脚 → 附件梁）
-    const from = new THREE.Vector3(beamX, topY, side * legTopZ);
-    const to = new THREE.Vector3(beamX, footY, side * footZ);
+    const from = new THREE.Vector3(strutX, topY, side * legTopZ);
+    const to = new THREE.Vector3(strutX, footY, side * footZ);
     const delta = new THREE.Vector3().subVectors(to, from);
     const angle = Math.atan2(delta.z, delta.y);
     const leg = bevelBoxGeometry(legW, delta.length() + 0.008, legW * 1.15, 0.002);
@@ -305,15 +326,15 @@ const fanFrame: GeometryBuilder = (spec) => {
     leg.translate((from.x + to.x) / 2, (from.y + to.y) / 2, (from.z + to.z) / 2);
     parts.push(leg);
 
-    const lowerFrom = new THREE.Vector3(beamX, footY, side * footZ);
-    const lowerTo = new THREE.Vector3(beamX, accBeamY + accBeamH / 2 - 0.004, side * footZ);
+    const lowerFrom = new THREE.Vector3(strutX, footY, side * footZ);
+    const lowerTo = new THREE.Vector3(strutX, accBeamY + accBeamH / 2 - 0.004, side * footZ);
     const lower = bevelBoxGeometry(legW, Math.abs(lowerFrom.y - lowerTo.y) + 0.008, legW * 1.15, 0.002);
-    lower.translate(beamX, (lowerFrom.y + lowerTo.y) / 2, side * footZ);
+    lower.translate(strutX, (lowerFrom.y + lowerTo.y) / 2, side * footZ);
     parts.push(lower);
 
-    // 地脚：贴正时盖前端面
+    // 地脚：后端面贴正时盖前端面（前端板 + 20mm 正时盖都在机脚之后）
     const foot = bevelBoxGeometry(footLen, 0.03, legW * 2.2, 0.002);
-    foot.translate(beamX - footLen / 2 + 0.0195, footY, side * footZ);
+    foot.translate(mountX + footLen / 2, footY, side * footZ);
     parts.push(foot);
 
     // 导流罩环（内径 = 叶尖半径 + 4mm）
@@ -532,25 +553,31 @@ const rodAssembly: GeometryBuilder = (spec) => {
   bigShape.lineTo(bigBore, 0);
   bigShape.absarc(0, 0, bigBore, 0, Math.PI, false); // 内弧：上半返回
   bigShape.closePath();
+  // 倒角必须关掉：three 的挤出倒角沿轮廓「外扩」bevelSize（45° 角处还要 ×√2），
+  // 1.5mm 倒角会让上半环越过 y=0 分面缝、并咬进轴瓦孔（实测 3.44mm / 0.53mm穿模）。
   const bigEye = new THREE.ExtrudeGeometry(bigShape, {
     depth: shankT,
-    bevelEnabled: true,
-    bevelThickness: 0.0015,
-    bevelSize: 0.0015,
-    bevelSegments: 1,
+    bevelEnabled: false,
     curveSegments: 20,
   });
   bigEye.translate(0, 0, -shankT / 2);
   bigEye.rotateY(Math.PI / 2); // 截面板 → YZ 面，挤出方向 → X
   parts.push(bigEye);
 
-  // 杆身：工字形（两片翼缘 + 腹板）
-  const web = bevelBoxGeometry(shankT, length - bigR - smallR + 0.01, shankW * 0.42, 0.002);
-  web.translate(0, bigR * 0.7 + (length - bigR - smallR) * 0.5, 0);
+  // 杆身：工字形（两片翼缘 + 腹板）。
+  // 端部必须落在两端环体的「材料带」里：下端 ≥ 大端孔半径 + 2mm（孔 37 → 39），
+  // 上端落进小端材料带（小端环带 y = length-smallR .. length-smallBore = 264..270mm）。
+  // 早先以 bigR*0.7 作腹板中心，杆身根部实际沉到 31.4mm（孔内空腔），被曲柄销穿 3.9mm。
+  const shankBottom = bigBore + 0.002;
+  const shankTop = length - smallR + 0.004;
+  const shankSpan = shankTop - shankBottom;
+  const shankMid = (shankBottom + shankTop) / 2;
+  const web = bevelBoxGeometry(shankT, shankSpan, shankW * 0.42, 0.002);
+  web.translate(0, shankMid, 0);
   parts.push(web);
   for (const sign of [-1, 1]) {
-    const flange = bevelBoxGeometry(shankT * 0.9, length - bigR - smallR + 0.004, shankW * 0.3, 0.002);
-    flange.translate(0, bigR * 0.7 + (length - bigR - smallR) * 0.5, sign * shankW * 0.35);
+    const flange = bevelBoxGeometry(shankT * 0.9, shankSpan - 0.004, shankW * 0.3, 0.002);
+    flange.translate(0, shankMid, sign * shankW * 0.35);
     parts.push(flange);
   }
 
@@ -580,23 +607,22 @@ const rodCap: GeometryBuilder = (spec) => {
   shape.lineTo(bigBore + 0.0035, 0);
   shape.absarc(0, 0, bigBore + 0.0035, Math.PI * 2, Math.PI, true); // 内弧：下半返回
   shape.closePath();
+  // 同上：倒角外扩会让盖越过 y=-0.6mm 分面缝顶进连杆本体
   const cap = new THREE.ExtrudeGeometry(shape, {
     depth: shankT,
-    bevelEnabled: true,
-    bevelThickness: 0.0018,
-    bevelSize: 0.0018,
-    bevelSegments: 2,
+    bevelEnabled: false,
     curveSegments: 20,
   });
   cap.translate(0, 0, -shankT / 2);
   cap.rotateY(Math.PI / 2); // 截面板 → YZ 面，挤出方向 → X
   cap.translate(0, -0.0006, 0);
   const parts: THREE.BufferGeometry[] = [cap];
-  // 连杆螺栓座：位于环体 45° 对角、轴线沿 Y（与大端孔同向的螺栓座在外侧）
-  const earR = Math.min(bigR * 0.96, bigR + 0.003 - 0.008);
+  // 连杆螺栓座：环体两侧的凸耳（螺栓孔轴沿 Y）。
+  // 凸耳内缘必须让开轴瓦孔（40.5 → 内缘 41）与曲柄销（r=36）：原先按 45° 对角摆在 33.2mm 处，
+  // 内缘只到 31.8mm，被曲柄销穿 3.4mm；改为横向 ±50mm、下探 25mm（顶面仍低于分面缝）。
   for (const sign of [-1, 1]) {
     const ear = cylinderGeometry(0.009, shankT * 0.96, 0.009, 12, 0.0012);
-    ear.translate(0, -Math.sin(Math.PI * 0.25) * earR, sign * Math.cos(Math.PI * 0.25) * earR);
+    ear.translate(0, -0.0135, sign * 0.05);
     parts.push(ear);
   }
   const merged = mergeGeometries(parts);

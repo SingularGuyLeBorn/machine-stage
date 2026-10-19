@@ -7,9 +7,22 @@ import type { PartHandle } from "../assembler/assembler";
 //
 // 报告必须可定位到实例：a/b 为 `零件ID[实例下标]`，禁止匿名 mesh 名。
 // hint 由检测器按零件的 mate / constants 引用自动生成，指到「该改哪个常量」。
+//
+// 深度语义（监工口径，detect.ts 三修）：
+//   · depth_mm 只报「真实穿透深度」（落入对方实体的采样点到对方表面的最大距离）；
+//   · 测不出时 depth_mm = null + estimated=true，卡片改显示「交线 XXmm（形态）」——
+//     禁止再拿 AABB 交叠尺寸冒充深度（旧的 125.60mm 假数字）。
 // ============================================================================
 
 export type ClippingPhase = "static" | "animation" | "param_scan";
+
+/**
+ * 相交形态（detect.ts 按交线几何分类）：
+ *   · bearing_overlap：交线绕轴闭合（分布尺寸 ≈ 轴径量级）→ 配合面重叠（白名单候选）；
+ *   · face_contact：交线成片、测不出穿透深度 → 贴合面（装配接触）；
+ *   · displaced：局部成团且有实测深度 → 错位穿透（真缺陷候选）。
+ */
+export type OverlapShape = "bearing_overlap" | "face_contact" | "displaced";
 
 export interface ClippingReport {
   type: "clipping";
@@ -17,15 +30,24 @@ export interface ClippingReport {
   /** 实例级引用：`tiger.track.link[42]`。 */
   a: string;
   b: string;
-  /** 估算重叠深度（毫米）。 */
-  depth_mm: number;
+  /**
+   * 实测穿透深度（毫米）。只报真实穿透；面贴合 / 同心配合面测不出时为 null，
+   * 卡片显示「交线 XXmm（形态）」而不是假深度。
+   */
+  depth_mm: number | null;
+  /** 交线总长（毫米）：所有相交三角面对的交线段长度之和（配合面尺度）。 */
+  intersection_mm?: number;
+  /** 交线分布包围盒尺寸（毫米 [x, y, z]）。 */
+  extent_mm?: [number, number, number];
+  /** 相交形态（见 OverlapShape）。 */
+  shape?: OverlapShape;
   /** 代表性穿透点（模型空间，米）。 */
   point: [number, number, number];
   /** 动画扫掠帧号（静态检测为 null）。 */
   frame: number | null;
   severity: "error" | "warn";
   hint: string;
-  /** 深度为几何近似（无顶点落入对方体内时的退化情形）时标记。 */
+  /** 深度为估算（未详细分析 / 测不出用交线形态兜底）时标记。 */
   estimated?: boolean;
   aLayer?: BuildLayer;
   bLayer?: BuildLayer;
@@ -64,7 +86,7 @@ export interface HintContext {
 }
 
 /** 自动提示：优先人工 hint，其次列出双方引用的常量，最后给出泛化建议。 */
-export function buildHint(context: HintContext, depthMm: number): string {
+export function buildHint(context: HintContext, depthMm: number | null, lineMm = 0): string {
   const { defA, defB, constants } = context;
   const authored = [...new Set([defA?.hint, defB?.hint].filter((item): item is string => Boolean(item)))];
   if (authored.length > 0) return authored.join("；");
@@ -72,7 +94,11 @@ export function buildHint(context: HintContext, depthMm: number): string {
   const refsB = defB ? referencedConstants(defB, constants) : [];
   const nameA = defA ? `${defA.name_cn}(${defA.id})` : "A";
   const nameB = defB ? `${defB.name_cn}(${defB.id})` : "B";
-  const parts: string[] = [`${nameA} 与 ${nameB} 重叠 ${depthMm.toFixed(2)}mm。`];
+  const parts: string[] = [
+    depthMm === null
+      ? `${nameA} 与 ${nameB} 交线 ${lineMm.toFixed(1)}mm（面级接触，未测出穿透深度）。`
+      : `${nameA} 与 ${nameB} 重叠 ${depthMm.toFixed(2)}mm。`,
+  ];
   if (refsA.length > 0 || refsB.length > 0) {
     const clauses: string[] = [];
     if (refsA.length > 0) clauses.push(`${refsA.join("/")}`);
@@ -88,15 +114,23 @@ export function formatReportRef(handle: PartHandle, index: number): string {
   return instanceRef(handle.partId, handle.instanced ? index : null);
 }
 
-/** 报告排序：深度大者在前（越深越严重）；同深度按 id 稳定排序。 */
+/** 排序用深度序：测不出深度的排在实测之后（按 -1 处理，再按交线长度排）。 */
+function depthRank(report: ClippingReport): number {
+  return report.depth_mm === null ? -1 : report.depth_mm;
+}
+
+/** 报告排序：实测深度大者在前；未测出深度的按交线长度排（贴合/配合级）。 */
 export function sortReports(reports: ClippingReport[]): ClippingReport[] {
   return [...reports].sort(
     (left, right) =>
-      right.depth_mm - left.depth_mm || left.a.localeCompare(right.a) || left.b.localeCompare(right.b),
+      depthRank(right) - depthRank(left) ||
+      (right.intersection_mm ?? 0) - (left.intersection_mm ?? 0) ||
+      left.a.localeCompare(right.a) ||
+      left.b.localeCompare(right.b),
   );
 }
 
-/** 汇总统计（UI 徽标使用）。 */
+/** 汇总统计（UI 徽标使用）：最深只统计实测深度。 */
 export function summarizeReports(reports: ClippingReport[]): {
   total: number;
   errors: number;
@@ -109,7 +143,7 @@ export function summarizeReports(reports: ClippingReport[]): {
   for (const report of reports) {
     if (report.severity === "error") errors++;
     else warns++;
-    deepestMm = Math.max(deepestMm, report.depth_mm);
+    deepestMm = Math.max(deepestMm, report.depth_mm ?? 0);
   }
   return { total: reports.length, errors, warns, deepestMm };
 }

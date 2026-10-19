@@ -29,7 +29,10 @@ describe("tiger/engine 白名单验收", () => {
     expect(
       split.active.map((item) => `${item.report.a} ↔ ${item.report.b} @${item.report.depth_mm}mm`),
     ).toEqual([]);
-    expect(split.expected.length).toBeGreaterThan(100);
+    // 计数随几何缺陷修复而下降（修一处缺陷 = 该家族计数归零）：守门目的是「白名单没退化成空表」，
+    // 所以同时看总数和命中家族数（家族数比实例数稳定）。
+    expect(split.expected.length).toBeGreaterThan(40);
+    expect(new Set(split.expected.map((item) => item.rule.family)).size).toBeGreaterThanOrEqual(8);
     built.dispose();
   }, 180_000);
 

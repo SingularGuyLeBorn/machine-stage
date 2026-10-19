@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { MeshBVH, type HitPointInfo } from "three-mesh-bvh";
 import type { AssembledModel, PartHandle } from "../assembler/assembler";
-import { buildHint, formatReportRef, sortReports, type ClippingReport } from "./report";
+import { buildHint, formatReportRef, sortReports, type ClippingReport, type OverlapShape } from "./report";
 
 // ============================================================================
 // solver/detect —— 穿模检测器（静态装配 + 动画扫掠）
@@ -11,11 +11,19 @@ import { buildHint, formatReportRef, sortReports, type ClippingReport } from "./
 //   2) 扫掠：动画按 ≥30fps 采样，逐帧对「至少一方在动」的候选对检测
 //   3) 参数扫描：= 重建 + 静态（由调用方循环）
 //
-// 深度估计（取最大可信值）：
-//   a) 顶点/面心/棱中点落入对方实体 → 到对方表面的最近距离（精确）
-//   b) AABB 交叠盒最小边长（共面 / 交叉条退化情形兜底，标记 estimated）
-// 判定阈值：重叠深度 < minDepthM（默认 0.5mm）视作装配接触，不报告。
-// 早退模式（超出详细分析预算）返回 depth=-1：确定相交但未测深。
+// 交线几何（三修之一：弃用「probeDepth 单打独斗 + AABB 冒充深度」）：
+//   · bvhcast 回调里累计 intersectsTriangle 输出线段的总长与分布包围盒；
+//   · 形态分类：交线绕轴闭合（分布尺寸 ≈ 轴径量级，含半环鞍座）→ bearing_overlap；
+//     局部成团且实测出深度 → displaced；其余（交线成片、测不出深度）→ face_contact。
+//   · 贴合面修正（三修补丁）：共面板接触的「交线」其实是侧壁切面与贴合面的交线（三角面法向近垂直），
+//     同轴配合面（压装轴承/轴套/鞍座）的交线才来自近共面三角面对（法向近平行）。
+//     测不出深度时再要求「交线主要来自近共面对」，否则判 face_contact（0 间隙装配接触/擦碰不报）。
+//   · 深度 = 落入对方实体的采样点到对方表面的最大距离（只报真实穿透）；
+//     测不出时 depth = null（卡片显示「交线 XXmm（形态）」）。
+//     AABB 交叠尺寸不再参与深度（旧实现用它兜底，才会出现 125.60mm 假数字）。
+// 判定口径：实测深度 ≥ minDepthM（默认 0.5mm）报「真穿透」级；
+//           测不出深度但交线绕轴闭合（配合面）仍报，交给白名单分层（未豁免 / 已豁免）。
+// 早退模式（超出详细分析预算）只判相交不测深：depth = null + estimated（保守照报）。
 // ============================================================================
 
 const bvhCache = new WeakMap<THREE.BufferGeometry, MeshBVH>();
@@ -32,13 +40,13 @@ export function getBVH(geometry: THREE.BufferGeometry): MeshBVH {
 }
 
 export interface ClippingOptions {
-  /** 判定阈值：重叠深度小于该值视作「装配接触」，不报告。默认 0.5mm。 */
+  /** 判定阈值：实测穿透深度小于该值视作「装配接触」，不报（多面贴合除外，见 detect 头部口径）。 */
   minDepthM?: number;
   /** AABB 粗检余量（米）。 */
   broadphaseMarginM?: number;
   /** 零件级过滤（层验收：只检查本层及以内）。 */
   filter?: (handle: PartHandle) => boolean;
-  /** 详细分析（测深）的零件对上限；超出的对只判定相交，深度标记 estimated。 */
+  /** 详细分析（测深）的零件对上限；超出的对只判定相交不测深（estimated）。 */
   analysisBudget?: number;
   onProgress?: (done: number, total: number) => void;
 }
@@ -157,11 +165,11 @@ interface DepthProbe {
 }
 
 /**
- * 在 `geometry`（位姿 `matrix`）中寻找「落入 other 实体且距其表面最远」的采样点。
- * 返回距离（米）与模型空间坐标。
+ * 在给定采样点（位于 `matrix` 位姿的零件局部空间）中，寻找「落入 other 实体且距其表面最远」的点。
+ * 返回距离（米）与模型空间坐标。采样点由调用方给出：相交三角形局部采样 + 全域采样兜底。
  */
 function probeDepth(
-  geometry: THREE.BufferGeometry,
+  points: readonly THREE.Vector3[],
   matrix: THREE.Matrix4,
   otherBVH: MeshBVH,
   otherMatrix: THREE.Matrix4,
@@ -169,7 +177,6 @@ function probeDepth(
   hitInfo: HitPointInfo,
 ): DepthProbe {
   const toOther = new THREE.Matrix4().copy(otherMatrix).invert().multiply(matrix);
-  const points = samplePoints(geometry);
   let best = 0;
   let bestWorld: THREE.Vector3 | null = null;
   const local = new THREE.Vector3();
@@ -186,88 +193,238 @@ function probeDepth(
   return { depth: best, point: bestWorld };
 }
 
-/** AABB 交集盒的最小边长（退化情形的深度下限）。 */
-function overlapMinExtent(boxA: THREE.Box3, boxB: THREE.Box3): number {
-  const minX = Math.max(boxA.min.x, boxB.min.x);
-  const minY = Math.max(boxA.min.y, boxB.min.y);
-  const minZ = Math.max(boxA.min.z, boxB.min.z);
-  const maxX = Math.min(boxA.max.x, boxB.max.x);
-  const maxY = Math.min(boxA.max.y, boxB.max.y);
-  const maxZ = Math.min(boxA.max.z, boxB.max.z);
-  if (maxX <= minX || maxY <= minY || maxZ <= minZ) return 0;
-  return Math.min(maxX - minX, maxY - minY, maxZ - minZ);
-}
+/** 交线形态阈值与采样预算（详见文件头部的三修口径）。 */
+const RING_MIN_RATIO = 0.62;
+/** 三角面对「近共面」判据：|cos(法向夹角)| ≥ 该值（≈ 45° 内）视为贴合面切向交线。 */
+const PARALLEL_FACE_DOT = 0.7;
+/** 近共面对贡献的交线长度占比下限：低于此值说明交线来自侧壁切面（普通贴合面）。 */
+const PARALLEL_LINE_MIN_RATIO = 0.5;
+/** 交线最小厚度（米 = 0.1mm）：退化在一个平面上的交线（贴合面 / 擦切面）没有体积穿透证据。 */
+const PLANAR_LINE_EPS = 1e-4;
+const SHAPE_SAMPLE_LIMIT = 480;
+const TRIANGLE_SAMPLE_LIMIT = 64;
+const GLOBAL_SAMPLE_BUDGET = 360;
+/** 低于该值（米 = 0.01mm）视为「测不出深度」：面贴合 / 同心配合面。 */
+const MIN_MEASURED_DEPTH_M = 1e-5;
 
 interface PairContact {
-  /** 重叠深度（米）；-1 表示「确定相交但未测深」（早退模式）。 */
-  depth: number;
+  /** 实测穿透深度（米）；null = 测不出（面贴合 / 同心配合面）。 */
+  depth: number | null;
   point: THREE.Vector3;
   estimated: boolean;
   triCount: number;
+  /** 交线总长（米）：相交三角面对的交线段长度之和。 */
+  lineLength: number;
+  /** 交线分布包围盒尺寸（米，A 局部空间；刚性变换下即世界尺寸）。 */
+  extent: THREE.Vector3;
+  /** 相交形态：bearing_overlap（绕轴闭合）/ face_contact（贴合面）/ displaced（错位穿透）。 */
+  shape: OverlapShape;
+  /** 形态判据留档：交线点到质心距离的 min/max（0 = 不成环）。 */
+  ringRatio: number;
+  /** 形态判据留档：交线总长里来自近共面三角面对（贴合面切向）的占比。 */
+  parallelRatio: number;
 }
 
 const reusableHitInfo: HitPointInfo = { point: new THREE.Vector3(), distance: 0, faceIndex: -1 };
 const reusableRay = new THREE.Ray();
 const reusableLine = new THREE.Line3();
 
-/** 完整分析一对实例：相交判定 + 深度 + 代表点。无相交返回 null。 */
+/** 采样一个三角形：顶点 + 棱中点 + 面心（大三角形内部也要覆盖）。 */
+function pushTrianglePoints(
+  out: THREE.Vector3[],
+  triangle: { a: THREE.Vector3; b: THREE.Vector3; c: THREE.Vector3 },
+): void {
+  const { a, b, c } = triangle;
+  out.push(
+    a.clone(),
+    b.clone(),
+    c.clone(),
+    new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5),
+    new THREE.Vector3().addVectors(b, c).multiplyScalar(0.5),
+    new THREE.Vector3().addVectors(c, a).multiplyScalar(0.5),
+    new THREE.Vector3()
+      .addVectors(a, b)
+      .add(c)
+      .multiplyScalar(1 / 3),
+  );
+}
+
+/**
+ * 交线是否「绕轴闭合」（配合面形态）：
+ *   · 环状：交线点到质心的距离几乎相等（中空的圆/椭圆/方框闭合线）；
+ *   · 半环鞍座：交线近似平面、双向铺开且尺寸达到「轴径量级」（≥ 小件最大尺寸的 45%）。
+ * 局部成团（错位穿透的碎块）两条都不满足。
+ */
+function analyzeShape(
+  samples: readonly THREE.Vector3[],
+  extent: THREE.Vector3,
+  spreadRatio: number,
+): { closed: boolean; ringRatio: number } {
+  let ringRatio = 0;
+  if (samples.length >= 8) {
+    const center = new THREE.Vector3();
+    for (const point of samples) center.add(point);
+    center.multiplyScalar(1 / samples.length);
+    let min = Infinity;
+    let max = 0;
+    for (const point of samples) {
+      const distance = point.distanceTo(center);
+      if (distance < min) min = distance;
+      if (distance > max) max = distance;
+    }
+    ringRatio = max > 1e-9 ? min / max : 0;
+  }
+  const dims = [extent.x, extent.y, extent.z].sort((left, right) => right - left);
+  const planar = dims[0] > 1e-9 && dims[2] <= 0.4 * dims[0];
+  const balanced = dims[1] >= 0.4 * dims[0];
+  const closed = ringRatio >= RING_MIN_RATIO || (planar && balanced && spreadRatio >= 0.45);
+  return { closed, ringRatio };
+}
+
+/** 两个三角面法向近平行（夹角 ≲45°）→ 该交线来自贴合面切向，而非侧壁切面。 */
+function isNearlyParallelPair(
+  first: THREE.Triangle,
+  second: THREE.Triangle,
+  normalA: THREE.Vector3,
+  normalB: THREE.Vector3,
+  edgeA: THREE.Vector3,
+  edgeB: THREE.Vector3,
+): boolean {
+  edgeA.subVectors(first.b, first.a);
+  edgeB.subVectors(first.c, first.a);
+  normalA.crossVectors(edgeA, edgeB);
+  edgeA.subVectors(second.b, second.a);
+  edgeB.subVectors(second.c, second.a);
+  normalB.crossVectors(edgeA, edgeB);
+  const scale = normalA.length() * normalB.length();
+  return scale > 1e-18 && Math.abs(normalA.dot(normalB)) / scale >= PARALLEL_FACE_DOT;
+}
+
+/** 完整分析一对实例：交线几何（总长/分布/形态）+ 实测深度 + 代表点。无相交返回 null。 */
 export function analyzePair(bodyA: BodyInstance, bodyB: BodyInstance, detailed: boolean): PairContact | null {
   const bvhA = getBVH(bodyA.handle.geometry);
   const bvhB = getBVH(bodyB.handle.geometry);
   const matrixBToA = new THREE.Matrix4().copy(bodyA.matrix).invert().multiply(bodyB.matrix);
+  const matrixAToB = new THREE.Matrix4().copy(matrixBToA).invert();
   let triCount = 0;
+  let lineLength = 0;
+  /** 近共面（贴合面切向）三角面对贡献的交线长度：配合面重叠 vs 普通贴合面的分水岭。 */
+  let parallelLength = 0;
+  const normalA = new THREE.Vector3();
+  const normalB = new THREE.Vector3();
+  const edgeA = new THREE.Vector3();
+  const edgeB = new THREE.Vector3();
   let firstPoint: THREE.Vector3 | null = null;
+  const lineBox = new THREE.Box3();
+  const lineSamples: THREE.Vector3[] = [];
+  const overlapPointsA: THREE.Vector3[] = [];
+  const overlapPointsB: THREE.Vector3[] = [];
+  let trianglesSampled = 0;
   bvhA.bvhcast(bvhB, matrixBToA, {
     intersectsTriangles(triangleA, triangleB) {
-      if (triangleA.intersectsTriangle(triangleB, reusableLine)) {
-        triCount++;
-        if (!firstPoint) firstPoint = reusableLine.start.clone().applyMatrix4(bodyA.matrix);
-        if (!detailed) return true; // 早退
+      if (!triangleA.intersectsTriangle(triangleB, reusableLine)) return false;
+      triCount++;
+      const segmentLength = reusableLine.distance();
+      if (segmentLength <= 1e-9) {
+        // 共面三角形：three-mesh-bvh 不给交线（edge 归零）→ 只计相交，不累计交线几何。
+        if (!firstPoint) firstPoint = triangleA.a.clone().applyMatrix4(bodyA.matrix);
+        return false;
+      }
+      lineLength += segmentLength;
+      if (isNearlyParallelPair(triangleA, triangleB, normalA, normalB, edgeA, edgeB)) {
+        parallelLength += segmentLength;
+      }
+      lineBox.expandByPoint(reusableLine.start).expandByPoint(reusableLine.end);
+      if (!firstPoint) firstPoint = reusableLine.start.clone().applyMatrix4(bodyA.matrix);
+      if (lineSamples.length < SHAPE_SAMPLE_LIMIT) {
+        lineSamples.push(reusableLine.start.clone(), reusableLine.end.clone());
+      }
+      if (detailed && trianglesSampled < TRIANGLE_SAMPLE_LIMIT) {
+        trianglesSampled++;
+        pushTrianglePoints(overlapPointsA, triangleA);
+        // bvhcast 已把 B 的三角形变换到 A 局部空间：折回 B 自身空间再采样。
+        const back = (point: THREE.Vector3) => point.clone().applyMatrix4(matrixAToB);
+        pushTrianglePoints(overlapPointsB, {
+          a: back(triangleB.a),
+          b: back(triangleB.b),
+          c: back(triangleB.c),
+        });
       }
       return false;
     },
   });
   if (triCount === 0) return null;
 
-  if (!detailed) {
-    return {
-      depth: -1,
-      point: firstPoint ?? bodyA.box.getCenter(new THREE.Vector3()),
-      estimated: true,
-      triCount,
-    };
+  const extent = lineBox.isEmpty() ? new THREE.Vector3() : lineBox.getSize(new THREE.Vector3());
+  const sizeA = bodyA.box.getSize(new THREE.Vector3());
+  const sizeB = bodyB.box.getSize(new THREE.Vector3());
+  const smallerBody = Math.min(Math.max(sizeA.x, sizeA.y, sizeA.z), Math.max(sizeB.x, sizeB.y, sizeB.z));
+  const spreadRatio = smallerBody > 1e-9 ? Math.max(extent.x, extent.y, extent.z) / smallerBody : 1;
+  const { closed, ringRatio } = analyzeShape(lineSamples, extent, spreadRatio);
+
+  let depth: number | null = null;
+  let point: THREE.Vector3 | null = null;
+  if (detailed) {
+    // 采样 = 相交三角形局部点（贴着交线，能抓到深埋点）+ 全域点（轴端/中部深埋兜底）。
+    const probeA = probeDepth(
+      overlapPointsA.concat(samplePoints(bodyA.handle.geometry, GLOBAL_SAMPLE_BUDGET)),
+      bodyA.matrix,
+      bvhB,
+      bodyB.matrix,
+      reusableRay,
+      reusableHitInfo,
+    );
+    const probeB = probeDepth(
+      overlapPointsB.concat(samplePoints(bodyB.handle.geometry, GLOBAL_SAMPLE_BUDGET)),
+      bodyB.matrix,
+      bvhA,
+      bodyA.matrix,
+      reusableRay,
+      reusableHitInfo,
+    );
+    const best = probeA.depth >= probeB.depth ? probeA : probeB;
+    if (best.depth >= MIN_MEASURED_DEPTH_M) {
+      depth = best.depth;
+      point = best.point;
+    }
   }
 
-  const probeA = probeDepth(
-    bodyA.handle.geometry,
-    bodyA.matrix,
-    bvhB,
-    bodyB.matrix,
-    reusableRay,
-    reusableHitInfo,
-  );
-  const probeB = probeDepth(
-    bodyB.handle.geometry,
-    bodyB.matrix,
-    bvhA,
-    bodyA.matrix,
-    reusableRay,
-    reusableHitInfo,
-  );
-  let depth = Math.max(probeA.depth, probeB.depth);
-  let point = (probeA.depth >= probeB.depth ? probeA.point : probeB.point) ?? firstPoint;
-  let estimated = false;
-  const aabbFloor = overlapMinExtent(bodyA.box, bodyB.box);
-  if (aabbFloor > 0 && depth < aabbFloor * 0.5) {
-    depth = Math.max(depth, aabbFloor);
-    estimated = true;
-  }
-  if (!point) point = bodyA.box.getCenter(new THREE.Vector3());
-  if (depth <= 0) {
-    depth = Math.max(aabbFloor, 1e-4);
-    estimated = true;
-  }
-  return { depth, point, estimated, triCount };
+  // 测得出深度 → 按「是否绕轴闭合」分配合面/错位；测不出深度 → 还要交线主要来自近共面对
+  // （贴合面切向）才算配合面重叠，否则是 0 间隙装配接触 / 擦碰，判 face_contact 不报。
+  const parallelRatio = lineLength > 0 ? parallelLength / lineLength : 0;
+  const shape: OverlapShape =
+    depth !== null
+      ? closed
+        ? "bearing_overlap"
+        : "displaced"
+      : closed && parallelRatio >= PARALLEL_LINE_MIN_RATIO
+        ? "bearing_overlap"
+        : "face_contact";
+  const fallback = firstPoint ?? lineBox.getCenter(new THREE.Vector3()).applyMatrix4(bodyA.matrix);
+  return {
+    depth,
+    point: point ?? fallback,
+    estimated: !detailed || depth === null,
+    triCount,
+    lineLength,
+    extent,
+    shape,
+    ringRatio,
+    parallelRatio,
+  };
+}
+
+/**
+ * 报告口径：实测穿透 ≥ minDepthM 报「真穿透」级；测不出深度但交线绕轴闭合（配合面）仍报，
+ * 交给白名单分层。纯贴合面不再报（旧实现是拿 AABB 交叠冒充深度才把它们拖进报告的）。
+ * 三修补丁：测不出深度时还要求交线是「三维曲线」——0 间隙面贴合、擦切面的交线退化在一个平面上
+ * （某轴尺寸 = 0），没有体积穿透证据，一律不报（两盒刚好接触 / 翼片擦过立柱都属于这类）。
+ */
+export function isReportableContact(contact: PairContact, minDepthM: number): boolean {
+  if (contact.depth !== null) return contact.depth >= minDepthM;
+  if (contact.shape !== "bearing_overlap") return false;
+  const minExtent = Math.min(contact.extent.x, contact.extent.y, contact.extent.z);
+  return minExtent > PLANAR_LINE_EPS;
 }
 
 function makeReport(
@@ -277,15 +434,22 @@ function makeReport(
   contact: PairContact,
   phase: ClippingReport["phase"],
   frame: number | null,
-  minDepthM: number,
 ): ClippingReport {
-  const depth = contact.depth < 0 ? minDepthM : Math.max(contact.depth, minDepthM);
+  const depthMm = contact.depth === null ? null : Number((contact.depth * 1000).toFixed(3));
+  const lineMm = Number((contact.lineLength * 1000).toFixed(2));
   return {
     type: "clipping",
     phase,
     a: bodyA.ref,
     b: bodyB.ref,
-    depth_mm: Number((depth * 1000).toFixed(3)),
+    depth_mm: depthMm,
+    intersection_mm: lineMm,
+    extent_mm: [
+      Number((contact.extent.x * 1000).toFixed(2)),
+      Number((contact.extent.y * 1000).toFixed(2)),
+      Number((contact.extent.z * 1000).toFixed(2)),
+    ],
+    shape: contact.shape,
     point: [
       Number(contact.point.x.toFixed(5)),
       Number(contact.point.y.toFixed(5)),
@@ -300,22 +464,29 @@ function makeReport(
         defA: bodyA.handle.def,
         defB: bodyB.handle.def,
       },
-      depth * 1000,
+      depthMm,
+      lineMm,
     ),
-    estimated: contact.depth < 0 || contact.estimated ? true : undefined,
+    estimated: contact.estimated ? true : undefined,
     aLayer: bodyA.handle.buildLayer,
     bLayer: bodyB.handle.buildLayer,
   };
 }
 
-/** 静态装配检测：全量实例对。 */
-export function detectStatic(assembled: AssembledModel, options: ClippingOptions = {}): ClippingReport[] {
-  const minDepthM = options.minDepthM ?? 0.0005;
+export interface PairPlan {
+  /** 实例级 body = 零件 × 实例展开（非实例件为 1 个）。 */
+  bodies: BodyInstance[];
+  /** AABB 粗检后的候选对。 */
+  pairs: Array<[BodyInstance, BodyInstance]>;
+}
+
+/**
+ * 零件对展开逻辑（诊断口径）：每个零件按实例展开成 body → 两两 AABB 粗检 → 候选对。
+ * 报告是「实例级」：一个 body 对一条报告；零件级去重要在报告上另做（见 diag-clips）。
+ */
+export function planPairs(assembled: AssembledModel, options: ClippingOptions = {}): PairPlan {
   const margin = options.broadphaseMarginM ?? 0;
-  const budget = options.analysisBudget ?? 120;
-  assembled.root.updateMatrixWorld(true);
   const bodies = collectInstances(assembled, options.filter);
-  const reports: ClippingReport[] = [];
   const pairs: Array<[BodyInstance, BodyInstance]> = [];
   for (let i = 0; i < bodies.length; i++) {
     for (let j = i + 1; j < bodies.length; j++) {
@@ -330,13 +501,25 @@ export function detectStatic(assembled: AssembledModel, options: ClippingOptions
       }
     }
   }
-  for (let index = 0; index < pairs.length; index++) {
-    const [left, right] = pairs[index];
-    const contact = analyzePair(left, right, index < budget);
-    if (contact && (contact.depth < 0 || contact.depth >= minDepthM)) {
-      reports.push(makeReport(assembled, left, right, contact, "static", null, minDepthM));
+  return { bodies, pairs };
+}
+
+/** 静态装配检测：全量实例对。 */
+export function detectStatic(assembled: AssembledModel, options: ClippingOptions = {}): ClippingReport[] {
+  const minDepthM = options.minDepthM ?? 0.0005;
+  const budget = options.analysisBudget ?? 1200;
+  assembled.root.updateMatrixWorld(true);
+  const plan = planPairs(assembled, options);
+  const reports: ClippingReport[] = [];
+  for (let index = 0; index < plan.pairs.length; index++) {
+    const [left, right] = plan.pairs[index];
+    const detailed = index < budget;
+    const contact = analyzePair(left, right, detailed);
+    // 预算外只判相交不测深：保守照报（estimated），不放过真实缺陷。
+    if (contact && (isReportableContact(contact, minDepthM) || !detailed)) {
+      reports.push(makeReport(assembled, left, right, contact, "static", null));
     }
-    options.onProgress?.(index + 1, pairs.length);
+    options.onProgress?.(index + 1, plan.pairs.length);
   }
   return sortReports(reports);
 }
@@ -421,11 +604,13 @@ export function detectSweep(assembled: AssembledModel, options: SweepOptions): C
       if (!left || !right) continue;
       if (!left.box.intersectsBox(right.box)) continue;
       const key = `${candidate.leftRef}\u0000${candidate.rightRef}`;
-      const contact = analyzePair(left, right, !seen.has(key) && reports.length < reportBudget);
-      if (contact && (contact.depth < 0 || contact.depth >= minDepthM)) {
+      const detailed = !seen.has(key) && reports.length < reportBudget;
+      const contact = analyzePair(left, right, detailed);
+      // 扫掠是「动件撞静件」的入口：预算外只判相交不测深，同样保守照报。
+      if (contact && (isReportableContact(contact, minDepthM) || !detailed)) {
         if (!seen.has(key)) {
           seen.add(key);
-          reports.push(makeReport(assembled, left, right, contact, "animation", frameIndex, minDepthM));
+          reports.push(makeReport(assembled, left, right, contact, "animation", frameIndex));
         }
       }
     }

@@ -17,7 +17,13 @@ import {
   type ClippingReport,
 } from "@/three/parts";
 import { findModel } from "../catalog";
-import { reportKey, reportPartIds, useStageStore } from "../state/stageStore";
+import {
+  formatReportMeasure,
+  reportKey,
+  reportPartIds,
+  shapeLabel,
+  useStageStore,
+} from "../state/stageStore";
 
 // ============================================================================
 // ClippingPanel —— 穿模报告（浮层抽屉内容）
@@ -36,7 +42,10 @@ interface FamilyRow {
   nameA: string;
   nameB: string;
   items: Array<{ report: ClippingReport; index: number }>;
-  depthMax: number;
+  /** 族内最深实测深度（mm）；全族都测不出深度时为 null。 */
+  depthMax: number | null;
+  /** 族内最长交线（mm）：深度测不出时的规模口径。 */
+  lineMax: number;
   layers: number[];
 }
 
@@ -56,11 +65,15 @@ function buildFamilies(items: Array<{ report: ClippingReport; index: number }>):
         nameA: "",
         nameB: "",
         items: [],
-        depthMax: 0,
+        depthMax: null,
+        lineMax: 0,
         layers: [],
       } satisfies FamilyRow);
     row.items.push({ report, index });
-    row.depthMax = Math.max(row.depthMax, report.depth_mm);
+    if (report.depth_mm !== null) {
+      row.depthMax = Math.max(row.depthMax ?? 0, report.depth_mm);
+    }
+    row.lineMax = Math.max(row.lineMax, report.intersection_mm ?? 0);
     for (const layer of [report.aLayer, report.bLayer]) {
       if (layer && !row.layers.includes(layer)) row.layers.push(layer);
     }
@@ -258,7 +271,11 @@ export function ClippingPanel() {
                       <span className="clipfam__id">{titleB}</span>
                     </span>
                     {!single ? <span className="badge">×{family.items.length}</span> : null}
-                    <span className="badge badge--danger num">{family.depthMax.toFixed(2)}mm</span>
+                    {family.depthMax !== null ? (
+                      <span className="badge badge--danger num">{family.depthMax.toFixed(2)}mm</span>
+                    ) : (
+                      <span className="badge badge--plain num">交线 {family.lineMax.toFixed(1)}mm</span>
+                    )}
                     {family.layers.length > 0 ? (
                       <span className="badge badge--plain">L{family.layers.join("-L")}</span>
                     ) : null}
@@ -283,7 +300,18 @@ export function ClippingPanel() {
                             <span className="clipcard__id" title={report.b}>
                               {report.b}
                             </span>
-                            <span className="badge badge--danger num">{report.depth_mm.toFixed(2)}mm</span>
+                            <span
+                              className={
+                                report.depth_mm === null
+                                  ? "badge badge--plain num"
+                                  : "badge badge--danger num"
+                              }
+                            >
+                              {formatReportMeasure(report)}
+                            </span>
+                            {report.shape ? (
+                              <span className="badge badge--plain">{shapeLabel(report.shape)}</span>
+                            ) : null}
                             {report.aLayer ? (
                               <span className="badge badge--plain">
                                 L{report.aLayer}
@@ -309,7 +337,9 @@ export function ClippingPanel() {
                               [{report.point.map((value) => value.toFixed(3)).join(", ")}]
                             </span>
                             {report.frame !== null ? <span className="num">帧 {report.frame}</span> : null}
-                            {report.estimated ? <span>深度为估算</span> : null}
+                            {report.estimated ? (
+                              <span>{report.depth_mm === null ? "深度未测出" : "深度为估算"}</span>
+                            ) : null}
                             <span className="clipcard__names">
                               {partName(modelId, family.partA, "A")} / {partName(modelId, family.partB, "B")}
                             </span>
@@ -382,7 +412,10 @@ export function ClippingPanel() {
                         <span className="clipcard__id" title={item.report.b}>
                           {item.report.b}
                         </span>
-                        <span className="badge badge--plain num">{item.report.depth_mm.toFixed(2)}mm</span>
+                        <span className="badge badge--plain num">{formatReportMeasure(item.report)}</span>
+                        {item.report.shape ? (
+                          <span className="badge badge--plain">{shapeLabel(item.report.shape)}</span>
+                        ) : null}
                         <div className="clipcard__actions">
                           <button
                             type="button"
