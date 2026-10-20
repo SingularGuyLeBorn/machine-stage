@@ -181,6 +181,28 @@ function makeLayouts(): Record<string, InstanceLayout> {
           .makeTranslation(5.41, 0, -0.9655)
           .multiply(new THREE.Matrix4().makeRotationY(Math.PI));
 
+  // —— L4-h 尾部 / 前灯（raw key，不进 HULL_LAYOUTS 常量表）——
+  layouts["hull.exhaust"] = ({ index }) =>
+    new THREE.Matrix4().makeTranslation(0, 0, index === 0 ? 0.32 : -0.32);
+
+  layouts["hull.grille"] = ({ index }) =>
+    new THREE.Matrix4()
+      .makeTranslation(0, 0, index === 0 ? 0.52 : -0.52)
+      .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+
+  layouts["hull.towHook"] = ({ index }) => {
+    const z = index % 2 === 0 ? 0.6 : -0.6;
+    const rear = index >= 2;
+    const m = new THREE.Matrix4().makeTranslation(rear ? 0.913 : -4.503, -0.16, z);
+    if (!rear) m.multiply(new THREE.Matrix4().makeRotationY(Math.PI));
+    return m;
+  };
+
+  layouts["hull.headlight"] = ({ index }) =>
+    new THREE.Matrix4()
+      .makeTranslation(0, 0, index === 0 ? 1.45 : -1.45)
+      .multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
+
   return layouts;
 }
 
@@ -752,6 +774,179 @@ function buildHullParts(): PartDefinition[] {
         "发动机舱盖外翼（Motorabdeckung Flügel）：x -0.681 ~ 0.91（与发动机舱盖同起止）、y 1.078 ~ 1.105（顶面与舱盖 1.105 齐平，下表面离赞助板顶板 1.075 留 3mm）、z ±0.9655 ~ ±1.78（内缘离舱盖 3mm）。作用：把 30mm 阶梯甲板补到上部车体全宽，消除后段赞助板上方的敞口与台阶侧面；实车发动机舱盖同样通到车体两侧外缘。",
     });
   }
+
+  // ===================== L4-h 尾部排气 / 发动机格栅 / 牵引钩 / 前灯 =====================
+
+  // 排气管 ×2：局部 +X 朝车后，x 0 为尾板外面（0.91），y 为世界高度
+  add({
+    id: "tiger.hull.exhaust_pipe",
+    name_cn: "排气管",
+    name_en: "Auspuffrohr",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 557,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.075, h: 0.03, at: [0.083, 0.06, 0], bevel: 0.004 },
+        { type: "cylinder", r: 0.045, h: 0.9, at: [0.083, 0.525, 0], bevel: 0.003 },
+        { type: "cylinder", r: 0.045, h: 0.06, rTop: 0.062, at: [0.083, 1.005, 0], bevel: 0.003 },
+      ],
+    },
+    material: "steel_worn",
+    instances: 2,
+    indexed: true,
+    instance_layout: "hull.exhaust",
+    mate: { type: "absolute", position: [0.91, 0, 0] },
+    source:
+      "排气管（Auspuffrohr）：立管 ⌀90、高 900，底部法兰 ⌀150×30（离尾板外面 10mm，法兰与尾板留 3mm 缝），顶端扩口 ⌀124。两根对称装在尾板 z ±0.32，占 y 0.06 ~ 1.04。实车排气口高出尾板、带装甲护罩（见 exhaust_shroud）。",
+  });
+
+  add({
+    id: "tiger.hull.exhaust_shroud",
+    name_cn: "排气护罩",
+    name_en: "Auspuffschutz",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 558,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.02, h: 0.62, d: 0.19, at: [0.155, 0.56, 0], bevel: 0.003 },
+        { type: "box", w: 0.12, h: 0.62, d: 0.02, at: [0.095, 0.56, 0.085], bevel: 0.003 },
+        { type: "box", w: 0.12, h: 0.62, d: 0.02, at: [0.095, 0.56, -0.085], bevel: 0.003 },
+        { type: "box", w: 0.14, h: 0.02, d: 0.03, at: [0.095, 0.9, 0.1], bevel: 0.003 },
+        { type: "box", w: 0.14, h: 0.02, d: 0.03, at: [0.095, 0.9, -0.1], bevel: 0.003 },
+      ],
+    },
+    material: "armor_steel",
+    instances: 2,
+    indexed: true,
+    instance_layout: "hull.exhaust",
+    mate: { type: "absolute", position: [0.91, 0, 0] },
+    source:
+      "排气护罩（Auspuffschutz）：三面围板 + 顶板，包住立管外侧与两侧（内侧面离管壁 32mm，板厚 20），下缘 y 0.25、上缘 0.89。实车为带加强筋的薄装甲罩，防止排气灼伤与碰撞。",
+  });
+
+  // 发动机舱散热格栅 ×2（百叶）
+  add({
+    id: "tiger.hull.engine_grille",
+    name_cn: "发动机舱散热格栅",
+    name_en: "Kühlerlüftung",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 559,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "louver", count: 9, w: 0.6, h: 0.54, slantDeg: 40, t: 0.008 },
+        { type: "box", w: 0.03, h: 0.6, d: 0.03, at: [-0.315, 0, 0], bevel: 0.003 },
+        { type: "box", w: 0.03, h: 0.6, d: 0.03, at: [0.315, 0, 0], bevel: 0.003 },
+        { type: "box", w: 0.66, h: 0.03, d: 0.03, at: [0, -0.285, 0], bevel: 0.003 },
+        { type: "box", w: 0.66, h: 0.03, d: 0.03, at: [0, 0.285, 0], bevel: 0.003 },
+      ],
+    },
+    material: "armor_steel",
+    instances: 2,
+    indexed: true,
+    instance_layout: "hull.grille",
+    mate: { type: "absolute", position: [0.12, 1.124, 0] },
+    source:
+      "发动机舱散热格栅（Kühlerlüftung）：9 片 40° 斜百叶，格栅框 660×630×30，装在发动机舱盖上方（框底离舱盖 1mm），x 中心 0.12、z ±0.52。实车左右各一，格栅下方是风扇与散热器（L1 已建模）。",
+  });
+
+  // 牵引钩 ×4（前 2 后 2）
+  add({
+    id: "tiger.hull.tow_hook",
+    name_cn: "牵引钩",
+    name_en: "Abschleppöse",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 560,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.03, h: 0.24, d: 0.18, at: [0.015, 0, 0], bevel: 0.004 },
+        { type: "box", w: 0.12, h: 0.045, d: 0.06, at: [0.09, 0.085, 0], bevel: 0.004 },
+        { type: "box", w: 0.12, h: 0.045, d: 0.06, at: [0.09, -0.085, 0], bevel: 0.004 },
+        { type: "box", w: 0.045, h: 0.21, d: 0.06, at: [0.14, 0, 0], bevel: 0.004 },
+      ],
+    },
+    material: "steel",
+    instances: 4,
+    indexed: true,
+    instance_layout: "hull.towHook",
+    mate: { type: "absolute" },
+    source:
+      "牵引钩（Abschleppöse）：底座板 30×240×180、上下臂各 120×45×60、端部立板 45×210×60，形成一个 100×130 的封闭钩眼（内空 100×130）。前两件装在首板外面 x -4.503、y 0.02、z ±0.60；后两件装在尾板 x 0.913 同高同 z。与板面留 3mm 缝、用 4 颗 M20 固定（随 L5 紧固件批）。",
+  });
+
+  // 前大灯（灯体 + 灯镜两件同布局）
+  add({
+    id: "tiger.hull.headlight_body",
+    name_cn: "前大灯灯体",
+    name_en: "Scheinwerfer",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 561,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.1, h: 0.14, at: [0, 0, 0], bevel: 0.006 },
+        { type: "tube", rOuter: 0.105, rInner: 0.083, h: 0.035, at: [0, 0.078, 0], segments: 24 },
+        { type: "box", w: 0.1, h: 0.1, d: 0.1, at: [-0.12, 0, 0], bevel: 0.006 },
+      ],
+    },
+    material: "armor_steel",
+    instances: 2,
+    indexed: true,
+    instance_layout: "hull.headlight",
+    mate: { type: "absolute", position: [-4.36, 0.36, 0] },
+    source:
+      "前大灯（Scheinwerfer）：灯壳 ⌀200×140、外圈框 ⌀210、下方支架 100×100×100。灯轴水平朝前（局部 +Y 经 rotZ(90°) 转到世界 -X），灯面在 x -4.435；支架落在履带挡板上方（挡板顶 0.115，支架底 0.15）。左右各一，z ±1.45。",
+  });
+
+  add({
+    id: "tiger.hull.headlight_lens",
+    name_cn: "前大灯灯镜",
+    name_en: "Scheinwerferglas",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 562,
+    geometry: {
+      type: "merge",
+      parts: [{ type: "cylinder", r: 0.078, h: 0.02, bevel: 0.004, at: [0, 0.082, 0] }],
+    },
+    material: "lamp_glass",
+    instances: 2,
+    indexed: true,
+    instance_layout: "hull.headlight",
+    mate: { type: "absolute", position: [-4.36, 0.36, 0] },
+    source:
+      "灯镜（Scheinwerferglas）：⌀166×22 玻璃，压在外圈框内、略凹于框口 6mm；与灯体分离建模以便单独赋透光材质。",
+  });
+
+  // 行军灯（Notek）
+  add({
+    id: "tiger.hull.notek_lamp",
+    name_cn: "行军灯",
+    name_en: "Notek-Tarnleuchte",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 563,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.1, h: 0.12, d: 0.1, at: [0, 0.06, 0], bevel: 0.008 },
+        { type: "box", w: 0.12, h: 0.02, d: 0.12, at: [0.01, 0.13, 0], bevel: 0.004 },
+        { type: "box", w: 0.05, h: 0.05, d: 0.11, at: [0.02, -0.02, 0], bevel: 0.004 },
+      ],
+    },
+    material: "armor_steel",
+    mate: { type: "absolute", position: [-4.3, 0.22, -1.62] },
+    source:
+      "行军灯（Notek-Tarnleuchte）：灯体 100×120×100、上檐 120×20×120、下座 50×50×110，装在左前履带挡板上（座底 y 0.13，挡板顶 0.115，留 15mm 走线），灯面朝前。实车为夜间纵队行驶用的低照度灯，带遮光檐。",
+  });
 
   return parts;
 }
