@@ -60,6 +60,190 @@ function breachOf(
   return { kind: "circle", x: Number(raw[0]), y: Number(raw[1]), r: Number(raw[2]) };
 }
 
+// ---------------------------------------------------------------------------
+// 不规则破口几何：径向噪声轮廓 + 入口碟形崩落 + 出口扩张翻卷花瓣 + 放射裂纹
+// ---------------------------------------------------------------------------
+
+export interface BreachPoint {
+  x: number;
+  y: number;
+  r: number;
+  angle: number;
+  spike: boolean;
+}
+
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * 破口轮廓：12–20 边形的径向噪声环；3 个顶点拉成撕裂尖角，另有 20% 概率的缺口。
+ * 不是正圆——这是「炸开/撕裂」和「切出来一个圆」的区别。
+ */
+export function irregularBreachLoop(
+  cx: number,
+  cy: number,
+  radius: number,
+  seed = 1,
+  count = 18,
+): BreachPoint[] {
+  const rand = mulberry32(seed);
+  const n = Math.max(12, Math.min(20, Math.round(count)));
+  const spikes = new Set<number>();
+  while (spikes.size < 3) spikes.add(Math.floor(rand() * n));
+  const points: BreachPoint[] = [];
+  for (let i = 0; i < n; i++) {
+    const angle = (i / n) * Math.PI * 2 + (rand() - 0.5) * 0.18;
+    const spike = spikes.has(i);
+    const notch = rand() < 0.22 ? 0.52 + rand() * 0.16 : 0.82 + rand() * 0.4;
+    const r = radius * (spike ? 1.32 + rand() * 0.42 : notch);
+    points.push({
+      x: cx + Math.cos(angle) * r,
+      y: cy + Math.sin(angle) * r,
+      r,
+      angle,
+      spike,
+    });
+  }
+  return points;
+}
+
+function scaleLoop(
+  points: BreachPoint[],
+  cx: number,
+  cy: number,
+  scale: number,
+  seed: number,
+): BreachPoint[] {
+  const rand = mulberry32(seed);
+  return points.map((point) => {
+    const r = point.r * scale * (0.86 + rand() * 0.3);
+    return {
+      ...point,
+      r,
+      x: cx + Math.cos(point.angle) * r,
+      y: cy + Math.sin(point.angle) * r,
+    };
+  });
+}
+
+/** 两圈不规则轮廓之间拉一层曲面（双面三角形，正反都可见）。 */
+function loftLoops(
+  inner: BreachPoint[],
+  outer: BreachPoint[],
+  zInner: number,
+  zOuter: number,
+): THREE.BufferGeometry {
+  const positions: number[] = [];
+  for (let i = 0; i < inner.length; i++) {
+    const j = (i + 1) % inner.length;
+    const a = [inner[i]!.x, inner[i]!.y, zInner];
+    const b = [inner[j]!.x, inner[j]!.y, zInner];
+    const c = [outer[j]!.x, outer[j]!.y, zOuter];
+    const d = [outer[i]!.x, outer[i]!.y, zOuter];
+    positions.push(...a, ...b, ...c, ...a, ...c, ...d);
+    positions.push(...a, ...c, ...b, ...a, ...d, ...c);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/** 入口崩落碟形：外圈贴表面、内圈下陷 7mm，形成一圈被压凹的崩落区。 */
+function entryDish(
+  entry: BreachPoint[],
+  cx: number,
+  cy: number,
+  zSurface: number,
+  outSign: 1 | -1,
+  seed: number,
+): THREE.BufferGeometry {
+  const outer = scaleLoop(entry, cx, cy, 2.15, seed);
+  return loftLoops(
+    entry.map((point) => ({ ...point })),
+    outer,
+    zSurface - outSign * 0.007,
+    zSurface + outSign * 0.0012,
+  );
+}
+
+/** 放射状裂纹：从破口边缘向外伸出的窄棱（几何槽，不靠贴图）。 */
+function entryCracks(
+  entry: BreachPoint[],
+  cx: number,
+  cy: number,
+  zSurface: number,
+  outSign: 1 | -1,
+  seed: number,
+): THREE.BufferGeometry[] {
+  const rand = mulberry32(seed);
+  const count = 8;
+  const cracks: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < count; i++) {
+    const point = entry[Math.floor(((i + 0.5) / count) * entry.length) % entry.length]!;
+    const length = point.r * (0.24 + rand() * 0.55);
+    const crack = bevelBoxGeometry(0.0045 + rand() * 0.004, length, 0.0035, 0.0008);
+    crack.translate(0, point.r + length * 0.36, 0);
+    crack.rotateZ(point.angle - Math.PI / 2);
+    crack.translate(cx, cy, zSurface + outSign * 0.0018);
+    cracks.push(crack);
+  }
+  return cracks;
+}
+
+/** 出口花瓣：破口背面（内侧）沿径向翻起的撕裂纹/大片卷边。 */
+function exitPetals(
+  exit: BreachPoint[],
+  zExit: number,
+  innerSide: 1 | -1,
+  seed: number,
+): THREE.BufferGeometry[] {
+  const rand = mulberry32(seed);
+  const petals: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < exit.length; i++) {
+    const point = exit[i]!;
+    if (!point.spike && i % 3 !== 1) continue;
+    const length = point.r * (0.28 + rand() * 0.4);
+    const width = point.r * (0.12 + rand() * 0.1);
+    const petal = bevelBoxGeometry(width, length, 0.006, 0.0012);
+    petal.translate(0, length * 0.45, 0);
+    petal.rotateX(innerSide * (0.55 + rand() * 0.35));
+    petal.rotateZ(point.angle - Math.PI / 2);
+    petal.translate(point.x, point.y, zExit);
+    petals.push(petal);
+  }
+  return petals;
+}
+
+/** 入口边缘的小卷边（比出口花瓣小，主要破掉「平切口」的感觉）。 */
+function entryRolls(
+  entry: BreachPoint[],
+  zSurface: number,
+  outSign: 1 | -1,
+  seed: number,
+): THREE.BufferGeometry[] {
+  const rand = mulberry32(seed);
+  const rolls: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < entry.length; i += 4) {
+    const point = entry[i]!;
+    const length = point.r * (0.12 + rand() * 0.18);
+    const roll = bevelBoxGeometry(0.016, length, 0.005, 0.001);
+    roll.translate(0, point.r + length * 0.3, 0);
+    roll.rotateX(outSign * (0.5 + rand() * 0.5));
+    roll.rotateZ(point.angle - Math.PI / 2);
+    roll.translate(point.x, point.y, zSurface);
+    rolls.push(roll);
+  }
+  return rolls;
+}
+
 /** 带破口的装甲板（可选保留原有开孔），含倒角。 */
 function breachedPlate(
   w: number,
@@ -68,6 +252,7 @@ function breachedPlate(
   holes: Array<[number, number, number]>,
   rects: Array<[number, number, number, number]>,
   breach: ReturnType<typeof breachOf>,
+  entryLoop?: BreachPoint[],
 ): THREE.BufferGeometry {
   const bevel = Math.max(Math.min(0.003, t * 0.3, w * 0.08, h * 0.08), 0.0004);
   const hw = w / 2 - bevel;
@@ -95,9 +280,21 @@ function breachedPlate(
     shape.holes.push(path);
   }
   if (breach?.kind === "circle") {
-    const path = new THREE.Path();
-    path.absarc(breach.x, breach.y, breach.r + bevel, 0, Math.PI * 2, true);
-    shape.holes.push(path);
+    if (entryLoop) {
+      // 不规则破口（顺时针给孔洞）；不是正圆
+      const path = new THREE.Path();
+      const ordered = [...entryLoop].reverse();
+      ordered.forEach((point, index) => {
+        if (index === 0) path.moveTo(point.x, point.y);
+        else path.lineTo(point.x, point.y);
+      });
+      path.closePath();
+      shape.holes.push(path);
+    } else {
+      const path = new THREE.Path();
+      path.absarc(breach.x, breach.y, breach.r + bevel, 0, Math.PI * 2, true);
+      shape.holes.push(path);
+    }
   } else if (breach?.kind === "rect") {
     const ex = breach.w / 2 + bevel;
     const ey = breach.h / 2 + bevel;
@@ -216,10 +413,30 @@ const damagePlate: GeometryBuilder = (spec) => {
   const ribs = Math.round(num(params, "ribs", 3));
   const pipe = Boolean(params?.pipe ?? true);
   const wires = Math.round(num(params, "wires", 2));
+  const seed = Math.round(num(params, "seed", 1));
+
+  const zInner = innerSide * (t / 2);
+  const zSurface = -zInner;
+  const outSign: 1 | -1 = innerSide > 0 ? -1 : 1;
+  const entryLoop =
+    breach.kind === "circle"
+      ? irregularBreachLoop(breach.x, breach.y, breach.r, seed, 18)
+      : null;
+  const features: THREE.BufferGeometry[] = [];
+  if (entryLoop) {
+    const exitLoop = scaleLoop(entryLoop, breach.x, breach.y, 1.8, seed + 17);
+    const zExit = zInner + innerSide * 0.075;
+    // 入口：碟形崩落 + 放射裂纹 + 小卷边；出口：扩张漏斗 + 大片翻卷花瓣
+    features.push(entryDish(entryLoop, breach.x, breach.y, zSurface, outSign, seed + 3));
+    features.push(...entryCracks(entryLoop, breach.x, breach.y, zSurface, outSign, seed + 5));
+    features.push(...entryRolls(entryLoop, zSurface, outSign, seed + 7));
+    features.push(loftLoops(entryLoop, exitLoop, zInner, zExit));
+    features.push(...exitPetals(exitLoop, zExit, innerSide, seed + 9));
+  }
 
   const parts: THREE.BufferGeometry[] = [
-    breachedPlate(w, h, t, holesOf(params), rectsOf(params), breach),
-    ...tornFlaps(breach, t, innerSide),
+    breachedPlate(w, h, t, holesOf(params), rectsOf(params), breach, entryLoop ?? undefined),
+    ...(entryLoop ? features : tornFlaps(breach, t, innerSide)),
     ...innerStructure(breach, t, innerSide, ribs, pipe, wires),
   ];
   const merged = mergeGeometries(parts);

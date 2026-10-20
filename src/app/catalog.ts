@@ -195,6 +195,16 @@ export const CATALOG: StageModel[] = [
         label: "重击（大口径）",
         hint: "榴弹命中：初焰闪 → 火球 → 冲击波 → 火花/破片 → 烟 → 焦痕；车体重挫 + 悬挂回弹",
       },
+      {
+        id: "hit_oblique",
+        label: "斜角命中",
+        hint: "穿甲弹擦角命中：椭圆撕裂口 + 不规则翻卷边缘 + 上游跳弹犁沟/掉漆",
+      },
+      {
+        id: "hit_ricochet",
+        label: "跳弹（未穿）",
+        hint: "跳弹未穿透：长条犁沟 + 碟形凹陷 + 崩落掉漆，没有孔",
+      },
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
     ],
     actions: [
@@ -206,6 +216,8 @@ export const CATALOG: StageModel[] = [
       { id: "aim", group: "火炮", label: "炮塔瞄准", kind: "machine-state", state: "aiming" },
       { id: "hit-light", group: "受击", label: "轻击（小口径）", kind: "machine-state", state: "hit_light" },
       { id: "hit-heavy", group: "受击", label: "重击（大口径）", kind: "machine-state", state: "hit_heavy" },
+      { id: "hit-oblique", group: "受击", label: "斜角命中", kind: "machine-state", state: "hit_oblique" },
+      { id: "hit-ricochet", group: "受击", label: "跳弹（未穿）", kind: "machine-state", state: "hit_ricochet" },
       { id: "damage-intact", group: "战损", label: "完好", kind: "damage", level: "intact" },
       { id: "damage-dented", group: "战损", label: "破损（凹陷/裂痕）", kind: "damage", level: "damaged" },
       { id: "damage-broken", group: "战损", label: "破碎（断面露内构）", kind: "damage", level: "broken" },

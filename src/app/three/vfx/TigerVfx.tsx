@@ -37,6 +37,10 @@ import { useStageStore } from "@/app/state/stageStore";
 const TIGER_ID = "tiger";
 /** 命中点：炮塔右侧装甲外表面（炮塔壳体 z ±0.94，与默认 3/4 视角同侧）。 */
 const IMPACT = new THREE.Vector3(-1.35, 1.52, 0.955);
+/** 斜角命中：椭圆撕裂口 + 上游跳弹划痕。 */
+const OBLIQUE = new THREE.Vector3(-1.75, 1.45, 0.955);
+/** 跳弹未穿：只有犁沟/凹陷/崩落。 */
+const RICOCHET = new THREE.Vector3(-1.3, 1.36, 0.955);
 const IMPACT_NORMAL = new THREE.Vector3(0, 0, 1);
 const RING = new THREE.Vector3(-1.65, 1.16, 0);
 const ENGINE_DECK = new THREE.Vector3(0.52, 1.16, 0.34);
@@ -70,6 +74,9 @@ interface VfxAssets {
   shockTexture: THREE.Texture;
   scorchTexture: THREE.Texture;
   holeTexture: THREE.Texture;
+  ricochetTexture: THREE.Texture;
+  /** 静态破碎板的热影响/掉漆环（中心透明，叠在几何破口周围）。 */
+  heatRingTexture: THREE.Texture;
   debrisGeometry: THREE.BufferGeometry;
   debrisMaterial: THREE.MeshStandardMaterial;
   dispose(): void;
@@ -202,15 +209,174 @@ function makeAssets(): VfxAssets {
     }
   });
 
-  const holeTexture = canvasTexture(128, (ctx) => {
-    const rim = ctx.createRadialGradient(64, 64, 8, 64, 64, 62);
-    rim.addColorStop(0, "rgba(4,4,4,1)");
-    rim.addColorStop(0.35, "rgba(10,9,8,0.98)");
-    rim.addColorStop(0.52, "rgba(95,78,58,0.9)");
-    rim.addColorStop(0.66, "rgba(30,24,18,0.75)");
-    rim.addColorStop(1, "rgba(20,16,12,0)");
-    ctx.fillStyle = rim;
-    ctx.fillRect(0, 0, 128, 128);
+  // 弹孔：不规则撕裂孔（18 边形径向噪声 + 3 个尖角）+ 热影响蓝黑圈 +
+  // 崩落掉漆 + 放射裂纹。绝不是正圆。
+  const holeTexture = canvasTexture(256, (ctx) => {
+    const rand = seeded(59);
+    const cx = 128;
+    const cy = 128;
+    const heat = ctx.createRadialGradient(cx, cy, 26, cx, cy, 120);
+    heat.addColorStop(0, "rgba(12,10,8,0)");
+    heat.addColorStop(0.3, "rgba(38,48,64,0.55)");
+    heat.addColorStop(0.48, "rgba(104,66,30,0.42)");
+    heat.addColorStop(0.72, "rgba(28,22,18,0.5)");
+    heat.addColorStop(1, "rgba(18,14,11,0)");
+    ctx.fillStyle = heat;
+    ctx.fillRect(0, 0, 256, 256);
+
+    // 崩落/掉漆：孔外一圈不规则浅色金属斑与暗斑
+    for (let i = 0; i < 74; i++) {
+      const angle = rand() * Math.PI * 2;
+      const distance = 48 + rand() * 74;
+      const x = cx + Math.cos(angle) * distance;
+      const y = cy + Math.sin(angle) * distance;
+      const r = 1.5 + rand() * 7;
+      ctx.fillStyle =
+        rand() < 0.55
+          ? `rgba(${125 + Math.round(rand() * 40)},${112 + Math.round(rand() * 30)},${88 + Math.round(rand() * 25)},${0.18 + rand() * 0.3})`
+          : `rgba(22,18,14,${0.18 + rand() * 0.3})`;
+      ctx.beginPath();
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * Math.PI * 2;
+        const rr = r * (0.55 + rand() * 0.75);
+        const px = x + Math.cos(a) * rr;
+        const py = y + Math.sin(a) * rr;
+        if (k === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 放射裂纹
+    for (let i = 0; i < 11; i++) {
+      const angle = (i / 11) * Math.PI * 2 + (rand() - 0.5) * 0.3;
+      const start = 34 + rand() * 8;
+      const length = 22 + rand() * 74;
+      ctx.strokeStyle = `rgba(8,7,6,${0.35 + rand() * 0.5})`;
+      ctx.lineWidth = 0.8 + rand() * 2.6;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(angle) * start, cy + Math.sin(angle) * start);
+      const mid = start + length * 0.55;
+      ctx.lineTo(
+        cx + Math.cos(angle + 0.06) * mid,
+        cy + Math.sin(angle + 0.06) * mid,
+      );
+      ctx.lineTo(cx + Math.cos(angle - 0.03) * (start + length), cy + Math.sin(angle - 0.03) * (start + length));
+      ctx.stroke();
+    }
+
+    // 不规则孔：18 边形、3 个尖角、随机缺口
+    const spikes = new Set<number>();
+    while (spikes.size < 3) spikes.add(Math.floor(rand() * 18));
+    const points: Array<[number, number]> = [];
+    for (let i = 0; i < 18; i++) {
+      const angle = (i / 18) * Math.PI * 2 + (rand() - 0.5) * 0.2;
+      const spike = spikes.has(i);
+      const notch = rand() < 0.22 ? 0.52 + rand() * 0.16 : 0.8 + rand() * 0.36;
+      const r = 42 * (spike ? 1.28 + rand() * 0.38 : notch);
+      points.push([cx + Math.cos(angle) * r, cy + Math.sin(angle) * r]);
+    }
+    const hole = ctx.createRadialGradient(cx, cy, 2, cx, cy, 42);
+    hole.addColorStop(0, "rgba(2,2,2,1)");
+    hole.addColorStop(0.55, "rgba(7,6,5,1)");
+    hole.addColorStop(0.85, "rgba(24,19,15,0.98)");
+    hole.addColorStop(1, "rgba(42,33,25,0.9)");
+    ctx.fillStyle = hole;
+    ctx.beginPath();
+    points.forEach(([x, y], index) => (index === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+    ctx.closePath();
+    ctx.fill();
+    // 撕裂边缘的金属亮边
+    ctx.strokeStyle = "rgba(158,138,108,0.55)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+
+  // 热影响/掉漆环：中心透明（露出几何破口与内构），只保留蓝黑退火圈和崩落漆片
+  const heatRingTexture = canvasTexture(256, (ctx) => {
+    const rand = seeded(83);
+    const cx = 128;
+    const cy = 128;
+    const ring = ctx.createRadialGradient(cx, cy, 34, cx, cy, 124);
+    ring.addColorStop(0, "rgba(0,0,0,0)");
+    ring.addColorStop(0.24, "rgba(0,0,0,0)");
+    ring.addColorStop(0.34, "rgba(44,58,82,0.22)");
+    ring.addColorStop(0.44, "rgba(120,72,36,0.18)");
+    ring.addColorStop(0.58, "rgba(34,26,20,0.16)");
+    ring.addColorStop(0.78, "rgba(24,20,16,0.08)");
+    ring.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = ring;
+    ctx.fillRect(0, 0, 256, 256);
+    // 斑驳退火/掉漆：不画连续圆环，只撒不规则的蓝黑/棕/金属碎斑
+    for (let i = 0; i < 150; i++) {
+      const angle = rand() * Math.PI * 2;
+      const distance = 40 + rand() * 84;
+      const x = cx + Math.cos(angle) * distance;
+      const y = cy + Math.sin(angle) * distance;
+      const r = 1.2 + rand() * 7;
+      const kind = rand();
+      ctx.fillStyle =
+        kind < 0.3
+          ? `rgba(${40 + Math.round(rand() * 30)},${52 + Math.round(rand() * 34)},${76 + Math.round(rand() * 34)},${0.12 + rand() * 0.28})`
+          : kind < 0.6
+            ? `rgba(${110 + Math.round(rand() * 40)},${70 + Math.round(rand() * 30)},${36 + Math.round(rand() * 24)},${0.12 + rand() * 0.26})`
+            : rand() < 0.5
+              ? `rgba(${135 + Math.round(rand() * 45)},${120 + Math.round(rand() * 35)},${92 + Math.round(rand() * 30)},${0.16 + rand() * 0.3})`
+              : `rgba(22,18,14,${0.14 + rand() * 0.24})`;
+      ctx.beginPath();
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2;
+        const rr = r * (0.55 + rand() * 0.7);
+        const px = x + Math.cos(a) * rr;
+        const py = y + Math.sin(a) * rr;
+        if (k === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+  });
+
+  // 跳弹：长条犁沟 + 亮金属擦痕 + 端部掉漆；没有穿透孔
+  const ricochetTexture = canvasTexture(256, (ctx) => {
+    const rand = seeded(71);
+    ctx.save();
+    ctx.translate(128, 128);
+    ctx.rotate(-0.08);
+    const dent = ctx.createLinearGradient(0, -26, 0, 30);
+    dent.addColorStop(0, "rgba(20,16,12,0)");
+    dent.addColorStop(0.35, "rgba(18,15,12,0.55)");
+    dent.addColorStop(0.55, "rgba(4,4,4,0.9)");
+    dent.addColorStop(0.72, "rgba(105,92,70,0.5)");
+    dent.addColorStop(1, "rgba(20,16,12,0)");
+    ctx.fillStyle = dent;
+    ctx.beginPath();
+    ctx.moveTo(-118, 4);
+    ctx.quadraticCurveTo(-20, -22, 118, -6);
+    ctx.quadraticCurveTo(10, 24, -118, 16);
+    ctx.closePath();
+    ctx.fill();
+    for (let i = 0; i < 5; i++) {
+      const offset = i * 4 - 8;
+      ctx.strokeStyle = i < 2 ? "rgba(190,172,140,0.5)" : "rgba(8,7,6,0.75)";
+      ctx.lineWidth = 1.2 + rand() * 1.8;
+      ctx.beginPath();
+      ctx.moveTo(-112, offset);
+      ctx.quadraticCurveTo(-10, offset - 14, 112, offset - 8);
+      ctx.stroke();
+    }
+    // 端部掉漆
+    for (let i = 0; i < 40; i++) {
+      const x = 60 + rand() * 80;
+      const y = -24 + rand() * 48;
+      const r = 1.5 + rand() * 5;
+      ctx.fillStyle = `rgba(${160 + Math.round(rand() * 55)},${150 + Math.round(rand() * 45)},${120 + Math.round(rand() * 35)},${0.3 + rand() * 0.45})`;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   });
 
   const fireMaterial = new THREE.MeshBasicMaterial({
@@ -253,6 +419,8 @@ function makeAssets(): VfxAssets {
     shockTexture,
     scorchTexture,
     holeTexture,
+    ricochetTexture,
+    heatRingTexture,
     debrisGeometry,
     debrisMaterial,
     dispose() {
@@ -263,6 +431,8 @@ function makeAssets(): VfxAssets {
       shockTexture.dispose();
       scorchTexture.dispose();
       holeTexture.dispose();
+      ricochetTexture.dispose();
+      heatRingTexture.dispose();
       fireMaterial.dispose();
       smokeMaterial.dispose();
       sparkMaterial.dispose();
@@ -527,17 +697,18 @@ function makeShockwave(
   return { mesh, material };
 }
 
-function makeScorch(
-  assets: VfxAssets,
+function makeDecal(
   position: THREE.Vector3,
   normal: THREE.Vector3,
-  size: number,
-  hole: boolean,
+  size: [number, number],
+  texture: THREE.Texture,
+  opacity = 0.95,
+  spin = 0,
 ): THREE.Mesh {
   const material = new THREE.MeshBasicMaterial({
-    map: hole ? assets.holeTexture : assets.scorchTexture,
+    map: texture,
     transparent: true,
-    opacity: hole ? 0.98 : 0.82,
+    opacity,
     depthWrite: false,
     polygonOffset: true,
     polygonOffsetFactor: -4,
@@ -546,8 +717,9 @@ function makeScorch(
   });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
   mesh.position.copy(position).addScaledVector(normal, 0.008);
-  mesh.scale.setScalar(size);
+  mesh.scale.set(size[0], size[1], 1);
   mesh.lookAt(position.clone().add(normal));
+  if (spin) mesh.rotateZ(spin);
   mesh.renderOrder = 8;
   return mesh;
 }
@@ -555,6 +727,7 @@ function makeScorch(
 export function TigerVfx() {
   const modelId = useStageStore((state) => state.modelId);
   const machineState = useStageStore((state) => state.machineState);
+  const damage = useStageStore((state) => state.damage);
   const rebuildToken = useStageStore((state) => state.rebuildToken);
   const { scene, camera } = useThree();
   const assets = useMemo(() => makeAssets(), []);
@@ -562,6 +735,16 @@ export function TigerVfx() {
   const root = useMemo(() => new THREE.Group(), []);
   const bursts = useRef<Burst[]>([]);
   const scorches = useRef<THREE.Mesh[]>([]);
+  const heatDecals = useRef<THREE.Mesh[]>([]);
+
+  const clearHeatDecals = () => {
+    for (const mesh of heatDecals.current) {
+      mesh.removeFromParent();
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+    }
+    heatDecals.current = [];
+  };
   const stateRef = useRef<string>("");
   const elapsed = useRef(0);
   const phase = useRef({ charge: false, main: false, spread: false, preheat: false });
@@ -580,11 +763,45 @@ export function TigerVfx() {
         (scorch.material as THREE.Material).dispose();
       }
       scorches.current = [];
+      clearHeatDecals();
       scene.remove(batch);
       scene.remove(root);
       // 不在这里 dispose assets：StrictMode 会 setup→cleanup→setup，提前释放会让第二遍用坏纹理
     };
   }, [scene, batch, root]);
+
+  // 静态破碎板的热影响/掉漆环：只在 damage=broken 时贴在三个几何破口周围
+  useEffect(() => {
+    clearHeatDecals();
+    if (modelId !== TIGER_ID || damage !== "broken") return;
+    const decals = [
+      makeDecal(
+        new THREE.Vector3(-4.506, 0.47, 0.42),
+        new THREE.Vector3(-1, 0, 0),
+        [0.82, 0.82],
+        assets.heatRingTexture,
+        0.62,
+      ),
+      makeDecal(
+        new THREE.Vector3(-3.99, 1.077, 0.15),
+        new THREE.Vector3(0, 1, 0),
+        [0.9, 0.9],
+        assets.heatRingTexture,
+        0.6,
+      ),
+      makeDecal(
+        new THREE.Vector3(0.66, 1.106, 0.35),
+        new THREE.Vector3(0, 1, 0),
+        [0.8, 0.8],
+        assets.heatRingTexture,
+        0.58,
+      ),
+    ];
+    for (const decal of decals) {
+      root.add(decal);
+      heatDecals.current.push(decal);
+    }
+  }, [damage, modelId, rebuildToken, assets, root]);
 
   useEffect(() => {
     // 重建/切模型时清掉旧特效（材质/几何随 burst 释放）
@@ -596,6 +813,7 @@ export function TigerVfx() {
       (scorch.material as THREE.Material).dispose();
     }
     scorches.current = [];
+    clearHeatDecals();
     stateRef.current = "";
   }, [rebuildToken, modelId, batch]);
 
@@ -683,16 +901,67 @@ export function TigerVfx() {
         position,
       );
 
-      // 焦痕/穿孔：留到状态切换；沿法线外推 7cm 避免埋进装甲面
+      // 焦痕/穿孔：留到状态切换；沿法线外推 7cm 避免埋进装甲面。
+      // 穿甲弹孔用不规则撕裂孔贴花（热影响圈/崩落/放射裂纹），不是正圆。
+      const decalPosition = position.clone().addScaledVector(normal, 0.07);
+      const ap = kind === "ap";
       addScorch(
-        makeScorch(
-          assets,
-          position.clone().addScaledVector(normal, 0.07),
+        makeDecal(
+          decalPosition,
           normal,
-          kind === "ap" ? 0.4 : kind === "he" ? 1.25 : 2.8,
-          kind === "ap",
+          ap ? [0.55, 0.55] : kind === "he" ? [1.25, 1.25] : [2.8, 2.8],
+          ap ? assets.holeTexture : assets.scorchTexture,
+          ap ? 0.98 : 0.82,
         ),
       );
+      addBurst(effect);
+    };
+
+    // 斜角命中 / 跳弹未穿：没有火球，只有闪光、定向火花和犁沟/椭圆撕裂口贴花
+    const grazeBurst = (kind: "oblique" | "ricochet") => {
+      const position = kind === "oblique" ? OBLIQUE : RICOCHET;
+      const effect = new Burst(1.8);
+      const flashSize = kind === "oblique" ? 1.5 : 1.05;
+      const flash = makeFlash(assets, position, flashSize);
+      effect.addBillboard(flash.mesh);
+      effect.addTween(0.22, (u) => {
+        flash.mesh.scale.setScalar(flashSize * (1 + u * 0.5));
+        flash.material.opacity = (1 - u) ** 1.5;
+      });
+      const light = new THREE.PointLight(0xffa055, 0, 10, 2);
+      light.position.copy(position).add(new THREE.Vector3(0, 0.15, 0.3));
+      effect.group.add(light);
+      effect.addTween(0.5, (u) => {
+        light.intensity = (kind === "oblique" ? 16 : 9) * (1 - u) ** 2;
+      });
+      effect.addSystem(
+        batch,
+        sparkSystem(assets, kind === "oblique" ? 42 : 28, kind === "oblique" ? 9 : 6),
+        position,
+      );
+      effect.addSystem(batch, smokeSystem(assets, 0.25, 0.4), position);
+      const decalPosition = position.clone().addScaledVector(IMPACT_NORMAL, 0.07);
+      if (kind === "oblique") {
+        // 斜角：椭圆撕裂口 + 上游犁沟
+        addScorch(
+          makeDecal(decalPosition, IMPACT_NORMAL, [0.95, 0.48], assets.holeTexture, 0.98, 0.12),
+        );
+        addScorch(
+          makeDecal(
+            decalPosition.clone().add(new THREE.Vector3(0.42, 0.03, 0)),
+            IMPACT_NORMAL,
+            [0.9, 0.27],
+            assets.ricochetTexture,
+            0.95,
+            0.16,
+          ),
+        );
+      } else {
+        // 跳弹：只有长条犁沟/凹陷/崩落，没有孔
+        addScorch(
+          makeDecal(decalPosition, IMPACT_NORMAL, [1.8, 0.5], assets.ricochetTexture, 0.96, 0.06),
+        );
+      }
       addBurst(effect);
     };
 
@@ -715,9 +984,16 @@ export function TigerVfx() {
       });
       addBurst(effect);
     }
-    if (machineState === "hit_light" && !phase.current.main && t >= 0.12) {
+    if (
+      (machineState === "hit_light" ||
+        machineState === "hit_oblique" ||
+        machineState === "hit_ricochet") &&
+      !phase.current.main &&
+      t >= 0.12
+    ) {
       phase.current.main = true;
-      impactBurst("ap");
+      if (machineState === "hit_light") impactBurst("ap");
+      else grazeBurst(machineState === "hit_oblique" ? "oblique" : "ricochet");
     }
     if (machineState === "hit_heavy" && !phase.current.main && t >= 0.12) {
       phase.current.main = true;
@@ -777,7 +1053,15 @@ export function TigerVfx() {
       effect.setTick((age) => {
         light.intensity = 14 + 5 * Math.sin(age * 17) + 3 * Math.sin(age * 31);
       });
-      addScorch(makeScorch(assets, new THREE.Vector3(0.52, 1.106, 0.34), new THREE.Vector3(0, 1, 0), 1.1, false));
+      addScorch(
+        makeDecal(
+          new THREE.Vector3(0.52, 1.106, 0.34),
+          new THREE.Vector3(0, 1, 0),
+          [1.1, 1.1],
+          assets.scorchTexture,
+          0.82,
+        ),
+      );
       addBurst(effect);
     }
 

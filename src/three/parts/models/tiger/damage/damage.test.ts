@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { buildModel } from "@/three/parts";
 import { findModel } from "@/app/catalog";
 import { applyDamage } from "@/app/three/pose";
+import { irregularBreachLoop } from "./kits";
 import {
   animateTigerBurning,
   animateTigerDetonation,
@@ -42,6 +43,18 @@ const DAMAGE_PARTS = [
 ];
 
 describe("tiger/P3 战损三态", () => {
+  it("破口轮廓是径向噪声的撕裂多边形，不是正圆", () => {
+    const loop = irregularBreachLoop(0, 0, 0.2, 11, 18);
+    expect(loop.length).toBe(18);
+    expect(loop.filter((point) => point.spike).length).toBe(3);
+    const radii = loop.map((point) => point.r);
+    const min = Math.min(...radii);
+    const max = Math.max(...radii);
+    // 尖角/缺口让最大/最小半径差出 1.6 倍以上
+    expect(max / min).toBeGreaterThan(1.6);
+    // 18 个顶点的半径不应只有少数几档（不是正圆）
+    expect(new Set(radii.map((r) => r.toFixed(4))).size).toBeGreaterThan(12);
+  });
   it("6 个关键件都有 damaged/broken 变体，切换只改可见性", () => {
     const built = build();
     for (const id of DAMAGE_PARTS) {
