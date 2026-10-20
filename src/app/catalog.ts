@@ -6,11 +6,14 @@ import {
   type ModelRegistry,
 } from "@/three/parts";
 import type { GeometryBuilder } from "@/three/parts/assembler/geometry";
+import { makeTigerLayouts, makeTigerRegistry, tigerBuilders } from "@/three/parts/models/tiger/registry";
 import {
-  makeTigerLayouts,
-  makeTigerRegistry,
-  tigerBuilders,
-} from "@/three/parts/models/tiger/registry";
+  animateTigerSuspension,
+  TIGER_MOTION_PARTS,
+  tigerDetachKeys,
+  tigerDetachOffset,
+  tigerInstanceLabel,
+} from "@/three/parts/models/tiger/motion";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -55,6 +58,14 @@ export interface StageModel {
   builders?: Record<string, GeometryBuilder>;
   /** 动画：只驱动节点，每帧调用前框架已 resetNodes。t 为秒。 */
   animate?: (assembled: AssembledModel, seconds: number) => void;
+  /** 由 animate 直接改写实例矩阵的零件（pose 层的爆炸/拆解据此取本帧位姿）。 */
+  motionParts?: string[];
+  /** 单实例拆解要一起移动的实例键（如负重轮 + 它的轮毂螺栓）。 */
+  detachKeys?: (partId: string, index: number, count: number) => string[];
+  /** 单实例拆解位移（模型空间，米）；返回 null 表示该实例不可拆。 */
+  detachOffset?: (partId: string, index: number, count: number) => [number, number, number] | null;
+  /** 实例检查器的人类可读标签（如「第 3 轴 · 第 2 排 · 右」）。 */
+  instanceLabel?: (partId: string, index: number, count: number) => string | null;
   /** 主角数字（状态栏/参数面板展示，必须由求解器或常量算出）。 */
   readouts?: (assembled: AssembledModel) => Array<{ label: string; value: string }>;
   actions?: StageAction[];
@@ -125,11 +136,23 @@ export const CATALOG: StageModel[] = [
     registry: makeTigerRegistry(),
     layouts: makeTigerLayouts(),
     builders: tigerBuilders,
+    animate: animateTigerSuspension,
+    motionParts: TIGER_MOTION_PARTS,
+    detachKeys: tigerDetachKeys,
+    detachOffset: tigerDetachOffset,
+    instanceLabel: tigerInstanceLabel,
     states: [
-      { id: "idle", label: "停机", hint: "发动机静止，可拖构建滑杆看装配" },
+      { id: "idle", label: "停机", hint: "悬挂静止，可拖构建滑杆看装配" },
+      {
+        id: "running",
+        label: "悬挂演示",
+        hint: "车体在扭杆上轻微浮沉，48 只负重轮各自转动；点单轮可拆下检查",
+      },
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
     ],
     actions: [
+      { id: "suspension-run", group: "机构", label: "悬挂演示", kind: "machine-state", state: "running" },
+      { id: "suspension-stop", group: "机构", label: "停机", kind: "machine-state", state: "idle" },
       { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
       { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
       { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },

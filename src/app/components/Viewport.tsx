@@ -1,4 +1,5 @@
 import { Boxes, Crosshair, Eye, Grid3x3, Layers, Tag } from "lucide-react";
+import { instanceKey } from "@/three/parts";
 import { StageCanvas } from "../three/StageCanvas";
 import { findModel } from "../catalog";
 import { useStageStore } from "../state/stageStore";
@@ -19,9 +20,30 @@ export function Viewport() {
   const assembled = useStageStore((state) => state.assembled);
   const machineState = useStageStore((state) => state.machineState);
   const selectedPart = useStageStore((state) => state.selectedPart);
+  const selectedInstance = useStageStore((state) => state.selectedInstance);
+  const detached = useStageStore((state) => state.detached);
+  const selectPart = useStageStore((state) => state.selectPart);
+  const toggleDetach = useStageStore((state) => state.toggleDetach);
   const model = findModel(modelId);
   const stateLabel = model.states?.find((state) => state.id === machineState)?.label ?? machineState;
   const readouts = assembled && model.readouts ? model.readouts(assembled) : [];
+
+  // 实例检查器：选中重复件里的某一实例（在视口里直接点中单只负重轮）
+  const selectedHandle = selectedPart && assembled ? assembled.getPart(selectedPart) : undefined;
+  const instanceCount = selectedHandle?.instances.length ?? 0;
+  const inspectInstance = selectedPart !== null && selectedInstance !== null && instanceCount > 1;
+  const instanceLabel =
+    inspectInstance && selectedPart !== null && selectedInstance !== null
+      ? (model.instanceLabel?.(selectedPart, selectedInstance, instanceCount) ?? null)
+      : null;
+  const instanceDetached =
+    inspectInstance && selectedPart !== null && selectedInstance !== null
+      ? detached.includes(instanceKey(selectedPart, selectedInstance))
+      : false;
+  const canDetach =
+    inspectInstance && selectedPart !== null && selectedInstance !== null
+      ? model.detachOffset?.(selectedPart, selectedInstance, instanceCount) != null
+      : false;
 
   return (
     <div className="viewport">
@@ -34,6 +56,52 @@ export function Viewport() {
 
       <ClippingDock />
       <IsolationView />
+
+      <div className="viewport__overlay viewport__overlay--tl">
+        {inspectInstance ? (
+          <div className="float-card instance-card">
+            <div className="instance-card__head">
+              <span>
+                实例 <span className="num">{selectedInstance! + 1}</span>
+                <span className="instance-card__of"> / {instanceCount}</span>
+              </span>
+              <span className="instance-card__part" title={selectedPart}>
+                {selectedPart!.replace(/^tiger\./, "")}
+              </span>
+            </div>
+            {instanceLabel ? <div className="instance-card__label">{instanceLabel}</div> : null}
+            <div className="instance-card__row">
+              <button
+                type="button"
+                className="btn btn--sm"
+                onClick={() =>
+                  selectPart(selectedPart!, (selectedInstance! - 1 + instanceCount) % instanceCount)
+                }
+              >
+                上一个
+              </button>
+              <button
+                type="button"
+                className="btn btn--sm"
+                onClick={() => selectPart(selectedPart!, (selectedInstance! + 1) % instanceCount)}
+              >
+                下一个
+              </button>
+              {canDetach ? (
+                <button
+                  type="button"
+                  className="btn btn--sm"
+                  aria-pressed={instanceDetached}
+                  title="把这个实例单独拆下来检查（不改变装配注册表）"
+                  onClick={() => toggleDetach(selectedPart!, selectedInstance!)}
+                >
+                  {instanceDetached ? "装回" : "拆下"}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       <div className="viewport__overlay viewport__overlay--tr">
         <div className="float-card toolstrip">
@@ -107,7 +175,11 @@ export function Viewport() {
           </span>
           {selectedPart ? (
             <span className="viewport__selection" title={selectedPart}>
-              选中 <span className="num">{selectedPart}</span>
+              选中{" "}
+              <span className="num">
+                {selectedPart}
+                {selectedInstance !== null ? `[${selectedInstance}]` : ""}
+              </span>
             </span>
           ) : null}
           {readouts.map((readout) => (

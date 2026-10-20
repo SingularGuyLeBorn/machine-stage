@@ -110,7 +110,9 @@ const RUNNING_CONSTANTS: Record<string, number> = {
   TORSION_ANCHOR_H: 0.1,
   TORSION_ANCHOR_T: 0.06,
   AXLE_R: 0.028,
-  AXLE_LEN: 0.75,
+  // 轴长 = 摆臂枢轴 z1.10 → 外侧轮外端面 z1.64；旧值 0.75 误用了履带宽度，
+  // 会让轴两端各伸出轮组 ~0.14m（侧视一根长杆），L5 侧视截图发现后修正。
+  AXLE_LEN: 0.51,
   /**
    * 诱导轮销中心半径的额外让量：履带板是平的（销间为弦），弦中点比销圆内缩
    * r·(1-cos(θ/2)) ≈ 4.2mm；不补这一块，平板中段会切进 ⌀600 诱导轮（实测 9mm）。
@@ -511,7 +513,8 @@ function makeLayouts(): Record<string, InstanceLayout> {
     const side: 1 | -1 = index < constants.WHEEL_STATIONS ? 1 : -1;
     const station = index % constants.WHEEL_STATIONS;
     const x = constants.WHEEL_X_FRONT + station * constants.WHEEL_STATION_PITCH;
-    return lateral(side, x, wheelCenterYOf(constants), side * (constants.TRACK_Z + 0.01));
+    // 轴从摆臂枢轴（TRACK_Z-0.12=1.37 为中心）穿到外侧轮端面，不能居中在履带中心
+    return lateral(side, x, wheelCenterYOf(constants), side * (constants.TRACK_Z - 0.105));
   };
 
   // —— L2 收尾：减震器 / 履带张紧调节机构 ——
@@ -560,8 +563,9 @@ function wheelProfile(): [string, string][] {
     ["0.152", "-WHEEL_W/2+0.035"],
     ["0.33", "-WHEEL_W/2+0.035"],
     ["0.352", "-WHEEL_W/2"],
-    ["WHEEL_R", "-WHEEL_W/2+0.004"],
-    ["WHEEL_R", "WHEEL_W/2-0.004"],
+    // 胎面收 4mm：24 段回转体转动时外接圆会顶进履带板，留 4mm 名义缝（与全车 2–5mm 口径一致）
+    ["WHEEL_R-0.004", "-WHEEL_W/2+0.004"],
+    ["WHEEL_R-0.004", "WHEEL_W/2-0.004"],
     ["0.352", "WHEEL_W/2"],
     ["0.33", "WHEEL_W/2-0.035"],
     ["0.152", "WHEEL_W/2-0.035"],

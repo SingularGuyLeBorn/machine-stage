@@ -10,9 +10,9 @@ import {
   validateRegistry,
   type AssembledModel,
 } from "@/three/parts";
-import { findModel } from "../catalog";
+import { findModel, type StageModel } from "../catalog";
 import { faultFromError, useStageStore } from "../state/stageStore";
-import { applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
+import { applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
 
 // ============================================================================
 // StageCanvas —— 中栏 3D 视口
@@ -25,6 +25,18 @@ import { applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
 // ============================================================================
 
 const HOME_DIRECTION = new THREE.Vector3(1.05, 0.78, 1.15).normalize();
+
+/** motionParts 每帧都要用 → 按模型缓存成 Set，避免 useFrame 里反复分配。 */
+const motionPartSets = new WeakMap<StageModel, ReadonlySet<string>>();
+function motionPartsOf(model: StageModel): ReadonlySet<string> | undefined {
+  if (!model.motionParts?.length) return undefined;
+  let set = motionPartSets.get(model);
+  if (!set) {
+    set = new Set(model.motionParts);
+    motionPartSets.set(model, set);
+  }
+  return set;
+}
 
 export function StageCanvas() {
   return (
@@ -211,16 +223,24 @@ function StageRuntime() {
     if (!assembled) return;
     const store = useStageStore.getState();
     const model = findModel(store.modelId);
-    if (store.machineState === "running" || store.scanPhase === "scanning") {
+    const running = store.machineState === "running";
+    if (running) {
       clockRef.current += Math.min(delta, 0.05);
     }
     assembled.resetNodes();
-    model.animate?.(assembled, clockRef.current);
+    // 停机时传 0：悬挂回到装配态（否则会停在上一帧的抬起位）
+    model.animate?.(assembled, running ? clockRef.current : 0);
     assembled.syncInstances();
-    if (store.views.explode) applyExplode(assembled, 1);
+    const motionParts = motionPartsOf(model);
+    if (store.views.explode) applyExplode(assembled, 1, motionParts);
+    if (model.detachOffset) {
+      applyDetach(assembled, store.detached, {
+        motionParts,
+        offsetOf: model.detachOffset,
+      });
+    }
     assembled.root.updateMatrixWorld(true);
   });
-
   // ---- 透视 / 高亮 ----
   useEffect(() => {
     if (!assembled) return;
@@ -228,11 +248,13 @@ function StageRuntime() {
   }, [assembled, views.xray]);
 
   const selectedPart = useStageStore((state) => state.selectedPart);
+  const selectedInstance = useStageStore((state) => state.selectedInstance);
   const hoveredPart = useStageStore((state) => state.hoveredPart);
+  const hoveredInstance = useStageStore((state) => state.hoveredInstance);
   useEffect(() => {
     if (!assembled) return;
-    applyHighlight(assembled, selectedPart, hoveredPart);
-  }, [assembled, selectedPart, hoveredPart]);
+    applyHighlight(assembled, selectedPart, hoveredPart, selectedInstance, hoveredInstance);
+  }, [assembled, selectedPart, selectedInstance, hoveredPart, hoveredInstance]);
 
   // ---- 总成标签 ----
   useEffect(() => {
@@ -343,20 +365,20 @@ function AssembledObject({
   onHover,
 }: {
   assembled: AssembledModel;
-  onSelect: (partId: string | null) => void;
-  onHover: (partId: string | null) => void;
+  onSelect: (partId: string | null, instance: number | null) => void;
+  onHover: (partId: string | null, instance: number | null) => void;
 }) {
   return (
     <primitive
       object={assembled.root}
       onPointerOver={(event: ThreeEvent<PointerEvent>) => {
         event.stopPropagation();
-        if (event.object.name) onHover(event.object.name);
+        if (event.object.name) onHover(event.object.name, event.instanceId ?? null);
       }}
-      onPointerOut={() => onHover(null)}
+      onPointerOut={() => onHover(null, null)}
       onClick={(event: ThreeEvent<MouseEvent>) => {
         event.stopPropagation();
-        onSelect(event.object.name || null);
+        onSelect(event.object.name || null, event.instanceId ?? null);
       }}
     />
   );

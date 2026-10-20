@@ -137,7 +137,12 @@ interface StageState {
   buildIndex: number;
 
   selectedPart: string | null;
+  /** 选中零件内的实例序号（InstancedMesh 的 instanceId；null = 整件）。 */
+  selectedInstance: number | null;
   hoveredPart: string | null;
+  hoveredInstance: number | null;
+  /** 单实例拆解（`partId#index`）—— 负重轮可单独拆下。 */
+  detached: string[];
   /** 展开态的报告（与 selectedPart 共用同一选中源的报告侧）。 */
   activeReport: number | null;
   /** 隔离小视图请求（null = 关闭）。 */
@@ -172,8 +177,10 @@ interface StageState {
   setStats(stats: StageStats): void;
   setBuildIndex(index: number): void;
   advanceBuild(step: number): void;
-  selectPart(partId: string | null): void;
-  hoverPart(partId: string | null): void;
+  selectPart(partId: string | null, instance?: number | null): void;
+  hoverPart(partId: string | null, instance?: number | null): void;
+  /** 单实例拆下 / 装回（含附属件，由模型的 detachKeys 决定）。 */
+  toggleDetach(partId: string, index: number): void;
   toggleView(key: ViewKey): void;
   setView(key: ViewKey, value: boolean): void;
   setColumnWidth(side: "left" | "right", width: number): void;
@@ -241,7 +248,10 @@ export const useStageStore = create<StageState>((set, get) => ({
   buildIndex: buildOrdersOf(initialModel.id).length,
 
   selectedPart: null,
+  selectedInstance: null,
   hoveredPart: null,
+  hoveredInstance: null,
+  detached: [],
   activeReport: null,
   isolation: null,
 
@@ -273,7 +283,10 @@ export const useStageStore = create<StageState>((set, get) => ({
       rebuildToken: get().rebuildToken + 1,
       buildIndex: buildOrdersOf(modelId).length,
       selectedPart: null,
+      selectedInstance: null,
       hoveredPart: null,
+      hoveredInstance: null,
+      detached: [],
       activeReport: null,
       isolation: null,
       allReports: [],
@@ -333,9 +346,24 @@ export const useStageStore = create<StageState>((set, get) => ({
 
   advanceBuild: (step) => get().setBuildIndex(get().buildIndex + step),
 
-  selectPart: (partId) => set({ selectedPart: partId, activeReport: null }),
+  selectPart: (partId, instance = null) =>
+    set({ selectedPart: partId, selectedInstance: instance, hoveredInstance: null, activeReport: null }),
 
-  hoverPart: (partId) => set({ hoveredPart: partId }),
+  hoverPart: (partId, instance = null) => set({ hoveredPart: partId, hoveredInstance: instance }),
+
+  toggleDetach: (partId, index) =>
+    set((state) => {
+      const model = findModel(state.modelId);
+      const handle = state.assembled?.getPart(partId);
+      const count = handle?.instances.length ?? 1;
+      const keys = model.detachKeys?.(partId, index, count) ?? [`${partId}#${index}`];
+      const attached = keys.every((key) => state.detached.includes(key));
+      return {
+        detached: attached
+          ? state.detached.filter((key) => !keys.includes(key))
+          : [...state.detached, ...keys.filter((key) => !state.detached.includes(key))],
+      };
+    }),
 
   toggleView: (key) => set((state) => ({ views: { ...state.views, [key]: !state.views[key] } })),
   setView: (key, value) => set((state) => ({ views: { ...state.views, [key]: value } })),
@@ -436,6 +464,9 @@ export const useStageStore = create<StageState>((set, get) => ({
       const started = performance.now();
       let raw: ClippingReport[] = [];
       try {
+        // 静态检测必须在装配态：悬挂动画把负重轮抬起时扫，会凭空多出一堆报告
+        assembled.resetNodes();
+        model.animate?.(assembled, 0);
         raw =
           kind === "sweep"
             ? detectSweep(assembled, {
