@@ -941,7 +941,7 @@ function hideTigerEffects(assembled: AssembledModel): void {
  * - aiming：炮塔回转 + 炮管俯仰；engine_start：起动机拖动→点火→怠速；
  * - burning：发动机舱起火（车体震颤；火焰/烟柱由 quarks VFX 叠加）；
  * - detonation：弹药殉爆（炮塔掀飞 + 车体冲击；火球/烟柱由 quarks VFX 叠加）；
- * - hit_light / hit_heavy：受击震荡（轻/重；命中火花/爆炸由 quarks VFX 叠加）；
+ * - hit_light / hit_heavy / hit_oblique / hit_ricochet：受击震荡（命中火花/贴花由 quarks VFX 叠加）；
  * - 其余状态：回到装配态（特效隐藏、节点由框架 resetNodes 复位）。
  */
 export function animateTiger(assembled: AssembledModel, seconds: number, state?: string): void {
@@ -982,7 +982,12 @@ export function animateTiger(assembled: AssembledModel, seconds: number, state?:
     animateTigerDetonation(assembled, seconds);
     return;
   }
-  if (state === "hit_light" || state === "hit_heavy") {
+  if (
+    state === "hit_light" ||
+    state === "hit_heavy" ||
+    state === "hit_oblique" ||
+    state === "hit_ricochet"
+  ) {
     hideTigerEffects(assembled);
     animateTigerHit(assembled, seconds, state === "hit_heavy" ? "heavy" : "light");
     return;

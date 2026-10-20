@@ -246,7 +246,9 @@ function StageRuntime() {
       state === "burning" ||
       state === "detonation" ||
       state === "hit_light" ||
-      state === "hit_heavy";
+      state === "hit_heavy" ||
+      state === "hit_oblique" ||
+      state === "hit_ricochet";
     // 切换机器状态时重置动画时钟：击发必须从 0s 开始，悬挂演示也应从头起步。
     if (state !== lastStateRef.current) {
       lastStateRef.current = state;
