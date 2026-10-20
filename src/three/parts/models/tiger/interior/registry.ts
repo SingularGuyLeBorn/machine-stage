@@ -1,4 +1,4 @@
-﻿import * as THREE from "three";
+import * as THREE from "three";
 import type { InstanceLayout } from "../../../assembler/assembler";
 import type { ModelRegistry, PartDefinition } from "../../../registry/types";
 
@@ -129,6 +129,56 @@ export function makeInteriorLayouts(): Record<string, InstanceLayout> {
   layouts[INTERIOR_LAYOUTS.mgGrip] = ({ index }) => {
     const list = [0.745, 0.815];
     return new THREE.Matrix4().makeTranslation(-3.945, 0.1, list[index] ?? list[0]!);
+  };
+
+  // —— L3 第二批：战斗舱（弹药 / 吊篮 / 座席）——
+  // 92 发基数：左右各 46，内外两排各 23；内排全 APCBC，外排前 2 发 APCBC、其余 HE
+  //（AP 50 / HE 42）。三个弹件共用同一套弹位表，药筒与弹丸严格同轴。
+  const ammoSlots: { x: number; z: number; ap: boolean }[] = [];
+  for (const sd of [1, -1] as const) {
+    for (const row of [0, 1] as const) {
+      for (let n = 0; n < 23; n++) {
+        ammoSlots.push({
+          x: -4.05 + n * 0.145,
+          z: sd * (row === 0 ? 1.18 : 1.42),
+          ap: row === 0 || n < 2,
+        });
+      }
+    }
+  }
+  const ammoAp = ammoSlots.filter((slot) => slot.ap);
+  const ammoHe = ammoSlots.filter((slot) => !slot.ap);
+
+  layouts["interior.ammoCase"] = ({ index }) => {
+    const slot = ammoSlots[index] ?? ammoSlots[0]!;
+    return new THREE.Matrix4().makeTranslation(slot.x, 0.153, slot.z);
+  };
+
+  layouts["interior.ammoProjectileAp"] = ({ index }) => {
+    const slot = ammoAp[index] ?? ammoAp[0]!;
+    return new THREE.Matrix4().makeTranslation(slot.x, 0.723, slot.z);
+  };
+
+  layouts["interior.ammoProjectileHe"] = ({ index }) => {
+    const slot = ammoHe[index] ?? ammoHe[0]!;
+    return new THREE.Matrix4().makeTranslation(slot.x, 0.723, slot.z);
+  };
+
+  layouts["interior.ammoRack"] = ({ index }) =>
+    index === 0
+      ? new THREE.Matrix4().makeTranslation(0, 0, 1.3)
+      : new THREE.Matrix4().makeTranslation(0, 0, -1.3).multiply(new THREE.Matrix4().makeRotationY(Math.PI));
+
+  layouts["interior.turretSeat"] = ({ index }) => {
+    const list: [number, number, number][] = [
+      [-1.32, 1.163, -0.44],
+      [-1.95, 1.163, -0.3],
+      [-1.95, 1.163, 0.35],
+    ];
+    const [x, y, z] = list[index] ?? list[0]!;
+    const m = new THREE.Matrix4().makeTranslation(x, y, z);
+    if (index === 2) m.multiply(new THREE.Matrix4().makeRotationY(Math.PI));
+    return m;
   };
 
   return layouts;
@@ -711,6 +761,219 @@ function buildInteriorParts(): PartDefinition[] {
     mate: { type: "absolute", position: [-2.55, -0.2, 0.79] },
     source:
       "杂件箱（300 × 200 × 180 + 盖沿 320×200）：放在地板上（箱底 -0.30，离地板 5mm），靠右侧板内表面 20mm，在变速箱尾端之后 20mm。",
+  });
+
+  // ===================== L3 第二批：战斗舱（弹药 / 吊篮 / 座席） =====================
+
+  add({
+    id: "tiger.interior.ammo_case",
+    name_cn: "88mm 药筒",
+    name_en: "8,8 cm Treibladungshülse",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 430,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.058, h: 0.02, at: [0, 0.01, 0], bevel: 0.002 },
+        { type: "cylinder", r: 0.052, h: 0.55, at: [0, 0.295, 0], bevel: 0.002 },
+      ],
+    },
+    material: "brass",
+    instances: 92,
+    indexed: true,
+    instance_layout: "interior.ammoCase",
+    mate: { type: "absolute" },
+    source:
+      "88mm 药筒（8,8 cm KwK 36 定装弹）：⌀105×570、底缘 ⌀116×20，全高 590，底面 y 0.153（赞助板地板面 0.15，留 3mm）。92 发基数：左右赞助板各 46 发、内外两排（z ±1.18 / ±1.42）各 23 发、纵向间距 145（x -4.05 ~ -0.86），后排离防火隔板 27mm。药筒与弹丸分为两个零件，便于殉爆连锁时逐发抛出。",
+  });
+
+  add({
+    id: "tiger.interior.ammo_projectile_ap",
+    name_cn: "88mm 穿甲弹丸（APCBC）",
+    name_en: "8,8 cm Pzgr. 39",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 431,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.044, h: 0.19, at: [0, 0.095, 0], bevel: 0.002 },
+        { type: "cylinder", r: 0.044, h: 0.08, rTop: 0.02, at: [0, 0.23, 0], bevel: 0.002 },
+        { type: "cylinder", r: 0.0455, h: 0.02, at: [0, 0.01, 0], bevel: 0.001 },
+      ],
+    },
+    material: "steel_worn",
+    instances: 50,
+    indexed: true,
+    instance_layout: "interior.ammoProjectileAp",
+    mate: { type: "absolute" },
+    source:
+      "穿甲弹丸（Pzgr. 39，APCBC）：弹体 ⌀88×190、风帽锥 80（顶 ⌀40）、弹带 ⌀91×20。弹底 y 0.723（药筒口 0.723），弹尖 1.033。50 发：内排 46 发全穿甲 + 外排每侧前 2 发，弹带与风帽按钢色区分 HE。",
+  });
+
+  add({
+    id: "tiger.interior.ammo_projectile_he",
+    name_cn: "88mm 榴弹丸（HE）",
+    name_en: "8,8 cm Sprgr. 43",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 432,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.044, h: 0.19, at: [0, 0.095, 0], bevel: 0.002 },
+        { type: "cylinder", r: 0.044, h: 0.075, rTop: 0.026, at: [0, 0.2275, 0], bevel: 0.002 },
+        { type: "cylinder", r: 0.0455, h: 0.02, at: [0, 0.01, 0], bevel: 0.001 },
+      ],
+    },
+    material: "paint",
+    instances: 42,
+    indexed: true,
+    instance_layout: "interior.ammoProjectileHe",
+    mate: { type: "absolute" },
+    source:
+      "榴弹丸（Sprgr. 43，HE）：弹体 ⌀88×190、弹头锥 75（顶 ⌀52，比穿甲弹钝）、弹带 ⌀91×20，整体按暗黄涂装区分弹种。42 发全部在外排（每侧 21 发）。弹底 y 0.723、弹尖 1.0255。",
+  });
+
+  add({
+    id: "tiger.interior.ammo_rack",
+    name_cn: "弹药架",
+    name_en: "Munitionshalterung",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 433,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 3.3, h: 0.04, d: 0.05, at: [0, 0.35, -0.245], bevel: 0.005 },
+        { type: "box", w: 3.3, h: 0.04, d: 0.05, at: [0, 0.35, 0.245], bevel: 0.005 },
+        { type: "box", w: 3.3, h: 0.04, d: 0.05, at: [0, 0.75, -0.245], bevel: 0.005 },
+        { type: "box", w: 3.3, h: 0.04, d: 0.05, at: [0, 0.75, 0.245], bevel: 0.005 },
+        { type: "box", w: 0.04, h: 0.46, d: 0.05, at: [-1.5, 0.55, -0.245], bevel: 0.004 },
+        { type: "box", w: 0.04, h: 0.46, d: 0.05, at: [-0.9, 0.55, -0.245], bevel: 0.004 },
+        { type: "box", w: 0.04, h: 0.46, d: 0.05, at: [-0.3, 0.55, -0.245], bevel: 0.004 },
+        { type: "box", w: 0.04, h: 0.46, d: 0.05, at: [0.3, 0.55, -0.245], bevel: 0.004 },
+        { type: "box", w: 0.04, h: 0.46, d: 0.05, at: [0.9, 0.55, -0.245], bevel: 0.004 },
+        { type: "box", w: 0.04, h: 0.46, d: 0.05, at: [1.5, 0.55, -0.245], bevel: 0.004 },
+        { type: "box", w: 0.04, h: 0.46, d: 0.05, at: [-1.5, 0.55, 0.245], bevel: 0.004 },
+        { type: "box", w: 0.04, h: 0.46, d: 0.05, at: [-0.9, 0.55, 0.245], bevel: 0.004 },
+        { type: "box", w: 0.04, h: 0.46, d: 0.05, at: [-0.3, 0.55, 0.245], bevel: 0.004 },
+        { type: "box", w: 0.04, h: 0.46, d: 0.05, at: [0.3, 0.55, 0.245], bevel: 0.004 },
+        { type: "box", w: 0.04, h: 0.46, d: 0.05, at: [0.9, 0.55, 0.245], bevel: 0.004 },
+        { type: "box", w: 0.04, h: 0.46, d: 0.05, at: [1.5, 0.55, 0.245], bevel: 0.004 },
+      ],
+    },
+    material: "steel",
+    instances: 2,
+    indexed: true,
+    instance_layout: "interior.ammoRack",
+    mate: { type: "absolute", position: [-2.455, 0, 0] },
+    source:
+      "弹药架（Munitionshalterung）：上下两层横梁（40×50、长 3300）夹住两排弹，横梁中心 y 0.35 / 0.75，内外侧 z 距架中心 ±245（离弹体最外缘 13mm）；6 组立柱（40×460×50）把横梁连成框架。左右各一，架中心 z ±1.30、x -2.455。",
+  });
+
+  add({
+    id: "tiger.interior.basket_floor",
+    name_cn: "炮塔吊篮地板",
+    name_en: "Turmboden",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 434,
+    geometry: { type: "tube", rOuter: 0.8, rInner: 0.34, h: 0.02, segments: 40 },
+    material: "armor_steel",
+    mate: { type: "absolute", position: [-1.65, 1.15, 0] },
+    source:
+      "炮塔吊篮地板（Turmboden）：环形板 ⌀1600 / 内孔 ⌀680、厚 20，中心 (x -1.65, z 0)，板面 y 1.14 ~ 1.16。外缘离炮塔内壁 60mm，底面离座圈上表面 1.108 留 32mm；中孔让开炮闩与炮手膝部。",
+  });
+
+  add({
+    id: "tiger.interior.basket_rail",
+    name_cn: "吊篮护栏",
+    name_en: "Turmboden Geländer",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 435,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "tube", rOuter: 0.82, rInner: 0.79, h: 0.03, at: [0, 1.32, 0], segments: 40 },
+        { type: "box", w: 0.03, h: 0.16, d: 0.03, at: [0.8, 1.245, 0], bevel: 0.003 },
+        { type: "box", w: 0.03, h: 0.16, d: 0.03, at: [-0.8, 1.245, 0], bevel: 0.003 },
+        { type: "box", w: 0.03, h: 0.16, d: 0.03, at: [0, 1.245, 0.8], bevel: 0.003 },
+        { type: "box", w: 0.03, h: 0.16, d: 0.03, at: [0, 1.245, -0.8], bevel: 0.003 },
+      ],
+    },
+    material: "steel",
+    mate: { type: "absolute", position: [-1.65, 0, 0] },
+    source:
+      "吊篮护栏（Turmboden Geländer）：扶手环 ⌀1640/⌀1580×30、中心 y 1.32；4 根立柱 30×160×30 落在吊篮地板面上方 5mm。护栏外缘离炮塔内壁 40mm，不随炮塔旋转卡死。",
+  });
+
+  add({
+    id: "tiger.interior.traverse_motor",
+    name_cn: "炮塔回转电机",
+    name_en: "Turmdrehwerk",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 436,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.26, h: 0.22, d: 0.2, at: [0, 0, 0], bevel: 0.008 },
+        { type: "cylinder", r: 0.08, h: 0.16, at: [0, 0.19, 0], bevel: 0.004 },
+        { type: "cylinder", r: 0.03, h: 0.12, at: [0, 0.33, 0], bevel: 0.003 },
+      ],
+    },
+    material: "steel",
+    mate: { type: "absolute", position: [-2.28, 1.3, 0] },
+    source:
+      "炮塔回转电机（Turmdrehwerk）：机体 260×220×200、上方法兰 ⌀160×160、输出轴 ⌀60×120，中心 (x -2.4, z 0)，底面 y 1.19（离吊篮地板面 1.16 留 30mm，实车坐在变速箱上）。位于炮闩正下方、炮手与装填手之间。",
+  });
+
+  add({
+    id: "tiger.interior.roof_fan",
+    name_cn: "炮塔排烟风扇",
+    name_en: "Turmlüfter",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 437,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "tube", rOuter: 0.14, rInner: 0.126, h: 0.06, at: [0, 0, 0], segments: 24 },
+        { type: "cylinder", r: 0.125, h: 0.012, at: [0, -0.005, 0], bevel: 0.002 },
+        { type: "cylinder", r: 0.03, h: 0.04, at: [0, 0.005, 0], bevel: 0.004 },
+      ],
+    },
+    material: "armor_steel",
+    mate: { type: "absolute", position: [-0.98, 1.78, -0.1] },
+    source:
+      "炮塔排烟风扇（Turmlüfter）：外罩筒 ⌀280/⌀252×60、叶轮盘 ⌀250×12、轮毂 ⌀60×60，中心 (x -0.98, z -0.10)，装在炮塔顶盖下方 31mm（顶盖内表面 1.811，风扇顶 1.81）。外观罩（L4-f）已在其正上方。",
+  });
+
+  add({
+    id: "tiger.interior.turret_seat",
+    name_cn: "炮塔座席",
+    name_en: "Turmsitz",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 438,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.055, h: 0.3, at: [0, 0.15, 0], bevel: 0.004 },
+        { type: "box", w: 0.36, h: 0.06, d: 0.36, at: [0, 0.32, 0], bevel: 0.01 },
+        { type: "box", w: 0.06, h: 0.28, d: 0.36, at: [0.16, 0.47, 0], bevel: 0.008 },
+      ],
+    },
+    material: "canvas_black",
+    instances: 3,
+    indexed: true,
+    instance_layout: "interior.turretSeat",
+    mate: { type: "absolute" },
+    source:
+      "炮塔座席（Turmsitz）：立柱 ⌀110×300、座垫 360×60×360、靠背 60×340×360。三席：车长 (-1.32, -0.44) 在指挥塔正下方、炮手 (-1.95, -0.30) 朝前、装填手 (-1.95, +0.35) 朝后（转 180°）。座面 y 1.485、靠背顶 1.833，离顶盖内表面 1.811 留 22mm；立柱底离吊篮地板面 3mm。",
   });
 
   return parts;
