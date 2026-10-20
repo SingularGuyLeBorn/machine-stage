@@ -1,10 +1,5 @@
 import { KJ } from "./constants";
-import {
-  HYDRAULICS,
-  jointOrigin,
-  type Side,
-  type Vec3,
-} from "./rig";
+import { HYDRAULICS, jointOrigin, type Side, type Vec3 } from "./rig";
 import {
   KingJoeParts,
   addHydraulic,
@@ -156,7 +151,7 @@ function addLegStructure(builder: KingJoeParts, side: Side): void {
     name_en: "thigh front armor",
     assembly: "legs",
     layer: 4,
-    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.5, h: 0.86, t: 0.04, corner: 0.08 } },
+    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.58, h: 0.9, t: 0.04, corner: 0.09 } },
     material: "silver",
     node: hip,
     mate: mateAt(hip, [legX, thighPlateY, 0.345]),
@@ -173,17 +168,6 @@ function addLegStructure(builder: KingJoeParts, side: Side): void {
     mate: mateAt(hip, [legX + 0.345 * s, thighPlateY, 0], [0, 90 * s, 0]),
   });
   builder.add({
-    id: pid("legs", `thigh_plate_inner_${side}`),
-    name_cn: "大腿内甲板",
-    name_en: "thigh inner armor",
-    assembly: "legs",
-    layer: 4,
-    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.56, h: 0.84, t: 0.035, corner: 0.08 } },
-    material: "silver_dark",
-    node: hip,
-    mate: mateAt(hip, [legX - 0.345 * s, thighPlateY, 0], [0, -90 * s, 0]),
-  });
-  builder.add({
     id: pid("legs", `thigh_plate_back_${side}`),
     name_cn: "大腿后甲板",
     name_en: "thigh rear armor",
@@ -194,17 +178,6 @@ function addLegStructure(builder: KingJoeParts, side: Side): void {
     node: hip,
     mate: mateAt(hip, [legX, thighPlateY + 0.25, -0.335]),
   });
-  rivetStripPart(builder, {
-    id: pid("legs", `thigh_rivets_${side}`),
-    name_cn: "大腿甲板铆钉",
-    name_en: "thigh armor rivets",
-    assembly: "legs",
-    node: hip,
-    world: [legX - 0.2, thighPlateY + 0.36, 0.373],
-    count: 6,
-    spacing: 0.075,
-  });
-
   // —— 膝：筒 / 球 / 衬套 / 金色膝甲 ——
   builder.add({
     id: pid("legs", `knee_tube_${side}`),
@@ -283,10 +256,10 @@ function addLegStructure(builder: KingJoeParts, side: Side): void {
     name_en: "calf front armor",
     assembly: "legs",
     layer: 4,
-    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.48, h: 0.82, t: 0.04, corner: 0.08 } },
+    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.56, h: 0.8, t: 0.04, corner: 0.09 } },
     material: "silver",
     node: knee,
-    mate: mateAt(knee, [legX, calfPlateY, 0.333]),
+    mate: mateAt(knee, [legX, calfPlateY - 0.03, 0.333]),
   });
   builder.add({
     id: pid("legs", `calf_plate_outer_${side}`),
@@ -423,6 +396,17 @@ function addLegStructure(builder: KingJoeParts, side: Side): void {
     node: ankle,
     mate: mateAt(ankle, [legX, 0.22, 0.62], [6, 0, 0]),
   });
+  builder.add({
+    id: pid("legs", `foot_side_plate_${side}`),
+    name_cn: "足侧甲",
+    name_en: "foot side armor",
+    assembly: "legs",
+    layer: 4,
+    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 1.0, h: 0.18, t: 0.03, corner: 0.06 } },
+    material: "silver_dark",
+    node: ankle,
+    mate: mateAt(ankle, [legX + 0.34 * s, 0.16, 0.1], [0, 90 * s, 0]),
+  });
   boltRingPart(builder, {
     id: pid("legs", `foot_bolts_${side}`),
     name_cn: "足背螺栓圈",
@@ -478,7 +462,7 @@ function addLegStructure(builder: KingJoeParts, side: Side): void {
     geometry: { type: "cylinder", r: 0.04, h: 0.055, segments: 14, bevel: 0.004 },
     material: "sensor_red",
     node: hip,
-    mate: mateAt(hip, [legX + 0.21 * s, KJ.KNEE_Y + 0.06, 0], [0, 0, 90]),
+    mate: mateAt(hip, [legX + 0.225 * s, KJ.KNEE_Y + 0.06, 0], [0, 0, 90]),
   });
   builder.add({
     id: pid("legs", `ankle_sensor_${side}`),

@@ -44,9 +44,9 @@ export function jointOrigin(side: Side): Record<string, Vec3> {
     [`arm_${side}`]: [armX, shoulderY, 0],
     [`forearm_${side}`]: [armX, elbowY, 0],
     [`hand_${side}`]: [armX, wristY, 0],
-    [`finger_${side}_0`]: [armX - 0.13, wristY - 0.42, 0.06],
-    [`finger_${side}_1`]: [armX, wristY - 0.44, 0.06],
-    [`finger_${side}_2`]: [armX + 0.13, wristY - 0.42, 0.06],
+    [`finger_${side}_0`]: [armX - 0.13, wristY - 0.43, 0.06],
+    [`finger_${side}_1`]: [armX, wristY - 0.43, 0.06],
+    [`finger_${side}_2`]: [armX + 0.13, wristY - 0.43, 0.06],
   };
 }
 
@@ -107,9 +107,9 @@ const LEG_HYDRAULICS: Omit<HydraulicSpec, "side">[] = [
   {
     id: "knee_main",
     barrelNode: "hip_{s}",
-    exit: [KJ.LEG_X, KJ.KNEE_Y + 0.62, 0.49],
+    exit: [KJ.LEG_X, KJ.KNEE_Y + 0.62, 0.52],
     tipNode: "knee_{s}",
-    tip: [KJ.LEG_X, KJ.KNEE_Y + 0.18, 0.43],
+    tip: [KJ.LEG_X, KJ.KNEE_Y + 0.18, 0.46],
     joint: "膝主驱动",
   },
   {
@@ -126,9 +126,9 @@ const ARM_HYDRAULICS: Omit<HydraulicSpec, "side">[] = [
   {
     id: "shoulder_main",
     barrelNode: "chest",
-    exit: [KJ.SHOULDER_X + 0.2, KJ.CHEST_Y + KJ.SHOULDER_Y - 0.18, 0.31],
+    exit: [KJ.SHOULDER_X + 0.4, KJ.CHEST_Y + KJ.SHOULDER_Y - 0.18, 0.31],
     tipNode: "arm_{s}",
-    tip: [KJ.SHOULDER_X + 0.2, KJ.CHEST_Y + KJ.SHOULDER_Y - 0.62, 0.30],
+    tip: [KJ.SHOULDER_X + 0.4, KJ.CHEST_Y + KJ.SHOULDER_Y - 0.62, 0.3],
     joint: "肩主驱动",
     mount: [KJ.SHOULDER_POD_CX + KJ.SHOULDER_POD_W / 2, KJ.CHEST_Y + KJ.SHOULDER_Y, 0.5],
   },
@@ -143,8 +143,12 @@ const ARM_HYDRAULICS: Omit<HydraulicSpec, "side">[] = [
 ];
 
 export const HYDRAULICS: HydraulicSpec[] = (["l", "r"] as const).flatMap((side) => [
-  ...LEG_HYDRAULICS.map((spec) => pair(spec.id, side, spec.barrelNode, spec.exit, spec.tipNode, spec.tip, spec.joint, spec.mount)),
-  ...ARM_HYDRAULICS.map((spec) => pair(spec.id, side, spec.barrelNode, spec.exit, spec.tipNode, spec.tip, spec.joint, spec.mount)),
+  ...LEG_HYDRAULICS.map((spec) =>
+    pair(spec.id, side, spec.barrelNode, spec.exit, spec.tipNode, spec.tip, spec.joint, spec.mount),
+  ),
+  ...ARM_HYDRAULICS.map((spec) =>
+    pair(spec.id, side, spec.barrelNode, spec.exit, spec.tipNode, spec.tip, spec.joint, spec.mount),
+  ),
 ]);
 
 export const hydraulicById = (id: string, side: Side): HydraulicSpec => {
@@ -262,10 +266,10 @@ export const NOZZLE_LOCAL: Record<string, Vec3[]> = {
     [0.72, 0.52, -0.56],
   ],
   legs: [
-    [-0.92, 0.56, -0.6],
-    [-0.4, 0.56, -0.66],
-    [0.4, 0.56, -0.66],
-    [0.92, 0.56, -0.6],
+    [-0.98, 0.78, -0.72],
+    [-0.42, 0.78, -0.78],
+    [0.42, 0.78, -0.78],
+    [0.98, 0.78, -0.72],
   ],
 };
 

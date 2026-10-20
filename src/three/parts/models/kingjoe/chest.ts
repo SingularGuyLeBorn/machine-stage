@@ -316,7 +316,10 @@ function addChestShell(builder: KingJoeParts): void {
     indexed: true,
     instance_layout: "kjMosaicAmber",
   });
-  for (const [suffix, px] of [["l", -0.72], ["r", 0.72]] as const) {
+  for (const [suffix, px] of [
+    ["l", -0.72],
+    ["r", 0.72],
+  ] as const) {
     builder.add({
       id: pid(A, `mosaic_frame_bolt_${suffix}`),
       name_cn: "镶嵌框螺栓",
@@ -353,11 +356,11 @@ function addChestShell(builder: KingJoeParts): void {
       geometry: { type: "cylinder", r: 0.022, h: 0.025, segments: 12, bevel: 0.002 },
       material: "gold",
       node: A,
-      mate: mateAt(A, [
-        Math.cos(angle) * 0.075,
-        KJ.CHEST_Y + 1.28 + Math.sin(angle) * 0.075,
-        0.7,
-      ], [90, 0, 0]),
+      mate: mateAt(
+        A,
+        [Math.cos(angle) * 0.075, KJ.CHEST_Y + 1.28 + Math.sin(angle) * 0.075, 0.7],
+        [90, 0, 0],
+      ),
     });
   }
   builder.add({
@@ -382,16 +385,55 @@ function addChestShell(builder: KingJoeParts): void {
     node: A,
     mate: mateAt(A, [0, KJ.CHEST_Y + 1.28, 0.69], [90, 0, 0]),
   });
+  for (const [suffix, sx] of [
+    ["l", -1],
+    ["r", 1],
+  ] as const) {
+    builder.add({
+      id: pid(A, `shoulder_pod_${suffix}`),
+      name_cn: "肩荚鼓筒",
+      name_en: "shoulder drum pod",
+      assembly: A,
+      layer: 4,
+      geometry: { type: "cylinder", r: 0.49, h: 0.86, segments: 40, bevel: 0.025 },
+      material: "silver",
+      node: A,
+      mate: mateAt(A, [sx * 1.62, KJ.CHEST_Y + 1.56, 0], [0, 0, 90]),
+      source: "参考图肩荚是巨型圆筒+金色端环，不是方盒；筒径 980mm，与胸侧承力梁同轴",
+    });
+    builder.add({
+      id: pid(A, `shoulder_pod_ring_inner_${suffix}`),
+      name_cn: "肩荚内金环",
+      name_en: "shoulder drum inner gold ring",
+      assembly: A,
+      layer: 5,
+      geometry: { type: "tube", rOuter: 0.535, rInner: 0.492, h: 0.08, segments: 40 },
+      material: "gold",
+      node: A,
+      mate: mateAt(A, [sx * 1.25, KJ.CHEST_Y + 1.56, 0], [0, 0, 90]),
+    });
+    builder.add({
+      id: pid(A, `shoulder_pod_ring_outer_${suffix}`),
+      name_cn: "肩荚外金环",
+      name_en: "shoulder drum outer gold ring",
+      assembly: A,
+      layer: 5,
+      geometry: { type: "tube", rOuter: 0.535, rInner: 0.492, h: 0.08, segments: 40 },
+      material: "gold",
+      node: A,
+      mate: mateAt(A, [sx * 1.99, KJ.CHEST_Y + 1.56, 0], [0, 0, 90]),
+    });
+  }
   builder.add({
-    id: pid(A, "shoulder_pod"),
-    name_cn: "肩荚",
-    name_en: "shoulder pod",
+    id: pid(A, "shoulder_cowl"),
+    name_cn: "肩荚前檐甲",
+    name_en: "shoulder cowl",
     assembly: A,
     layer: 4,
-    geometry: { type: "box", w: 0.86, h: 0.88, d: 1.02, bevel: 0.09 },
+    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.6, h: 0.5, t: 0.035, corner: 0.09 } },
     material: "silver",
     node: A,
-    mate: mateAt(A, [0, KJ.CHEST_Y + 1.55, 0]),
+    mate: mateAt(A, [0, KJ.CHEST_Y + 1.86, 0.51]),
     instances: 2,
     indexed: true,
     instance_layout: "kjMirrorX162",
@@ -439,29 +481,15 @@ function addChestShell(builder: KingJoeParts): void {
     instance_layout: "kjShoulderAxles",
   });
   builder.add({
-    id: pid(A, "shoulder_pod_rim"),
-    name_cn: "肩荚下箍",
-    name_en: "shoulder pod rim",
-    assembly: A,
-    layer: 4,
-    geometry: { type: "box", w: 0.9, h: 0.1, d: 1.06, bevel: 0.03 },
-    material: "gold_dark",
-    node: A,
-    mate: mateAt(A, [0, KJ.CHEST_Y + 1.06, 0]),
-    instances: 2,
-    indexed: true,
-    instance_layout: "kjMirrorX162",
-  });
-  builder.add({
     id: pid(A, "shoulder_stack"),
     name_cn: "肩荚四联短筒",
     name_en: "shoulder quad stack",
     assembly: A,
     layer: 4,
-    geometry: { type: "cylinder", r: 0.075, h: 0.24, segments: 18, bevel: 0.008 },
+    geometry: { type: "cylinder", r: 0.085, h: 0.3, segments: 18, bevel: 0.008 },
     material: "silver_dark",
     node: A,
-    mate: mateAt(A, [0, KJ.CHEST_Y + 2.115, 0]),
+    mate: mateAt(A, [0, KJ.CHEST_Y + 2.21, 0]),
     instances: 8,
     indexed: true,
     instance_layout: "kjPodStacks",
@@ -542,17 +570,6 @@ function addArm(builder: KingJoeParts, side: Side): void {
     instance_layout: "kjShoulderLugs",
   });
   builder.add({
-    id: pid(A, `arm_sh_lock_seal_${side}`),
-    name_cn: "肩锁环密封",
-    name_en: "shoulder lock seal",
-    assembly: A,
-    layer: 4,
-    geometry: { type: "kit", kit: "kjTorus", params: { radius: 0.215, tube: 0.012, segments: 28 } },
-    material: "rubber",
-    node: arm,
-    mate: absMate([-0.145 * s, 0, 0], [0, 0, 90]),
-  });
-  builder.add({
     id: pid(A, `arm_sh_sensor_${side}`),
     name_cn: "肩角传感器",
     name_en: "shoulder encoder",
@@ -593,10 +610,10 @@ function addArm(builder: KingJoeParts, side: Side): void {
     name_en: "upper arm front armor",
     assembly: A,
     layer: 4,
-    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.38, h: 0.3, t: 0.03, corner: 0.06 } },
+    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.42, h: 0.32, t: 0.03, corner: 0.06 } },
     material: "silver",
     node: arm,
-    mate: absMate([0, -0.56, 0.25]),
+    mate: absMate([0, -0.55, 0.255]),
   });
   builder.add({
     id: pid(A, `arm_upper_side_${side}`),
@@ -604,7 +621,7 @@ function addArm(builder: KingJoeParts, side: Side): void {
     name_en: "upper arm side armor",
     assembly: A,
     layer: 4,
-    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.34, h: 0.28, t: 0.03, corner: 0.05 } },
+    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.4, h: 0.3, t: 0.03, corner: 0.05 } },
     material: "silver_dark",
     node: arm,
     mate: absMate([0.25 * s, -0.56, 0], [0, 90 * s, 0]),
@@ -681,10 +698,21 @@ function addArm(builder: KingJoeParts, side: Side): void {
     name_en: "forearm front armor",
     assembly: A,
     layer: 4,
-    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.44, h: 0.4, t: 0.03, corner: 0.06 } },
+    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.5, h: 0.44, t: 0.03, corner: 0.06 } },
     material: "silver",
     node: fore,
-    mate: absMate([0, -0.58, 0.28]),
+    mate: absMate([0, -0.57, 0.28]),
+  });
+  builder.add({
+    id: pid(A, `arm_fore_back_${side}`),
+    name_cn: "前臂后甲",
+    name_en: "forearm back plate",
+    assembly: A,
+    layer: 4,
+    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.42, h: 0.38, t: 0.02, corner: 0.06 } },
+    material: "silver_dark",
+    node: fore,
+    mate: absMate([0, -0.58, -0.28]),
   });
   builder.add({
     id: pid(A, `arm_fore_side_${side}`),
@@ -692,7 +720,7 @@ function addArm(builder: KingJoeParts, side: Side): void {
     name_en: "forearm side armor",
     assembly: A,
     layer: 4,
-    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.4, h: 0.36, t: 0.03, corner: 0.06 } },
+    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.46, h: 0.42, t: 0.03, corner: 0.06 } },
     material: "silver_dark",
     node: fore,
     mate: absMate([0.28 * s, -0.58, 0], [0, 90 * s, 0]),
@@ -730,7 +758,7 @@ function addArm(builder: KingJoeParts, side: Side): void {
     name_en: "palm block",
     assembly: A,
     layer: 1,
-    geometry: { type: "box", w: KJ.PALM_W, h: 0.2, d: KJ.PALM_D, bevel: 0.03 },
+    geometry: { type: "box", w: 0.46, h: 0.2, d: 0.36, bevel: 0.03 },
     material: "silver_dark",
     node: hand,
     mate: absMate([0, -0.32, 0]),
@@ -741,10 +769,10 @@ function addArm(builder: KingJoeParts, side: Side): void {
     name_en: "palm back plate",
     assembly: A,
     layer: 4,
-    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.36, h: 0.16, t: 0.02, corner: 0.04 } },
+    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.4, h: 0.16, t: 0.02, corner: 0.04 } },
     material: "silver",
     node: hand,
-    mate: absMate([0, -0.32, -0.18]),
+    mate: absMate([0, -0.32, -0.195]),
   });
 
   for (let finger = 0; finger < 3; finger++) {
@@ -756,7 +784,7 @@ function addArm(builder: KingJoeParts, side: Side): void {
       name_en: `finger ${finger + 1} proximal`,
       assembly: A,
       layer: 1,
-      geometry: { type: "box", w: 0.075, h: 0.17, d: 0.09, bevel: 0.012 },
+      geometry: { type: "box", w: 0.09, h: 0.17, d: 0.095, bevel: 0.012 },
       material: "silver",
       node: fingerNode,
       mate: absMate([0, -0.085, 0]),
@@ -767,7 +795,7 @@ function addArm(builder: KingJoeParts, side: Side): void {
       name_en: `finger ${finger + 1} middle`,
       assembly: A,
       layer: 1,
-      geometry: { type: "box", w: 0.07, h: 0.15, d: 0.08, bevel: 0.01 },
+      geometry: { type: "box", w: 0.085, h: 0.15, d: 0.085, bevel: 0.01 },
       material: "silver_dark",
       node: fingerNode,
       mate: absMate([0, -0.25, 0]),
@@ -778,7 +806,7 @@ function addArm(builder: KingJoeParts, side: Side): void {
       name_en: `finger ${finger + 1} distal`,
       assembly: A,
       layer: 1,
-      geometry: { type: "box", w: 0.06, h: 0.12, d: 0.07, bevel: 0.01 },
+      geometry: { type: "box", w: 0.075, h: 0.12, d: 0.075, bevel: 0.01 },
       material: "silver",
       node: fingerNode,
       mate: absMate([0, -0.39, 0]),
@@ -789,7 +817,7 @@ function addArm(builder: KingJoeParts, side: Side): void {
       name_en: `finger ${finger + 1} claw`,
       assembly: A,
       layer: 5,
-      geometry: { type: "cylinder", r: 0.035, rTop: 0.002, h: 0.1, segments: 12 },
+      geometry: { type: "cylinder", r: 0.04, rTop: 0.002, h: 0.1, segments: 12 },
       material: "gold",
       node: fingerNode,
       mate: absMate([0, -0.52, 0], [180, 0, 0]),
@@ -802,8 +830,8 @@ function addArm(builder: KingJoeParts, side: Side): void {
       layer: 2,
       geometry: {
         type: "weld",
-        from: [0, -0.02, -0.055],
-        to: [0, -0.43, -0.055],
+        from: [0, -0.02, -0.065],
+        to: [0, -0.43, -0.065],
         radius: 0.008,
         seed: 21,
       },

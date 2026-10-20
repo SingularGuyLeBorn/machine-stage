@@ -45,7 +45,13 @@ export class KingJoeParts {
       layer: BuildLayer;
     },
   ): void {
-    this.drafts.push({ ...input, build_layer: input.layer, build_order: 0, layer: input.layer, seq: this.seq++ });
+    this.drafts.push({
+      ...input,
+      build_layer: input.layer,
+      build_order: 0,
+      layer: input.layer,
+      seq: this.seq++,
+    });
   }
 
   /** 按层排序 → 层内按 腿/腹/胸/头 组装；build_order 全局单调、层间留出校验区间。 */
@@ -96,9 +102,8 @@ const CAP_T = 0.035;
 const PIN_GAP = 0.085;
 
 export function addHydraulic(builder: KingJoeParts, spec: HydraulicSpec): void {
-  const assembly = spec.id.startsWith("hip") || spec.id.startsWith("knee") || spec.id.startsWith("ankle")
-    ? "legs"
-    : "chest";
+  const assembly =
+    spec.id.startsWith("hip") || spec.id.startsWith("knee") || spec.id.startsWith("ankle") ? "legs" : "chest";
   const prefix = pid(assembly, `hyd_${spec.id}_${spec.side}`);
   const dir = restDirection(spec);
   const rotation = rotationFromY(dir);
@@ -215,7 +220,13 @@ export function addHydraulic(builder: KingJoeParts, spec: HydraulicSpec): void {
     name_en: `${spec.joint} rod seal`,
     assembly,
     layer: 2,
-    geometry: { type: "tube", rOuter: KJ.HYD_GLAND_R + 0.012, rInner: KJ.HYD_GLAND_R + 0.002, h: 0.014, segments: 20 },
+    geometry: {
+      type: "tube",
+      rOuter: KJ.HYD_GLAND_R + 0.012,
+      rInner: KJ.HYD_GLAND_R + 0.002,
+      h: 0.014,
+      segments: 20,
+    },
     material: "rubber",
     node: spec.barrelNode,
     mate: mateAt(spec.barrelNode, sealCenter, rotation),
@@ -334,10 +345,10 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     name_en: "face seal ring",
     assembly: dock.upper,
     layer: 4,
-    geometry: { type: "tube", rOuter: 0.51, rInner: 0.45, h: 0.016, segments: 36 },
+    geometry: { type: "tube", rOuter: 0.48, rInner: 0.44, h: 0.016, segments: 36 },
     material: "rubber",
     node: dock.upperNode,
-    mate: absMate([0, upperYLocal + 0.008, 0]),
+    mate: absMate([0, upperYLocal + 0.015, 0]),
   });
   builder.add({
     id: `${upperPrefix}_lock_ring`,
@@ -406,7 +417,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     mate: absMate([0, upperYLocal - 0.09, 0.1]),
     instances: 2,
     indexed: true,
-    instance_layout: "kjMirrorX07",
+    instance_layout: "kjMirrorX074",
   });
   builder.add({
     id: `${upperPrefix}_sensor`,
@@ -498,10 +509,10 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     geometry: { type: "box", w: 0.09, h: 0.18, d: 0.08, bevel: 0.008 },
     material: "silver_dark",
     node: dock.lowerNode,
-    mate: absMate([0, lowerTopLocal + 0.13, -0.1]),
+    mate: absMate([0, lowerTopLocal + 0.09, -0.1]),
     instances: 2,
     indexed: true,
-    instance_layout: "kjMirrorX07",
+    instance_layout: "kjMirrorX074",
   });
 }
 
@@ -509,12 +520,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
 // 反重力发生器（外壳框 + 6 悬浮线圈 + 能量核心 + 稳定环 + 冷却套 + 管路）
 // ---------------------------------------------------------------------------
 
-export function addAntigravity(
-  builder: KingJoeParts,
-  module: string,
-  center: Vec3,
-  scale = 1,
-): void {
+export function addAntigravity(builder: KingJoeParts, module: string, center: Vec3, scale = 1): void {
   const prefix = pid(module, "ag");
   const node = module;
   const H = KJ.AG_H * scale;
@@ -564,7 +570,13 @@ export function addAntigravity(
     name_en: "energy core",
     assembly: module,
     layer: 3,
-    geometry: { type: "cylinder", r: 0.06 * scale, h: Math.max(0.12, H - 0.08 * scale), segments: 18, bevel: 0.002 },
+    geometry: {
+      type: "cylinder",
+      r: 0.06 * scale,
+      h: Math.max(0.12, H - 0.08 * scale),
+      segments: 18,
+      bevel: 0.002,
+    },
     material: "servo_blue",
     node,
     mate: absMate(center),
@@ -576,13 +588,23 @@ export function addAntigravity(
     name_en: "levitation coil",
     assembly: module,
     layer: 3,
-    geometry: { type: "kit", kit: "kjTorus", params: { radius: 0.11 * scale, tube: Math.max(0.014, 0.035 * scale), segments: 26 } },
+    geometry: {
+      type: "kit",
+      kit: "kjTorus",
+      params: { radius: 0.11 * scale, tube: Math.max(0.014, 0.035 * scale), segments: 26 },
+    },
     material: "copper",
     node,
     mate: absMate(center),
     instances: KJ.AG_COIL_COUNT,
     indexed: true,
-    instance_layout: small ? (scale < 0.45 ? "kjAgCoilsSmall34" : "kjAgCoilsSmall") : scale < 0.9 ? "kjAgCoils08" : "kjAgCoils",
+    instance_layout: small
+      ? scale < 0.45
+        ? "kjAgCoilsSmall34"
+        : "kjAgCoilsSmall"
+      : scale < 0.9
+        ? "kjAgCoils08"
+        : "kjAgCoils",
   });
 }
 

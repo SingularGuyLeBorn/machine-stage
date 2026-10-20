@@ -64,7 +64,7 @@ function Studio() {
       <directionalLight
         castShadow
         position={[5.5, 8.5, 4.5]}
-        intensity={1.7}
+        intensity={1.9}
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0006}
         shadow-normalBias={0.012}
@@ -106,7 +106,7 @@ function Studio() {
           scale={[16, 12, 1]}
         />
       </Environment>
-      <SceneEnvIntensity value={1.15} />
+      <SceneEnvIntensity value={1.4} />
     </>
   );
 }
@@ -223,13 +223,15 @@ function StageRuntime() {
     if (!assembled) return;
     const store = useStageStore.getState();
     const model = findModel(store.modelId);
-    const running = store.machineState === "running";
+    const running = model.animatedStates
+      ? model.animatedStates.includes(store.machineState)
+      : store.machineState === "running";
     if (running) {
       clockRef.current += Math.min(delta, 0.05);
     }
     assembled.resetNodes();
-    // 停机时传 0：悬挂回到装配态（否则会停在上一帧的抬起位）
-    model.animate?.(assembled, running ? clockRef.current : 0);
+    // 停机时传 0：机构回到装配态（否则会停在上一帧的抬起位）
+    model.animate?.(assembled, running ? clockRef.current : 0, store.machineState);
     assembled.syncInstances();
     const motionParts = motionPartsOf(model);
     if (store.views.explode) applyExplode(assembled, 1, motionParts);
@@ -287,16 +289,24 @@ function StageRuntime() {
   const selectPart = useStageStore((state) => state.selectPart);
   const hoverPart = useStageStore((state) => state.hoverPart);
 
-  // 开发期自检钩子（QA 截图 / 控制台调试；生产构建不写）
+  // QA 钩子：开发模式或 ?qa=1 时暴露只读场景引用，用于自动化截图/录屏/相机机位。
   const three = useThree();
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
+    const qa = import.meta.env.DEV || new URLSearchParams(window.location.search).has("qa");
+    if (!qa) return;
     (window as unknown as { __stage?: unknown }).__stage = {
       store: useStageStore,
       assembled,
       scene: three.scene,
       camera: three.camera,
       controls: three.controls,
+      setCamera: (position: [number, number, number], target: [number, number, number]) => {
+        three.camera.position.set(...position);
+        const controls = three.controls as { target?: THREE.Vector3; update?: () => void } | null;
+        if (controls?.target) controls.target.set(...target);
+        controls?.update?.();
+        three.camera.lookAt(new THREE.Vector3(...target));
+      },
     };
   }, [assembled, three]);
 

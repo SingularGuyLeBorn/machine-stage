@@ -1,11 +1,17 @@
 import { buildModel, detectStatic, detectUnsupportedParts, validateRegistry } from "@/three/parts";
-import { makeKingJoeRegistry, makeKingJoeLayouts, kingjoeModelBuilders } from "@/three/parts/models/kingjoe/registry";
+import {
+  makeKingJoeRegistry,
+  makeKingJoeLayouts,
+  kingjoeModelBuilders,
+} from "@/three/parts/models/kingjoe/registry";
 
 const registry = makeKingJoeRegistry();
 const issues = validateRegistry(registry);
 const errors = issues.filter((i) => i.level === "error");
 const warnings = issues.filter((i) => i.level === "warn");
-console.log(`parts=${registry.parts.length} nodes=${registry.nodes.length} errors=${errors.length} warnings=${warnings.length}`);
+console.log(
+  `parts=${registry.parts.length} nodes=${registry.nodes.length} errors=${errors.length} warnings=${warnings.length}`,
+);
 if (errors.length) console.log(errors.slice(0, 20));
 if (warnings.length) console.log(warnings.slice(0, 20));
 const byAssembly = new Map<string, number>();
@@ -35,8 +41,12 @@ for (const handle of model.parts) {
 console.log(`built triangles=${Math.round(triangles)}`);
 const staticReports = detectStatic(model, { minDepthM: 0.0005 });
 console.log(`static clipping=${staticReports.length}`);
-for (const r of staticReports.slice(0, 25)) console.log(`  ${r.a} <-> ${r.b} depth=${r.depth_mm} form=${r.form} point=${r.point.map((n) => n.toFixed(2)).join(",")}`);
+for (const r of staticReports.slice(0, 25))
+  console.log(
+    `  ${r.a} <-> ${r.b} depth=${r.depth_mm} form=${r.form} point=${r.point.map((n) => n.toFixed(2)).join(",")}`,
+  );
 const support = detectUnsupportedParts(model);
 console.log(`unsupported=${support.length}`);
-for (const r of support.slice(0, 25)) console.log(`  ${r.ref} gap=${r.gap_mm.toFixed(1)} nearest=${r.nearest}`);
+for (const r of support.slice(0, 25))
+  console.log(`  ${r.ref} gap=${r.gap_mm.toFixed(1)} nearest=${r.nearest}`);
 model.dispose();

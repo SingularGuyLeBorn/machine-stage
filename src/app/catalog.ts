@@ -8,6 +8,17 @@ import {
 import type { GeometryBuilder } from "@/three/parts/assembler/geometry";
 import { makeTigerLayouts, makeTigerRegistry, tigerBuilders } from "@/three/parts/models/tiger/registry";
 import {
+  KINGJOE_ANIMATED_STATES,
+  KINGJOE_STATE_LABELS,
+  animateKingJoe,
+  type KingJoeState,
+} from "@/three/parts/models/kingjoe/motion";
+import {
+  makeKingJoeLayouts,
+  makeKingJoeRegistry,
+  kingjoeModelBuilders,
+} from "@/three/parts/models/kingjoe/registry";
+import {
   animateTigerSuspension,
   TIGER_MOTION_PARTS,
   tigerDetachKeys,
@@ -56,8 +67,10 @@ export interface StageModel {
   layouts?: Record<string, InstanceLayout>;
   /** 模型自定义几何 kit 构造器（如发动机 borePlate/siameseBlock 等）。 */
   builders?: Record<string, GeometryBuilder>;
-  /** 动画：只驱动节点，每帧调用前框架已 resetNodes。t 为秒。 */
-  animate?: (assembled: AssembledModel, seconds: number) => void;
+  /** 动画：只驱动节点，每帧调用前框架已 resetNodes。t 为秒；state 用于多形态导演。 */
+  animate?: (assembled: AssembledModel, seconds: number, state?: string) => void;
+  /** 这些状态由时钟推进（缺省只有 running）；多形态模型用它声明可动状态。 */
+  animatedStates?: string[];
   /** 由 animate 直接改写实例矩阵的零件（pose 层的爆炸/拆解据此取本帧位姿）。 */
   motionParts?: string[];
   /** 单实例拆解要一起移动的实例键（如负重轮 + 它的轮毂螺栓）。 */
@@ -163,6 +176,49 @@ export const CATALOG: StageModel[] = [
     notes: [
       "M-B 进行中：当前可见 L1 已写零件（曲轴箱为主）；后续零件随注册表补全自动出现，无需等待全部完成。",
       "机构动画（曲轴/活塞联动）由实现者接入后，此处追加 running 状态与启动/停机动作。",
+    ],
+  },
+  {
+    id: "kingjoe",
+    title: "金古桥 King Joe",
+    subtitle: "四体分离合体 · 锥销/锁环真实对接 · 反重力编队 · 怪光线",
+    milestone: "M-G",
+    status: "ready",
+    registry: makeKingJoeRegistry(),
+    layouts: makeKingJoeLayouts(),
+    builders: kingjoeModelBuilders,
+    animatedStates: KINGJOE_ANIMATED_STATES,
+    animate: (assembled, seconds, state) =>
+      animateKingJoe(assembled, seconds, (state as KingJoeState) ?? "idle"),
+    states: KINGJOE_STATE_LABELS.map((state) => ({ id: state.id, label: state.label, hint: state.hint })),
+    actions: [
+      { id: "kj-formation", group: "四体", label: "编队巡航", kind: "machine-state", state: "formation" },
+      { id: "kj-combine", group: "四体", label: "阻尼合体", kind: "machine-state", state: "combining" },
+      { id: "kj-separate", group: "四体", label: "分离回避", kind: "machine-state", state: "separation" },
+      { id: "kj-crippled", group: "四体", label: "残缺合体", kind: "machine-state", state: "crippled" },
+      { id: "kj-walk", group: "机构", label: "机器人步行", kind: "machine-state", state: "robot" },
+      { id: "kj-fire", group: "武器", label: "怪光线", kind: "machine-state", state: "firing" },
+      { id: "kj-idle", group: "机构", label: "合体待机", kind: "machine-state", state: "idle" },
+      { id: "kj-explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "kj-xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "kj-labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "kj-grid", group: "展示", label: "网格", kind: "view-toggle", view: "grid" },
+      { id: "kj-reset", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "kj-scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "kj-scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    readouts: (assembled) => [
+      { label: "定义零件", value: `${assembled.parts.length} 件` },
+      { label: "合体高度", value: "8.16 m" },
+      { label: "对接面", value: "3 轴向 + 2 肩锁" },
+      { label: "锥销 / 锁环", value: "12 / 5 组" },
+    ],
+    notes: [
+      "合体顺序自下而上：腿 → 腹 → 胸 → 头；每段先阻尼减速，再锥销入槽、电弧接通、锁环旋紧。",
+      "双臂属于胸部飞船；合体完成后肩锁环转 18°、肘/腕展开。",
+      "对齐精度：锥销 45mm 入 56mm 承座孔；锁爪与锁钩轴向留 7.5mm，旋转 30° 咬合。",
+      "「分离回避」可重复：解锁 → 电弧拉断 → 四体飞散编队。",
+      "「残缺合体」隐藏腿部飞船，躯干落地，双臂撑地。",
     ],
   },
   {
