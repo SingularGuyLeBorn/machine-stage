@@ -19,6 +19,7 @@ import {
   Vector3 as QVec3,
   Vector4 as QVec4,
 } from "three.quarks";
+import { TIGER_PREHEAT_END } from "@/three/parts/models/tiger/motion";
 import { useStageStore } from "@/app/state/stageStore";
 
 // ============================================================================
@@ -563,7 +564,7 @@ export function TigerVfx() {
   const scorches = useRef<THREE.Mesh[]>([]);
   const stateRef = useRef<string>("");
   const elapsed = useRef(0);
-  const phase = useRef({ charge: false, main: false, spread: false });
+  const phase = useRef({ charge: false, main: false, spread: false, preheat: false });
 
   useEffect(() => {
     batch.name = "tiger-vfx";
@@ -604,7 +605,7 @@ export function TigerVfx() {
     if (stateRef.current !== machineState) {
       stateRef.current = machineState;
       elapsed.current = 0;
-      phase.current = { charge: false, main: false, spread: false };
+      phase.current = { charge: false, main: false, spread: false, preheat: false };
       // 一次性爆炸允许播完（连续触发时可同屏叠加）；只有持续燃烧（maxAge=∞）随状态切走
       for (let i = bursts.current.length - 1; i >= 0; i--) {
         const effect = bursts.current[i]!;
@@ -695,6 +696,25 @@ export function TigerVfx() {
       addBurst(effect);
     };
 
+    if (machineState === "engine_start" && !phase.current.preheat) {
+      phase.current.preheat = true;
+      // 预热：发动机舱盖上方一团低强度橙色暖光（只亮 0–1.6s，曲轴仍未转）
+      const effect = new Burst(TIGER_PREHEAT_END + 0.15);
+      const glow = makeFlash(assets, ENGINE_DECK, 0.9);
+      glow.material.color.set(0xff7a33);
+      glow.material.opacity = 0;
+      effect.addBillboard(glow.mesh);
+      const light = new THREE.PointLight(0xff7a33, 0, 8, 2);
+      light.position.copy(ENGINE_DECK).add(new THREE.Vector3(0, 0.32, 0.1));
+      effect.group.add(light);
+      effect.setTick((age) => {
+        const pulse = 0.55 + 0.45 * Math.sin(age * 10) ** 2;
+        const fade = age < TIGER_PREHEAT_END ? 1 : 0;
+        light.intensity = 3.2 * pulse * fade;
+        glow.material.opacity = 0.16 * pulse * fade;
+      });
+      addBurst(effect);
+    }
     if (machineState === "hit_light" && !phase.current.main && t >= 0.12) {
       phase.current.main = true;
       impactBurst("ap");

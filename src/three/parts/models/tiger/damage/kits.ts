@@ -407,13 +407,10 @@ const fuelTank: GeometryBuilder = (spec) => {
     strap.translate(u * w * 0.5, 0, 0);
     parts.push(strap);
   }
-  // 加油颈朝车外侧上方（与甲板加油口同轴），出油管朝车内侧（发动机舱）
-  const neck = cylinderGeometry(0.062, 0.09, 0.062, 20, 0.004);
+  // 加油颈朝车外侧上方（通孔，接甲板加注管；盖上甲板盖才是密封面），出油管朝车内侧
+  const neck = tubeGeometry(0.062, 0.048, 0.09, 20);
   neck.translate(w * 0.3, h / 2 + 0.03, side * d * 0.22);
   parts.push(neck);
-  const cap = cylinderGeometry(0.075, 0.022, 0.075, 24, 0.004);
-  cap.translate(w * 0.3, h / 2 + 0.085, side * d * 0.22);
-  parts.push(cap);
   const sender = cylinderGeometry(0.045, 0.05, 0.045, 16, 0.003);
   sender.translate(-w * 0.28, h / 2 + 0.02, -side * d * 0.18);
   parts.push(sender);
@@ -505,6 +502,43 @@ const fuelTankBroken: GeometryBuilder = (spec) => {
 // 排气烟几何（fx）——爆炸/火焰改用 three.quarks 粒子（app/three/vfx）
 // ---------------------------------------------------------------------------
 
+/**
+ * 打开的燃油加注口：底座圈 + 通孔颈管 + 铰链 + 支起的盖盘 + 提手。
+ * 盖盘绕 X 轴掀起 68°（向外侧），从上方能直接看到颈孔和下面的加注管。
+ */
+const fuelFillerCap: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  const base = tubeGeometry(0.09, 0.066, 0.02, 28);
+  base.translate(0, 0.01, 0);
+  parts.push(base);
+  const neck = tubeGeometry(0.068, 0.052, 0.062, 24);
+  neck.translate(0, 0.051, 0);
+  parts.push(neck);
+  const hinge = bevelBoxGeometry(0.18, 0.018, 0.03, 0.002);
+  hinge.translate(0, 0.078, 0.074);
+  parts.push(hinge);
+  const angle = THREE.MathUtils.degToRad(68);
+  const lid = cylinderGeometry(0.082, 0.014, 0.082, 28, 0.002);
+  lid.translate(0, 0, 0.082); // 铰链边落在局部 z=0
+  lid.rotateX(-angle);
+  lid.translate(0, 0.078, 0.074);
+  parts.push(lid);
+  const handle = bevelBoxGeometry(0.12, 0.024, 0.022, 0.003);
+  handle.translate(
+    0,
+    0.078 + Math.sin(angle) * 0.15,
+    0.074 + Math.cos(angle) * 0.15,
+  );
+  parts.push(handle);
+  // 防丢链：从铰链座垂到盖盘内侧的两段短链节
+  const chain = bevelBoxGeometry(0.012, 0.11, 0.008, 0.001);
+  chain.translate(-0.06, 0.095, 0.1);
+  parts.push(chain);
+  const merged = mergeGeometries(parts);
+  for (const part of parts) part.dispose();
+  return merged;
+};
+
 /** 烟雾团：多个低面数球组成的粗糙云（材质透明）。 */
 const smokePuff: GeometryBuilder = (spec) => {
   const params = (spec as { params?: Params }).params;
@@ -532,5 +566,6 @@ export const tigerDamageKitBuilders: Record<string, GeometryBuilder> = {
   mantletBroken,
   fuelTank,
   fuelTankBroken,
+  fuelFillerCap,
   smokePuff,
 };

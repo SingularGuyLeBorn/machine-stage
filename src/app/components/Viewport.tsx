@@ -4,6 +4,7 @@ import { StageCanvas } from "../three/StageCanvas";
 import { findModel } from "../catalog";
 import { useStageStore } from "../state/stageStore";
 import { ClippingDock } from "./ClippingPanel";
+import { EngineHud } from "./EngineHud";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { IsolationView } from "./IsolationView";
 import { PartInfoCard } from "./PartInfoCard";
@@ -175,6 +176,7 @@ export function Viewport() {
           <span>
             三角面 <span className="num">{stats ? stats.triangles.toLocaleString("en-US") : "—"}</span>
           </span>
+          <EngineHud />
           {readouts.map((readout) => (
             <span key={readout.label}>
               {readout.label} <span className="num">{readout.value}</span>

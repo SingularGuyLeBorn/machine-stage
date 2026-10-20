@@ -1032,6 +1032,10 @@ function makeLayouts(): Record<string, InstanceLayout> {
   layouts[ENGINE_LAYOUTS.airFilterClamp] = ({ index, constants }) =>
     bankPairOf("AIR_FILTER_CLAMP_Y", index, constants);
 
+  // 燃油加注管：与甲板加油口 / 油箱颈同轴（x 0.616 / z ±0.802）
+  layouts["engine.fuelFiller"] = ({ index }) =>
+    new THREE.Matrix4().makeTranslation(0.616, 0.875, index === 0 ? 0.802 : -0.802);
+
   return layouts;
 }
 
@@ -2984,6 +2988,37 @@ function buildParts(): PartDefinition[] {
         "虎式 I 燃油箱（实车 534L 分两侧布置；本模型按可用空间 520 × 680 × 280 建模）：三道固定箍 + 外侧加油颈/盖 + 油位传感器 + 内侧出油管 + 放油塞。箱体 x 0.20 ~ 0.72、z ±0.60 ~ ±0.88：前缘离电台支架 30mm、后缘离尾板 110mm、内壁离风扇叶尖 76mm、外壁离侧板 20mm。三态战损：破损 = 凹陷裂痕，破碎 = 外侧撕开露出防晃隔板/吸油管/残油。",
     });
   }
+
+  // 燃油加注管：甲板加油孔 → 发动机舱 → 油箱颈（左右各一，X 光下可见整条加油路径）
+  add({
+    id: "tiger.engine.fuel_filler",
+    name_cn: "燃油加注管",
+    name_en: "Kraftstoff-Einfüllrohr",
+    assembly: "accessory",
+    build_layer: 1,
+    build_order: 182,
+    geometry: {
+      type: "merge",
+      parts: [
+        // 立管：油箱颈上方 → 甲板孔下沿（局部 y -0.197 ~ +0.197）
+        { type: "cylinder", r: 0.044, h: 0.394, segments: 20, bevel: 0.002 },
+        // 上法兰（甲板下方，托住加注孔）
+        { type: "cylinder", r: 0.078, h: 0.014, at: [0, 0.193, 0], segments: 24, bevel: 0.002 },
+        // 穿过甲板孔的短套筒（外径 128 < 孔径 140，单边 6mm）
+        { type: "tube", rOuter: 0.064, rInner: 0.05, h: 0.032, at: [0, 0.213, 0], segments: 24 },
+        // 下端软管 + 卡箍（套在油箱颈外，3mm 间隙）
+        { type: "tube", rOuter: 0.054, rInner: 0.04, h: 0.04, at: [0, -0.217, 0], segments: 20 },
+        { type: "cylinder", r: 0.06, h: 0.012, at: [0, -0.199, 0], segments: 20, bevel: 0.001 },
+      ],
+    },
+    material: "steel_worn",
+    instances: 2,
+    indexed: true,
+    instance_layout: "engine.fuelFiller",
+    mate: { type: "absolute" },
+    source:
+      "燃油加注管（Kraftstoff-Einfüllrohr）×2：立管 ⌀88、上法兰 ⌀156、穿甲板套筒 ⌀128/⌀100 × 32、下端软管 ⌀108/⌀80 × 40 + 卡箍。轴线 x 0.616 / z ±0.802：上端穿过发动机舱盖的 ⌀140 加油孔、距甲板盖底座 2mm；下端套在油箱通孔颈（顶 y 0.635）外 3mm。路径：打开甲板盖 → 颈孔 → 套筒 → 立管 → 软管 → 油箱颈 → 油箱。",
+  });
 
   return parts;
 }
