@@ -1279,11 +1279,11 @@ export function makeHullRegistry(): ModelRegistry {
     nodes: [],
     materials: {
       armor_steel: {
-        base: "#8b7d53",
-        metalness: 0.22,
-        roughness: 0.62,
+        base: "#79683f",
+        metalness: 0.12,
+        roughness: 0.74,
         preset: "steel",
-        envMapIntensity: 1.2,
+        envMapIntensity: 1.0,
       },
       tactical_number: {
         base: "#f3efe2",

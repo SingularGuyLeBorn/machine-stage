@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { instanceKey, type AssembledModel } from "@/three/parts";
+import { TIGER_MG_BELT_DIR, TIGER_MG_BELT_PITCH } from "./turret/kits";
 
 // ============================================================================
 // tiger/motion —— 虎式行动装置动画（整车悬挂起伏 + 单轮拆解）
@@ -15,7 +16,11 @@ import { instanceKey, type AssembledModel } from "@/three/parts";
 // ============================================================================
 
 /** 受动画直接改写实例矩阵的零件（pose 层据此取「本帧位姿」而不是静止位姿）。 */
-export const TIGER_MOTION_PARTS = ["tiger.suspension.wheel", "tiger.suspension.hub_bolt"];
+export const TIGER_MOTION_PARTS = [
+  "tiger.suspension.wheel",
+  "tiger.suspension.hub_bolt",
+  "tiger.turret.aa_mg_case",
+];
 
 /** 车体升沉幅度（米）。8mm ≈ 扭杆正常行程的观感尺度，再大就会看见履带离地。 */
 export const VEHICLE_HEAVE_MAX = 0.008;
@@ -190,11 +195,14 @@ export function animateTigerFiring(assembled: AssembledModel, seconds: number): 
   const pin = assembled.getNode("FiringPin");
   if (pin) pin.position.x = tigerFiringPinOffset(t);
 
-  // 后坐力传全车：57 吨「沉一下」——6mm 下沉 + 0.2° 点头，随复进阻尼回位
+  // 后坐力传全车：57 吨「沉下去—回弹」——26mm 下沉 + 约 1° 点头 + 4mm 高频颤
   const kick = clamp01(tigerRecoilOffset(t) / TIGER_RECOIL_DISTANCE);
-  assembled.root.position.y = -0.006 * kick;
-  assembled.root.rotation.z = -0.0035 * kick;
-  assembled.root.rotation.x = 0;
+  const since = Math.max(0, t - 1.2);
+  const rebound = t >= 1.2 ? Math.exp(-2.4 * since) * Math.sin(7.5 * since) : 0;
+  assembled.root.position.y =
+    -0.022 * kick - 0.008 * rebound - 0.002 * Math.sin(40 * since) * Math.exp(-5 * since);
+  assembled.root.rotation.z = -0.014 * kick - 0.005 * rebound;
+  assembled.root.rotation.x = 0.002 * rebound;
 
   // 炮口焰：只在击发窗口可见；尺度随压力峰值起伏（特效件 fx，不参与支撑检测）
   const flash = assembled.getPart(TIGER_FLASH_PART);
@@ -209,18 +217,212 @@ export function animateTigerFiring(assembled: AssembledModel, seconds: number): 
   }
 }
 
+// ---------------------------------------------------------------------------
+// 车顶 MG34 连射循环（P3）——枪管短后坐 / 枪口上跳 / 供弹链步进 / 弹壳抛出
+// ---------------------------------------------------------------------------
+export const TIGER_MG_CYCLE = 3.2;
+const MG_SHOT_START = 0.25;
+const MG_SHOT_INTERVAL = 0.09;
+const MG_SHOT_COUNT = 10;
+const MG_BARREL_RECOIL = 0.006;
+const MG_CLIMB_PER_SHOT = 0.0045;
+const MG_FLASH_PART = "tiger.turret.aa_mg_flash";
+const MG_CASE_PART = "tiger.turret.aa_mg_case";
+
+function latestMgShot(t: number): { index: number; since: number } | null {
+  if (t < MG_SHOT_START) return null;
+  const index = Math.min(MG_SHOT_COUNT - 1, Math.floor((t - MG_SHOT_START) / MG_SHOT_INTERVAL));
+  return { index, since: t - (MG_SHOT_START + index * MG_SHOT_INTERVAL) };
+}
+
+/** 单发弹壳轨迹：重力抛物线 + 顶盖弹跳（最多 4 次），返回弹壳中心位置。 */
+function mgCaseFlight(
+  origin: THREE.Vector3,
+  velocity: THREE.Vector3,
+  seconds: number,
+  groundY: number,
+): THREE.Vector3 {
+  const position = origin.clone();
+  const v = velocity.clone();
+  let remaining = seconds;
+  const g = 9.81;
+  for (let bounce = 0; bounce < 4 && remaining > 0; bounce++) {
+    const dy = Math.max(0, position.y - groundY);
+    const flight = (v.y + Math.sqrt(Math.max(v.y * v.y + 2 * g * dy, 0))) / g;
+    if (flight <= 0 || remaining < flight) {
+      position.addScaledVector(v, remaining);
+      position.y -= 0.5 * g * remaining * remaining;
+      return position;
+    }
+    position.addScaledVector(v, flight);
+    position.y = groundY;
+    remaining -= flight;
+    v.y = -Math.abs(v.y - g * flight) * 0.42;
+    v.x *= 0.55;
+    v.z *= 0.55;
+    if (Math.abs(v.y) < 0.35) {
+      position.addScaledVector(v, remaining);
+      position.y = groundY;
+      return position;
+    }
+  }
+  return position;
+}
+
+export function animateTigerMg(assembled: AssembledModel, seconds: number): void {
+  const t = ((seconds % TIGER_MG_CYCLE) + TIGER_MG_CYCLE) % TIGER_MG_CYCLE;
+  const shot = latestMgShot(t);
+  const gun = assembled.getNode("AaGun");
+  const barrel = assembled.getNode("AaBarrel");
+  const feed = assembled.getNode("AaFeed");
+
+  // 枪口上跳：每发加一个小角冲量、0.32s 时间常数回落（连射会累积，停火后回正）
+  let climb = 0;
+  for (let k = 0; k < MG_SHOT_COUNT; k++) {
+    const t0 = MG_SHOT_START + k * MG_SHOT_INTERVAL;
+    if (t >= t0) climb += MG_CLIMB_PER_SHOT * Math.exp(-(t - t0) / 0.32);
+  }
+  climb = Math.min(climb, 0.035);
+  if (gun) {
+    const restPitch = -THREE.MathUtils.degToRad(assembled.constants.TR_AA_PITCH ?? 10);
+    gun.rotation.z = restPitch - climb;
+    gun.updateMatrix();
+  }
+
+  // 枪管短后坐：每发 6mm，50ms 内出—回
+  if (barrel) {
+    const phase = shot ? shot.since / 0.05 : 1;
+    barrel.position.x = shot && phase < 1 ? MG_BARREL_RECOIL * Math.sin(Math.PI * phase) : 0;
+  }
+
+  // 供弹链：每发沿链路方向步进一节距（整链周期排列，回位即下一节到位）
+  if (feed) {
+    const rest = assembled.nodeRest.get("AaFeed");
+    const step = shot ? Math.min(1, shot.since / MG_SHOT_INTERVAL) * TIGER_MG_BELT_PITCH : 0;
+    feed.position
+      .set(rest?.elements[12] ?? 0, rest?.elements[13] ?? 0, rest?.elements[14] ?? 0)
+      .addScaledVector(TIGER_MG_BELT_DIR, step);
+  }
+
+  // 枪口焰：每发 30ms（fx 件，默认隐藏）
+  const flash = assembled.getPart(MG_FLASH_PART);
+  if (flash) {
+    const on = !!shot && shot.since < 0.03;
+    flash.object.visible = on;
+    if (on && shot) {
+      flash.object.scale.setScalar(0.85 + 0.35 * Math.sin(Math.PI * (shot.since / 0.03)));
+    }
+  }
+
+  // 车体轻微震颤（57 吨不会被 7.92mm 推动，只给高频微颤）
+  const burst =
+    t >= MG_SHOT_START && t <= MG_SHOT_START + (MG_SHOT_COUNT - 1) * MG_SHOT_INTERVAL + 0.12;
+  const envelope = burst ? 1 : 0;
+  assembled.root.position.y = 0.0007 * Math.sin(t * 95) * envelope;
+  assembled.root.rotation.z = 0.00035 * Math.sin(t * 83 + 0.7) * envelope;
+  assembled.root.rotation.x = 0.0002 * Math.cos(t * 71) * envelope;
+
+  // 弹壳：从枪管右侧抛壳口抛出，沿重力抛物线落到顶盖，弹跳后留在原地
+  const cases = assembled.getPart(MG_CASE_PART);
+  if (cases && gun) {
+    cases.object.visible = true;
+    const origin = new THREE.Vector3(0.06, 0.07, 0.045).applyMatrix4(gun.matrix);
+    const velocity = new THREE.Vector3(0.15, 1.25, 1.4).applyMatrix4(
+      new THREE.Matrix4().extractRotation(gun.matrix),
+    );
+    const roofTop =
+      (assembled.constants.TR_RING_TOP ?? 1.108) +
+      (assembled.constants.TR_JOINT ?? 0.003) +
+      (assembled.constants.TR_WALL_H ?? 0.7) +
+      (assembled.constants.TR_ROOF_T ?? 0.025);
+    const groundY = roofTop + 0.007;
+    for (let i = 0; i < cases.instances.length; i++) {
+      const matrix = new THREE.Matrix4();
+      if (i >= MG_SHOT_COUNT) {
+        matrix.makeScale(0, 0, 0);
+      } else {
+        const shotTime = MG_SHOT_START + i * MG_SHOT_INTERVAL;
+        const age = t - shotTime;
+        if (age < 0) {
+          matrix.makeScale(0, 0, 0);
+        } else {
+          const position = mgCaseFlight(origin, velocity, age, groundY);
+          const spin = age * 14 + i * 1.7;
+          const quaternion = new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(spin * 0.7, spin, 0),
+          );
+          matrix.compose(position, quaternion, new THREE.Vector3(1, 1, 1));
+        }
+      }
+      cases.setInstanceMatrix(i, matrix);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 受击震荡（P3）——按口径分级：小口径高频轻颤；大口径重挫 + 悬挂回弹
+// ---------------------------------------------------------------------------
+export type TigerHitGrade = "light" | "heavy";
+export const TIGER_HIT_CYCLE = 2.6;
+
+export function animateTigerHit(
+  assembled: AssembledModel,
+  seconds: number,
+  grade: TigerHitGrade,
+): void {
+  const t = ((seconds % TIGER_HIT_CYCLE) + TIGER_HIT_CYCLE) % TIGER_HIT_CYCLE;
+  const since = t - 0.12;
+  if (since < 0) {
+    assembled.root.position.y = 0;
+    assembled.root.rotation.x = 0;
+    assembled.root.rotation.z = 0;
+    return;
+  }
+  if (grade === "light") {
+    const env = Math.exp(-8 * since);
+    const shake = Math.sin(26 * since) * env;
+    assembled.root.position.y = 0.0018 * shake;
+    assembled.root.rotation.z = -0.0009 * shake;
+    assembled.root.rotation.x = 0.0006 * Math.cos(26 * 1.3 * since) * env;
+    return;
+  }
+  const env = Math.exp(-2.4 * since);
+  const body = Math.exp(-3.1 * since) * Math.cos(6.2 * since);
+  assembled.root.position.y = -0.02 * body + 0.003 * Math.sin(22 * since) * env;
+  assembled.root.rotation.z = -0.018 * body + 0.0015 * Math.sin(19 * since) * env;
+  assembled.root.rotation.x = 0.007 * Math.exp(-2.6 * since) * Math.sin(5.2 * since);
+}
+
+/** 非射击状态统一隐藏所有 fx（主炮口焰 / MG 枪口焰 / 弹壳）。 */
+function hideTigerEffects(assembled: AssembledModel): void {
+  for (const id of [TIGER_FLASH_PART, MG_FLASH_PART, MG_CASE_PART]) {
+    const part = assembled.getPart(id);
+    if (part) part.object.visible = false;
+  }
+}
+
 /**
  * 虎式动画总入口（catalog.animate）：按机器状态分流。
- * - running：悬挂演示（车体浮沉 + 48 轮转动）；
- * - firing：主炮击发循环；
- * - 其余状态：回到装配态（炮口焰隐藏、节点由框架 resetNodes 复位）。
+ * - running：悬挂演示；firing：主炮击发；mg_firing：MG34 连射；
+ * - hit_light / hit_heavy：受击震荡（轻/重）；
+ * - 其余状态：回到装配态（特效隐藏、节点由框架 resetNodes 复位）。
  */
 export function animateTiger(assembled: AssembledModel, seconds: number, state?: string): void {
   if (state === "firing") {
+    hideTigerEffects(assembled);
     animateTigerFiring(assembled, seconds);
     return;
   }
+  if (state === "mg_firing") {
+    hideTigerEffects(assembled);
+    animateTigerMg(assembled, seconds);
+    return;
+  }
+  if (state === "hit_light" || state === "hit_heavy") {
+    hideTigerEffects(assembled);
+    animateTigerHit(assembled, seconds, state === "hit_heavy" ? "heavy" : "light");
+    return;
+  }
   animateTigerSuspension(assembled, seconds);
-  const flash = assembled.getPart(TIGER_FLASH_PART);
-  if (flash) flash.object.visible = false;
+  hideTigerEffects(assembled);
 }

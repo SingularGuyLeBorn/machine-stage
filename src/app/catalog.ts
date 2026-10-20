@@ -153,11 +153,29 @@ export const CATALOG: StageModel[] = [
         label: "主炮击发",
         hint: "开闩 → 关闩 → 击针 → 后坐 450mm → 复进 → 开闩抛壳，6s 循环；看车体后坐与炮口焰",
       },
+      {
+        id: "mg_firing",
+        label: "机枪连射",
+        hint: "MG34 10 发连射：枪管短后坐、枪口上跳、供弹链步进、弹壳抛出/弹跳；3.2s 循环",
+      },
+      {
+        id: "hit_light",
+        label: "轻击（小口径）",
+        hint: "小口径命中：车体高频轻颤，悬挂不沉",
+      },
+      {
+        id: "hit_heavy",
+        label: "重击（大口径）",
+        hint: "大口径正中：车体重挫 + 悬挂压缩 + 阻尼回弹",
+      },
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
     ],
     actions: [
       { id: "suspension-run", group: "机构", label: "悬挂演示", kind: "machine-state", state: "running" },
       { id: "cannon-fire", group: "火力", label: "主炮击发", kind: "machine-state", state: "firing" },
+      { id: "mg-fire", group: "火力", label: "机枪连射", kind: "machine-state", state: "mg_firing" },
+      { id: "hit-light", group: "受击", label: "轻击（小口径）", kind: "machine-state", state: "hit_light" },
+      { id: "hit-heavy", group: "受击", label: "重击（大口径）", kind: "machine-state", state: "hit_heavy" },
       { id: "suspension-stop", group: "机构", label: "停机", kind: "machine-state", state: "idle" },
       { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
       { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
@@ -168,7 +186,7 @@ export const CATALOG: StageModel[] = [
     ],
     notes: [
       "L1–L5 已装配到 223 件 / 1998 实例；主炮闩 / 中空炮管 / 车长塔枪座 / 战术编号已落地。",
-      "主炮击发是节点驱动的机械演示（后坐 450mm + 开闩 + 击针 + 炮口焰）；弹壳抛壳与供弹链是下一步。",
+      "主炮击发是节点驱动的机械演示（后坐 450mm + 开闩 + 击针 + 炮口焰）；机枪连射含枪管短后坐/枪口上跳/供弹链/弹壳；受击按口径分级。",
     ],
   },
   {
