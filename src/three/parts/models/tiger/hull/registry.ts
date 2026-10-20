@@ -731,6 +731,28 @@ function buildHullParts(): PartDefinition[] {
     });
   }
 
+  const wingX0 = c.HULL_SCHOTT_X2! + 0.036 + c.HULL_JOINT!;
+  const wingLen = 0.91 - wingX0;
+  for (const side of [1, -1] as const) {
+    parts.push({
+      id: side > 0 ? "tiger.hull.engine_deck_wing_right" : "tiger.hull.engine_deck_wing_left",
+      name_cn: side > 0 ? "发动机舱盖外翼（右）" : "发动机舱盖外翼（左）",
+      name_en: side > 0 ? "Motorabdeckung Flügel (rechts)" : "Motorabdeckung Flügel (links)",
+      assembly: "hull",
+      build_layer: 4,
+      build_order: side > 0 ? 555 : 556,
+      geometry: {
+        type: "kit",
+        kit: "engineDeckWing",
+        params: { side, len: wingLen, width: 0.8145, t: 0.027 },
+      },
+      material: "armor_steel",
+      mate: { type: "absolute", position: [wingX0, c.HULL_DECK_UNDER! - 0.002, side * 0.9655] },
+      source:
+        "发动机舱盖外翼（Motorabdeckung Flügel）：x -0.681 ~ 0.91（与发动机舱盖同起止）、y 1.078 ~ 1.105（顶面与舱盖 1.105 齐平，下表面离赞助板顶板 1.075 留 3mm）、z ±0.9655 ~ ±1.78（内缘离舱盖 3mm）。作用：把 30mm 阶梯甲板补到上部车体全宽，消除后段赞助板上方的敞口与台阶侧面；实车发动机舱盖同样通到车体两侧外缘。",
+    });
+  }
+
   return parts;
 }
 
