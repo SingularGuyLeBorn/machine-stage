@@ -24,6 +24,8 @@ export interface KingJoeFxFrame {
   flashes: Record<string, number>;
   /** 残缺合体时铺一块地面承影盘（特效件，不参与零件检测）。 */
   floor?: boolean;
+  /** 重踏步冲击 0..1（左/右脚），驱动地面震环与扬尘。 */
+  steps?: { left: number; right: number };
 }
 
 const ARC_SEGMENTS = 9;
@@ -54,6 +56,16 @@ interface ThrusterRig {
   local: THREE.Vector3;
 }
 
+interface StepRig {
+  side: "left" | "right";
+  node: string;
+  ring: THREE.Mesh;
+  ringMaterial: THREE.MeshBasicMaterial;
+  dust: THREE.Mesh[];
+  dustMaterial: THREE.MeshBasicMaterial;
+  dirs: Array<{ x: number; z: number; r: number }>;
+}
+
 function pseudo(seed: number): number {
   const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
   return x - Math.floor(x);
@@ -64,6 +76,7 @@ export class KingJoeFx {
   private readonly arcs: ArcRig[] = [];
   private readonly beams: BeamRig[] = [];
   private readonly thrusters: ThrusterRig[] = [];
+  private readonly steps: StepRig[] = [];
   private floor!: THREE.Mesh;
   private readonly ownedGeometries = new Set<THREE.BufferGeometry>();
   private readonly ownedMaterials = new Set<THREE.Material>();
@@ -213,6 +226,52 @@ export class KingJoeFx {
         });
       });
     }
+
+    // 重踏步：地面震环 + 十粒扬尘，脚落地的瞬间由 motion 给出 0..1 冲击。
+    // 内径大于宽足半宽（0.32m）与半长（0.52m），否则震环会整圈藏在脚底。
+    const ringGeometry = new THREE.RingGeometry(0.56, 0.64, 48);
+    ringGeometry.rotateX(-Math.PI / 2);
+    this.ownedGeometries.add(ringGeometry);
+    const dustGeometry = new THREE.SphereGeometry(0.03, 8, 6);
+    this.ownedGeometries.add(dustGeometry);
+    for (const [side, suffix] of [
+      ["left", "l"],
+      ["right", "r"],
+    ] as const) {
+      const ringMaterial = new THREE.MeshBasicMaterial({
+        color: 0x5b7280,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      this.ownedMaterials.add(ringMaterial);
+      const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+      ring.visible = false;
+      this.group.add(ring);
+      const dustMaterial = new THREE.MeshBasicMaterial({
+        color: 0x5f6a72,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      });
+      this.ownedMaterials.add(dustMaterial);
+      const dust: THREE.Mesh[] = [];
+      const dirs: Array<{ x: number; z: number; r: number }> = [];
+      for (let i = 0; i < 10; i++) {
+        const angle = (i / 10) * Math.PI * 2;
+        dirs.push({
+          x: Math.cos(angle),
+          z: Math.sin(angle),
+          r: 0.38 + pseudo(i * 7.31 + (suffix === "l" ? 0.7 : 3.9)) * 0.16,
+        });
+        const mesh = new THREE.Mesh(dustGeometry, dustMaterial);
+        mesh.visible = false;
+        this.group.add(mesh);
+        dust.push(mesh);
+      }
+      this.steps.push({ side, node: `ankle_${suffix}`, ring, ringMaterial, dust, dustMaterial, dirs });
+    }
   }
 
   update(assembled: AssembledModel, frame: KingJoeFxFrame): void {
@@ -331,6 +390,31 @@ export class KingJoeFx {
       thruster.flame.scale.set(0.7 + throttle * 0.5, length, 0.7 + throttle * 0.5);
       thruster.flame.position.z = -0.28 - length * 0.35;
       thruster.material.opacity = 0.22 + throttle * 0.6;
+    }
+
+    for (const step of this.steps) {
+      const impact = Math.min(1, frame.steps?.[step.side] ?? 0);
+      const visible = impact > 0.02;
+      step.ring.visible = visible;
+      for (const mesh of step.dust) mesh.visible = visible;
+      if (!visible) continue;
+      anyVisible = true;
+      const foot = nodeWorld(step.node, new THREE.Vector3(0, 0, 0));
+      const progress = 1 - impact;
+      step.ring.position.set(foot.x, -0.016, foot.z);
+      step.ring.scale.setScalar(1 + progress * 0.6);
+      step.ringMaterial.opacity = impact * 0.65;
+      step.dustMaterial.opacity = impact * 0.5;
+      step.dust.forEach((mesh, index) => {
+        const dir = step.dirs[index]!;
+        const spread = dir.r + progress * 0.5;
+        mesh.position.set(
+          foot.x + dir.x * spread,
+          -0.004 + Math.sin(Math.PI * progress) * 0.2,
+          foot.z + dir.z * spread,
+        );
+        mesh.scale.setScalar(0.6 + progress * 1.2);
+      });
     }
 
     this.group.visible = anyVisible;

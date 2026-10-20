@@ -421,6 +421,27 @@ function addLegStructure(builder: KingJoeParts, side: Side): void {
     boltH: 0.012,
   });
 
+  // —— 足底四角减震垫（站立支撑 + 重踏步吸震）——
+  for (const [corner, dx, dz, cn] of [
+    ["front_outer", 0.2, 0.38, "前外"],
+    ["front_inner", -0.2, 0.38, "前内"],
+    ["rear_outer", 0.2, -0.38, "后外"],
+    ["rear_inner", -0.2, -0.38, "后内"],
+  ] as const) {
+    builder.add({
+      id: pid("legs", `foot_damper_${corner}_${side}`),
+      name_cn: `足底${cn}减震垫`,
+      name_en: `foot damper pad ${corner}`,
+      assembly: "legs",
+      layer: 4,
+      geometry: { type: "box", w: 0.16, h: 0.024, d: 0.2, bevel: 0.006 },
+      material: "rubber",
+      node: ankle,
+      mate: mateAt(ankle, [legX + dx, -0.013, 0.12 + dz]),
+      source: "上表面与足底承力板留 1mm 装配缝；四角独立吸震，重踏步时先触地",
+    });
+  }
+
   // —— 管线 / 传感器 ——
   tubeBetween(builder, {
     id: pid("legs", `hip_hose_${side}`),

@@ -6,7 +6,7 @@ import os from "node:os";
 // ============================================================================
 // scripts/capture-kingjoe.mjs —— 金古桥浏览器验收采集
 //   · 生产构建 + ?qa=1 只读场景钩子
-//   · 四体编队 / 合体对接特写 / 合体成品 / 怪光线 / 残缺合体截图
+//   · 四体编队 / 合体对接特写 / 合体成品 / 重踏步特写 / 怪光线 / 残缺合体截图
 //   · rAF 实测 FPS
 //   · canvas.captureStream(60) + MediaRecorder 录制合体全程（画面 + Web Audio 音轨，随后 ffmpeg 转 MP4）
 // ============================================================================
@@ -204,11 +204,19 @@ async function main() {
   await sleep(800);
   await shot("kingjoe-combined.png");
 
-  // 5.5) 机器人步行 + 腰部转轴
+  // 5.5) 机器人步行 + 腰部转轴 + 3.0s 重踏步震环
   await setCamera([9.2, 5.5, 12.4], [0, 4.25, 0]);
   await setState("robot");
-  await sleep(900);
+  await sleep(3100);
   await shot("kingjoe-robot.png");
+
+  // 5.6) 重踏步特写：左足落地冲击环 + 扬尘
+  await setState("idle");
+  await sleep(200);
+  await setCamera([4.6, 2.1, 5.6], [0, 0.7, 0.05]);
+  await setState("robot");
+  await sleep(3100);
+  await shot("kingjoe-footstep.png");
 
   // 6) 怪光线
   await setCamera([9.2, 5.4, 12.4], [0, 4.3, 0]);

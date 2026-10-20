@@ -31,7 +31,7 @@ describe("kingjoe motion", () => {
     // 腰部关节关键帧：上腹/胸/头绕 waist 转，腿↔腹接口不动
     model.resetNodes();
     animateKingJoe(model, 0, "robot");
-    for (const t of [1.5, 3, 4.5]) {
+    for (const t of [1.5, 3, 3.05, 4.5, 6.05]) {
       model.resetNodes();
       animateKingJoe(model, t, "robot");
       model.root.updateMatrixWorld(true);
