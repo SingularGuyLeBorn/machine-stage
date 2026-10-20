@@ -856,7 +856,7 @@ function buildTurretParts(): PartDefinition[] {
     },
     tags: ["fx"],
     source:
-      "炮口焰（Mündungsfeuer，特效件）：核心球 ⌀200 + 前向锥 ⌀240 × 420 + 6 片径向星芒，几何整体在炮口前方 35mm 之外（不碰炮管制退器）；挂 GunRecoil 节点，随炮身后坐。只由击发动画切 visible 与 scale（1.16–1.55s），不参与静态装配语义；tags: [\"fx\"] 让悬空检测豁免。",
+      '炮口焰（Mündungsfeuer，特效件）：核心球 ⌀200 + 前向锥 ⌀240 × 420 + 6 片径向星芒，几何整体在炮口前方 35mm 之外（不碰炮管制退器）；挂 GunRecoil 节点，随炮身后坐。只由击发动画切 visible 与 scale（1.16–1.55s），不参与静态装配语义；tags: ["fx"] 让悬空检测豁免。',
   });
 
   parts.push({
