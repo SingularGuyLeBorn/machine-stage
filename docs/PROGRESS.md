@@ -1363,7 +1363,7 @@ y 1.078~1.105（顶面与舱盖齐平，下表面离赞助板顶板 1.075 留 3m
 | 项     | 结果                                                                                                                            |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
 | 四体   | King Ship / King Chest（含双臂）/ King Stomach / King Legs，四个独立 assembly + 独立节点运动                                    |
-| 零件级 | **469 个定义件 / 663 个实例 / 265,722 三角面**；缸体/活塞/活塞杆/耳环/销轴、锥销/承座/锁环/锁爪/锁钩、喷管/叶片/作动器逐件      |
+| 零件级 | **570 个定义件 / 764 个实例 / 305,710 三角面**；缸体/活塞/活塞杆/耳环/销轴、锥销/承座/锁环/锁爪/锁钩、喷管/叶片/作动器逐件      |
 | 对接   | 3 对轴向接口（腿↔腹↔胸↔头）+ 双肩锁；锥形销 45mm 入 56mm 承座孔、锁环 30°、端面密封/传感器/锁钩留 5–15mm 间隙                   |
 | 动画   | idle / formation / combining / robot / firing / separation / crippled / scanning 八态；状态驱动时钟（catalog `animatedStates`） |
 | 合体   | 编队收敛 → 自下而上三段阻尼对接 → 电弧 → 销入槽 → 锁环过冲咔哒 → 双臂展开；可逆分离                                             |
@@ -1375,9 +1375,9 @@ y 1.078~1.105（顶面与舱盖齐平，下表面离赞助板顶板 1.075 留 3m
 
 - 静态/悬空：`npx vite-node scripts/diag-kingjoe.ts` → `static clipping=0 / unsupported=0`。
 - 全程扫掠：`npx vite-node scripts/diag-sweep-kj.ts` —— combining 10s@30fps / separation 4s / robot 6s / firing 3s / formation 3s / crippled 3s，均为 **0 reports**，悬空 0。
-- 浏览器：生产构建 + `?qa=1`，`node scripts/capture-kingjoe.mjs`；headless Chrome rAF **57.1 fps**，录屏 613 帧/10.7s。
-- 截图：`docs/screenshots/kingjoe-idle.png`、`kingjoe-formation.png`、`kingjoe-docking-closeup.png`、`kingjoe-lock-closeup.png`、`kingjoe-docking-wide.png`、`kingjoe-combined.png`、`kingjoe-firing.png`、`kingjoe-separation.png`、`kingjoe-crippled.png`。
-- 录屏：`docs/recordings/kingjoe-combine-60fps.mp4`（60fps / 10.7s / 938×734，四体编队 → 合体全程）；缩略拼图 `docs/qa/kingjoe-combine-contact.png`。
+- 浏览器：生产构建 + `?qa=1`，`node scripts/capture-kingjoe.mjs`；headless Chrome rAF **57.2 fps**，录屏 611 帧/10.7s。
+- 截图：`docs/screenshots/kingjoe-idle.jpg`、`kingjoe-formation.jpg`、`kingjoe-docking-closeup.jpg`、`kingjoe-lock-closeup.jpg`、`kingjoe-docking-wide.jpg`、`kingjoe-combined.jpg`、`kingjoe-firing.jpg`、`kingjoe-separation.jpg`、`kingjoe-crippled.jpg`。
+- 录屏：`docs/recordings/kingjoe-combine-60fps.mp4`（60fps / 10.7s / 938×734，四体编队 → 合体全程）；缩略拼图 `docs/qa/kingjoe-combine-contact.jpg`。
 
 ### 关键口径 / 设计取舍
 
@@ -1391,7 +1391,7 @@ y 1.078~1.105（顶面与舱盖齐平，下表面离赞助板顶板 1.075 留 3m
 
 ### 已知边界（下一轮优先）
 
-1. **定义件 469 vs 计划 ~580**：所有机构件（液压 7–8 件/缸、对接销/座/锁/钩、喷口 4 件、三指三节）已逐件；差额主要是四体各自的紧固件/线束族没有铺满，以及反重力发生器简化为「框+核心+6 线圈+极板」。不为凑数增加无支撑小件；后续按层补 fastener 族/管路。
+1. **定义件 570 vs 计划 ~580（差 10）**：四体为 **Ship 100 / Chest 198（含双臂）/ Stomach 100 / Legs 172**。所有机构件（液压 7–8 件/缸、对接销/座/锁/钩、喷口 4 件、三指三节、对接环座/锁环/导轨）逐件；Ship/Stomach 已补到 100 件（背部接缝、紧固件圈、耳荚端盖、腰部制动块、腹部角撑、徽章/能量缝）。差额不再是「总成级糊弄」，而是胸体因双臂略超 180、其余体没有为凑满 580 继续加无支撑小件。
 2. **腰部未做成独立动画节点**：齿圈/轴承/电机都是零件，但躯干作为整体移动；要做真实弯腰需把腹部上段拆成 waist 节点并重排对接接口。
 3. **步行/爬行无地面 IK**：脚底随关节角度抬落，站立脚有轻微滑动；残缺形态是低姿态撑地，不是位移爬行。
 4. **音频缺失**：锁死「咔哒」目前是视觉闪光 + 锁环过冲，没有声音资产。

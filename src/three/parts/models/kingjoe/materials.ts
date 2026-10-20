@@ -129,6 +129,14 @@ export const KINGJOE_MATERIALS: Record<string, MaterialSpec> = {
     emissiveIntensity: 1.3,
     envMapIntensity: 0.7,
   },
+  seam_glow: {
+    base: "#123340",
+    metalness: 0.3,
+    roughness: 0.3,
+    emissive: "#7fe6ff",
+    emissiveIntensity: 1.8,
+    envMapIntensity: 0.7,
+  },
   sensor_red: {
     base: "#3a0707",
     metalness: 0.3,
