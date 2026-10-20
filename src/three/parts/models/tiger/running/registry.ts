@@ -514,6 +514,19 @@ function makeLayouts(): Record<string, InstanceLayout> {
     return lateral(side, x, wheelCenterYOf(constants), side * (constants.TRACK_Z + 0.01));
   };
 
+  // —— L2 收尾：减震器 / 履带张紧调节机构 ——
+  layouts["running.damper"] = ({ index, constants }) => {
+    const side: 1 | -1 = index < 2 ? 1 : -1;
+    const station = index % 2 === 0 ? 0 : constants.WHEEL_STATIONS! - 1;
+    const x = constants.WHEEL_X_FRONT! + station * constants.WHEEL_STATION_PITCH!;
+    return new THREE.Matrix4().makeTranslation(x, 0, side * 1.025);
+  };
+
+  layouts["running.idlerTensioner"] = ({ index, constants }) => {
+    const side: 1 | -1 = index === 0 ? 1 : -1;
+    return new THREE.Matrix4().makeTranslation(constants.IDLER_X!, idlerCenterYOf(constants), side * 1.045);
+  };
+
   return layouts;
 }
 
@@ -911,6 +924,57 @@ function buildParts(): PartDefinition[] {
     instance_layout: RUNNING_LAYOUTS.driveShaft,
     mate: { type: "absolute" },
     source: "终传输出轴 → 主动轮轮毂孔（6mm 名义间隙）",
+  });
+
+  add({
+    id: "tiger.suspension.damper",
+    name_cn: "悬挂减震器",
+    name_en: "Stoßdämpfer",
+    assembly: "suspension",
+    build_layer: 2,
+    build_order: 397,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.12, h: 0.06, d: 0.1, at: [0, -0.2, 0], bevel: 0.006 },
+        { type: "cylinder", r: 0.058, h: 0.04, at: [0, -0.215, 0], segments: 20, bevel: 0.004 },
+        { type: "cylinder", r: 0.05, h: 0.26, at: [0, -0.36, 0], segments: 20, bevel: 0.004 },
+        { type: "cylinder", r: 0.018, h: 0.18, at: [0, -0.565, 0], segments: 12, bevel: 0.002 },
+      ],
+    },
+    material: "cast_iron_dark",
+    instances: 4,
+    indexed: true,
+    instance_layout: "running.damper",
+    mate: { type: "absolute" },
+    source:
+      "悬挂减震器（Stoßdämpfer）：上座板 120×60×100、缸体 ⌀110×260、活塞杆 ⌀36×180。每侧只在首/末两站各装一只（共 4 只）：缸体中心线 y -0.36，下杆端 -0.655（离负重轮轴顶 -0.672 留 17mm），缸体 z ±1.025（内缘离车体侧板外面 0.9625 留 8mm、外缘离履带内侧面 1.1275 留 47mm）；x 装在首站 -3.60 与末站 -0.17。",
+  });
+
+  add({
+    id: "tiger.track.idler_tensioner",
+    name_cn: "履带张紧调节机构",
+    name_en: "Kettenspanner",
+    assembly: "track",
+    build_layer: 2,
+    build_order: 398,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.16, h: 0.16, d: 0.12, at: [0, 0, 0], bevel: 0.008 },
+        { type: "box", w: 0.12, h: 0.09, d: 0.06, at: [-0.14, 0, 0], bevel: 0.005 },
+        { type: "box", w: 0.1, h: 0.1, d: 0.12, at: [-0.2, 0, 0], bevel: 0.006 },
+        { type: "box", w: 0.03, h: 0.22, d: 0.03, at: [-0.2, 0.17, 0], bevel: 0.003 },
+        { type: "box", w: 0.05, h: 0.05, d: 0.03, at: [-0.2, 0.3, 0], bevel: 0.004 },
+      ],
+    },
+    material: "steel",
+    instances: 2,
+    indexed: true,
+    instance_layout: "running.idlerTensioner",
+    mate: { type: "absolute" },
+    source:
+      "履带张紧调节机构（Kettenspanner）：偏心座 160×160×120、拉臂 120×90×60、耳座 100×100×120、调节螺杆 ⌀30×220 + 锁紧块 50×50×30。装在诱导轮轴线内侧 z ±1.045（内缘离侧板 0.9625 留 22mm、外缘离履带内侧面 1.1275 留 22mm），拉臂朝车前（-X，world x 0.38~0.52，避开车尾板内表面 0.83）。",
   });
 
   return parts;

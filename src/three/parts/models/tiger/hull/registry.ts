@@ -203,6 +203,27 @@ function makeLayouts(): Record<string, InstanceLayout> {
       .makeTranslation(0, 0, index === 0 ? 1.45 : -1.45)
       .multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
 
+  // —— L5 表面：焊缝 / 铆钉带 / 防滑纹 ——
+  layouts["hull.weldSponson"] = ({ index }) => {
+    const side = index < 20 ? 1 : -1;
+    const i = index % 20;
+    return new THREE.Matrix4().makeTranslation(-4.4 + i * 0.285, 1.086, side * 1.791);
+  };
+
+  layouts["hull.weldRear"] = ({ index }) =>
+    new THREE.Matrix4().makeTranslation(0.899, 1.116, -0.84 + index * 0.24);
+
+  layouts["hull.sponsonRivets"] = ({ index }) =>
+    new THREE.Matrix4()
+      .makeTranslation(0, 0.9, index === 0 ? 1.781 : -1.781)
+      .multiply(new THREE.Matrix4().makeRotationX(index === 0 ? Math.PI / 2 : -Math.PI / 2));
+
+  layouts["hull.balkenkreuz"] = ({ index }) =>
+    new THREE.Matrix4().makeTranslation(-2.2, 0.55, index === 0 ? 1.783 : -1.783);
+
+  layouts["hull.antislip"] = ({ index }) =>
+    new THREE.Matrix4().makeTranslation(-2.7, 1.078, index === 0 ? 1.35 : -1.35);
+
   return layouts;
 }
 
@@ -948,6 +969,254 @@ function buildHullParts(): PartDefinition[] {
       "行军灯（Notek-Tarnleuchte）：灯体 100×120×100、上檐 120×20×120、下座 50×50×110，装在左前履带挡板上（座底 y 0.13，挡板顶 0.115，留 15mm 走线），灯面朝前。实车为夜间纵队行驶用的低照度灯，带遮光檐。",
   });
 
+  // ===================== L5 随车工具 / 焊缝 / 紧固件 / 防滑纹 =====================
+
+  // 千斤顶
+  add({
+    id: "tiger.hull.tool_jack",
+    name_cn: "随车千斤顶",
+    name_en: "Wagenheber",
+    assembly: "hull",
+    build_layer: 5,
+    build_order: 600,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.26, h: 0.03, d: 0.18, at: [0, 0.015, 0], bevel: 0.006 },
+        { type: "box", w: 0.2, h: 0.16, d: 0.16, at: [0, 0.11, 0], bevel: 0.012 },
+        { type: "box", w: 0.05, h: 0.12, d: 0.05, at: [0, 0.25, 0], bevel: 0.006 },
+        { type: "box", w: 0.5, h: 0.03, d: 0.03, at: [0.27, 0.27, 0], bevel: 0.006 },
+      ],
+    },
+    material: "steel_worn",
+    mate: { type: "absolute", position: [-2.6, 1.078, -1.62] },
+    source:
+      "随车千斤顶（Wagenheber）：底座 260×180×30、机身 200×160×160、顶杆 50×120×50、手柄 500×30×30。放在左赞助板顶板（面 1.075）上、底面留 3mm，机身顶 1.348，全长占 x -0.30~0.52。",
+  });
+
+  // 撬棍
+  add({
+    id: "tiger.hull.tool_crowbar",
+    name_cn: "撬棍",
+    name_en: "Brechstange",
+    assembly: "hull",
+    build_layer: 5,
+    build_order: 601,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 1.0, h: 0.035, d: 0.035, at: [0.5, 0.0175, 0], bevel: 0.008 },
+        { type: "box", w: 0.13, h: 0.035, d: 0.07, at: [1.02, 0.035, 0.02], bevel: 0.008 },
+        { type: "box", w: 0.1, h: 0.035, d: 0.09, at: [-0.03, 0.0175, 0], bevel: 0.006 },
+      ],
+    },
+    material: "steel_worn",
+    mate: { type: "absolute", position: [-2.0, 1.078, -1.45] },
+    source:
+      "撬棍（Brechstange）：杆 1000×35×35、钩头 130×35×70、扁端 100×35×90。平放在左赞助板顶板上（底面留 3mm），x -0.18 ~ 0.82，离车尾边 90mm。",
+  });
+
+  // 铁锹
+  add({
+    id: "tiger.hull.tool_shovel",
+    name_cn: "铁锹",
+    name_en: "Spaten",
+    assembly: "hull",
+    build_layer: 5,
+    build_order: 602,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.62, h: 0.045, d: 0.05, at: [0.31, 0.0225, 0], bevel: 0.008 },
+        { type: "box", w: 0.06, h: 0.05, d: 0.09, at: [0.62, 0.025, 0], bevel: 0.006 },
+        { type: "box", w: 0.26, h: 0.03, d: 0.24, at: [0.76, 0.015, 0], bevel: 0.012 },
+        { type: "box", w: 0.06, h: 0.03, d: 0.18, at: [0.9, 0.015, 0], bevel: 0.008 },
+      ],
+    },
+    material: "steel_worn",
+    mate: { type: "absolute", position: [-4.02, 1.078, 1.38] },
+    source:
+      "铁锹（Spaten）：柄 620×45×50、锹肩 60×50×90、锹面 260×30×240、刃口 60×30×180。平放在右前赞助板顶板上（底面 3mm），x -4.02 ~ -3.12。",
+  });
+
+  // 斧头
+  add({
+    id: "tiger.hull.tool_axe",
+    name_cn: "斧头",
+    name_en: "Beil",
+    assembly: "hull",
+    build_layer: 5,
+    build_order: 603,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.6, h: 0.04, d: 0.04, at: [0.3, 0.02, 0], bevel: 0.008 },
+        { type: "box", w: 0.16, h: 0.05, d: 0.26, at: [0.64, 0.025, 0], bevel: 0.008 },
+        { type: "box", w: 0.05, h: 0.05, d: 0.1, at: [0.73, 0.025, 0.09], bevel: 0.006 },
+      ],
+    },
+    material: "steel_worn",
+    mate: { type: "absolute", position: [-1.6, 1.078, 1.34] },
+    source:
+      "斧头（Beil）：柄 600×40×40、斧头 160×50×260、刃口 50×50×100。平放在右后赞助板顶板上（底面 3mm），x 0.02 ~ 0.62。",
+  });
+
+  // 履带销拆卸器
+  add({
+    id: "tiger.hull.tool_pin_pusher",
+    name_cn: "履带销拆卸器",
+    name_en: "Kettenglied-Austreiber",
+    assembly: "hull",
+    build_layer: 5,
+    build_order: 604,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.24, h: 0.06, d: 0.16, at: [0, 0.03, 0], bevel: 0.008 },
+        { type: "box", w: 0.04, h: 0.2, d: 0.04, at: [0, 0.16, 0], bevel: 0.006 },
+        { type: "box", w: 0.3, h: 0.03, d: 0.03, at: [0.15, 0.27, 0], bevel: 0.006 },
+        { type: "box", w: 0.06, h: 0.1, d: 0.16, at: [-0.15, 0.05, 0], bevel: 0.006 },
+      ],
+    },
+    material: "steel",
+    mate: { type: "absolute", position: [-4.1, 1.078, -1.3] },
+    source:
+      "履带销拆卸器（Kettenglied-Austreiber）：底座 240×60×160、螺杆 ⌀40×200、手柄 300×30×30、夹爪 60×100×160。放在左前赞助板顶板上（底面 3mm），x -4.10 ~ -3.80。",
+  });
+
+  // 千斤顶垫木
+  add({
+    id: "tiger.hull.tool_jack_block",
+    name_cn: "千斤顶垫木",
+    name_en: "Unterlegklotz",
+    assembly: "hull",
+    build_layer: 5,
+    build_order: 605,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.42, h: 0.12, d: 0.2, at: [0, 0.06, 0], bevel: 0.014 },
+        { type: "box", w: 0.3, h: 0.03, d: 0.14, at: [0, 0.135, 0], bevel: 0.01 },
+      ],
+    },
+    material: "canvas_black",
+    mate: { type: "absolute", position: [-1.15, 1.078, 1.6] },
+    source:
+      "千斤顶垫木（Unterlegklotz）：420×120×200 木块 + 300×30×140 上垫板，放在左后赞助板顶板上（底面 3mm），x 0.40 ~ 0.82。",
+  });
+
+  // 焊缝：赞助板外壁 × 顶板转角（蛇形纹）
+  add({
+    id: "tiger.hull.weld_sponson",
+    name_cn: "赞助板角焊缝",
+    name_en: "Schweißnaht",
+    assembly: "hull",
+    build_layer: 5,
+    build_order: 606,
+    geometry: { type: "weld", from: [0, 0, 0], to: [0.27, 0, 0], radius: 0.008, seed: 7 },
+    material: "armor_steel",
+    instances: 40,
+    indexed: true,
+    instance_layout: "hull.weldSponson",
+    mate: { type: "absolute" },
+    source:
+      "赞助板角焊缝（Schweißnaht）：每段 280、焊道半径 8，沿 z ±1.78 外壁与顶板 1.075 的转角通长 5.3m（每侧 20 段）。焊道中心取在两面尖角外侧 11mm 处，离两侧板面各 3mm（不埋进板内），蛇形起伏由 weldBeadGeometry 的随机种子生成。",
+  });
+
+  // 焊缝：尾板 × 发动机舱盖转角
+  add({
+    id: "tiger.hull.weld_rear",
+    name_cn: "尾板角焊缝",
+    name_en: "Schweißnaht Heck",
+    assembly: "hull",
+    build_layer: 5,
+    build_order: 607,
+    geometry: { type: "weld", from: [0, 0, 0], to: [0.24, 0, 0], radius: 0.007, seed: 11 },
+    material: "armor_steel",
+    instances: 8,
+    indexed: true,
+    instance_layout: "hull.weldRear",
+    mate: { type: "absolute" },
+    source:
+      "尾板角焊缝：每段 240、焊道半径 7，沿尾板外面 0.91 与发动机舱盖顶 1.105 的转角（焊道中心 x 0.899、y 1.116），z -0.84 ~ 0.84 共 8 段。",
+  });
+
+  // 紧固件圈：赞助板外壁铆钉带
+  add({
+    id: "tiger.hull.sponson_rivets",
+    name_cn: "赞助板铆钉带",
+    name_en: "Nietreihe",
+    assembly: "hull",
+    build_layer: 5,
+    build_order: 608,
+    geometry: { type: "rivets", count: 34, spacing: 0.105, radius: 0.009 },
+    material: "armor_steel",
+    instances: 2,
+    indexed: true,
+    instance_layout: "hull.sponsonRivets",
+    mate: { type: "absolute" },
+    source:
+      "赞助板铆钉带：34 颗 ⌀18 半球铆钉、间距 105（总长 3.47），沿赞助板外壁 z ±1.78 上缘 y 0.90 通长布置；铆钉基面离壁面 1mm（半球凸出 9）。左右各一条。",
+  });
+
+  // 防滑纹：赞助板顶板前段
+  add({
+    id: "tiger.hull.deck_antislip",
+    name_cn: "防滑纹板",
+    name_en: "Trittschutz",
+    assembly: "hull",
+    build_layer: 5,
+    build_order: 609,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.62, h: 0.004, d: 0.3, at: [0, 0.002, 0], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.006, d: 0.3, at: [-0.27, 0.007, 0], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.006, d: 0.3, at: [-0.21, 0.007, 0], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.006, d: 0.3, at: [-0.15, 0.007, 0], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.006, d: 0.3, at: [-0.09, 0.007, 0], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.006, d: 0.3, at: [-0.03, 0.007, 0], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.006, d: 0.3, at: [0.03, 0.007, 0], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.006, d: 0.3, at: [0.09, 0.007, 0], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.006, d: 0.3, at: [0.15, 0.007, 0], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.006, d: 0.3, at: [0.21, 0.007, 0], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.006, d: 0.3, at: [0.27, 0.007, 0], bevel: 0.002 },
+      ],
+    },
+    material: "armor_steel",
+    instances: 2,
+    indexed: true,
+    instance_layout: "hull.antislip",
+    mate: { type: "absolute" },
+    source:
+      "防滑纹板（Trittschutz）：620×500×4 底板 + 11 道 20×6×500 凸筋，铺在赞助板顶板前段（底面 1.078，离顶板 3mm）；左右各一块，中心 x -3.30、z ±1.35。",
+  });
+
+  // ===================== L5 涂装：巴尔干十字 =====================
+
+  add({
+    id: "tiger.hull.balkenkreuz",
+    name_cn: "巴尔干十字涂装",
+    name_en: "Balkenkreuz",
+    assembly: "hull",
+    build_layer: 5,
+    build_order: 610,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.26, h: 0.06, d: 0.006, at: [0, 0, 0], bevel: 0.001 },
+        { type: "box", w: 0.06, h: 0.26, d: 0.006, at: [0, 0, 0], bevel: 0.001 },
+      ],
+    },
+    material: "interior_paint",
+    instances: 2,
+    indexed: true,
+    instance_layout: "hull.balkenkreuz",
+    mate: { type: "absolute" },
+    source:
+      "巴尔干十字（Balkenkreuz）：横臂 260×60、竖臂 60×260，厚 6（凸出漆面 3mm），画在赞助板外壁 z ±1.783、x -2.20、y 0.55。1943 年西线/东线虎式的标准识别标志，白漆描边式样此处按实心白十字简化。",
+  });
+
   return parts;
 }
 
@@ -968,9 +1237,9 @@ export function makeHullRegistry(): ModelRegistry {
     nodes: [],
     materials: {
       armor_steel: {
-        base: "#8b9199",
-        metalness: 0.46,
-        roughness: 0.5,
+        base: "#8b7d53",
+        metalness: 0.22,
+        roughness: 0.62,
         preset: "steel",
         envMapIntensity: 1.2,
       },
