@@ -48,4 +48,29 @@ describe("kingjoe motion", () => {
     }
     model.dispose();
   }, 120_000);
+
+  it("编队纵队↔楔形变换与楔形起步合体零穿模", () => {
+    const registry = makeKingJoeRegistry();
+    const model = buildModel(registry, {
+      builders: kingjoeModelBuilders,
+      instanceLayouts: makeKingJoeLayouts(),
+      warnMissingLayout: false,
+    });
+    for (const t of [0, 2.8, 5.7, 8.5, 11.4]) {
+      model.resetNodes();
+      animateKingJoe(model, t, "formation");
+      model.root.updateMatrixWorld(true);
+      expect(detectStatic(model, { minDepthM: 0.0005 }), `formation morph t=${t}`).toEqual([]);
+    }
+    // 从楔形编队直接进入合体：快照应接住上一帧形态，而不是跳回纵队
+    model.resetNodes();
+    animateKingJoe(model, 5.7, "formation");
+    for (const t of [0, 0.4, 1, 1.4, 2]) {
+      model.resetNodes();
+      animateKingJoe(model, t, "combining");
+      model.root.updateMatrixWorld(true);
+      expect(detectStatic(model, { minDepthM: 0.0005 }), `combining from wedge t=${t}`).toEqual([]);
+    }
+    model.dispose();
+  }, 120_000);
 });
