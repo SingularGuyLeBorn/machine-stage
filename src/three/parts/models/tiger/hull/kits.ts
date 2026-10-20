@@ -500,8 +500,22 @@ const engineDeckWing: GeometryBuilder = (spec) => {
   return merged;
 };
 
+// ---------------------------------------------------------------------------
+// 贴花板（战术编号）：单面 PlaneGeometry，UV 归一化 0..1，材质 decal 用 canvas 文字贴图。
+// 局部：面在 XY、法线 +Z、原点在中心；装配位给 3mm 离面距，左件绕 Y 转 180°。
+// ---------------------------------------------------------------------------
+const decalPanel: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Record<string, unknown> }).params;
+  const w = Number(params?.w ?? 0.5);
+  const h = Number(params?.h ?? 0.2);
+  const geometry = new THREE.PlaneGeometry(w, h);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
 export const tigerHullKitBuilders: Record<string, GeometryBuilder> = {
   hullPlate,
+  decalPanel,
   hatchLid,
   rectBezel,
   visorPlate,
