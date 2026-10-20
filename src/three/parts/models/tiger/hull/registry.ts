@@ -115,6 +115,13 @@ const HULL_CONSTANTS: Record<string, number> = {
   HULL_EYE_X: -4.15,
   HULL_EYE_Z: 0.85,
   HULL_EYE2_X: -2.62,
+
+  // —— 战术编号（L5）——
+  HULL_TACTICAL_X: -1.55,
+  HULL_TACTICAL_Y: 0.62,
+  HULL_TACTICAL_Z: 1.783,
+  HULL_TACTICAL_W: 0.5,
+  HULL_TACTICAL_H: 0.26,
 };
 
 function sideOf(index: number): 1 | -1 {
@@ -222,6 +229,17 @@ function makeLayouts(): Record<string, InstanceLayout> {
 
   layouts["hull.balkenkreuz"] = ({ index }) =>
     new THREE.Matrix4().makeTranslation(-2.2, 0.55, index === 0 ? 1.783 : -1.783);
+
+  // 战术编号：右件在 z +1.783、左件在 z -1.783 并绕 Y 转 180°（法线朝外）
+  layouts["hull.tacticalNumber"] = ({ index }) => {
+    const m = new THREE.Matrix4().makeTranslation(
+      HULL_CONSTANTS.HULL_TACTICAL_X!,
+      HULL_CONSTANTS.HULL_TACTICAL_Y!,
+      index === 0 ? HULL_CONSTANTS.HULL_TACTICAL_Z! : -HULL_CONSTANTS.HULL_TACTICAL_Z!,
+    );
+    if (index === 1) m.multiply(new THREE.Matrix4().makeRotationY(Math.PI));
+    return m;
+  };
 
   layouts["hull.antislip"] = ({ index }) =>
     new THREE.Matrix4().makeTranslation(-2.7, 1.078, index === 0 ? 1.35 : -1.35);
@@ -1161,6 +1179,28 @@ function buildHullParts(): PartDefinition[] {
       "赞助板铆钉带：51 颗 ⌀18 半球铆钉、间距 105（总长 5.25），沿赞助板外壁 z ±1.78 上缘 y 0.90 通长布置；带中心 x -1.795 = 赞助板壳体中心（-4.50 ~ 0.91），两端各留 80mm 板边。铆钉基面离壁面 1mm（半球凸出 9）。左右各一条。",
   });
 
+  // 战术编号：炮塔侧后 / 车体赞助板侧面的白色三位编号（贴花，3mm 离面）
+  add({
+    id: "tiger.hull.tactical_number",
+    name_cn: "战术编号",
+    name_en: "Taktische Nummer",
+    assembly: "hull",
+    build_layer: 5,
+    build_order: 611,
+    geometry: {
+      type: "kit",
+      kit: "decalPanel",
+      params: { w: c.HULL_TACTICAL_W!, h: c.HULL_TACTICAL_H! },
+    },
+    material: "tactical_number",
+    instances: 2,
+    indexed: true,
+    instance_layout: "hull.tacticalNumber",
+    mate: { type: "absolute" },
+    source:
+      "战术编号（Taktische Nummer）：白色三位编号「132」+ 黑描边，500 × 260 贴花面，离赞助板外壁（z ±1.78）3mm；位于 x -1.80 ~ -1.30、y 0.49 ~ 0.75——在铁十字（x -2.20）之后、铆钉带（y 0.90）之下、履带挡板（z ±1.905）之内，左右各一。材质 decal 用 canvas 文字贴图（透明底，UV 归一化），左右件共用一张贴图；左件绕 Y 转 180° 使法线朝外。实车编号多刷在炮塔侧壁；本模型炮塔侧壁已被备用履带/抛壳窗/烟雾弹占满，编号落到车体赞助板侧面，保持三位数的识别性。",
+  });
+
   // 防滑纹：赞助板顶板前段
   add({
     id: "tiger.hull.deck_antislip",
@@ -1244,6 +1284,14 @@ export function makeHullRegistry(): ModelRegistry {
         roughness: 0.62,
         preset: "steel",
         envMapIntensity: 1.2,
+      },
+      tactical_number: {
+        base: "#f3efe2",
+        metalness: 0.04,
+        roughness: 0.72,
+        preset: "none",
+        envMapIntensity: 0.8,
+        decal: "132",
       },
     },
     parts: buildHullParts(),
