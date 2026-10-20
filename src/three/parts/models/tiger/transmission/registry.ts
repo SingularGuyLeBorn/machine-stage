@@ -160,6 +160,26 @@ export function makeTransmissionLayouts(): Record<string, InstanceLayout> {
   layouts[TRANSMISSION_LAYOUTS.shiftRail] = ({ index }) =>
     axialX(c.TR_LAY_X, index === 0 ? c.TR_RAIL_Y1 : c.TR_RAIL_Y2, c.TR_RAIL_Z);
 
+  // 齿圈：主轴 3 只齿轮坯 + 中间轴 4 只齿轮坯。几何基准 r 0.11、齿顶 +11mm，
+  // 布局按坯半径等比缩放；齿圈轴局部 +Z → 绕 Y 转 90° 对齐世界 X。
+  layouts["transmission.gearRim"] = ({ index }) => {
+    const list: [number, number, number, number][] = [
+      [c.TR_MAIN_X + 0.24, c.TR_MAIN_Y, c.TR_MAIN_Z, 0.07 / 0.11],
+      [c.TR_MAIN_X + 0.08, c.TR_MAIN_Y, c.TR_MAIN_Z, 0.09 / 0.11],
+      [c.TR_MAIN_X - 0.08, c.TR_MAIN_Y, c.TR_MAIN_Z, 1.0],
+      [c.TR_LAY_X + 0.24, c.TR_LAY_Y, c.TR_LAY_Z, 0.09 / 0.11],
+      [c.TR_LAY_X + 0.08, c.TR_LAY_Y, c.TR_LAY_Z, 1.0],
+      [c.TR_LAY_X - 0.08, c.TR_LAY_Y, c.TR_LAY_Z, 0.13 / 0.11],
+      [c.TR_LAY_X - 0.24, c.TR_LAY_Y, c.TR_LAY_Z, 0.15 / 0.11],
+    ];
+    const [x, y, z, scale] = list[index] ?? list[0]!;
+    return new THREE.Matrix4().compose(
+      new THREE.Vector3(x, y, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, 0)),
+      new THREE.Vector3(scale, scale, scale),
+    );
+  };
+
   layouts[TRANSMISSION_LAYOUTS.steeringOutput] = ({ index }) => {
     const s = side(index);
     // 回转体轴向对称，法兰盘居中（±0.011），轴头朝车外侧：± 两侧用相反旋向 → 轴头都朝外。
@@ -210,6 +230,22 @@ export function makeTransmissionRegistry(): ModelRegistry {
     assemblies: [{ id: "transmission", name_cn: "传动装置", name_en: "transmission", explode: [0, 0.9, 0] }],
     nodes: [],
     materials: {},
+    expectedContacts: [
+      {
+        family: "gear-rim-on-blank",
+        a: "tiger.transmission.gear_rim",
+        b: "tiger.transmission.main_shaft",
+        reason: "齿圈过盈套在主轴齿轮坯外（内孔比坯小 1mm，压装；齿圈按坯径等比缩放，齿根会探入坯体 ≤2.4mm）",
+        maxDepthMm: 3,
+      },
+      {
+        family: "gear-rim-on-blank",
+        a: "tiger.transmission.gear_rim",
+        b: "tiger.transmission.layshaft",
+        reason: "齿圈过盈套在中间轴齿轮坯外（内孔比坯小 1mm，压装；齿圈按坯径等比缩放，齿根会探入坯体 ≤2.4mm）",
+        maxDepthMm: 3,
+      },
+    ],
     parts: buildTransmissionParts(),
   };
 }
@@ -792,6 +828,27 @@ function buildTransmissionParts(): PartDefinition[] {
     mate: { type: "absolute" },
     source:
       "终传输入壳体（0.30 × 0.48 × 0.096；局部原点 = 终传壳轴心 z = ±1.039，卡圈环抱终传壳内端法兰、径向 5mm 缝，立柱四角离轴心 ≥0.25）：输入凸台内端面 z = ±1.00，与侧传动轴外端留 18mm 缝、与法兰螺栓头面留 3mm；外侧离履带销内端 7mm。",
+  });
+
+  add({
+    id: "tiger.transmission.gear_rim",
+    name_cn: "齿轮齿圈",
+    name_en: "Zahnkranz",
+    assembly: "transmission",
+    build_layer: 2,
+    build_order: 364,
+    geometry: {
+      type: "kit",
+      kit: "spurGear",
+      params: { teeth: 30, r: 0.11, w: 0.044, bore: 0.109, bevel: 0.0006 },
+    },
+    material: "steel",
+    instances: 7,
+    indexed: true,
+    instance_layout: "transmission.gearRim",
+    mate: { type: "absolute" },
+    source:
+      "齿轮齿圈 7 只（30 齿，梯形齿廓 + 倒角）：主轴 3 只齿轮坯（ф140/ф180/ф220）与中间轴 4 只（ф180/ф220/ф260/ф300）各套一圈，齿顶 = 坯半径 + 11mm，按坯半径等比缩放。内孔比坯外径小 1mm（过盈套合）；ф220 齿圈齿顶 121 与换挡拨叉内径 122 留 1mm。齿圈让原来的「光坯齿轮」在剖视里真正有齿。",
   });
 
   return parts;
