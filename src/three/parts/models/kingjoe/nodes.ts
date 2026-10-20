@@ -40,6 +40,14 @@ const waist: NodeDef = {
   note: "腰部转轴：上腹/胸/头绕腰鼓旋转，腿↔腹接口不动",
 };
 
+const damagePanel: NodeDef = {
+  name: "damagePanelL",
+  parent: "hip_l",
+  pivot: [-0.382, -0.91, 0],
+  motion: "translate",
+  note: "左大腿外挂装甲板：战损时沿外下方脱落",
+};
+
 const locks: NodeDef[] = [
   { name: "stomachLock", parent: "stomach", pivot: [0, -0.06, 0], motion: "rotate", axis: "y" },
   { name: "chestLock", parent: "chest", pivot: [0, -0.06, 0], motion: "rotate", axis: "y" },
@@ -141,6 +149,7 @@ const rods: NodeDef[] = HYDRAULICS.map((spec) => ({
 export const KINGJOE_NODES: NodeDef[] = [
   ...modules,
   waist,
+  damagePanel,
   ...locks,
   ...nozzles,
   ...legNodes("l"),

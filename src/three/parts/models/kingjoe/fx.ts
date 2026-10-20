@@ -26,6 +26,8 @@ export interface KingJoeFxFrame {
   floor?: boolean;
   /** 重踏步冲击 0..1（左/右脚），驱动地面震环与扬尘。 */
   steps?: { left: number; right: number };
+  /** 战损液压喷溅：节点 + 强度 0..1。 */
+  spray?: { node: string; strength: number };
 }
 
 const ARC_SEGMENTS = 9;
@@ -77,6 +79,10 @@ export class KingJoeFx {
   private readonly beams: BeamRig[] = [];
   private readonly thrusters: ThrusterRig[] = [];
   private readonly steps: StepRig[] = [];
+  private readonly sprayDrops: THREE.Mesh[] = [];
+  private sprayMaterial!: THREE.MeshBasicMaterial;
+  private puddle!: THREE.Mesh;
+  private puddleMaterial!: THREE.MeshBasicMaterial;
   private floor!: THREE.Mesh;
   private readonly ownedGeometries = new Set<THREE.BufferGeometry>();
   private readonly ownedMaterials = new Set<THREE.Material>();
@@ -272,6 +278,36 @@ export class KingJoeFx {
       }
       this.steps.push({ side, node: `ankle_${suffix}`, ring, ringMaterial, dust, dustMaterial, dirs });
     }
+
+    // 战损液压喷溅：18 粒油滴 + 地面油洼，均为场景级 FX。
+    const dropGeometry = new THREE.SphereGeometry(0.018, 6, 5);
+    this.ownedGeometries.add(dropGeometry);
+    this.sprayMaterial = new THREE.MeshBasicMaterial({
+      color: 0x7a4718,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    this.ownedMaterials.add(this.sprayMaterial);
+    for (let i = 0; i < 18; i++) {
+      const drop = new THREE.Mesh(dropGeometry, this.sprayMaterial);
+      drop.visible = false;
+      this.group.add(drop);
+      this.sprayDrops.push(drop);
+    }
+    const puddleGeometry = new THREE.CircleGeometry(0.36, 28);
+    puddleGeometry.rotateX(-Math.PI / 2);
+    this.ownedGeometries.add(puddleGeometry);
+    this.puddleMaterial = new THREE.MeshBasicMaterial({
+      color: 0x4a2a12,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    this.ownedMaterials.add(this.puddleMaterial);
+    this.puddle = new THREE.Mesh(puddleGeometry, this.puddleMaterial);
+    this.puddle.visible = false;
+    this.group.add(this.puddle);
   }
 
   update(assembled: AssembledModel, frame: KingJoeFxFrame): void {
@@ -415,6 +451,32 @@ export class KingJoeFx {
         );
         mesh.scale.setScalar(0.6 + progress * 1.2);
       });
+    }
+
+    const spray = frame.spray;
+    const sprayStrength = spray ? Math.min(1, Math.max(0, spray.strength)) : 0;
+    const sprayVisible = sprayStrength > 0.02;
+    this.sprayMaterial.opacity = sprayVisible ? sprayStrength * 0.8 : 0;
+    for (const drop of this.sprayDrops) drop.visible = sprayVisible;
+    this.puddle.visible = sprayVisible;
+    if (sprayVisible && spray) {
+      anyVisible = true;
+      const origin = nodeWorld(spray.node, new THREE.Vector3(0, 0, 0));
+      this.sprayDrops.forEach((drop, index) => {
+        const phase = (frame.time * 1.35 + index / this.sprayDrops.length) % 1;
+        const angle = (index / this.sprayDrops.length) * Math.PI * 2 + 0.4;
+        const spread = 0.08 + phase * 0.55;
+        drop.position.set(
+          origin.x + Math.cos(angle) * spread,
+          origin.y - 0.12 - phase * 0.95,
+          origin.z + Math.sin(angle) * spread,
+        );
+        drop.scale.setScalar(0.55 + phase * 0.9);
+      });
+      const grow = Math.min(1, Math.max(0, (frame.time - 0.8) / 2.5));
+      this.puddle.position.set(origin.x, -0.014, origin.z);
+      this.puddle.scale.setScalar(0.5 + grow * 0.7);
+      this.puddleMaterial.opacity = sprayStrength * 0.32;
     }
 
     this.group.visible = anyVisible;

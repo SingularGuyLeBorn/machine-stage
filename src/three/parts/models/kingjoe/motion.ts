@@ -21,7 +21,15 @@ import { getKingJoeFx, type KingJoeFxFrame } from "./fx";
 // ============================================================================
 
 export type KingJoeState =
-  "idle" | "formation" | "combining" | "robot" | "firing" | "separation" | "crippled" | "scanning";
+  | "idle"
+  | "formation"
+  | "combining"
+  | "robot"
+  | "firing"
+  | "separation"
+  | "crippled"
+  | "damaged"
+  | "scanning";
 
 export const KINGJOE_ANIMATED_STATES: KingJoeState[] = [
   "formation",
@@ -30,6 +38,7 @@ export const KINGJOE_ANIMATED_STATES: KingJoeState[] = [
   "firing",
   "separation",
   "crippled",
+  "damaged",
 ];
 
 export const KINGJOE_STATE_LABELS: Array<{ id: KingJoeState; label: string; hint: string }> = [
@@ -40,6 +49,7 @@ export const KINGJOE_STATE_LABELS: Array<{ id: KingJoeState; label: string; hint
   { id: "firing", label: "怪光线", hint: "眼部 + 胸口发射口充能 → 发射" },
   { id: "separation", label: "分离回避", hint: "解锁 → 电弧拉断 → 四体四散再编队" },
   { id: "crippled", label: "残缺合体", hint: "腿体被击落：躯干落地，双臂撑地爬行" },
+  { id: "damaged", label: "机器人受击", hint: "左大腿外挂装甲崩落、肘部液压喷溅、插接座短路" },
   { id: "scanning", label: "穿模扫描", hint: "静态 / 动画扫掠检测进行中" },
 ];
 
@@ -627,6 +637,38 @@ function poseCrippled(assembled: AssembledModel, t: number): void {
   setShoulderLocks(assembled, 18);
 }
 
+function poseDamaged(assembled: AssembledModel, t: number): { spray: number; sparks: number } {
+  setLegVisibility(assembled, true);
+  setNode(assembled, "legs", REST.legs, [0, 0, 0]);
+  setLeg(assembled, "l", 0, 6, -3);
+  setLeg(assembled, "r", 0, 0, 0);
+  const shock = Math.exp(-t * 3.2) * Math.sin(t * 16);
+  const lean = smoothstep(0.15, 1.2, t);
+  waistTorso(assembled, new THREE.Vector3(0, KJ.STOMACH_Y, 0), [
+    -2.6 * lean + shock * 1.2,
+    3.4 * lean + shock * 0.6,
+    0,
+  ]);
+  setArm(assembled, "l", 6 * lean + shock * 3, 0, 8 * lean, 6, 10);
+  setArm(assembled, "r", -8 * lean, 0, 12 * lean, 6, 16);
+  setAxialLocks(assembled, 30);
+  setShoulderLocks(assembled, 18);
+  setMaterialIntensity(assembled, "sensor_red", 0.18);
+
+  // 外挂板：先向外弹出 0.6m，再落到左足外侧地面（世界 y≈0.1）。
+  const blow = smoothstep(0.25, 0.6, t);
+  const fall = smoothstep(0.5, 1.5, t);
+  setNode(
+    assembled,
+    "damagePanelL",
+    new THREE.Vector3(-0.382 - 0.6 * blow, -0.91 - 2.05 * fall, 0.55 * blow + 0.2 * fall),
+    [15 * fall, 0, 70 * fall],
+  );
+  const spray = smoothstep(0.3, 0.6, t) * (1 - smoothstep(3.5, 5, t)) + 0.12;
+  const sparks = smoothstep(0.35, 0.55, t) * (1 - smoothstep(2.6, 3.4, t));
+  return { spray, sparks };
+}
+
 function poseIdle(assembled: AssembledModel): void {
   setLegVisibility(assembled, true);
   setNode(assembled, "legs", REST.legs, [0, 0, 0]);
@@ -707,6 +749,12 @@ export function animateKingJoe(
     case "crippled": {
       poseCrippled(assembled, t);
       fxFrame.floor = true;
+      break;
+    }
+    case "damaged": {
+      const damage = poseDamaged(assembled, t);
+      fxFrame.spray = { node: "forearm_l", strength: damage.spray };
+      fxFrame.arcs = { chest_stomach: damage.sparks * 0.45 };
       break;
     }
     default: {

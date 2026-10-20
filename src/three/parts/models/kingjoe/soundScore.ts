@@ -72,6 +72,12 @@ export function kingJoeSoundEvents(
       if (crossed(0.4)) events.push({ kind: "footstep", strength: 1.3 });
       break;
     }
+    case "damaged": {
+      if (entered) events.push({ kind: "unlock", strength: 1.2 });
+      if (crossed(0.35)) events.push({ kind: "servo", strength: 0.9 });
+      if (crossed(1.25)) events.push({ kind: "footstep", strength: 1.1 });
+      break;
+    }
     default:
       break;
   }

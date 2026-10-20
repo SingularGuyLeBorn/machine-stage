@@ -196,6 +196,7 @@ export const CATALOG: StageModel[] = [
       { id: "kj-combine", group: "四体", label: "阻尼合体", kind: "machine-state", state: "combining" },
       { id: "kj-separate", group: "四体", label: "分离回避", kind: "machine-state", state: "separation" },
       { id: "kj-crippled", group: "四体", label: "残缺合体", kind: "machine-state", state: "crippled" },
+      { id: "kj-damage", group: "受击", label: "机器人受击", kind: "machine-state", state: "damaged" },
       { id: "kj-walk", group: "机构", label: "机器人步行", kind: "machine-state", state: "robot" },
       { id: "kj-fire", group: "武器", label: "怪光线", kind: "machine-state", state: "firing" },
       { id: "kj-idle", group: "机构", label: "合体待机", kind: "machine-state", state: "idle" },

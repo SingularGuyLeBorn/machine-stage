@@ -37,4 +37,5 @@ sweep("robot", 6);
 sweep("firing", 3);
 sweep("formation", 3);
 sweep("crippled", 3);
+sweep("damaged", 3);
 model.dispose();
