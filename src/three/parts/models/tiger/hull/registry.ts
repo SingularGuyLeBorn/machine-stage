@@ -243,6 +243,18 @@ function makeLayouts(): Record<string, InstanceLayout> {
     return m;
   };
 
+  // 加油口盖：铰链轴在盘体外缘；右盖沿 -Z 盖住颈孔，左盖绕 Y 转 180° 后同样向车内侧盖住。
+  // 铰链高度 1.19（颈管顶 1.188 上方 2mm），与底座耳片/颈管均留间隙。
+  layouts["hull.fuelCapLid"] = ({ index }) => {
+    const m = new THREE.Matrix4().makeTranslation(
+      0.616,
+      1.19,
+      index === 0 ? 0.886 : -0.886,
+    );
+    if (index === 1) m.multiply(new THREE.Matrix4().makeRotationY(Math.PI));
+    return m;
+  };
+
   // 战术编号：右件在 z +1.783、左件在 z -1.783 并绕 Y 转 180°（法线朝外）
   layouts["hull.tacticalNumber"] = ({ index }) => {
     const m = new THREE.Matrix4().makeTranslation(
@@ -1083,14 +1095,31 @@ function buildHullParts(): PartDefinition[] {
     assembly: "hull",
     build_layer: 4,
     build_order: 548,
-    geometry: { type: "kit", kit: "fuelFillerCap" },
+    geometry: { type: "kit", kit: "fuelFillerBase" },
     material: "steel_worn",
     instances: 2,
     indexed: true,
     instance_layout: "hull.fuelCap",
     mate: { type: "absolute" },
     source:
-      "燃油加注口 ×2（展示为开盖状态）：底座圈 ⌀180 × 20 + 通孔颈管 ⌀136/⌀104 × 62 + 铰链 + 68° 掀起盖盘 ⌀164 × 14 + 提手 + 防丢链。位置 x 0.616 / z ±0.802，正对发动机舱盖上的 ⌀140 加油孔；往下依次是加注管（L1）、软管与油箱颈——油箱 → 加注管 → 甲板孔 → 加油口，路径连续。左盖绕 Y 转 180°，两边都向外开。",
+      "燃油加注口底座 ×2：底座圈 ⌀180 × 20 + 通孔颈管 ⌀136/⌀104 × 62 + 外缘铰链座（双耳 + 销轴让位）。位置 x 0.616 / z ±0.802，正对发动机舱盖的 ⌀140 加油孔；往下是加注管（L1）、软管与油箱通孔颈。盖盘是独立可动件（tiger.hull.fuel_cap_lid），由「加油（开盖）」状态绕铰链掀起 72°。",
+  });
+
+  add({
+    id: "tiger.hull.fuel_cap_lid",
+    name_cn: "燃油加注口盖",
+    name_en: "Kraftstoff-Einfüllklappe",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 549,
+    geometry: { type: "kit", kit: "fuelFillerLid" },
+    material: "steel_worn",
+    instances: 2,
+    indexed: true,
+    instance_layout: "hull.fuelCapLid",
+    mate: { type: "absolute" },
+    source:
+      "燃油加注口盖 ×2（可动）：盖盘 ⌀164 × 14 + 提手 + 铰链销 + 防丢链；铰链轴在盘体外缘（x 0.616 / y 1.19 / z ±0.886），闭合时向车内侧盖住 ⌀104 颈孔，与颈管顶留 2mm；「加油」状态绕铰链掀起 72°，露出加注孔与下方加注管。",
   });
 
   add({

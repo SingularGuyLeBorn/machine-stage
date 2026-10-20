@@ -28,6 +28,7 @@ export const TIGER_MOTION_PARTS = [
   "tiger.track.idler",
   "tiger.turret.aa_mg_case",
   "tiger.hull.hatch_lid",
+  "tiger.hull.fuel_cap_lid",
   "tiger.effects.exhaust_smoke",
 ];
 
@@ -699,6 +700,23 @@ const fxPosition = new THREE.Vector3();
 const fxScale = new THREE.Vector3();
 const frac = (value: number): number => value - Math.floor(value);
 
+// 加油口盖：底座固定，盖盘是独立实例件，绕外缘铰链旋转；
+// 局部 -Z 是盖盘指向颈孔的方向，绕本地 X 正转 72° 即掀起。
+const FUEL_LID_PART = "tiger.hull.fuel_cap_lid";
+const fuelLidMatrix = new THREE.Matrix4();
+const fuelLidRotation = new THREE.Matrix4();
+
+function animateFuelLids(assembled: AssembledModel, state: string | undefined, seconds: number): void {
+  const handle = assembled.getPart(FUEL_LID_PART);
+  if (!handle) return;
+  const open = state === "refuel" ? smoothstep(0, 0.8, seconds) : 0;
+  fuelLidRotation.makeRotationX(THREE.MathUtils.degToRad(72) * open);
+  for (const instance of handle.instances) {
+    fuelLidMatrix.multiplyMatrices(instance.restMatrix, fuelLidRotation);
+    handle.setInstanceMatrix(instance.index, fuelLidMatrix);
+  }
+}
+
 /** 烟柱：逐实例从 origin 上飘、扩散、由小到大再到零（避免循环时突现突灭）。 */
 function writeSmokePlume(
   handle: NonNullable<ReturnType<AssembledModel["getPart"]>>,
@@ -938,7 +956,7 @@ function hideTigerEffects(assembled: AssembledModel): void {
 /**
  * 虎式动画总入口（catalog.animate）：按机器状态分流。
  * - running：悬挂演示；driving：行进演示；firing：主炮击发；mg_firing：MG34 连射；
- * - aiming：炮塔回转 + 炮管俯仰；engine_start：起动机拖动→点火→怠速；
+ * - aiming：炮塔回转 + 炮管俯仰；refuel：加油口盖绕铰链掀起；engine_start：预热→拖动→点火→怠速；
  * - burning：发动机舱起火（车体震颤；火焰/烟柱由 quarks VFX 叠加）；
  * - detonation：弹药殉爆（炮塔掀飞 + 车体冲击；火球/烟柱由 quarks VFX 叠加）；
  * - hit_light / hit_heavy / hit_oblique / hit_ricochet：受击震荡（命中火花/贴花由 quarks VFX 叠加）；
@@ -946,7 +964,12 @@ function hideTigerEffects(assembled: AssembledModel): void {
  */
 export function animateTiger(assembled: AssembledModel, seconds: number, state?: string): void {
   setHatchLids(assembled, state === "aiming");
+  animateFuelLids(assembled, state, seconds);
   if (state !== "driving") resetDriveInstances(assembled);
+  if (state === "refuel") {
+    hideTigerEffects(assembled);
+    return;
+  }
   if (state === "driving") {
     hideTigerEffects(assembled);
     animateTigerDriving(assembled, seconds);

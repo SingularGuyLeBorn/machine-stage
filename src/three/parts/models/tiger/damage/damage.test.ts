@@ -5,6 +5,7 @@ import { findModel } from "@/app/catalog";
 import { applyDamage } from "@/app/three/pose";
 import { irregularBreachLoop } from "./kits";
 import {
+  animateTiger,
   animateTigerBurning,
   animateTigerDetonation,
   animateTigerEngine,
@@ -186,6 +187,23 @@ describe("tiger/P3 发动机 / 事故特效", () => {
     const restPosition = new THREE.Vector3().setFromMatrixPosition(rest);
     expect(piston.position.distanceTo(restPosition)).toBeGreaterThan(0.001);
     expect(smoke.object.visible).toBe(true);
+    built.dispose();
+  });
+
+  it("加油口盖是独立可动件：加油状态绕铰链掀起，停机合盖", () => {
+    const built = build();
+    const lid = built.getPart("tiger.hull.fuel_cap_lid")!;
+    expect(lid.instances.length).toBe(2);
+    animateTiger(built, 0, "idle");
+    const closed = built.instanceMatrix(lid, 0, new THREE.Matrix4()).clone();
+    expect(closed.elements[5]).toBeCloseTo(1, 3);
+    animateTiger(built, 0.8, "refuel");
+    const open = built.instanceMatrix(lid, 0, new THREE.Matrix4()).clone();
+    expect(open.elements[5]).toBeLessThan(0.7);
+    expect(Math.abs(open.elements[6])).toBeGreaterThan(0.5);
+    animateTiger(built, 0, "idle");
+    const reclined = built.instanceMatrix(lid, 0, new THREE.Matrix4()).clone();
+    expect(reclined.elements[5]).toBeCloseTo(1, 3);
     built.dispose();
   });
 

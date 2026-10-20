@@ -873,7 +873,8 @@ const fuelTankBroken: GeometryBuilder = (spec) => {
  * 打开的燃油加注口：底座圈 + 通孔颈管 + 铰链 + 支起的盖盘 + 提手。
  * 盖盘绕 X 轴掀起 68°（向外侧），从上方能直接看到颈孔和下面的加注管。
  */
-const fuelFillerCap: GeometryBuilder = () => {
+/** 加油口底座：底座圈 + 通孔颈管 + 外侧铰链座（盖盘为独立可动件）。 */
+const fuelFillerBase: GeometryBuilder = () => {
   const parts: THREE.BufferGeometry[] = [];
   const base = tubeGeometry(0.09, 0.066, 0.02, 28);
   base.translate(0, 0.01, 0);
@@ -881,25 +882,39 @@ const fuelFillerCap: GeometryBuilder = () => {
   const neck = tubeGeometry(0.068, 0.052, 0.062, 24);
   neck.translate(0, 0.051, 0);
   parts.push(neck);
-  const hinge = bevelBoxGeometry(0.18, 0.018, 0.03, 0.002);
-  hinge.translate(0, 0.078, 0.074);
+  // 铰链座在外缘（+Z），高度低于盖盘 5mm
+  const hinge = bevelBoxGeometry(0.18, 0.012, 0.028, 0.002);
+  hinge.translate(0, 0.07, 0.084);
   parts.push(hinge);
-  const angle = THREE.MathUtils.degToRad(68);
+  const eyeL = cylinderGeometry(0.014, 0.024, 0.014, 12, 0.001);
+  eyeL.rotateZ(Math.PI / 2);
+  eyeL.translate(-0.062, 0.082, 0.084);
+  parts.push(eyeL);
+  const eyeR = cylinderGeometry(0.014, 0.024, 0.014, 12, 0.001);
+  eyeR.rotateZ(Math.PI / 2);
+  eyeR.translate(0.062, 0.082, 0.084);
+  parts.push(eyeR);
+  const merged = mergeGeometries(parts);
+  for (const part of parts) part.dispose();
+  return merged;
+};
+
+/** 加油口盖：局部原点 = 铰链轴，闭合时盘体沿 -Z 盖住颈孔；提手/链随盖动。 */
+const fuelFillerLid: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
   const lid = cylinderGeometry(0.082, 0.014, 0.082, 28, 0.002);
-  lid.translate(0, 0, 0.082); // 铰链边落在局部 z=0
-  lid.rotateX(-angle);
-  lid.translate(0, 0.078, 0.074);
+  lid.translate(0, 0.007, -0.082); // 铰链边 z=0，向内盖住颈孔
   parts.push(lid);
   const handle = bevelBoxGeometry(0.12, 0.024, 0.022, 0.003);
-  handle.translate(
-    0,
-    0.078 + Math.sin(angle) * 0.15,
-    0.074 + Math.cos(angle) * 0.15,
-  );
+  handle.translate(0, 0.03, -0.15);
   parts.push(handle);
-  // 防丢链：从铰链座垂到盖盘内侧的两段短链节
-  const chain = bevelBoxGeometry(0.012, 0.11, 0.008, 0.001);
-  chain.translate(-0.06, 0.095, 0.1);
+  const hingePin = cylinderGeometry(0.01, 0.08, 0.01, 12, 0.001);
+  hingePin.rotateZ(Math.PI / 2);
+  hingePin.translate(0, 0.007, 0);
+  parts.push(hingePin);
+  // 防丢链：贴在盖面上的一小段链节（随盖掀起，不垂进颈孔）
+  const chain = bevelBoxGeometry(0.012, 0.02, 0.008, 0.001);
+  chain.translate(-0.055, 0.03, -0.11);
   parts.push(chain);
   const merged = mergeGeometries(parts);
   for (const part of parts) part.dispose();
@@ -934,6 +949,7 @@ export const tigerDamageKitBuilders: Record<string, GeometryBuilder> = {
   mantletBroken,
   fuelTank,
   fuelTankBroken,
-  fuelFillerCap,
+  fuelFillerBase,
+  fuelFillerLid,
   smokePuff,
 };
