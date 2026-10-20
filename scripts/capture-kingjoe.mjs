@@ -6,7 +6,7 @@ import os from "node:os";
 // ============================================================================
 // scripts/capture-kingjoe.mjs —— 金古桥浏览器验收采集
 //   · 生产构建 + ?qa=1 只读场景钩子
-//   · 四体编队 / 合体对接特写 / 合体成品 / 重踏步特写 / 怪光线 / 残缺合体截图
+//   · 四体纵队/楔形编队 / 合体对接特写 / 合体成品 / 重踏步特写 / 怪光线 / 残缺合体截图
 //   · rAF 实测 FPS
 //   · canvas.captureStream(60) + MediaRecorder 录制合体全程（画面 + Web Audio 音轨，随后 ffmpeg 转 MP4）
 // ============================================================================
@@ -169,11 +169,15 @@ async function main() {
   await sleep(700);
   await shot("kingjoe-idle.png");
 
-  // 2) 四体编队
+  // 2) 四体编队：纵队 → 楔形变换
   await setCamera([12.5, 9.2, 15.5], [0, 4.8, -1.1]);
   await setState("formation");
   await sleep(1100);
   await shot("kingjoe-formation.png");
+  await sleep(4600);
+  await setCamera([11.5, 13.5, 14.5], [0, 4.6, -1.2]);
+  await sleep(250);
+  await shot("kingjoe-formation-wedge.png");
 
   // 3) 合体对接特写（腹部→腿，电弧 + 锥销入槽）
   await setState("idle");

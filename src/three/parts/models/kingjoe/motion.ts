@@ -34,7 +34,7 @@ export const KINGJOE_ANIMATED_STATES: KingJoeState[] = [
 
 export const KINGJOE_STATE_LABELS: Array<{ id: KingJoeState; label: string; hint: string }> = [
   { id: "idle", label: "合体待机", hint: "四体锁死成机器人；静态装配零穿模，可拖构建滑杆" },
-  { id: "formation", label: "编队巡航", hint: "四艘飞船独立悬浮、喷口摆动，双臂收拢" },
+  { id: "formation", label: "编队巡航", hint: "四艘飞船独立悬浮，纵队↔楔形变换、喷口摆动，双臂收拢" },
   { id: "combining", label: "阻尼合体", hint: "自下而上逐对对接：锥销入槽、电弧接通、锁环咔哒" },
   { id: "robot", label: "机器人步行", hint: "髋/膝/踝液压随角度伸缩，腰部微转，重踏步" },
   { id: "firing", label: "怪光线", hint: "眼部 + 胸口发射口充能 → 发射" },
@@ -53,12 +53,46 @@ const REST = {
   ship: new THREE.Vector3(0, KJ.SHIP_Y, 0),
 };
 
-const FORMATION: Record<"legs" | "stomach" | "chest" | "ship", THREE.Vector3> = {
+type FormationName = "legs" | "stomach" | "chest" | "ship";
+type FormationOffsets = Record<FormationName, THREE.Vector3>;
+const FORMATION_MODULES: FormationName[] = ["legs", "stomach", "chest", "ship"];
+
+/** 纵队：四体沿纵深错开；楔形：头部在前，胸/腹两翼，腿体殿后。 */
+const FORMATION_COLUMN: FormationOffsets = {
   legs: new THREE.Vector3(0, 0.55, 0),
   stomach: new THREE.Vector3(-2.7, 1.7, -2.2),
   chest: new THREE.Vector3(2.9, 2.1, -2.5),
   ship: new THREE.Vector3(0, 2.85, -3.25),
 };
+const FORMATION_WEDGE: FormationOffsets = {
+  legs: new THREE.Vector3(0, 0.35, 1.6),
+  stomach: new THREE.Vector3(-3.6, 1.25, -0.9),
+  chest: new THREE.Vector3(3.6, 1.6, -0.9),
+  ship: new THREE.Vector3(0, 2.55, -4.8),
+};
+const FORMATION_YAW: Record<FormationName, number> = { legs: 0, stomach: 18, chest: -18, ship: 0 };
+const FORMATION_MORPH_RATE = 0.55;
+
+interface FormationState {
+  offsets: FormationOffsets;
+  blend: number;
+}
+
+const formationSnapshots = new WeakMap<AssembledModel, FormationState>();
+
+function formationBlend(seconds: number): number {
+  return 0.5 - 0.5 * Math.cos(Math.max(0, seconds) * FORMATION_MORPH_RATE);
+}
+
+/** 用连续绝对时钟混合两种编队，避免状态切换时重置相位。 */
+function formationState(seconds: number): FormationState {
+  const blend = formationBlend(seconds);
+  const offsets = {} as FormationOffsets;
+  for (const name of FORMATION_MODULES) {
+    offsets[name] = FORMATION_COLUMN[name].clone().lerp(FORMATION_WEDGE[name], blend);
+  }
+  return { offsets, blend };
+}
 
 const PRE_DOCK = {
   stomach: new THREE.Vector3(0, KJ.STOMACH_Y + 1.7, 0),
@@ -317,9 +351,9 @@ function stateSeconds(assembled: AssembledModel, seconds: number, state: string)
   return Math.max(0, seconds - entry.start);
 }
 
-function poseFormation(assembled: AssembledModel, t: number): void {
+function poseFormation(assembled: AssembledModel, t: number, formation: FormationState): void {
   const bob = 0.06;
-  const modules: Array<["legs" | "stomach" | "chest" | "ship", number]> = [
+  const modules: Array<[FormationName, number]> = [
     ["legs", 0],
     ["stomach", 1.7],
     ["chest", 3.1],
@@ -327,7 +361,7 @@ function poseFormation(assembled: AssembledModel, t: number): void {
   ];
   for (const [name, phase] of modules) {
     const base = REST[name];
-    const offset = FORMATION[name];
+    const offset = formation.offsets[name];
     const bobY = Math.sin(t * 1.15 + phase) * bob;
     const driftX = Math.sin(t * 0.8 + phase * 0.7) * 0.015;
     const driftZ = Math.cos(t * 0.65 + phase * 1.1) * 0.015;
@@ -335,7 +369,11 @@ function poseFormation(assembled: AssembledModel, t: number): void {
       assembled,
       name,
       new THREE.Vector3(base.x + offset.x + driftX, base.y + offset.y + bobY, base.z + offset.z + driftZ),
-      [Math.sin(t * 0.9 + phase) * 1.4, Math.cos(t * 0.7 + phase) * 2.0, Math.sin(t * 1.2 + phase) * 1.4],
+      [
+        Math.sin(t * 0.9 + phase) * 1.4,
+        Math.cos(t * 0.7 + phase) * 2.0 + formation.blend * FORMATION_YAW[name],
+        Math.sin(t * 1.2 + phase) * 1.4,
+      ],
     );
     for (let nozzle = 0; nozzle < 4; nozzle++) {
       setRotation(assembled, `${name}Nozzle${nozzle}`, [
@@ -356,6 +394,7 @@ function poseFormation(assembled: AssembledModel, t: number): void {
 function poseCombining(
   assembled: AssembledModel,
   t: number,
+  startFormation: FormationState,
 ): { arcs: Record<string, number>; flashes: Record<string, number>; thruster: number } {
   const arcs: Record<string, number> = {};
   const flashes: Record<string, number> = {};
@@ -375,7 +414,7 @@ function poseCombining(
     ship: KJ.SHIP_Y,
   };
   for (const name of modules) {
-    const formation = new THREE.Vector3().copy(REST[name]).add(FORMATION[name]);
+    const formation = new THREE.Vector3().copy(REST[name]).add(startFormation.offsets[name]);
     formation.y += Math.sin(t * 1.15 + (name === "stomach" ? 1.7 : name === "chest" ? 3.1 : 4.4)) * 0.06;
     const pre = prePositions[name];
     const start = new THREE.Vector3().lerpVectors(formation, pre, converge);
@@ -405,7 +444,7 @@ function poseCombining(
     setNode(assembled, name, new THREE.Vector3(x, y, z), [
       Math.sin(t * 2.3 + (name === "ship" ? 0.8 : 0)) * wobble +
         (t < timing.start ? 0 : Math.sin(t * 28) * 0.25 * (1 - descent)),
-      0,
+      (1 - converge) * startFormation.blend * FORMATION_YAW[name],
       Math.cos(t * 1.9 + (name === "stomach" ? 1.4 : 0)) * wobble,
     ]);
     const timeSinceLock = t - timing.lock;
@@ -420,12 +459,17 @@ function poseCombining(
       ? smoothstep(0.95, 0.12, gap) * (1 - smoothstep(timing.lock - 0.15, timing.lock, t))
       : 0;
   }
-  // 腿体在编队位置起飞后落到最终位
+  // 腿体从当前编队位置起飞后落到最终位
   const legsConverge = smoothstep(0, 1.4, t);
+  const legsStart = startFormation.offsets.legs;
   setNode(
     assembled,
     "legs",
-    new THREE.Vector3(0, (FORMATION.legs.y - 0.55) * (1 - legsConverge), 0),
+    new THREE.Vector3(
+      legsStart.x * (1 - legsConverge),
+      legsStart.y * (1 - legsConverge),
+      legsStart.z * (1 - legsConverge),
+    ),
     [0, 0, 0],
   );
   setLeg(assembled, "l", 0, 0, 0);
@@ -445,6 +489,7 @@ function poseCombining(
 function poseSeparation(
   assembled: AssembledModel,
   t: number,
+  targetFormation: FormationState,
 ): { arcs: Record<string, number>; flashes: Record<string, number>; thruster: number } {
   const arcs: Record<string, number> = {};
   const flashes: Record<string, number> = {};
@@ -463,7 +508,7 @@ function poseSeparation(
     const timing =
       DOCK_TIMES[name === "stomach" ? "stomach_legs" : name === "chest" ? "chest_stomach" : "neck"]!;
     const rest = REST[name];
-    const formation = new THREE.Vector3().copy(rest).add(FORMATION[name]);
+    const formation = new THREE.Vector3().copy(rest).add(targetFormation.offsets[name]);
     const liftY = (name === "stomach" ? 0.55 : name === "chest" ? 0.85 : 1.1) * lift;
     const target = new THREE.Vector3(
       rest.x + (formation.x - rest.x) * fly,
@@ -472,7 +517,7 @@ function poseSeparation(
     );
     setNode(assembled, name, target, [
       Math.sin(t * 2.1 + (name === "ship" ? 0.8 : 0)) * 2.5 * fly,
-      0,
+      targetFormation.blend * FORMATION_YAW[name] * fly,
       Math.cos(t * 1.7) * 2.5 * fly,
     ]);
     const lowerTop = name === "stomach" ? KJ.LEGS_TOP : name === "chest" ? KJ.STOMACH_TOP : KJ.CHEST_TOP;
@@ -486,20 +531,21 @@ function poseSeparation(
     void timing;
   }
   const legsFly = smoothstep(0.9, 3.0, t);
+  const legsTarget = targetFormation.offsets.legs;
   setNode(
     assembled,
     "legs",
-    new THREE.Vector3(0, (FORMATION.legs.y - 0.55) * (1 - legsFly) + 0.55 * legsFly, 0),
+    new THREE.Vector3(legsTarget.x * legsFly, legsTarget.y * legsFly, legsTarget.z * legsFly),
     [0, 0, 0],
   );
   const bob = 0.05;
   if (t > 3.2) {
     for (const name of modules) {
-      const formation = new THREE.Vector3().copy(REST[name]).add(FORMATION[name]);
+      const formation = new THREE.Vector3().copy(REST[name]).add(targetFormation.offsets[name]);
       formation.y += Math.sin(t * 1.2) * bob;
       setNode(assembled, name, formation, [
         Math.sin(t) * 1.2,
-        Math.cos(t * 0.8) * 1.5,
+        Math.cos(t * 0.8) * 1.5 + targetFormation.blend * FORMATION_YAW[name],
         Math.sin(t * 1.1) * 1.2,
       ]);
     }
@@ -600,6 +646,9 @@ export function animateKingJoe(
 ): void {
   const effective = state === "scanning" ? "idle" : state;
   const t = stateSeconds(assembled, seconds, effective);
+  const formation = formationState(seconds);
+  if (effective === "formation") formationSnapshots.set(assembled, formation);
+  const combiningFormation = formationSnapshots.get(assembled) ?? formation;
   applyMaterialDefaults(assembled);
   setLegVisibility(assembled, true);
 
@@ -616,12 +665,12 @@ export function animateKingJoe(
 
   switch (effective) {
     case "formation": {
-      poseFormation(assembled, t);
+      poseFormation(assembled, t, formation);
       fxFrame.thrusters = { ship: 0.75, chest: 0.8, stomach: 0.8, legs: 0.9 };
       break;
     }
     case "combining": {
-      const result = poseCombining(assembled, t);
+      const result = poseCombining(assembled, t, combiningFormation);
       fxFrame.arcs = result.arcs;
       fxFrame.flashes = result.flashes;
       fxFrame.thrusters = {
@@ -644,7 +693,7 @@ export function animateKingJoe(
       break;
     }
     case "separation": {
-      const result = poseSeparation(assembled, t);
+      const result = poseSeparation(assembled, t, formation);
       fxFrame.arcs = result.arcs;
       fxFrame.flashes = result.flashes;
       fxFrame.thrusters = {

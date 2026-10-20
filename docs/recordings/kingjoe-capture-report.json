@@ -11,8 +11,8 @@
   },
   "fps": 57.2,
   "recording": {
-    "bytes": 4655150,
-    "frames": 607,
+    "bytes": 4760052,
+    "frames": 608,
     "audioTracks": 1,
     "chunks": 45,
     "mimeType": "video/webm;codecs=vp9,opus",
