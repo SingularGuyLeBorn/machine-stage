@@ -233,7 +233,12 @@ function StageRuntime() {
     const store = useStageStore.getState();
     const model = findModel(store.modelId);
     const state = store.machineState;
-    const running = state === "running" || state === "firing";
+    const running =
+      state === "running" ||
+      state === "firing" ||
+      state === "mg_firing" ||
+      state === "hit_light" ||
+      state === "hit_heavy";
     // 切换机器状态时重置动画时钟：击发必须从 0s 开始，悬挂演示也应从头起步。
     if (state !== lastStateRef.current) {
       lastStateRef.current = state;
@@ -247,7 +252,8 @@ function StageRuntime() {
     model.animate?.(assembled, running ? clockRef.current : 0, state);
     assembled.syncInstances();
     const motionParts = motionPartsOf(model);
-    if (store.views.explode) applyExplode(assembled, 1, motionParts);
+    // 每帧都要给爆炸姿态一个目标值：关掉爆炸时必须回 0，否则模型会停在半爆炸态
+    applyExplode(assembled, store.views.explode ? 1 : 0, motionParts);
     if (model.detachOffset) {
       applyDetach(assembled, store.detached, {
         motionParts,

@@ -467,83 +467,6 @@ const smokeTube: GeometryBuilder = (spec) => {
 // 世界向：原点 = 耳轴中心（落在枪管轴线上），枪口朝 -X、枪托朝 +X。
 // 枪身自原点起左右各展开：机匣 -0.11 ~ +0.15、枪管到 -0.59、枪托到 +0.50。
 // ---------------------------------------------------------------------------
-const aaMg: GeometryBuilder = (spec) => {
-  const params = (spec as { params?: Params }).params;
-  const barrelLen = num(params, "barrelLen", 0.44);
-
-  const parts: THREE.BufferGeometry[] = [];
-  const box = (w: number, h: number, d: number, x: number, y: number, z: number, bevel = 0.002) => {
-    const g = bevelBoxGeometry(w, h, d, bevel);
-    g.translate(x, y, z);
-    parts.push(g);
-  };
-
-  // 机匣 + 供弹盖（鼓座）
-  box(0.26, 0.08, 0.075, 0.02, 0, 0);
-  box(0.16, 0.022, 0.062, 0.02, 0.051, 0);
-  // 机匣尾部 + 木质枪托 + 托底板
-  box(0.24, 0.06, 0.042, 0.37, -0.004, 0);
-  box(0.012, 0.078, 0.05, 0.496, -0.004, 0);
-  // 枪管 + 散热套（前后两道箍）+ 枪口
-  const barrel = cylinderGeometry(0.0195, barrelLen, 0.0195, 18, 0.002);
-  barrel.rotateZ(Math.PI / 2);
-  barrel.translate(-0.11 - barrelLen / 2, 0, 0);
-  parts.push(barrel);
-  const jacket = cylinderGeometry(0.033, 0.17, 0.03, 20, 0.002);
-  jacket.rotateZ(Math.PI / 2);
-  jacket.translate(-0.195, 0, 0);
-  parts.push(jacket);
-  for (const x of [-0.125, -0.265]) {
-    const ring = cylinderGeometry(0.036, 0.014, 0.036, 20, 0.002);
-    ring.rotateZ(Math.PI / 2);
-    ring.translate(x, 0, 0);
-    parts.push(ring);
-  }
-  const muzzle = cylinderGeometry(0.028, 0.05, 0.022, 18, 0.002);
-  muzzle.rotateZ(Math.PI / 2);
-  muzzle.translate(-0.11 - barrelLen - 0.02, 0, 0);
-  parts.push(muzzle);
-  // 准星 / 照门
-  box(0.014, 0.03, 0.01, -0.11 - barrelLen + 0.04, 0.042, 0);
-  box(0.05, 0.012, 0.03, 0.09, 0.074, 0);
-  box(0.008, 0.02, 0.026, 0.072, 0.09, 0);
-  // 握把（后倾 15°）+ 扳机护圈
-  const grip = bevelBoxGeometry(0.032, 0.09, 0.034, 0.003);
-  grip.translate(0, -0.078, 0);
-  grip.rotateZ(0.26);
-  grip.translate(0.15, 0, 0);
-  parts.push(grip);
-  box(0.056, 0.008, 0.03, 0.178, -0.048, 0);
-  // 双联弹鼓：两只 ⌀176 × 52，轴沿 Z，中间留 3mm；箍带 + 中央轴
-  for (const sign of [-1, 1]) {
-    const drum = cylinderGeometry(0.088, 0.052, 0.088, 28, 0.003);
-    drum.rotateX(Math.PI / 2);
-    drum.translate(0.02, 0.165, sign * 0.0275);
-    parts.push(drum);
-  }
-  const band = tubeGeometry(0.094, 0.086, 0.022, 28);
-  band.rotateX(Math.PI / 2);
-  band.translate(0.02, 0.165, 0);
-  parts.push(band);
-  const hub = cylinderGeometry(0.012, 0.11, 0.012, 14, 0.001);
-  hub.rotateX(Math.PI / 2);
-  hub.translate(0.02, 0.165, 0);
-  parts.push(hub);
-
-  // 耳轴座（枪座立柱顶面之上 3mm：枪身与环形枪架之间留检视缝）
-  const lug = bevelBoxGeometry(0.06, 0.012, 0.06, 0.002);
-  lug.translate(0, -0.046, 0);
-  parts.push(lug);
-
-  // 枪身整体上移 40mm：耳轴（原点）落在机匣底面，枪管轴线在原点上方 40mm；
-  // 再按 pitch 抬头（固定展示姿态，默认 10°）
-  const merged = mergeGeometries(parts);
-  for (const item of parts) item.dispose();
-  merged.translate(0, 0.04, 0);
-  merged.rotateZ(-THREE.MathUtils.degToRad(num(params, "pitch", 10)));
-  return merged;
-};
-
 // ---------------------------------------------------------------------------
 // 近防武器管（Nahverteidigungswaffe）：底座圈 + ⌀90 短管 + 顶盖
 // 世界向，原点 = 底座底面中心（落在顶盖上 3mm）。
@@ -934,7 +857,7 @@ const aaRingMount: GeometryBuilder = (spec) => {
   parts.push(band);
 
   // 3 只支脚（底面离顶盖 3mm）
-  for (const deg of [60, 200, 280]) {
+  for (const deg of [100, 200, 280]) {
     const angle = THREE.MathUtils.degToRad(deg);
     const foot = bevelBoxGeometry(0.045, 0.012, 0.032, 0.002);
     foot.translate(Math.cos(angle) * (ringR - 0.018), 0.009, Math.sin(angle) * (ringR - 0.018));
@@ -1061,6 +984,197 @@ const ventCowl: GeometryBuilder = (spec) => {
   return merged;
 };
 
+// 车顶 MG34 拆分件（装填手舱口环形枪座用）
+//
+// 局部系（与 AaGun 节点一致）：原点 = 耳轴（机匣底面中心），+X 枪托、-X 枪口；
+// 机匣中心抬到 y +0.04（枪管轴线 y 0.04）。抬头角改为节点 rest_rotation，
+// 这些 kit 不再自带 pitch —— 射击动画可在节点上叠加枪口上跳。
+//   aaMgBody   机匣 + 供弹盖 + 照门 + 枪管延伸套（空心，枪管在其孔内短后坐）
+//   aaMgStock  木质枪托 + 托底板（与机匣后榫留 3mm 装配缝）
+//   aaMgGrip   握把 + 扳机护圈（与机匣底面留 3mm）
+//   aaMgDrums  双联弹鼓 + 箍带 + 中央轴（离供弹盖 3mm）
+//   aaMgBarrel 枪管 + 散热套 + 箍 + 枪口 + 准星
+//   aaMgBelt   可见供弹链（7 节，沿斜向路径；AaFeed 节点每发步进一节距）
+// ---------------------------------------------------------------------------
+const MG_LOCAL_Y = 0.04;
+
+const aaMgBody: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number, bevel = 0.002) => {
+    const g = bevelBoxGeometry(w, h, d, bevel);
+    g.translate(x, y, z);
+    parts.push(g);
+  };
+  box(0.26, 0.08, 0.075, 0.02, MG_LOCAL_Y, 0);
+  box(0.16, 0.022, 0.062, 0.02, MG_LOCAL_Y + 0.051, 0);
+  // 机匣后榫：与独立枪托之间留 3mm 装配缝
+  box(0.03, 0.04, 0.04, 0.165, MG_LOCAL_Y, 0);
+  // 枪管延伸套（空心）：枪管尾段在孔内，短后坐 6mm 不碰机匣
+  const extension = tubeGeometry(0.032, 0.021, 0.06, 24);
+  extension.rotateZ(Math.PI / 2);
+  extension.translate(-0.14, MG_LOCAL_Y, 0);
+  parts.push(extension);
+  // 照门
+  box(0.05, 0.012, 0.03, 0.13, MG_LOCAL_Y + 0.074, 0);
+  box(0.008, 0.02, 0.026, 0.112, MG_LOCAL_Y + 0.09, 0);
+  // 耳轴座（立柱顶 2mm 检视缝）
+  box(0.06, 0.012, 0.06, 0, -0.006, 0);
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+const aaMgStock: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  const stock = bevelBoxGeometry(0.31, 0.06, 0.042, 0.003);
+  stock.translate(0.335, 0.036, 0);
+  parts.push(stock);
+  const butt = bevelBoxGeometry(0.012, 0.078, 0.05, 0.002);
+  butt.translate(0.496, 0.036, 0);
+  parts.push(butt);
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+const aaMgGrip: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  const grip = bevelBoxGeometry(0.03, 0.08, 0.034, 0.003);
+  grip.translate(0, 0, 0);
+  grip.rotateZ(0.26);
+  grip.translate(0.15, -0.0455, 0);
+  parts.push(grip);
+  // 握把与扳机护圈之间的连接块（同一零件内）
+  const neck = bevelBoxGeometry(0.016, 0.03, 0.02, 0.002);
+  neck.translate(0.164, -0.052, 0);
+  parts.push(neck);
+  const guard = bevelBoxGeometry(0.056, 0.008, 0.03, 0.002);
+  guard.translate(0.178, -0.062, 0);
+  parts.push(guard);
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+const aaMgDrums: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  for (const sign of [-1, 1]) {
+    const drum = cylinderGeometry(0.088, 0.052, 0.088, 28, 0.003);
+    drum.rotateX(Math.PI / 2);
+    drum.translate(0.02, 0.199, sign * 0.0275);
+    parts.push(drum);
+  }
+  const band = tubeGeometry(0.094, 0.086, 0.022, 28);
+  band.rotateX(Math.PI / 2);
+  band.translate(0.02, 0.199, 0);
+  parts.push(band);
+  const hub = cylinderGeometry(0.012, 0.11, 0.012, 14, 0.001);
+  hub.rotateX(Math.PI / 2);
+  hub.translate(0.02, 0.199, 0);
+  parts.push(hub);
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+const aaMgBarrel: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const barrelLen = num(params, "barrelLen", 0.44);
+  const parts: THREE.BufferGeometry[] = [];
+  const barrel = cylinderGeometry(0.0195, barrelLen, 0.0195, 18, 0.002);
+  barrel.rotateZ(Math.PI / 2);
+  barrel.translate(-0.13 - barrelLen / 2, MG_LOCAL_Y, 0);
+  parts.push(barrel);
+  const jacket = cylinderGeometry(0.033, 0.17, 0.03, 20, 0.002);
+  jacket.rotateZ(Math.PI / 2);
+  jacket.translate(-0.275, MG_LOCAL_Y, 0);
+  parts.push(jacket);
+  for (const x of [-0.195, -0.345]) {
+    const ring = cylinderGeometry(0.036, 0.014, 0.036, 20, 0.002);
+    ring.rotateZ(Math.PI / 2);
+    ring.translate(x, MG_LOCAL_Y, 0);
+    parts.push(ring);
+  }
+  const muzzle = cylinderGeometry(0.028, 0.05, 0.022, 18, 0.002);
+  muzzle.rotateZ(Math.PI / 2);
+  muzzle.translate(-0.13 - barrelLen - 0.02, MG_LOCAL_Y, 0);
+  parts.push(muzzle);
+  const sight = bevelBoxGeometry(0.014, 0.03, 0.01, 0.002);
+  sight.translate(-0.13 - barrelLen + 0.04, MG_LOCAL_Y + 0.042, 0);
+  parts.push(sight);
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+/** 供弹链局部路径：从弹鼓左下方斜向供弹盖；AaFeed 节点沿该方向每发步进一节距。 */
+export const TIGER_MG_BELT_DIR = new THREE.Vector3(0.93, -0.20, -0.28).normalize();
+export const TIGER_MG_BELT_PITCH = 0.014;
+const MG_BELT_LINKS = 5;
+
+const aaMgBelt: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  const quaternion = new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(1, 0, 0),
+    TIGER_MG_BELT_DIR,
+  );
+  const matrix = new THREE.Matrix4();
+  for (let i = 0; i < MG_BELT_LINKS; i++) {
+    const link = bevelBoxGeometry(0.011, 0.006, 0.022, 0.0012);
+    link.translate(0, 0, 0);
+    matrix.compose(
+      TIGER_MG_BELT_DIR.clone().multiplyScalar(i * TIGER_MG_BELT_PITCH),
+      quaternion,
+      new THREE.Vector3(1, 1, 1),
+    );
+    link.applyMatrix4(matrix);
+    parts.push(link);
+  }
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+/** 7.92×57 弹壳：壳体 + 底缘 + 收口，局部轴沿 X。 */
+const mgCase: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  const body = cylinderGeometry(0.006, 0.057, 0.006, 12, 0.0004);
+  body.rotateZ(Math.PI / 2);
+  parts.push(body);
+  const rim = cylinderGeometry(0.0072, 0.004, 0.0072, 12, 0.0003);
+  rim.rotateZ(Math.PI / 2);
+  rim.translate(-0.0305, 0, 0);
+  parts.push(rim);
+  const neck = cylinderGeometry(0.0052, 0.01, 0.0042, 10, 0.0003);
+  neck.rotateZ(Math.PI / 2);
+  neck.translate(0.0305, 0, 0);
+  parts.push(neck);
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+/** 车顶 MG34 枪口焰（小）：在枪口前方 5mm，供 AaBarrel 上的 fx 件使用。 */
+const aaMgFlash: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  const core = sphereGeometry(0.028, 10, 8);
+  core.scale(1.6, 1, 1);
+  core.translate(-0.06, 0, 0);
+  parts.push(core);
+  for (let i = 0; i < 4; i++) {
+    const lobe = sphereGeometry(0.016, 8, 6);
+    lobe.scale(2.2, 1, 1);
+    lobe.rotateX((i * Math.PI) / 2);
+    lobe.translate(-0.05, 0, 0);
+    parts.push(lobe);
+  }
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
+
 export const tigerTurretKitBuilders: Record<string, GeometryBuilder> = {
   turretShell,
   turretCupola,
@@ -1071,7 +1185,14 @@ export const tigerTurretKitBuilders: Record<string, GeometryBuilder> = {
   radialPort,
   smokeTube,
   aaRingMount,
-  aaMg,
+  aaMgBody,
+  aaMgStock,
+  aaMgGrip,
+  aaMgDrums,
+  aaMgBarrel,
+  aaMgBelt,
+  aaMgFlash,
+  mgCase,
   aaShield,
   closeDefense,
   loaderPeriscope,

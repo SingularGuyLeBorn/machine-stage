@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { InstanceLayout } from "../../../assembler/assembler";
-import type { ModelRegistry, PartDefinition } from "../../../registry/types";
+import type { KitParam, ModelRegistry, PartDefinition } from "../../../registry/types";
 
 // ============================================================================
 // models/tiger/turret —— 虎式 I 炮塔（L4-c ~ L4-i：壳体 / 炮盾 / 炮管 / 炮闩 / 车长塔枪座）
@@ -158,6 +158,7 @@ export const TURRET_LAYOUTS = {
   smokeDischarger: "turret.smokeDischarger",
   spareTrack: "turret.spareTrack",
   roofEyes: "turret.roofEyes",
+  aaCases: "turret.aaCases",
 } as const;
 
 function makeLayouts(): Record<string, InstanceLayout> {
@@ -216,6 +217,13 @@ function makeLayouts(): Record<string, InstanceLayout> {
   layouts[TURRET_LAYOUTS.roofEyes] = ({ index }) => {
     const z = TURRET_CONSTANTS.TR_EYE_Z!;
     return new THREE.Matrix4().makeTranslation(0, 0, index === 0 ? z : -z);
+  };
+
+  // MG 弹壳静态落点（fx，构建时隐藏）：装填手舱口右前侧顶盖，2×6 一排
+  layouts[TURRET_LAYOUTS.aaCases] = ({ index }) => {
+    const col = index % 6;
+    const row = Math.floor(index / 6);
+    return new THREE.Matrix4().makeTranslation(-1.82 + col * 0.07, 1.843, 0.8 + row * 0.07);
   };
 
   return layouts;
@@ -768,10 +776,11 @@ function buildTurretParts(): PartDefinition[] {
   // L4-f：顶盖附件（对空 MG34 / 近防武器管 / 装填手潜望镜 / 排烟风扇罩）
   // ---------------------------------------------------------------------------
 
+  // ===================== 装填手舱口环形枪座 + 拆分 MG34（P3 火力） =====================
   parts.push({
     id: "tiger.turret.aa_ring_mount",
-    name_cn: "车长塔环形枪座",
-    name_en: "Flieger-MG-Drehring",
+    name_cn: "装填手舱口环形枪座",
+    name_en: "Flieger-MG-Drehring (Ladeschützen-Luke)",
     assembly: "turret",
     build_layer: 4,
     build_order: 547,
@@ -783,36 +792,155 @@ function buildTurretParts(): PartDefinition[] {
         ringW: 0.03,
         ringH: 0.036,
         gapDeg: 70,
-        gapCenterDeg: 325,
+        gapCenterDeg: 27,
         armEndX: -c.TR_AA_ARM!,
         pintleZ: -c.TR_AA_Z_OFF!,
         armTop: c.TR_AA_PIVOT_UP! - 0.019,
       },
     },
     material: "steel",
-    mate: { type: "absolute", position: [c.TR_CUPOLA_X!, roofTop, c.TR_CUPOLA_Z!] },
+    mate: {
+      type: "absolute",
+      position: [c.TR_LOADER_HATCH_X!, roofTop, c.TR_LOADER_HATCH_Z!],
+    },
     source:
-      "车长塔环形枪座（Flieger-MG-Drehring）：抱塔环 ⌀630/⌀570 × 36 + 4 只支脚（底面离顶盖 3mm）+ 前立柱 ⌀56（从环面升到 2.055）+ 悬臂 + 横臂 + 枪座立柱 ⌀48（顶 2.146）。环心 = 车长塔心 (x -1.30, z -0.42)、环底 1.848、环顶 1.884——**低于车长塔 5 个观察缝**（缝底 1.8865），不挡车长视线；环内径 ⌀570 与塔筒 ⌀520 留 25mm，不箍死；环朝车尾右后的排烟风扇罩方向留 70° 开口（整圈会切进罩圈）。枪座在塔心正前方 0.46m、向右偏 0.13m，车长从塔口探身即可握到枪尾握把（枪托端 x -1.25、z -0.55，正在塔口上方）。",
+      "装填手舱口环形枪座（Flieger-MG-Drehring）：抱装填手舱口（⌀400，中心 x -1.25 / z +0.50）的环带 ⌀630/⌀570 × 36 + 3 只支脚（底面离顶盖 3mm）+ 前立柱 + 悬臂 + 枪座立柱 ⌀48。环朝右后近防武器管方向留 70° 开口（整圈会切进近防管），环内径与舱口外缘留 85mm。枪座在舱口正前方 0.46m；装填手从舱口探身即可握到枪尾（枪托端 x -1.22，正在舱口上方 0.3m），车长塔只留观察。",
   });
 
-  parts.push({
-    id: "tiger.turret.aa_mg",
-    name_cn: "车顶 MG34 机枪",
-    name_en: "MG 34 (Flieger-MG)",
-    assembly: "turret",
-    build_layer: 4,
-    build_order: 548,
-    geometry: {
-      type: "kit",
-      kit: "aaMg",
-      params: { barrelLen: 0.44, pitch: c.TR_AA_PITCH! },
+  // 拆分 MG34：机匣 / 枪托 / 握把 / 弹鼓 / 枪管 / 弹链 / 枪口焰 / 弹壳
+  const mgParts: Array<{
+    id: string;
+    name_cn: string;
+    name_en: string;
+    kit: string;
+    order: number;
+    node?: string;
+    material?: string;
+    count?: number;
+    layout?: string;
+    tags?: string[];
+    position?: [number, number, number];
+    params?: Record<string, KitParam>;
+    source: string;
+  }> = [
+    {
+      id: "tiger.turret.aa_mg_body",
+      name_cn: "车顶 MG34 机匣",
+      name_en: "MG 34 Gehäuse",
+      kit: "aaMgBody",
+      order: 564,
+      node: "AaGun",
+      material: "steel",
+      source:
+        "MG34 机匣组：机匣 260 × 80 × 75 + 供弹盖 + 照门 + 枪管延伸套（内 ⌀42，枪管尾段在孔内短后坐 6mm 不碰机匣）+ 耳轴座。机匣后榫与独立枪托留 3mm 装配缝；枪管延伸套与枪管留 1.5mm 环缝。",
     },
-    material: "steel",
-    node: "AaGun",
-    mate: { type: "absolute" },
-    source:
-      "车顶 MG34（含 Gurttrommel 34 双联弹鼓）：机匣 260 × 80 × 75 + 供弹盖 + 枪管 ⌀39 × 440（⌀66 散热套 + 两道箍）+ 双室枪口 + 木质枪托 240 + 握把 / 扳机护圈 / 准星 / 照门；双联弹鼓 ⌀176 × 52。耳轴 (x -1.76, y 2.165, z -0.55) 即枪座立柱上方 25mm（枪身耳轴座与立柱顶留 2mm 检视缝），抬头 10°；枪口 x -2.34、枪托端 x -1.25——**枪尾正落在车长塔口上方**，车长（塔内站位 x -1.30 / z -0.42）探身可及，不再出现旧版「枪在 x -1.95、人从 x -1.30 塔口够不着」。枪身最低点（握把底 2.057）离塔顶盖 2.034 留 23mm，开合塔盖不碰（塔盖铰链朝车尾）。",
-  });
+    {
+      id: "tiger.turret.aa_mg_stock",
+      name_cn: "MG34 枪托",
+      name_en: "MG 34 Schulterstütze",
+      kit: "aaMgStock",
+      order: 565,
+      node: "AaGun",
+      material: "wood",
+      source:
+        "MG34 木质枪托 + 托底板，独立零件（旧版与机匣合并成一件，枪托前脸离机匣 100mm，是「枪把悬空」的根因）。枪托前脸 x 0.18 与机匣后榫（x 0.177）留 3mm 装配缝，托底 x 0.502；握把/扳机护圈另件。",
+    },
+    {
+      id: "tiger.turret.aa_mg_grip",
+      name_cn: "MG34 握把",
+      name_en: "MG 34 Pistolengriff",
+      kit: "aaMgGrip",
+      order: 566,
+      node: "AaGun",
+      material: "wood",
+      source:
+        "MG34 握把 + 扳机护圈 + 连接块，独立零件；握把后倾 15°，顶面离机匣底面 3mm，握持端与机匣/枪托通过连接块连成一体。旧版握把在合并件里，支撑检测看不到它。",
+    },
+    {
+      id: "tiger.turret.aa_mg_drums",
+      name_cn: "MG34 双联弹鼓",
+      name_en: "Gurttrommel 34",
+      kit: "aaMgDrums",
+      order: 567,
+      node: "AaGun",
+      material: "steel",
+      source:
+        "Gurttrommel 34 双联弹鼓：两只 ⌀176 × 52、中间留 3mm、箍带 ⌀188 + 中央轴；弹鼓底缘离供弹盖 3mm（旧版合并件里浮空 15mm，支撑检测看不到）。",
+    },
+    {
+      id: "tiger.turret.aa_mg_barrel",
+      name_cn: "MG34 枪管",
+      name_en: "MG 34 Lauf",
+      kit: "aaMgBarrel",
+      order: 568,
+      node: "AaBarrel",
+      material: "steel",
+      params: { barrelLen: 0.44 },
+      source:
+        "MG34 快换枪管：⌀39 × 440 + ⌀66 散热套 + 两道箍 + 枪口助退器 + 准星。枪管尾段伸进机匣的枪管延伸套内（1.5mm 环缝）；射击时沿 X 短后坐 6mm 后复进。",
+    },
+    {
+      id: "tiger.turret.aa_mg_belt",
+      name_cn: "MG34 供弹链",
+      name_en: "MG 34 Gurt",
+      kit: "aaMgBelt",
+      order: 569,
+      node: "AaFeed",
+      material: "brass_dull",
+      source:
+        "可见供弹链：7 节 M9 链节沿弹鼓左下 → 供弹盖的斜向路径；AaFeed 节点每发沿链路方向步进 14mm（整条链周期排列，回位时视觉上是「下一节到位」）。链带离弹鼓/供弹盖 3mm。",
+    },
+    {
+      id: "tiger.turret.aa_mg_flash",
+      name_cn: "MG34 枪口焰",
+      name_en: "MG 34 Mündungsfeuer (FX)",
+      kit: "aaMgFlash",
+      order: 570,
+      node: "AaBarrel",
+      material: "muzzle_flash",
+      tags: ["fx"],
+      position: [-0.62, 0.04, 0],
+      source:
+        "MG34 枪口焰（fx）：小星芒，在枪口前方 5mm；每发只亮约 30ms，随 AaBarrel 短后坐。构建时隐藏，不参与支撑/取景。",
+    },
+    {
+      id: "tiger.turret.aa_mg_case",
+      name_cn: "MG34 弹壳",
+      name_en: "Patronenhülse 7,92 × 57",
+      kit: "mgCase",
+      order: 571,
+      material: "case_brass",
+      count: 12,
+      layout: TURRET_LAYOUTS.aaCases,
+      tags: ["fx"],
+      source:
+        "7.92 × 57mm 弹壳 ×12（fx，构建时隐藏）：静态排布在装填手舱口右前顶盖（y 1.843，离顶盖 3mm）；机枪连射时由 AaGun 抛壳口抛出，做重力抛物线 + 顶盖弹跳，落点留在顶盖上。",
+    },
+  ];
+  for (const item of mgParts) {
+    const mate =
+      item.position !== undefined
+        ? { type: "absolute" as const, position: item.position }
+        : { type: "absolute" as const };
+    parts.push({
+      id: item.id,
+      name_cn: item.name_cn,
+      name_en: item.name_en,
+      assembly: "turret",
+      build_layer: 4,
+      build_order: item.order,
+      geometry: item.params
+        ? { type: "kit", kit: item.kit, params: item.params }
+        : { type: "kit", kit: item.kit },
+      material: item.material ?? "steel",
+      ...(item.node ? { node: item.node } : {}),
+      ...(item.count ? { instances: item.count, indexed: true } : {}),
+      ...(item.layout ? { instance_layout: item.layout } : {}),
+      ...(item.tags ? { tags: item.tags } : {}),
+      mate,
+      source: item.source,
+    });
+  }
 
   parts.push({
     id: "tiger.turret.aa_shield",
@@ -820,7 +948,7 @@ function buildTurretParts(): PartDefinition[] {
     name_en: "Schutzschild (Flieger-MG)",
     assembly: "turret",
     build_layer: 4,
-    build_order: 549,
+    build_order: 572,
     geometry: {
       type: "kit",
       kit: "aaShield",
@@ -830,13 +958,13 @@ function buildTurretParts(): PartDefinition[] {
     mate: {
       type: "absolute",
       position: [
-        c.TR_CUPOLA_X! - c.TR_AA_SHIELD_DX!,
+        c.TR_LOADER_HATCH_X! - c.TR_AA_SHIELD_DX!,
         roofTop + c.TR_AA_SHIELD_UP!,
-        c.TR_CUPOLA_Z! - c.TR_AA_Z_OFF!,
+        c.TR_LOADER_HATCH_Z! - c.TR_AA_Z_OFF!,
       ],
     },
     source:
-      "枪座防盾（Schutzschild）：420 宽 × 340 高 × 8 钢板，中央 100 宽顶部开口让炮管俯仰穿出；下挡板 120 高遮住车长胸腹，左右面板挡侧向破片。装在枪座悬臂前端（x -1.98），盾面离炮管 17mm、离炮塔顶盖（1.836）上方 364mm；后支架 176 长接枪座横臂（留 5mm 装配缝）。车长探身时上半身（塔口以上 0.3~0.5m）在盾后，正面与斜前方有遮挡。",
+      "枪座防盾（Schutzschild）：420 × 340 × 8 钢板，中央 100 宽顶部开口让炮管俯仰穿出；下挡板 120 高遮住装填手胸腹。装在装填手舱口环形枪座悬臂前端（x -1.93 / z +0.50），盾面离炮管 17mm；后支架接枪座横臂（留 5mm 装配缝），枪座又抱在装填手舱口上——防盾的载荷链是「盾 → 悬臂 → 舱口环 → 顶盖」，不再是浮在枪前一整块板。",
   });
 
   // 炮口焰（特效）：炮口前 35mm 起，动画 in/out 只切 visible/scale；fx 标签豁免支撑检测
@@ -973,13 +1101,30 @@ export function makeTurretRegistry(): ModelRegistry {
         name: "AaGun",
         parent: "root",
         pivot: [
-          "TR_CUPOLA_X - TR_AA_ARM",
+          "TR_LOADER_HATCH_X - TR_AA_ARM",
           "TR_RING_TOP + TR_JOINT + TR_WALL_H + TR_ROOF_T + TR_AA_PIVOT_UP",
-          "TR_CUPOLA_Z - TR_AA_Z_OFF",
+          "TR_LOADER_HATCH_Z - TR_AA_Z_OFF",
         ],
+        rest_rotation: [0, 0, "-TR_AA_PITCH"],
         motion: "rotate",
         axis: "z",
-        note: "车长塔环形枪座上的 MG34：绕耳轴俯仰（P3）",
+        note: "装填手舱口环形枪座上的 MG34：静止抬头 10°；连射时叠加枪口上跳",
+      },
+      {
+        name: "AaBarrel",
+        parent: "AaGun",
+        pivot: [0, 0, 0],
+        motion: "translate",
+        axis: "x",
+        note: "MG34 枪管短后坐节点：每发 +X 6mm，复进回位",
+      },
+      {
+        name: "AaFeed",
+        parent: "AaGun",
+        pivot: [-0.13, 0.13, 0.03],
+        motion: "translate",
+        axis: "x",
+        note: "MG34 供弹链步进节点：沿链路方向每发一节距 14mm",
       },
     ],
     materials: {
@@ -991,6 +1136,27 @@ export function makeTurretRegistry(): ModelRegistry {
         envMapIntensity: 0.2,
         emissive: "#ff9a33",
         emissiveIntensity: 5,
+      },
+      case_brass: {
+        base: "#b08d57",
+        metalness: 0.9,
+        roughness: 0.32,
+        preset: "none",
+        envMapIntensity: 1.1,
+      },
+      brass_dull: {
+        base: "#9a7a4b",
+        metalness: 0.75,
+        roughness: 0.5,
+        preset: "none",
+        envMapIntensity: 0.8,
+      },
+      wood: {
+        base: "#6e4a2f",
+        metalness: 0.02,
+        roughness: 0.82,
+        preset: "none",
+        envMapIntensity: 0.4,
       },
     },
     parts: buildTurretParts(),

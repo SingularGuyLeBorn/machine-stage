@@ -39,7 +39,12 @@ describe("tiger/turret 主炮闩验收", () => {
       "tiger.turret.breech_extractor",
       "tiger.turret.breech_safety",
       "tiger.turret.aa_ring_mount",
-      "tiger.turret.aa_mg",
+      "tiger.turret.aa_mg_body",
+      "tiger.turret.aa_mg_stock",
+      "tiger.turret.aa_mg_grip",
+      "tiger.turret.aa_mg_drums",
+      "tiger.turret.aa_mg_barrel",
+      "tiger.turret.aa_mg_belt",
       "tiger.turret.aa_shield",
     ]) {
       expect(ids.has(id), `缺少零件 ${id}`).toBe(true);
@@ -117,32 +122,33 @@ describe("tiger/turret 主炮闩验收", () => {
     built.dispose();
   }, 180_000);
 
-  it("人机工程：MG34 枪尾落在车长塔口上方，防盾在枪前方且高于顶盖", () => {
+  it("人机工程：MG34 枪尾落在装填手舱口上方，防盾在枪前方且高于顶盖", () => {
     const built = build();
-    const gun = built.getPart("tiger.turret.aa_mg")!;
+    const stock = built.getPart("tiger.turret.aa_mg_stock")!;
     const shield = built.getPart("tiger.turret.aa_shield")!;
-    const gunBox = built.partBounds(gun, new THREE.Box3());
+    const stockBox = built.partBounds(stock, new THREE.Box3());
     const shieldBox = built.partBounds(shield, new THREE.Box3());
-    const cupolaX = built.constants.TR_CUPOLA_X!;
-    const cupolaZ = built.constants.TR_CUPOLA_Z!;
+    const hatchX = built.constants.TR_LOADER_HATCH_X!;
+    const hatchZ = built.constants.TR_LOADER_HATCH_Z!;
     const roofTop =
       built.constants.TR_RING_TOP! +
       built.constants.TR_JOINT! +
       built.constants.TR_WALL_H! +
       built.constants.TR_ROOF_T!;
 
-    // 枪尾（+X 端）不早于塔心，横向偏距 ≤ 0.2m——车长探身可及
-    expect(gunBox.max.x).toBeGreaterThan(cupolaX - 0.1);
-    expect(Math.abs((gunBox.min.z + gunBox.max.z) / 2 - cupolaZ)).toBeLessThan(0.2);
+    // 枪尾（+X 端）落在装填手舱口上方；横向偏距 ≤ 0.2m——装填手探身可及
+    expect(stockBox.max.x).toBeGreaterThan(hatchX - 0.1);
+    expect(Math.abs((stockBox.min.z + stockBox.max.z) / 2 - hatchZ)).toBeLessThan(0.2);
     const nearest = new THREE.Vector3(
-      THREE.MathUtils.clamp(cupolaX, gunBox.min.x, gunBox.max.x),
+      THREE.MathUtils.clamp(hatchX, stockBox.min.x, stockBox.max.x),
       0,
-      THREE.MathUtils.clamp(cupolaZ, gunBox.min.z, gunBox.max.z),
+      THREE.MathUtils.clamp(hatchZ, stockBox.min.z, stockBox.max.z),
     );
-    expect(Math.hypot(nearest.x - cupolaX, nearest.z - cupolaZ)).toBeLessThan(0.5);
+    expect(Math.hypot(nearest.x - hatchX, nearest.z - hatchZ)).toBeLessThan(0.5);
 
     // 防盾位于枪座耳轴前、高于顶盖（探出的上半身有遮挡）
-    expect(shieldBox.max.x).toBeLessThan(-1.76);
+    const gunX = built.constants.TR_LOADER_HATCH_X! - built.constants.TR_AA_ARM!;
+    expect(shieldBox.max.x).toBeLessThan(gunX);
     expect(shieldBox.min.y).toBeGreaterThan(roofTop);
     built.dispose();
   });
