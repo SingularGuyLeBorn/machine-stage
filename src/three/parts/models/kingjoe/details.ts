@@ -405,6 +405,7 @@ export function addShipDetails(builder: KingJoeParts): void {
 
 export function addStomachDetails(builder: KingJoeParts): void {
   const A = "stomach";
+  const U = "waist";
   // 腹前 5 条纵向接缝
   for (const [i, x] of [-0.32, -0.16, 0.16, 0.32].entries()) {
     box(builder, {
@@ -412,7 +413,7 @@ export function addStomachDetails(builder: KingJoeParts): void {
       name_cn: "腹前接缝",
       name_en: "abdomen front seam",
       assembly: A,
-      node: A,
+      node: U,
       world: stomachWorld(x, 0.85, 0.565),
       size: [0.022, 0.2, 0.018],
       material: "black_metal",
@@ -427,7 +428,7 @@ export function addStomachDetails(builder: KingJoeParts): void {
       name_cn: "腹后接缝",
       name_en: "abdomen back seam",
       assembly: A,
-      node: A,
+      node: U,
       world: stomachWorld(x, 0.85, -0.565),
       size: [0.022, 0.2, 0.018],
       material: "black_metal",
@@ -447,7 +448,7 @@ export function addStomachDetails(builder: KingJoeParts): void {
       name_cn: "腹框角撑",
       name_en: "abdomen frame gusset",
       assembly: A,
-      node: A,
+      node: U,
       world: stomachWorld(gx, 0.8, gz),
       size: [0.06, 0.08, 0.06],
       material: "gold_dark",
@@ -497,8 +498,8 @@ export function addStomachDetails(builder: KingJoeParts): void {
       layer: 4,
       geometry: { type: "cylinder", r: 0.04, h: 0.05, segments: 14, bevel: 0.003 },
       material: "sensor_red",
-      node: A,
-      mate: mateAt(A, stomachWorld(sx * 0.4, 0.92, 0.59), [90, 0, 0]),
+      node: U,
+      mate: mateAt(U, stomachWorld(sx * 0.4, 0.92, 0.59), [90, 0, 0]),
     });
   }
   emblem(builder, {
@@ -506,7 +507,7 @@ export function addStomachDetails(builder: KingJoeParts): void {
     name_cn: "佩丹星腹部徽章",
     name_en: "Pedan abdomen emblem",
     assembly: A,
-    node: A,
+    node: U,
     world: stomachWorld(0, 0.85, 0.57),
     size: 0.1,
   });
@@ -519,7 +520,7 @@ export function addStomachDetails(builder: KingJoeParts): void {
       name_cn: "腹部能量缝",
       name_en: "abdomen glow seam",
       assembly: A,
-      node: A,
+      node: U,
       world: stomachWorld(sx * 0.12, 0.85, 0.56),
       size: [0.008, 0.2, 0.01],
       material: "seam_glow",
@@ -536,7 +537,7 @@ export function addStomachDetails(builder: KingJoeParts): void {
       name_cn: "腹前金饰条",
       name_en: "abdomen front trim",
       assembly: A,
-      node: A,
+      node: U,
       world: stomachWorld(sx * 0.42, 0.7, 0.565),
       size: [0.03, 0.15, 0.02],
       material: "gold_dark",
@@ -547,7 +548,7 @@ export function addStomachDetails(builder: KingJoeParts): void {
       name_cn: "腹侧检修口",
       name_en: "side access panel",
       assembly: A,
-      node: A,
+      node: U,
       world: stomachWorld(sx * 0.57, 0.85, -0.35),
       size: [0.016, 0.18, 0.12],
       material: "black_metal",
@@ -559,7 +560,7 @@ export function addStomachDetails(builder: KingJoeParts): void {
     name_cn: "腹后螺栓圈",
     name_en: "abdomen back bolts",
     assembly: A,
-    node: A,
+    node: U,
     world: stomachWorld(0, 0.78, -0.59),
     rotation: [90, 0, 0],
     count: 10,
@@ -574,7 +575,7 @@ export function addStomachDetails(builder: KingJoeParts): void {
     name_cn: "下腹板",
     name_en: "lower belly plate",
     assembly: A,
-    node: A,
+    node: U,
     world: stomachWorld(0, 0.715, 0.565),
     size: [0.4, 0.05, 0.018],
     material: "silver_dark",
@@ -585,7 +586,7 @@ export function addStomachDetails(builder: KingJoeParts): void {
     name_cn: "腹后中金条",
     name_en: "abdomen back center trim",
     assembly: A,
-    node: A,
+    node: U,
     world: stomachWorld(0, 0.9, -0.59),
     size: [0.2, 0.04, 0.018],
     material: "gold_dark",
@@ -604,7 +605,7 @@ export function addStomachDetails(builder: KingJoeParts): void {
       name_cn: "腹框上段角撑",
       name_en: "abdomen upper frame rib",
       assembly: A,
-      node: A,
+      node: U,
       world: stomachWorld(gx, 0.9, gz),
       size: [0.04, 0.06, 0.04],
       material: "gold_dark",
@@ -641,8 +642,8 @@ export function addStomachDetails(builder: KingJoeParts): void {
       layer: 4,
       geometry: { type: "cylinder", r: 0.025, h: 0.04, segments: 12, bevel: 0.002 },
       material: "sensor_red",
-      node: A,
-      mate: mateAt(A, stomachWorld(sx * 0.12, 0.715, 0.6), [90, 0, 0]),
+      node: U,
+      mate: mateAt(U, stomachWorld(sx * 0.12, 0.715, 0.6), [90, 0, 0]),
     });
   }
   // 腰部锁销
@@ -654,8 +655,8 @@ export function addStomachDetails(builder: KingJoeParts): void {
     layer: 2,
     geometry: { type: "cylinder", r: 0.025, h: 0.05, segments: 12, bevel: 0.002 },
     material: "silver_bright",
-    node: A,
-    mate: mateAt(A, stomachWorld(0.2, 0.708, 0.1)),
+    node: U,
+    mate: mateAt(U, stomachWorld(0.2, 0.708, 0.1)),
   });
   // 腹后两侧铆钉
   for (const [suffix, sx] of [
@@ -667,7 +668,7 @@ export function addStomachDetails(builder: KingJoeParts): void {
       name_cn: "腹后铆钉",
       name_en: "abdomen back rivets",
       assembly: A,
-      node: A,
+      node: U,
       world: stomachWorld(sx * 0.3, 0.9, -0.59),
       count: 3,
       spacing: 0.06,

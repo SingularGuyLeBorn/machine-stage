@@ -203,6 +203,12 @@ async function main() {
   await sleep(800);
   await shot("kingjoe-combined.png");
 
+  // 5.5) 机器人步行 + 腰部转轴
+  await setCamera([9.2, 5.5, 12.4], [0, 4.25, 0]);
+  await setState("robot");
+  await sleep(900);
+  await shot("kingjoe-robot.png");
+
   // 6) 怪光线
   await setCamera([9.2, 5.4, 12.4], [0, 4.3, 0]);
   await setState("firing");

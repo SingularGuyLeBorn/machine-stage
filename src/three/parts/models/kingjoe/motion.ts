@@ -186,6 +186,33 @@ function chainTorso(
   setNode(assembled, "ship", shipPos, headRot);
 }
 
+/**
+ * 腰部关节链：腰鼓/齿轮/下轴承留在 stomach；上腹/胸/头绕 waist 枢轴旋转。
+ * 胸↔腹接口两侧同步旋转；腿↔腹接口在腰下，不受影响。
+ */
+function waistTorso(
+  assembled: AssembledModel,
+  stomachPos: THREE.Vector3,
+  waistRot: [number, number, number],
+): void {
+  setNode(assembled, "stomach", stomachPos, [0, 0, 0]);
+  setNode(assembled, "waist", undefined, waistRot);
+  const waistQuat = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(waistRot[0] * DEG, waistRot[1] * DEG, waistRot[2] * DEG, "XYZ"),
+  );
+  const pivot = new THREE.Vector3(stomachPos.x, stomachPos.y + 0.49, stomachPos.z);
+  const chestOffset = new THREE.Vector3(0, KJ.CHEST_Y - (KJ.STOMACH_Y + 0.49), 0).applyQuaternion(waistQuat);
+  const chestPos = pivot.clone().add(chestOffset);
+  setNode(assembled, "chest", chestPos, waistRot);
+  const chestQuat = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(waistRot[0] * DEG, waistRot[1] * DEG, waistRot[2] * DEG, "XYZ"),
+  );
+  const shipPos = chestPos
+    .clone()
+    .add(new THREE.Vector3(0, KJ.CHEST_H + KJ.DOCK_H, 0).applyQuaternion(chestQuat));
+  setNode(assembled, "ship", shipPos, waistRot);
+}
+
 function setAxialLocks(assembled: AssembledModel, angleDeg: number): void {
   setRotation(assembled, "stomachLock", [0, angleDeg, 0]);
   setRotation(assembled, "chestLock", [0, angleDeg, 0]);
@@ -490,11 +517,9 @@ function poseRobot(assembled: AssembledModel, t: number): void {
   setLeg(assembled, "r", rightHip, rightKnee, rightAnkle);
   const bob = 0.008 * (1 - Math.cos(u * TAU * 2)) + 0.003 * Math.abs(step);
   setNode(assembled, "legs", new THREE.Vector3(0, bob, 0), [0, 0, 0]);
-  const lean = 1.1 * Math.sin(u * TAU * 2);
-  const sway = 1.8 * Math.sin(u * TAU);
-  chainTorso(assembled, new THREE.Vector3(0, KJ.STOMACH_Y + bob, 0), [0, 0, 0], [0, 0, 0], [0, 0, 0]);
-  void lean;
-  void sway;
+  const lean = 1.2 * Math.sin(u * TAU * 2);
+  const sway = 4 * Math.sin(u * TAU);
+  waistTorso(assembled, new THREE.Vector3(0, KJ.STOMACH_Y + bob, 0), [lean, sway, 0]);
   const armSwing = -step * 3;
   setArm(assembled, "l", armSwing, 0, 5 + 2 * Math.abs(step), 0, 6);
   setArm(assembled, "r", -armSwing, 0, 5 + 2 * Math.abs(step), 0, 6);
@@ -513,7 +538,8 @@ function fireCycle(t: number): { beam: number; charge: number } {
 function poseFiring(assembled: AssembledModel, t: number): { beam: number; charge: number } {
   const fire = fireCycle(t);
   const recoil = fire.beam > 0 ? 0.018 : 0;
-  chainTorso(assembled, new THREE.Vector3(0, KJ.STOMACH_Y, -recoil), [0, 0, 0], [0, 0, 0], [0, 0, 0]);
+  const waistPitch = -1.2 * fire.beam - 0.4 * fire.charge;
+  waistTorso(assembled, new THREE.Vector3(0, KJ.STOMACH_Y, -recoil), [waistPitch, 0, 0]);
   setNode(assembled, "legs", new THREE.Vector3(0, 0, -recoil), [0, 0, 0]);
   setLeg(assembled, "l", 0, 0, 0);
   setLeg(assembled, "r", 0, 0, 0);
@@ -547,7 +573,7 @@ function poseCrippled(assembled: AssembledModel, t: number): void {
 function poseIdle(assembled: AssembledModel): void {
   setLegVisibility(assembled, true);
   setNode(assembled, "legs", REST.legs, [0, 0, 0]);
-  chainTorso(assembled, new THREE.Vector3(0, KJ.STOMACH_Y, 0), [0, 0, 0], [0, 0, 0], [0, 0, 0]);
+  waistTorso(assembled, new THREE.Vector3(0, KJ.STOMACH_Y, 0), [0, 0, 0]);
   setLeg(assembled, "l", 0, 0, 0);
   setLeg(assembled, "r", 0, 0, 0);
   setArm(assembled, "l", 0, 0, 0, 0, 0);

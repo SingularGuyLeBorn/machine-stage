@@ -19,6 +19,9 @@ import {
 
 export function addStomachParts(builder: KingJoeParts): void {
   const A = "stomach";
+  const U = "waist";
+  const upperMate = (p: [number, number, number], r?: [number, number, number]) =>
+    absMate([p[0], p[1] - 0.49, p[2]], r);
 
   // —— 腰鼓 / 轴承 / 齿圈 / 驱动 ——
   builder.add({
@@ -27,11 +30,11 @@ export function addStomachParts(builder: KingJoeParts): void {
     name_en: "waist drum",
     assembly: A,
     layer: 1,
-    geometry: { type: "tube", rOuter: 0.4, rInner: 0.18, h: 0.3, segments: 36 },
+    geometry: { type: "tube", rOuter: 0.4, rInner: 0.18, h: 0.24, segments: 36 },
     material: "silver_dark",
     node: A,
-    mate: absMate([0, 0.49, 0]),
-    source: "腰鼓同时是上下轴承内圈与齿圈轮毂：改腰径只需改 WAIST_R 系列常量",
+    mate: absMate([0, 0.48, 0]),
+    source: "腰鼓同时是上下轴承内圈与齿圈轮毂；鼓顶降到 0.60，给上盖 4cm 摆动间隙",
   });
   builder.add({
     id: pid(A, "waist_motor"),
@@ -162,15 +165,15 @@ export function addStomachParts(builder: KingJoeParts): void {
     layer: 1,
     geometry: { type: "cylinder", r: 0.52, h: 0.04, segments: 36, bevel: 0.006 },
     material: "silver",
-    node: A,
-    mate: absMate([0, 0.662, 0]),
+    node: U,
+    mate: upperMate([0, 0.662, 0]),
   });
   boltRingPart(builder, {
     id: pid(A, "waist_bolts"),
     name_cn: "腰盖螺栓圈",
     name_en: "waist cap bolts",
     assembly: A,
-    node: A,
+    node: U,
     world: [0, 3.68 + 0.682, 0],
     count: 16,
     radius: 0.42,
@@ -188,8 +191,8 @@ export function addStomachParts(builder: KingJoeParts): void {
     layer: 1,
     geometry: { type: "cylinder", r: 0.045, h: 0.27, segments: 14 },
     material: "joint_steel",
-    node: A,
-    mate: absMate([0, 0.82, 0]),
+    node: U,
+    mate: upperMate([0, 0.82, 0]),
     instances: 4,
     indexed: true,
     instance_layout: "kjAgPosts",
@@ -202,8 +205,8 @@ export function addStomachParts(builder: KingJoeParts): void {
     layer: 1,
     geometry: { type: "tube", rOuter: 0.5, rInner: 0.34, h: 0.04, segments: 32 },
     material: "silver_dark",
-    node: A,
-    mate: absMate([0, 0.945, 0]),
+    node: U,
+    mate: upperMate([0, 0.945, 0]),
   });
   builder.add({
     id: pid(A, "abdomen_top_plate"),
@@ -213,8 +216,8 @@ export function addStomachParts(builder: KingJoeParts): void {
     layer: 1,
     geometry: { type: "cylinder", r: 0.78, h: 0.03, segments: 40, bevel: 0.004 },
     material: "silver_dark",
-    node: A,
-    mate: absMate([0, 0.98, 0]),
+    node: U,
+    mate: upperMate([0, 0.98, 0]),
     hint: "承托胸部对接基盘；基盘底面 y=1.0",
   });
 
@@ -227,8 +230,8 @@ export function addStomachParts(builder: KingJoeParts): void {
     layer: 4,
     geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.86, h: 0.22, t: 0.045, corner: 0.08 } },
     material: "silver",
-    node: A,
-    mate: absMate([0, 0.85, 0.53]),
+    node: U,
+    mate: upperMate([0, 0.85, 0.53]),
   });
   builder.add({
     id: pid(A, "abdomen_back"),
@@ -238,8 +241,8 @@ export function addStomachParts(builder: KingJoeParts): void {
     layer: 4,
     geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.8, h: 0.22, t: 0.04, corner: 0.08 } },
     material: "silver_dark",
-    node: A,
-    mate: absMate([0, 0.85, -0.53]),
+    node: U,
+    mate: upperMate([0, 0.85, -0.53]),
   });
   builder.add({
     id: pid(A, "abdomen_side"),
@@ -249,8 +252,8 @@ export function addStomachParts(builder: KingJoeParts): void {
     layer: 4,
     geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.62, h: 0.22, t: 0.04, corner: 0.08 } },
     material: "silver",
-    node: A,
-    mate: absMate([0, 0.82, 0]),
+    node: U,
+    mate: upperMate([0, 0.82, 0]),
     instances: 2,
     indexed: true,
     instance_layout: "kjSidePanels",
@@ -263,8 +266,8 @@ export function addStomachParts(builder: KingJoeParts): void {
     layer: 4,
     geometry: { type: "louver", count: 6, w: 0.3, h: 0.24, slantDeg: 35, t: 0.008 },
     material: "black_metal",
-    node: A,
-    mate: absMate([0, 0.82, 0]),
+    node: U,
+    mate: upperMate([0, 0.82, 0]),
     instances: 2,
     indexed: true,
     instance_layout: "kjSideLouvers",
@@ -274,7 +277,7 @@ export function addStomachParts(builder: KingJoeParts): void {
     name_cn: "腹甲铆钉",
     name_en: "abdomen rivets",
     assembly: A,
-    node: A,
+    node: U,
     world: [-0.3, 3.68 + 0.95, 0.554],
     count: 4,
     spacing: 0.08,
@@ -285,7 +288,7 @@ export function addStomachParts(builder: KingJoeParts): void {
     name_cn: "腹顶螺栓圈",
     name_en: "abdomen top bolts",
     assembly: A,
-    node: A,
+    node: U,
     world: [0, 3.68 + 1.013, 0],
     count: 12,
     radius: 0.66,
@@ -294,6 +297,6 @@ export function addStomachParts(builder: KingJoeParts): void {
     layer: 4,
   });
 
-  addAntigravity(builder, A, [0, 0.82, -0.05], 0.4);
-  addNozzles(builder, A);
+  addAntigravity(builder, A, [0, 0.33, -0.05], 0.4, U);
+  addNozzles(builder, A, { parentNode: U, yOffset: -0.49 });
 }
