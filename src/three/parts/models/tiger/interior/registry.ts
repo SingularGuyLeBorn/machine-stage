@@ -2195,6 +2195,37 @@ function buildInteriorParts(): PartDefinition[] {
       "机油压力管 ⌀12：从后隔板接线盒底部左角（盒底 0.79，起点离盒 15mm）沿左侧板内表面下沿一路向前，过座椅靠背顶（0.57）上方 50mm、方向盘轮缘（0.526）上方 48mm，在仪表板左上角接管；全程离壁 160~180mm，避开采暖/线束带（y 0.767 以上）。",
   });
 
+  add({
+    id: "tiger.interior.hydraulic_line",
+    name_cn: "转向液压管",
+    name_en: "Hydraulikleitung",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 485,
+    geometry: {
+      type: "kit",
+      kit: "cableRun",
+      params: {
+        points: [
+          [-0.86, 0.44, 0.62],
+          [-1.2, 0.42, 0.82],
+          [-2.0, 0.42, 0.87],
+          [-3.0, 0.42, 0.87],
+          [-3.55, 0.4, 0.79],
+          [-3.62, 0.37, 0.55],
+        ],
+        strands: 2,
+        r: 0.007,
+        pitch: 0.02,
+        segments: 72,
+      },
+    },
+    material: "cable_rubber",
+    mate: { type: "absolute" },
+    source:
+      "转向液压管（2 股 ⌀14 并排）从战斗室右前壁的液压分配阀（x -0.86 / y 0.44 / z 0.62）沿右侧板内表面（z 0.87、离壁 16mm，让开座椅靠背外缘 6mm）走到转向机顶部（x -3.62 / y 0.37 / z 0.55，离转向机顶 10mm），全程在座椅靠背（z ±0.85 但 x -3.13 之后）与线束带（y 0.767 以上）之间的空档，离右舷灭火器顶 230mm。",
+  });
+
   // ---- 装填链演示件（fx：构建时隐藏，不参与穿模/支撑检测，由 motion.ts 摆位）----
   add({
     id: "tiger.interior.loading_round_case",

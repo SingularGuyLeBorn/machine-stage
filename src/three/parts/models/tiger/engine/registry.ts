@@ -878,6 +878,18 @@ function makeLayouts(): Record<string, InstanceLayout> {
   };
 
   layouts[ENGINE_LAYOUTS.carburetor] = ({ index, constants }) => bankPairOf("CARB_BASE_Y", index, constants);
+  // 化油器内部：沿化油器本体的局部 +Y（进气方向）分层，四只同布局
+  const carbAlong = (index: number, along: number, constants: Record<string, number>) =>
+    bankPairOf("CARB_BASE_Y", index, constants).multiply(
+      new THREE.Matrix4().makeTranslation(0, along, 0),
+    );
+  layouts["engine.carbVenturi"] = ({ index, constants }) => carbAlong(index, 0.052, constants);
+  layouts["engine.carbThrottle"] = ({ index, constants }) => carbAlong(index, 0.088, constants);
+  layouts["engine.carbFloat"] = ({ index, constants }) =>
+    bankPairOf("CARB_BASE_Y", index, constants).multiply(
+      new THREE.Matrix4().makeTranslation(0.016, 0.022, 0.014),
+    );
+  layouts["engine.carbJet"] = ({ index, constants }) => carbAlong(index, 0.034, constants);
   layouts[ENGINE_LAYOUTS.airFilter] = ({ index, constants }) => bankPairOf("FILTER_BASE_Y", index, constants);
 
   // ---- L1 第一批：紧固件布局（全部由 constants 派生，位置不手写）----
@@ -2291,6 +2303,71 @@ function buildParts(): PartDefinition[] {
     instance_layout: ENGINE_LAYOUTS.carburetor,
     source: "4 × Solex 52JFF 双喉化油器：每两缸共用一个（简化：每缸列 2 只）",
   });
+  add({
+    id: "tiger.induction.carb_venturi",
+    name_cn: "化油器喉管",
+    name_en: "Venturi",
+    assembly: "induction",
+    build_layer: 1,
+    build_order: 190,
+    geometry: { type: "tube", rOuter: 0.03, rInner: 0.022, h: 0.03, segments: 22 },
+    material: "aluminium",
+    instances: 4,
+    indexed: true,
+    instance_layout: "engine.carbVenturi",
+    mate: { type: "absolute" },
+    source:
+      "化油器喉管（Solex 52JFF 双喉）：外径 ⌀60 / 内径 ⌀44 × 30 的收缩环，装在化油器本体内 y 0.052（进气道上段）；本体 ⌀95×135，内部件被壳体包住，只有透视/剖切可见。",
+  });
+  add({
+    id: "tiger.induction.carb_throttle",
+    name_cn: "化油器节气门",
+    name_en: "Drosselklappe",
+    assembly: "induction",
+    build_layer: 1,
+    build_order: 191,
+    geometry: { type: "cylinder", r: 0.028, h: 0.004, segments: 22, bevel: 0.0005 },
+    material: "steel_worn",
+    instances: 4,
+    indexed: true,
+    instance_layout: "engine.carbThrottle",
+    mate: { type: "absolute" },
+    source:
+      "节气门蝶阀 ⌀56 × 4：在化油器本体内 y 0.088（喉管下 36mm），关到开 0~90° 由驾驶席油门拉杆控制（本模型不驱动）。",
+  });
+  add({
+    id: "tiger.induction.carb_float",
+    name_cn: "化油器浮子",
+    name_en: "Schwimmer",
+    assembly: "induction",
+    build_layer: 1,
+    build_order: 192,
+    geometry: { type: "box", w: 0.02, h: 0.03, d: 0.012, bevel: 0.003 },
+    material: "case_brass",
+    instances: 4,
+    indexed: true,
+    instance_layout: "engine.carbFloat",
+    mate: { type: "absolute" },
+    source:
+      "浮子 20×30×12（黄铜）：在浮子室里（本体 y 0.022、偏离中心 16/14mm），随油面升降控制针阀；本体半径 47.5，浮子外缘 ≤ 31mm，全在壳体内。",
+  });
+  add({
+    id: "tiger.induction.carb_jet",
+    name_cn: "化油器主量孔",
+    name_en: "Hauptdüse",
+    assembly: "induction",
+    build_layer: 1,
+    build_order: 193,
+    geometry: { type: "cylinder", r: 0.004, h: 0.022, segments: 12, bevel: 0.0005 },
+    material: "brass",
+    instances: 4,
+    indexed: true,
+    instance_layout: "engine.carbJet",
+    mate: { type: "absolute" },
+    source:
+      "主量孔 ⌀8 × 22（黄铜）：立在浮子室底部（本体 y 0.034、偏中心 16mm），孔口朝喉管；四只化油器各一个。",
+  });
+
   add({
     id: "tiger.induction.air_filter",
     name_cn: "空气滤清器",

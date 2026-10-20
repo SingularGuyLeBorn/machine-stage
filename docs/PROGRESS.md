@@ -1784,10 +1784,10 @@ tsc / build ✓。零件/实例仍为 223 / 1998，227 报告 / 未豁免 0，�
 - 没有改动战损几何——本夜的手够不到它，硬改会破坏 47 条既有战损测试的口径。
 
 **门禁与证据**
-- 最终：**162 tests / tsc / build ✓；227 报告未豁免 0；悬空 0/0；287 件 / 2224 实例**。
+- 最终：**164 tests / tsc / build ✓；227 报告未豁免 0；悬空 0/0；292 件 / 2241 实例**。
 - 证据（docs/qa/，共 ~1.5MB）：loading-1-carry / loading-2-interior / loading-3-muzzle、
   engine-valvetrain、weather-rain-wiper、weather-mud、surface-camo-zimmerit、damage-breach，
   以及上一批 interior/ 5 张。
-- 待办（下一轮）：正时腔挖空后摆正时齿轮组；变速箱轴距重排后补 8 档齿轮/同步器；
-  化油器内部；任务书里的「吊篮随炮塔同步回转」已由 instance_nodes 保证（待发弹/潜望镜/座席），
+- 待办（下一轮）：正时腔挖空后摆正时齿轮组；变速箱轴距重排后补 8 档齿轮/同步器。
+  任务书里的「吊篮随炮塔同步回转」已由 instance_nodes 保证（待发弹/潜望镜/座席），
   吊篮地板/护栏本身挂 Turret 节点。
