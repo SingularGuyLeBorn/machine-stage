@@ -1470,6 +1470,28 @@ function buildParts(): PartDefinition[] {
     instance_layout: ENGINE_LAYOUTS.crankJournalAxis,
   });
   add({
+    id: "tiger.crankshaft.main_bearing",
+    name_cn: "主轴瓦",
+    name_en: "main bearing shell",
+    assembly: "crankcase",
+    build_layer: 1,
+    build_order: 179,
+    geometry: {
+      type: "tube",
+      rOuter: "BEARING_R_IN-0.0004",
+      rInner: "JOURNAL_R+0.0008",
+      h: "JOURNAL_W*0.82",
+      segments: 24,
+    },
+    material: "steel_worn",
+    mate: { type: "absolute" },
+    instances: 7,
+    indexed: true,
+    instance_layout: ENGINE_LAYOUTS.crankJournalAxis,
+    source:
+      "主轴瓦 ×7（不随曲轴转）：套在主轴颈外，内径比轴颈大 0.8mm（油膜）、外径比轴承座孔小 0.4mm（装配间隙）；X 光下能看到轴颈与瓦背的分层。",
+  });
+  add({
     id: "tiger.crankshaft.crank_pin",
     name_cn: "曲柄销",
     name_en: "crank pin",

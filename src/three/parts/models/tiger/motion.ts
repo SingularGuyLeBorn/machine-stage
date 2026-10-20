@@ -884,7 +884,7 @@ export function animateTigerEngine(assembled: AssembledModel, seconds: number): 
 // ---------------------------------------------------------------------------
 // 燃烧 / 殉爆（P3）
 // ---------------------------------------------------------------------------
-export const TIGER_DETONATION_IMPACT = 0.65;
+export const TIGER_DETONATION_IMPACT = 2.4;
 
 export function animateTigerBurning(assembled: AssembledModel, seconds: number): void {
   assembled.root.position.set(0, 0.001 * Math.sin(seconds * 13), 0);

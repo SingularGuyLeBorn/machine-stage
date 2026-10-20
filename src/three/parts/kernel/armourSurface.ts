@@ -104,12 +104,12 @@ export function applyArmourSurface(
             : vec3(1.0, 0.0, 0.0);
           vec3 perturbWorld = tangent * dh + vec3(0.0, 1.0, 0.0) * 0.35 * cos(ridge * 0.7 + 1.7);
           vec3 perturbView = (viewMatrix * vec4(perturbWorld * armourVertical, 0.0)).xyz;
-          normal = normalize(normal + perturbView * 0.30);
+          normal = normalize(normal + perturbView * 0.52);
 
           // 手抹涂层的细小表面粗糙（顶面也有，只弱一些）
           float micro = armourFbm(vArmourWorld * 19.0) - 0.5;
           vec3 microView = (viewMatrix * vec4(tangent * micro, 0.0)).xyz;
-          normal = normalize(normal + microView * 0.045);
+          normal = normalize(normal + microView * 0.065);
         }`,
       );
     }
@@ -121,33 +121,64 @@ export function applyArmourSurface(
         {
           ${verticalMask}
           ${
+            zimmerit
+              ? `// 防磁棱的高度场同时压暗谷底，让凹凸在平光下也可读
+          {
+            vec3 hAxis = abs(vArmourNormal.x) > 0.55 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+            float coord = dot(vArmourWorld.xz, normalize(hAxis.xz));
+            float ridgeH = cos(coord * 72.0
+              + 1.15 * sin(vArmourWorld.y * 5.0)
+              + 0.85 * sin(coord * 3.1 + vArmourWorld.y * 1.7)
+              + 2.6 * armourFbm(vArmourWorld * 2.4));
+            float relief = clamp(ridgeH * 0.5 + 0.5, 0.0, 1.0);
+            diffuseColor.rgb *= mix(1.0, 0.84 + 0.20 * relief, armourVertical);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.026, 0.022, 0.016), (1.0 - relief) * armourVertical * 0.20);
+          }`
+              : ""
+          }
+          ${
             camo
-              ? `// 迷彩：两组高频、拉伸方向的噪声阈值；细噪声打碎边界并留软过渡
-          float camoA = armourFbm(vArmourWorld * vec3(2.35, 0.85, 2.35) + vec3(3.1));
-          float camoB = armourFbm(vArmourWorld * vec3(1.85, 0.75, 2.95) + vec3(11.7, 5.3, 2.1));
-          float camoBreak = (armourFbm(vArmourWorld * 13.0) - 0.5) * 0.10;
-          float green = smoothstep(0.50, 0.58, camoA + camoBreak) * 0.86;
-          float brown = smoothstep(0.535, 0.605, camoB + camoBreak) * (1.0 - green) * 0.78;
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.038, 0.055, 0.020), green);
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.075, 0.032, 0.014), brown);`
+              ? `// 迷彩：三组高频噪声 + 细碎条纹/喷绘软边；不再是大块硬边贴纸
+          float camoWarp = (armourFbm(vArmourWorld * vec3(6.5, 2.0, 6.0) + vec3(1.7)) - 0.5) * 0.16;
+          float camoA = armourFbm(vArmourWorld * vec3(3.4, 1.1, 3.2) + vec3(3.1) + camoWarp);
+          float camoB = armourFbm(vArmourWorld * vec3(2.7, 0.9, 3.8) + vec3(11.7, 5.3, 2.1) - camoWarp);
+          float camoBreak = (armourFbm(vArmourWorld * 22.0) - 0.5) * 0.075;
+          float camoFine = (armourFbm(vArmourWorld * 41.0 + vec3(4.0, 1.3, 8.0)) - 0.5) * 0.06;
+          float green = smoothstep(0.50, 0.62, camoA + camoBreak + camoFine) * 0.80;
+          float brown = smoothstep(0.535, 0.655, camoB + camoBreak - camoFine) * (1.0 - green) * 0.70;
+          float olive = smoothstep(0.55, 0.67, camoA * 0.68 + camoB * 0.32 + camoBreak * 0.5) * (1.0 - green) * (1.0 - brown) * 0.34;
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.034, 0.050, 0.018), green);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.066, 0.028, 0.012), brown);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.042, 0.040, 0.018), olive);`
               : ""
           }
           ${
             grime
-              ? `// 战场痕迹：下缘泥浆 / 稀疏锈斑 / 车尾熏黑 / 朝上面浮尘
-          float low = (1.0 - smoothstep(-0.35, 0.58, vArmourWorld.y)) * armourVertical;
-          float mudN = smoothstep(0.24, 0.74, armourFbm(vArmourWorld * 4.1));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.055, 0.045, 0.030), low * mudN * 0.70);
-          float rust = smoothstep(0.79, 0.90, armourFbm(vArmourWorld * 12.5 + vec3(5.0)))
-            * (0.35 + 0.65 * armourVertical) * (1.0 - low * 0.6);
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.075, 0.025, 0.009), rust * 0.45);
-          float sootBand = smoothstep(0.28, 0.72, vArmourWorld.x)
-            * (1.0 - smoothstep(0.85, 1.35, vArmourWorld.y))
-            * smoothstep(0.30, 0.78, armourFbm(vArmourWorld * 4.2 + vec3(9.0)));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.012, 0.012, 0.011), sootBand * 0.32);
+              ? `// 战场痕迹：下缘泥浆/飞溅、锈斑与竖向锈痕、车尾熏黑、朝上面浮尘、
+          // 高密度掉漆斑（露出深色金属）——让 v2 的「贴纸感」再压一层
           float up = smoothstep(0.55, 0.90, vArmourNormal.y);
-          float dust = up * smoothstep(0.20, 0.72, armourFbm(vArmourWorld * 2.6 + vec3(2.0)));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16, 0.135, 0.095), dust * 0.16);`
+          float low = (1.0 - smoothstep(-0.35, 0.58, vArmourWorld.y)) * armourVertical;
+          float mudN = smoothstep(0.22, 0.72, armourFbm(vArmourWorld * 4.1));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.050, 0.040, 0.026), low * mudN * 0.82);
+          float splat = low * smoothstep(0.70, 0.87, armourFbm(vArmourWorld * 19.0 + vec3(6.0)));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.038, 0.030, 0.020), splat * 0.55);
+          float rust = smoothstep(0.78, 0.91, armourFbm(vArmourWorld * 12.5 + vec3(5.0)))
+            * (0.35 + 0.65 * armourVertical) * (1.0 - low * 0.6);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.070, 0.023, 0.008), rust * 0.48);
+          float rustStreak = smoothstep(0.80, 0.93, armourFbm(vec3(vArmourWorld.x * 9.0, vArmourWorld.y * 1.7, vArmourWorld.z * 9.0) + vec3(7.0)))
+            * (0.35 + 0.65 * armourVertical);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.058, 0.020, 0.007), rustStreak * 0.30);
+          float sootBand = smoothstep(0.20, 0.70, vArmourWorld.x)
+            * (1.0 - smoothstep(0.80, 1.32, vArmourWorld.y))
+            * smoothstep(0.26, 0.76, armourFbm(vArmourWorld * 4.2 + vec3(9.0)));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.010, 0.010, 0.009), sootBand * 0.42);
+          float dust = up * smoothstep(0.18, 0.70, armourFbm(vArmourWorld * 2.6 + vec3(2.0)));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.155, 0.130, 0.090), dust * 0.22);
+          float chip = smoothstep(0.855, 0.945, armourFbm(vArmourWorld * 27.0 + vec3(3.2, 8.1, 1.4)))
+            * (0.35 + 0.65 * max(up, armourVertical));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.048, 0.041, 0.031), chip * 0.62);
+          float chipCore = smoothstep(0.91, 0.97, armourFbm(vArmourWorld * 31.0 + vec3(1.2, 4.4, 7.7)));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.020, 0.018, 0.015), chipCore * 0.45);`
               : ""
           }
         }`,
@@ -162,10 +193,11 @@ export function applyArmourSurface(
         ${verticalMask}
         float grain = armourFbm(vArmourWorld * 9.0);
         float low = (1.0 - smoothstep(-0.35, 0.58, vArmourWorld.y)) * armourVertical;
-        float mudN = smoothstep(0.24, 0.74, armourFbm(vArmourWorld * 4.1));
+        float mudN = smoothstep(0.22, 0.72, armourFbm(vArmourWorld * 4.1));
+        float chipR = smoothstep(0.855, 0.945, armourFbm(vArmourWorld * 27.0 + vec3(3.2, 8.1, 1.4)));
         roughnessFactor = clamp(
-          roughnessFactor + 0.12 * grain + 0.08 * low * mudN + 0.04 * armourVertical,
-          0.42,
+          roughnessFactor + 0.13 * grain + 0.10 * low * mudN + 0.04 * armourVertical + 0.07 * chipR,
+          0.40,
           1.0
         );
       }`,
@@ -174,5 +206,5 @@ export function applyArmourSurface(
     shader.fragmentShader = fragment;
   };
   material.customProgramCacheKey = () =>
-    `armour-surface-v2-${zimmerit ? 1 : 0}${camo ? 1 : 0}${grime ? 1 : 0}`;
+    `armour-surface-v3-${zimmerit ? 1 : 0}${camo ? 1 : 0}${grime ? 1 : 0}`;
 }
