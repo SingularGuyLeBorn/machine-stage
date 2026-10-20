@@ -294,6 +294,10 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
         ringT: 0.009,
         ringCount: 5,
         endT: 0.014,
+        bodyX: femur.bodyX,
+        endScale: femur.endScale,
+        endBottomX: femur.endBottomX,
+        endTopScale: femur.endTopScale,
         padW: 0.034,
         padH: 0.034,
         padT: 0.016,
@@ -320,7 +324,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "chrome",
     layer: 3,
     node: NODES.hip,
-    at: [0.0525, 1.21, 0],
+    at: [0.1075, 1.21, 0],
     rot: [0, 90, 0],
     hint: "只护大腿上段正面的局部护板（不包全身），髋缸与骨面全露",
   });
@@ -340,8 +344,8 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "只在骨段两侧夹一条窄护条（宽 20mm，避开安装凸台），不遮骨架",
   });
   layouts["t800.thigh.armor_side"] = instanceLayout(NODES.hip, [
-    [0, 1.01, -0.0385],
-    [0, 1.01, 0.0385],
+    [0.055, 1.01, -0.0382],
+    [0.055, 1.01, 0.0382],
   ]);
   builder.add({
     id: "t800.thigh.lines",
@@ -359,10 +363,10 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "沿股骨前后侧走管，两端各有一个卡套接头",
   });
   layouts["t800.thigh.lines"] = instanceLayout(NODES.hip, [
-    [0.055, 1.0, 0.02],
-    [0.055, 1.0, -0.02],
-    [-0.055, 1.0, 0.02],
-    [-0.055, 1.0, -0.02],
+    [0.11, 1.0, 0.02],
+    [0.11, 1.0, -0.02],
+    [0.0, 1.0, 0.02],
+    [0.0, 1.0, -0.02],
   ]);
   builder.add({
     id: "t800.thigh.fittings",
@@ -380,14 +384,14 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "硬管两端卡套接头（内孔 0.2mm 间隙包住硬管）",
   });
   layouts["t800.thigh.fittings"] = instanceLayout(NODES.hip, [
-    [0.055, 1.14, 0.02],
-    [0.055, 0.86, 0.02],
-    [0.055, 1.14, -0.02],
-    [0.055, 0.86, -0.02],
-    [-0.055, 1.14, 0.02],
-    [-0.055, 0.86, 0.02],
-    [-0.055, 1.14, -0.02],
-    [-0.055, 0.86, -0.02],
+    [0.11, 1.14, 0.02],
+    [0.11, 0.86, 0.02],
+    [0.11, 1.14, -0.02],
+    [0.11, 0.86, -0.02],
+    [0.0, 1.14, 0.02],
+    [0.0, 0.86, 0.02],
+    [0.0, 1.14, -0.02],
+    [0.0, 0.86, -0.02],
   ]);
   builder.add({
     id: "t800.thigh.clamps",
@@ -405,10 +409,10 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "卡箍抱住硬管（内孔 0.2mm 间隙），把管固定在护甲上",
   });
   layouts["t800.thigh.clamps"] = instanceLayout(NODES.hip, [
-    [0.055, 1.07, 0.02],
-    [0.055, 0.93, 0.02],
-    [-0.055, 1.07, -0.02],
-    [-0.055, 0.93, -0.02],
+    [0.11, 1.07, 0.02],
+    [0.11, 0.93, 0.02],
+    [0.0, 1.07, -0.02],
+    [0.0, 0.93, -0.02],
   ]);
 
   builder.add({
@@ -420,7 +424,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "chrome",
     layer: 3,
     node: NODES.hip,
-    at: [-0.0525, 1.0, 0],
+    at: [0.0025, 1.0, 0],
     rot: [0, -90, 0],
     hint: "股骨后侧的窄加强条（背面也只留一条，不包壳）",
   });
@@ -433,7 +437,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "rubber",
     layer: 5,
     node: NODES.hip,
-    at: [-0.061, 1.0, 0.0305],
+    at: [-0.006, 1.0, 0.0305],
     hint: "沿股骨后加强条走的中段线束（外露可见）",
   });
 

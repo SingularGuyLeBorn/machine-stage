@@ -28,6 +28,17 @@ export const JOINT_Y = {
 } as const;
 
 /**
+ * 关节中心的 X（模型坐标，+X 前）。
+ * 膝盖比髋略后 20mm：股骨轴线后倾，大腿本体（股四头肌）再前移，
+ * 于是大腿前缘鼓出；小腿本体后移到踝缸后方，形成小腿肚后凸。
+ */
+export const JOINT_X = {
+  hip: 0,
+  knee: 0,
+  ankle: 0,
+} as const;
+
+/**
  * 转动副通用标准（三个关节共用，尺寸不同处单列）。
  *
  *   上骨（U）：叉耳 cast 在本体下端，z=±cheekZ，厚 cheekT，圆头半径 cheekR，
@@ -47,7 +58,7 @@ export const JOINT_STD = {
   boreR: 0.0165,
   stubR: 0.012,
   stubDrop: 0.018,
-  pinR: 0.016,
+  pinR: 0.0135,
   pinLen: 0.1,
   bushOuter: 0.0225,
   bushBore: 0.0165,
@@ -79,6 +90,18 @@ export interface BoneSpec {
   bottom: number;
   /** 本体上沿（模型 Y） */
   top: number;
+  /**
+   * 本体相对关节连线的 X 偏移（+X 前）。
+   * 腿的"S 曲线"就靠它：大腿本体前移（股四头肌弧度），小腿本体后移（小腿肚），
+   * 而两端端板仍留在关节连线上 —— 于是骨段中心线前后摆动，不是一根直柱。
+   */
+  bodyX: number;
+  /** 端板缩放（<1 = 关节处收细，膝盖比大腿小腿都窄） */
+  endScale: number;
+  /** 上端端板缩放（髋端/踝端保持全宽，腿段之间才连得上） */
+  endTopScale: number;
+  /** 下端端板的 X 偏移（局部坐标，对准下关节中心） */
+  endBottomX: number;
 }
 
 export const BONES: Record<string, BoneSpec> = {
@@ -92,6 +115,14 @@ export const BONES: Record<string, BoneSpec> = {
     corner: 0.012,
     bottom: JOINT_Y.knee + JOINT_STD.upperDrop,
     top: JOINT_Y.hip - JOINT_STD.lowerRise,
+    /** 大腿本体前移 55mm：股四头肌弧度（局部坐标，骨段原点 = 髋中心） */
+    bodyX: 0.055,
+    /** 下端（膝）收细成腰 */
+    endScale: 0.7,
+    /** 上端（髋）保持全宽 */
+    endTopScale: 1,
+    /** 下端端板的 X 偏移（对准膝中心，局部坐标） */
+    endBottomX: JOINT_X.knee,
   },
   tibia: {
     key: "tibia",
@@ -103,6 +134,14 @@ export const BONES: Record<string, BoneSpec> = {
     corner: 0.012,
     bottom: JOINT_Y.ankle + JOINT_STD.upperDrop,
     top: JOINT_Y.knee - JOINT_STD.lowerRise,
+    /** 小腿本体后移 35mm（局部坐标，骨段原点 = 膝中心）+ 踝驱动缸后置 → 小腿肚后凸 */
+    bodyX: -0.035,
+    /** 上端（膝）收细成腰 */
+    endScale: 0.7,
+    /** 下端（踝）保持全宽 */
+    endTopScale: 0.8,
+    /** 下端端板的 X 偏移（对准踝中心，局部坐标） */
+    endBottomX: JOINT_X.ankle - JOINT_X.knee,
   },
 };
 
@@ -130,7 +169,7 @@ export const CYL = {
   /** 耳环外半径 */
   eyeOuter: 0.022,
   /** 耳环孔半径（球头球半径 + 0.8mm） */
-  eyeBore: 0.013,
+  eyeBore: 0.016,
   /** 耳环宽度（沿销轴） */
   eyeWidth: 0.022,
   /** 耳环颈起点（离球心） */
@@ -251,33 +290,34 @@ const FACE_Z = 0.034; // 骨段 d/2
 const PELVIS_FACE_Z = 0.055;
 
 /**
- * 安装点表（凸台面中心）。
+ * 安装点表（凸台面中心，模型坐标）。
  *
  * 选点原则：
  *   ① 凸台自骨面伸出后，球心必须与另一端球心同 z —— 缸轴才能与销轴垂直。
- *      髋部两缸因此把大腿侧的凸台加长到 52mm，与骨盆轭侧面齐平。
- *   ② 安装点 |x| ≥ 0.028，保证凸台根部完全落在骨壁内（不悬在管腔上方）。
+ *   ② 凸台根部必须落在骨段本体上（本体有 X 偏移时，模型坐标要跟着偏）。
  *   ③ 关节盘插销与缸杆要形成真实力臂：膝前后两缸分居 +X / -X，
  *      屈膝时前缸伸长、后缸缩短，形成对置。
+ *   ④ 大腿本体前移 24mm、小腿本体后移 8mm（见 BONES.*.bodyX），
+ *      所以大腿侧凸台整体前移、小腿侧整体后移，交叉布置的力臂更足。
  */
 export const MOUNTS: Record<string, MountSpec> = {
   // 髋屈曲缸：骨盆前上（+Z 侧） → 大腿前上
   hip_flex_a: { segment: "base", at: [0.13, 1.39, PELVIS_FACE_Z], normal: [0, 0, 1], out: 0.016 },
-  hip_flex_b: { segment: "hip", at: [0.031, 1.09, FACE_Z], normal: [0, 0, 1], out: 0.037 },
+  hip_flex_b: { segment: "hip", at: [0.086, 1.09, FACE_Z], normal: [0, 0, 1], out: 0.037 },
   // 髋伸展缸：骨盆后上（-Z 侧） → 大腿后上
   hip_ext_a: { segment: "base", at: [-0.13, 1.39, -PELVIS_FACE_Z], normal: [0, 0, -1], out: 0.016 },
-  hip_ext_b: { segment: "hip", at: [-0.031, 1.09, -FACE_Z], normal: [0, 0, -1], out: 0.037 },
+  hip_ext_b: { segment: "hip", at: [0.024, 1.09, -FACE_Z], normal: [0, 0, -1], out: 0.037 },
   // 膝后主缸：股骨前上 → 胫骨后下（交叉布置，缸轴与关节回转切向成角才有行程）
-  knee_main_a: { segment: "hip", at: [0.028, 0.95, FACE_Z], normal: [0, 0, 1], out: 0.026 },
-  knee_main_b: { segment: "knee", at: [-0.028, 0.6, FACE_Z], normal: [0, 0, 1], out: 0.026 },
+  knee_main_a: { segment: "hip", at: [0.083, 0.95, FACE_Z], normal: [0, 0, 1], out: 0.026 },
+  knee_main_b: { segment: "knee", at: [-0.063, 0.6, FACE_Z], normal: [0, 0, 1], out: 0.026 },
   // 膝前补偿缸：股骨后上 → 胫骨前下（与主缸反向交叉，一伸一缩对置）
-  knee_comp_a: { segment: "hip", at: [-0.028, 0.93, -FACE_Z], normal: [0, 0, -1], out: 0.026 },
-  knee_comp_b: { segment: "knee", at: [0.028, 0.58, -FACE_Z], normal: [0, 0, -1], out: 0.026 },
-  // 踝驱动缸（左右各一）：胫骨前 → 足前
-  ankle_l_a: { segment: "knee", at: [0.028, 0.3, FACE_Z], normal: [0, 0, 1], out: 0.026 },
-  ankle_l_b: { segment: "ankle", at: [0.055, 0.07, FACE_Z], normal: [0, 0, 1], out: 0.026 },
-  ankle_r_a: { segment: "knee", at: [0.028, 0.3, -FACE_Z], normal: [0, 0, -1], out: 0.026 },
-  ankle_r_b: { segment: "ankle", at: [0.055, 0.07, -FACE_Z], normal: [0, 0, -1], out: 0.026 },
+  knee_comp_a: { segment: "hip", at: [0.027, 0.93, -FACE_Z], normal: [0, 0, -1], out: 0.026 },
+  knee_comp_b: { segment: "knee", at: [-0.007, 0.58, -FACE_Z], normal: [0, 0, -1], out: 0.026 },
+  // 踝驱动缸（左右各一）：胫骨后 → 足后（后置，形成小腿肚的实体量）
+  ankle_l_a: { segment: "knee", at: [-0.063, 0.3, FACE_Z], normal: [0, 0, 1], out: 0.026 },
+  ankle_l_b: { segment: "ankle", at: [-0.055, 0.07, FACE_Z], normal: [0, 0, 1], out: 0.026 },
+  ankle_r_a: { segment: "knee", at: [-0.063, 0.3, -FACE_Z], normal: [0, 0, -1], out: 0.026 },
+  ankle_r_b: { segment: "ankle", at: [-0.055, 0.07, -FACE_Z], normal: [0, 0, -1], out: 0.026 },
 };
 
 /** 液压缸种子（安装点表 + 行程比例）。 */
@@ -306,7 +346,8 @@ const CYLINDER_SEEDS: CylinderSeed[] = [
     b: "hip_flex_b",
     rBody: 0.024,
     lc: 0.45,
-    lr: 0.5,
+    // 杆端余量要留足（缩回极限时杆端不能顶到缸底）：lr 偏小
+    lr: 0.47,
   },
   {
     key: "hip_ext",
@@ -398,7 +439,7 @@ export const NODES = {
 export const NODE_PIVOT: Record<string, Vec3> = {
   [NODES.base]: [0, 0, 0],
   [NODES.hip]: [0, JOINT_Y.hip, 0],
-  [NODES.knee]: [0, JOINT_Y.knee, 0],
+  [NODES.knee]: [JOINT_X.knee, JOINT_Y.knee, 0],
   [NODES.ankle]: [0, JOINT_Y.ankle, 0],
 };
 
@@ -420,7 +461,13 @@ export const SEGMENT_NODE: Record<Segment, string> = {
 /** 安装凸台埋进骨壁的深度（保证凸台根部落实在实心骨壁内，不悬在管腔上）。 */
 export const BOSS_EMBED = 0.028;
 
-/** 骨段 kit 的安装凸台参数（y 相对骨段中心）。 */
+/**
+ * 骨段 kit 的安装凸台参数。
+ *
+ * 坐标说明：骨段零件挂在关节节点上，零件原点 = 节点 pivot（模型 x=0），
+ * 所以凸台的局部 x 直接等于模型 x（本体偏移 bodyX 只挪骨段本体，不挪凸台位置）——
+ * 但凸台必须落在偏移后的本体上，因此安装点的模型 x 要按本体范围挑。
+ */
 export function mountKitParams(
   key: string,
   centerY: number,
