@@ -6,7 +6,7 @@ import os from "node:os";
 // ============================================================================
 // scripts/capture-kingjoe.mjs —— 金古桥浏览器验收采集
 //   · 生产构建 + ?qa=1 只读场景钩子
-//   · 四体纵队/楔形编队 / 合体对接特写 / 合体成品 / 肩对接透视 / 重踏步 / 受击战损 / 怪光线 / 残缺合体截图
+//   · 四体纵队/楔形编队 / 合体对接特写 / 合体成品 / 肩对接透视 / 船尾飞控 / 重踏步 / 受击战损 / 怪光线 / 残缺合体截图
 //   · rAF 实测 FPS
 //   · canvas.captureStream(60) + MediaRecorder 录制合体全程（画面 + Web Audio 音轨，随后 ffmpeg 转 MP4）
 // ============================================================================
@@ -216,6 +216,12 @@ async function main() {
   await sleep(300);
   await shot("kingjoe-shoulder-dock.png");
   await evaluate(`window.__stage.store.getState().setView("xray", false); true`);
+
+  // 5.45) Ship 后部：姿态舵面 / 作动器 / 控制板 / 线束
+  await setState("idle");
+  await setCamera([4.6, 9.2, -6.2], [0, 7.9, 0]);
+  await sleep(300);
+  await shot("kingjoe-ship-rear.png");
 
   // 5.5) 机器人步行 + 腰部转轴 + 3.0s 重踏步震环
   await setCamera([9.2, 5.5, 12.4], [0, 4.25, 0]);

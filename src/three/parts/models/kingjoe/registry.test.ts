@@ -27,6 +27,21 @@ describe("kingjoe registry", () => {
     expect(counts.get("ship")).toBeGreaterThan(40);
   });
 
+  it("Ship 舵面 / 控制板 / 线束零件存在", () => {
+    const ids = new Set(registry.parts.map((part) => part.id));
+    for (const id of [
+      "kingjoe.ship.ship_rudder_h0",
+      "kingjoe.ship.ship_rudder_h1",
+      "kingjoe.ship.ship_rudder_v0",
+      "kingjoe.ship.ship_rudder_v1",
+      "kingjoe.ship.ship_control_panel",
+      "kingjoe.ship.ship_harness_0",
+      "kingjoe.ship.ship_harness_1",
+    ]) {
+      expect(ids.has(id)).toBe(true);
+    }
+  });
+
   it("双肩第 4 对接口零件存在", () => {
     const ids = new Set(registry.parts.map((part) => part.id));
     expect(ids.has("kingjoe.chest.arm_dock_guide")).toBe(true);

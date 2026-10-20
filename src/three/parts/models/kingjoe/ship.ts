@@ -1,5 +1,14 @@
 import { KJ } from "./constants";
-import { KingJoeParts, addAntigravity, addNozzles, mateAt, pid, rivetStripPart } from "./helpers";
+import {
+  KingJoeParts,
+  absMate,
+  addAntigravity,
+  addNozzles,
+  mateAt,
+  pid,
+  rivetStripPart,
+  tubeBetween,
+} from "./helpers";
 
 // ============================================================================
 // models/kingjoe/ship —— King Ship（头部飞船）
@@ -261,6 +270,101 @@ export function addShipParts(builder: KingJoeParts): void {
     indexed: true,
     instance_layout: "kjShipAntennae",
   });
+  // —— 后部姿态舵面 ×4 + 作动器；控制板 / 线束 ——
+  for (const [rudder, name, x] of [
+    ["shipRudder0", "左水平舵面", -0.16],
+    ["shipRudder1", "右水平舵面", 0.16],
+  ] as const) {
+    builder.add({
+      id: pid(A, x < 0 ? "ship_rudder_h0" : "ship_rudder_h1"),
+      name_cn: name,
+      name_en: "horizontal attitude rudder",
+      assembly: A,
+      layer: 4,
+      geometry: { type: "box", w: 0.32, h: 0.03, d: 0.2, bevel: 0.008 },
+      material: "silver_dark",
+      node: rudder,
+      mate: absMate([x, 0, -0.11]),
+      hint: "铰点在背板上缘外侧，舵面在喷口上方 35mm；编队时绕 X 轴小角度摆动",
+    });
+  }
+  for (const [rudder, name, id] of [
+    ["shipRudder2", "左垂直舵面", "ship_rudder_v0"],
+    ["shipRudder3", "右垂直舵面", "ship_rudder_v1"],
+  ] as const) {
+    builder.add({
+      id: pid(A, id),
+      name_cn: name,
+      name_en: "vertical attitude rudder",
+      assembly: A,
+      layer: 4,
+      geometry: { type: "box", w: 0.03, h: 0.24, d: 0.2, bevel: 0.006 },
+      material: "silver_dark",
+      node: rudder,
+      mate: absMate([0, 0.12, -0.1]),
+      hint: "铰点在背板上缘，舵面向上/后伸出；编队时绕 Y 轴小角度摆动",
+    });
+  }
+  for (const [x, y] of [
+    [-0.6, 0.8],
+    [0.6, 0.8],
+    [-0.27, 0.82],
+    [0.27, 0.82],
+  ] as const) {
+    builder.add({
+      id: pid(A, `ship_rudder_actuator_${x < 0 ? "l" : "r"}_${y === 0.8 ? "h" : "v"}`),
+      name_cn: "舵面作动器",
+      name_en: "rudder actuator can",
+      assembly: A,
+      layer: 2,
+      geometry: { type: "cylinder", r: 0.03, h: 0.04, segments: 16, bevel: 0.004 },
+      material: "joint_steel",
+      node: A,
+      mate: mateAt(A, [x, headY(y), -0.595], [90, 0, 0]),
+      hint: "作动筒贴背板，伸缩端到舵面铰点 5mm；同时作为舵面支撑",
+    });
+  }
+  builder.add({
+    id: pid(A, "ship_control_panel"),
+    name_cn: "船体控制板",
+    name_en: "ship control board",
+    assembly: A,
+    layer: 4,
+    geometry: { type: "box", w: 0.28, h: 0.12, d: 0.02, bevel: 0.006 },
+    material: "black_metal",
+    node: A,
+    mate: mateAt(A, [0, headY(0.76), -0.612]),
+    hint: "上背板外挂控制板，离背板 10mm；线束从两侧引到颈圈",
+  });
+  builder.add({
+    id: pid(A, "ship_control_led"),
+    name_cn: "控制板状态灯",
+    name_en: "control board status led",
+    assembly: A,
+    layer: 5,
+    geometry: { type: "cylinder", r: 0.012, h: 0.012, segments: 10, bevel: 0.002 },
+    material: "sensor_red",
+    node: A,
+    mate: mateAt(A, [0.09, headY(0.79), -0.632], [90, 0, 0]),
+  });
+  for (const [index, sx] of [
+    [0, -1],
+    [1, 1],
+  ] as const) {
+    tubeBetween(builder, {
+      id: pid(A, `ship_harness_${index}`),
+      name_cn: "控制线束",
+      name_en: "control harness",
+      assembly: A,
+      node: A,
+      from: [sx * 0.155, headY(0.72), -0.622],
+      to: [sx * 0.33, headY(0.66), -0.61],
+      radius: 0.01,
+      material: "rubber",
+      layer: 3,
+    });
+  }
+
   rivetStripPart(builder, {
     id: pid(A, "face_rivets"),
     name_cn: "面部铆钉",

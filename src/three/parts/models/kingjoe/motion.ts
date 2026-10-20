@@ -399,6 +399,12 @@ function poseFormation(assembled: AssembledModel, t: number, formation: Formatio
   setArm(assembled, "r", 82, 0, 0, 0, 5);
   setAxialLocks(assembled, 0);
   setShoulderLocks(assembled, 0);
+  for (let i = 0; i < 2; i++) {
+    setRotation(assembled, `shipRudder${i}`, [Math.sin(t * 1.8 + i * 1.7) * 6, 0, 0]);
+  }
+  for (let i = 2; i < 4; i++) {
+    setRotation(assembled, `shipRudder${i}`, [0, Math.sin(t * 1.4 + i) * 5, 0]);
+  }
 }
 
 function poseCombining(
