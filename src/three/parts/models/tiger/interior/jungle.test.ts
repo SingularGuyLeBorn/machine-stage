@@ -42,6 +42,8 @@ describe("tiger/interior 机械丛林", () => {
     const box = new THREE.Box3();
     const violations: string[] = [];
     for (const handle of interiorHandles()) {
+      // fx 演示件（装填链的弹/空筒）在运行时才摆位，静止姿态不参与包络验收
+      if (handle.def.tags?.includes("fx")) continue;
       built.partBounds(handle, box);
       const out =
         box.min.x < ENVELOPE.x0 ||

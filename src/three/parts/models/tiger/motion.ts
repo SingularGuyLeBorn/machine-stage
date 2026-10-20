@@ -448,6 +448,162 @@ export function animateTigerFiring(assembled: AssembledModel, seconds: number): 
 }
 
 // ---------------------------------------------------------------------------
+// 装填链（P3+）—— 取弹 → 递弹 → 推入炮膛 → 关闩 → 击发 → 抛壳
+//
+// 时间轴（不循环，5.2s 后停在终态）：
+//   0.00–0.45  从待发弹架把弹提起并横转 90°（筒轴指向炮膛）
+//   0.45–1.65  搬到炮闩前（走一段弧线，模拟装填手转身递弹）
+//   1.45–1.80  闩体下开
+//   1.95–2.55  推弹入膛（弹底停在膛底 -2.27）
+//   2.55–2.85  关闩闭锁
+//   3.00       击发（复进/击针/炮口焰/车体后坐全部复用主炮击发的时间函数）
+//   3.50–4.35  闩体再开，空筒抛出、翻滚落到吊篮地板
+// 演示件 tags fx：构建时隐藏、不参与穿模/支撑检测，坐标全部是 Turret 节点局部系。
+// ---------------------------------------------------------------------------
+export const TIGER_LOAD_HOLD = 5.2;
+export const TIGER_LOAD_FIRE = 3.0;
+const LOAD_FIRE_OFFSET = 1.9; // t' = t - 1.9 → 正好落进 animateTigerFiring 的时间轴
+const LOAD_ROUND_PARTS = [
+  "tiger.interior.loading_round_case",
+  "tiger.interior.loading_round_shell",
+];
+const LOAD_CASE_PART = "tiger.interior.ejected_case";
+const LOAD_START: [number, number, number] = [-1.15, 1.7, 0.3];
+const LOAD_ALIGN: [number, number, number] = [-1.71, 1.45, 0];
+const LOAD_RAMMED: [number, number, number] = [-2.47, 1.45, 0];
+const LOAD_TILT_END = 0.45;
+const LOAD_CARRY_START = 0.45;
+const LOAD_CARRY_END = 1.65;
+const LOAD_RAM_START = 1.95;
+const LOAD_RAM_END = 2.55;
+const LOAD_ROUND_HIDE = 3.15;
+const LOAD_EJECT_START = 3.5;
+const LOAD_EJECT_END = 4.35;
+
+const lerp3 = (
+  a: readonly [number, number, number],
+  b: readonly [number, number, number],
+  u: number,
+): [number, number, number] => [
+  a[0] + (b[0] - a[0]) * u,
+  a[1] + (b[1] - a[1]) * u,
+  a[2] + (b[2] - a[2]) * u,
+];
+
+export interface TigerLoadPose {
+  position: [number, number, number];
+  tilt: number;
+  visible: boolean;
+}
+
+/** 弹的位姿（纯函数，便于单测）：起点在待发架上方，终点膛内。 */
+export function tigerLoadRoundPose(t: number): TigerLoadPose {
+  const tilt = (Math.PI / 2) * smoothstep(0, LOAD_TILT_END, t);
+  let position: [number, number, number];
+  if (t < LOAD_CARRY_START) {
+    position = [...LOAD_START];
+  } else if (t < LOAD_CARRY_END) {
+    const u = smoothstep(LOAD_CARRY_START, LOAD_CARRY_END, t);
+    position = lerp3(LOAD_START, LOAD_ALIGN, u);
+    position[1] += 0.07 * Math.sin(Math.PI * u); // 递弹弧线：中途抬 70mm
+  } else if (t < LOAD_RAM_START) {
+    position = [...LOAD_ALIGN];
+  } else {
+    position = lerp3(LOAD_ALIGN, LOAD_RAMMED, smoothstep(LOAD_RAM_START, LOAD_RAM_END, t));
+  }
+  return { position, tilt, visible: t < LOAD_ROUND_HIDE };
+}
+
+/** 空筒抛出位姿：从膛底掉到吊篮地板上，边落边滚。 */
+export function tigerLoadCasePose(t: number): {
+  position: [number, number, number];
+  spin: number;
+  visible: boolean;
+} {
+  const u = smoothstep(LOAD_EJECT_START, LOAD_EJECT_END, t);
+  const position: [number, number, number] = [
+    -2.3 + 0.42 * u,
+    1.44 - 0.26 * u * u,
+    0.02 + 0.22 * u,
+  ];
+  return { position, spin: u * Math.PI * 2.4, visible: t >= LOAD_EJECT_START };
+}
+
+/** 闩体行程（0 闭锁 / -160mm 全开）：装填开一次、抛壳再开一次。 */
+export function tigerLoadingBlockOffset(t: number): number {
+  const open = (a: number, b: number) => -TIGER_BLOCK_DROP * smoothstep(a, b, t);
+  if (t < 1.45) return 0;
+  if (t < 1.8) return open(1.45, 1.8);
+  if (t < 2.55) return -TIGER_BLOCK_DROP;
+  if (t < 2.85) return -TIGER_BLOCK_DROP * (1 - smoothstep(2.55, 2.85, t));
+  if (t < 3.4) return 0;
+  if (t < 3.7) return open(3.4, 3.7);
+  if (t < 4.0) return -TIGER_BLOCK_DROP;
+  if (t < 4.3) return -TIGER_BLOCK_DROP * (1 - smoothstep(4.0, 4.3, t));
+  return 0;
+}
+
+const loadMatrix = new THREE.Matrix4();
+
+function poseLoadPart(
+  assembled: AssembledModel,
+  id: string,
+  position: readonly [number, number, number],
+  tilt: number,
+  visible: boolean,
+): void {
+  const handle = assembled.getPart(id);
+  if (!handle) return;
+  handle.object.visible = visible;
+  if (!visible) return;
+  loadMatrix.makeRotationZ(tilt).setPosition(position[0], position[1], position[2]);
+  handle.setInstanceMatrix(0, loadMatrix);
+}
+
+export function animateTigerLoading(assembled: AssembledModel, seconds: number): void {
+  const t = Math.min(seconds, TIGER_LOAD_HOLD + 0.4);
+  const round = tigerLoadRoundPose(t);
+  for (const id of LOAD_ROUND_PARTS) {
+    poseLoadPart(assembled, id, round.position, round.tilt, round.visible);
+  }
+  const shell = tigerLoadCasePose(t);
+  poseLoadPart(assembled, LOAD_CASE_PART, shell.position, shell.spin, shell.visible);
+
+  const block = assembled.getNode("BreechBlock");
+  if (block) block.position.y = tigerLoadingBlockOffset(t);
+
+  // 击发段：复用主炮击发的时间函数（击针 / 后坐 / 炮口焰 / 车体后坐）
+  if (t >= TIGER_LOAD_FIRE) {
+    const fireT = t - LOAD_FIRE_OFFSET;
+    const recoil = assembled.getNode("GunRecoil");
+    if (recoil) recoil.position.x = tigerRecoilOffset(fireT);
+    const pin = assembled.getNode("FiringPin");
+    if (pin) pin.position.x = tigerFiringPinOffset(fireT);
+    const flash = assembled.getPart(TIGER_FLASH_PART);
+    if (flash) {
+      const u = (fireT - FLASH_START) / (FLASH_END - FLASH_START);
+      const visible = u >= 0 && u <= 1;
+      flash.object.visible = visible;
+      if (visible) flash.object.scale.setScalar(0.7 + 0.6 * Math.sin(Math.PI * u));
+    }
+    const kick = clamp01(tigerRecoilOffset(fireT) / TIGER_RECOIL_DISTANCE);
+    const since = Math.max(0, fireT - 1.2);
+    const rebound = fireT >= 1.2 ? Math.exp(-2.4 * since) * Math.sin(7.5 * since) : 0;
+    assembled.root.position.y =
+      -0.022 * kick - 0.008 * rebound - 0.002 * Math.sin(40 * since) * Math.exp(-5 * since);
+    assembled.root.rotation.z = -0.014 * kick - 0.005 * rebound;
+    assembled.root.rotation.x = 0.002 * rebound;
+  }
+}
+
+function hideLoadingProps(assembled: AssembledModel): void {
+  for (const id of [...LOAD_ROUND_PARTS, LOAD_CASE_PART]) {
+    const handle = assembled.getPart(id);
+    if (handle) handle.object.visible = false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 车顶 MG34 连射循环（P3）——枪管短后坐 / 枪口上跳 / 供弹链步进 / 弹壳抛出
 // ---------------------------------------------------------------------------
 export const TIGER_MG_CYCLE = 3.2;
@@ -1050,6 +1206,12 @@ export function animateTiger(assembled: AssembledModel, seconds: number, state?:
   // 仪表是「常通」系统：发动机在转就一直在读数，不受下面的分支早退影响。
   animateTigerGauges(assembled, seconds, state);
   if (state !== "driving") resetDriveInstances(assembled);
+  if (state !== "loading") hideLoadingProps(assembled);
+  if (state === "loading") {
+    hideTigerEffects(assembled);
+    animateTigerLoading(assembled, seconds);
+    return;
+  }
   if (state === "refuel") {
     hideTigerEffects(assembled);
     return;
