@@ -33,6 +33,7 @@ export type StageAction =
   | { id: string; group: string; label: string; kind: "param"; param: string; value: number | null }
   | { id: string; group: string; label: string; kind: "scan"; scanKind: "static" | "sweep" }
   | { id: string; group: string; label: string; kind: "reset-view" }
+  | { id: string; group: string; label: string; kind: "reroll-damage" }
   | { id: string; group: string; label: string; kind: "planned"; note: string };
 
 export interface StageStateDef {
@@ -227,6 +228,7 @@ export const CATALOG: StageModel[] = [
       { id: "damage-intact", group: "战损", label: "完好", kind: "damage", level: "intact" },
       { id: "damage-dented", group: "战损", label: "破损（凹陷/裂痕）", kind: "damage", level: "damaged" },
       { id: "damage-broken", group: "战损", label: "破碎（断面露内构）", kind: "damage", level: "broken" },
+      { id: "damage-reroll", group: "战损", label: "随机破口", kind: "reroll-damage" },
       { id: "burning", group: "战损", label: "发动机起火", kind: "machine-state", state: "burning" },
       { id: "detonation", group: "战损", label: "弹药殉爆", kind: "machine-state", state: "detonation" },
       { id: "suspension-stop", group: "机构", label: "停机", kind: "machine-state", state: "idle" },
@@ -242,6 +244,7 @@ export const CATALOG: StageModel[] = [
       "加油路径：甲板开盖（静态开盖展示）→ ⌀140 甲板孔 → 加注管 → 软管 → 油箱通孔加油颈；开「透视」可看到整条路径。",
       "主炮击发是节点驱动的机械演示（后坐 450mm + 开闩 + 击针 + 炮口焰）；机枪连射含枪管短后坐/枪口上跳/供弹链/弹壳。",
       "爆炸/燃烧用 vendored three.quarks 粒子（初焰闪→火球→冲击波→火花/破片→烟→焦痕）；轻击=穿甲穿孔，重击=榴弹全相，殉爆再叠加炮塔掀飞与火势蔓延。",
+      "破碎形态由 damageSeed 随机：单穿孔 / 大口径爆裂 / 双孔，位置在安全区内抖动；战损组「随机破口」换一组并保持相机。",
     ],
   },
   {

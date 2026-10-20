@@ -6,6 +6,7 @@ import {
   tubeGeometry,
 } from "../../../kernel/geometry";
 import type { GeometryBuilder } from "../../../assembler/geometry";
+import { getDamagePlan, type DamagePlanKey } from "./plan";
 
 // ============================================================================
 // models/tiger/damage/kits —— 战损变体几何（三态：完好 / 破损 / 破碎）
@@ -323,14 +324,16 @@ const dentPlate: GeometryBuilder = (spec) => {
   const w = num(params, "w");
   const h = num(params, "h");
   const t = num(params, "t", 0.03);
-  const hit = pair(params, "hit", [0, 0]);
   const caliber = num(params, "caliber", 0.05);
   const angle = THREE.MathUtils.degToRad(num(params, "angleDeg", 15));
   const push: 1 | -1 = num(params, "push", -1) >= 0 ? 1 : -1;
   const iterations = Math.max(1, Math.min(3, Math.round(num(params, "subdivide", 2))));
   const seed = Math.round(num(params, "seed", 1));
+  const planKey = params?.planKey ? String(params.planKey) : null;
+  const plan = planKey ? getDamagePlan(planKey as DamagePlanKey) : null;
+  const hit = plan ? ([plan.x, plan.y] as [number, number]) : pair(params, "hit", [0, 0]);
 
-  const base = breachedPlate(w, h, t, holesOf(params), rectsOf(params), null, undefined);
+  const base = breachedPlate(w, h, t, holesOf(params), rectsOf(params), null, []);
   const geometry = subdivide(base, iterations);
   base.dispose();
 
@@ -402,7 +405,7 @@ function breachedPlate(
   holes: Array<[number, number, number]>,
   rects: Array<[number, number, number, number]>,
   breach: ReturnType<typeof breachOf>,
-  entryLoop?: BreachPoint[],
+  entryLoops?: BreachPoint[][],
 ): THREE.BufferGeometry {
   const bevel = Math.max(Math.min(0.003, t * 0.3, w * 0.08, h * 0.08), 0.0004);
   const hw = w / 2 - bevel;
@@ -430,16 +433,18 @@ function breachedPlate(
     shape.holes.push(path);
   }
   if (breach?.kind === "circle") {
-    if (entryLoop) {
-      // 不规则破口（顺时针给孔洞）；不是正圆
-      const path = new THREE.Path();
-      const ordered = [...entryLoop].reverse();
-      ordered.forEach((point, index) => {
-        if (index === 0) path.moveTo(point.x, point.y);
-        else path.lineTo(point.x, point.y);
-      });
-      path.closePath();
-      shape.holes.push(path);
+    if (entryLoops?.length) {
+      // 不规则破口（顺时针给孔洞）；不是正圆；支持多孔
+      for (const entryLoop of entryLoops) {
+        const path = new THREE.Path();
+        const ordered = [...entryLoop].reverse();
+        ordered.forEach((point, index) => {
+          if (index === 0) path.moveTo(point.x, point.y);
+          else path.lineTo(point.x, point.y);
+        });
+        path.closePath();
+        shape.holes.push(path);
+      }
     } else {
       const path = new THREE.Path();
       path.absarc(breach.x, breach.y, breach.r + bevel, 0, Math.PI * 2, true);
@@ -558,35 +563,60 @@ const damagePlate: GeometryBuilder = (spec) => {
   const t = num(params, "t", 0.025);
   const orient = String(params?.orient ?? "xy");
   const innerSide: 1 | -1 = num(params, "innerSide", -1) >= 0 ? 1 : -1;
-  const breach = breachOf(params);
+  const planKey = params?.planKey ? String(params.planKey) : null;
+  const plan = planKey ? getDamagePlan(planKey as DamagePlanKey) : null;
+  const breach = plan
+    ? ({ kind: "circle", x: plan.x, y: plan.y, r: plan.radius } as const)
+    : breachOf(params);
   if (!breach) throw new Error("damagePlate：缺少 breach");
   const ribs = Math.round(num(params, "ribs", 3));
   const pipe = Boolean(params?.pipe ?? true);
   const wires = Math.round(num(params, "wires", 2));
-  const seed = Math.round(num(params, "seed", 1));
+  const seed = plan ? plan.seed : Math.round(num(params, "seed", 1));
 
   const zInner = innerSide * (t / 2);
   const zSurface = -zInner;
   const outSign: 1 | -1 = innerSide > 0 ? -1 : 1;
-  const entryLoop =
+  const circleBreaches: Array<{ x: number; y: number; r: number }> =
     breach.kind === "circle"
-      ? irregularBreachLoop(breach.x, breach.y, breach.r, seed, 18)
-      : null;
+      ? [
+          { x: breach.x, y: breach.y, r: breach.r },
+          ...(plan?.secondary
+            ? [{ x: plan.secondary.x, y: plan.secondary.y, r: plan.secondary.radius }]
+            : []),
+        ]
+      : [];
+  const entryLoops = circleBreaches.map((b, index) =>
+    irregularBreachLoop(b.x, b.y, b.r, seed + index * 13, 18),
+  );
   const features: THREE.BufferGeometry[] = [];
-  if (entryLoop) {
-    const exitLoop = scaleLoop(entryLoop, breach.x, breach.y, 1.8, seed + 17);
-    const zExit = zInner + innerSide * 0.075;
+  entryLoops.forEach((entryLoop, index) => {
+    const b = circleBreaches[index]!;
+    const secondary = index > 0;
+    const exitScale = secondary ? 1.5 : plan?.kind === "blast" ? 2.15 : 1.8;
+    const zDepth = secondary ? 0.05 : plan?.kind === "blast" ? 0.09 : 0.075;
+    const featureSeed = seed + index * 31;
+    const exitLoop = scaleLoop(entryLoop, b.x, b.y, exitScale, featureSeed + 17);
+    const zExit = zInner + innerSide * zDepth;
     // 入口：碟形崩落 + 放射裂纹 + 小卷边；出口：扩张漏斗 + 大片翻卷花瓣
-    features.push(entryDish(entryLoop, breach.x, breach.y, zSurface, outSign, seed + 3));
-    features.push(...entryCracks(entryLoop, breach.x, breach.y, zSurface, outSign, seed + 5));
-    features.push(...entryRolls(entryLoop, zSurface, outSign, seed + 7));
+    features.push(entryDish(entryLoop, b.x, b.y, zSurface, outSign, featureSeed + 3));
+    features.push(...entryCracks(entryLoop, b.x, b.y, zSurface, outSign, featureSeed + 5));
+    features.push(...entryRolls(entryLoop, zSurface, outSign, featureSeed + 7));
     features.push(loftLoops(entryLoop, exitLoop, zInner, zExit));
-    features.push(...exitPetals(exitLoop, zExit, innerSide, seed + 9));
-  }
+    features.push(...exitPetals(exitLoop, zExit, innerSide, featureSeed + 9));
+  });
 
   const parts: THREE.BufferGeometry[] = [
-    breachedPlate(w, h, t, holesOf(params), rectsOf(params), breach, entryLoop ?? undefined),
-    ...(entryLoop ? features : tornFlaps(breach, t, innerSide)),
+    breachedPlate(
+      w,
+      h,
+      t,
+      holesOf(params),
+      rectsOf(params),
+      breach,
+      entryLoops.length ? entryLoops : undefined,
+    ),
+    ...(entryLoops.length ? features : tornFlaps(breach, t, innerSide)),
     ...innerStructure(breach, t, innerSide, ribs, pipe, wires),
   ];
   const merged = mergeGeometries(parts);

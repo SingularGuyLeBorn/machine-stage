@@ -20,6 +20,7 @@ import {
   Vector4 as QVec4,
 } from "three.quarks";
 import { TIGER_DETONATION_IMPACT, TIGER_PREHEAT_END } from "@/three/parts/models/tiger/motion";
+import { getDamagePlan, type DamagePlanKey } from "@/three/parts/models/tiger/damage/plan";
 import { useStageStore } from "@/app/state/stageStore";
 
 // ============================================================================
@@ -786,6 +787,7 @@ export function TigerVfx() {
   const modelId = useStageStore((state) => state.modelId);
   const machineState = useStageStore((state) => state.machineState);
   const damage = useStageStore((state) => state.damage);
+  const damageSeed = useStageStore((state) => state.damageSeed);
   const rebuildToken = useStageStore((state) => state.rebuildToken);
   const { scene, camera } = useThree();
   const assets = useMemo(() => makeAssets(), []);
@@ -832,37 +834,68 @@ export function TigerVfx() {
   useEffect(() => {
     clearHeatDecals();
     if (modelId !== TIGER_ID || (damage !== "broken" && damage !== "damaged")) return;
-    const texture = damage === "broken" ? assets.heatRingTexture : assets.dentRingTexture;
-    const opacity = damage === "broken" ? 0.62 : 0.8;
-    const scale = damage === "broken" ? 1 : 0.75;
-    const decals = [
-      makeDecal(
-        new THREE.Vector3(-4.506, 0.47, 0.42),
-        new THREE.Vector3(-1, 0, 0),
-        [0.82 * scale, 0.82 * scale],
-        texture,
-        opacity,
-      ),
-      makeDecal(
-        new THREE.Vector3(-3.99, 1.077, 0.15),
-        new THREE.Vector3(0, 1, 0),
-        [0.9 * scale, 0.9 * scale],
-        texture,
-        opacity,
-      ),
-      makeDecal(
-        new THREE.Vector3(0.66, 1.106, 0.35),
-        new THREE.Vector3(0, 1, 0),
-        [0.8 * scale, 0.8 * scale],
-        texture,
-        opacity,
-      ),
+    const entries: Array<{
+      key: DamagePlanKey;
+      baseRadius: number;
+      heatSize: number;
+      dentSize: number;
+      normal: THREE.Vector3;
+      world: (p: { x: number; y: number }) => THREE.Vector3;
+    }> = [
+      {
+        key: "front",
+        baseRadius: 0.2,
+        heatSize: 0.82,
+        dentSize: 0.62,
+        normal: new THREE.Vector3(-1, 0, 0),
+        world: (p) => new THREE.Vector3(-4.506, 0.35 + p.y, p.x),
+      },
+      {
+        key: "roof",
+        baseRadius: 0.22,
+        heatSize: 0.9,
+        dentSize: 0.6,
+        normal: new THREE.Vector3(0, 1, 0),
+        world: (p) => new THREE.Vector3(-2.64 + p.x, 1.077, p.y),
+      },
+      {
+        key: "deck",
+        baseRadius: 0.19,
+        heatSize: 0.8,
+        dentSize: 0.55,
+        normal: new THREE.Vector3(0, 1, 0),
+        world: (p) => new THREE.Vector3(0.1145 + p.x, 1.106, p.y),
+      },
     ];
+    const broken = damage === "broken";
+    const texture = broken ? assets.heatRingTexture : assets.dentRingTexture;
+    const opacity = broken ? 0.62 : 0.8;
+    const decals: THREE.Mesh[] = [];
+    for (const entry of entries) {
+      const plan = getDamagePlan(entry.key, damageSeed);
+      const size = broken
+        ? entry.heatSize * (plan.radius / entry.baseRadius)
+        : entry.dentSize;
+      decals.push(
+        makeDecal(entry.world(plan), entry.normal, [size, size], texture, opacity),
+      );
+      if (broken && plan.secondary) {
+        decals.push(
+          makeDecal(
+            entry.world(plan.secondary),
+            entry.normal,
+            [size * 0.6, size * 0.6],
+            texture,
+            opacity * 0.85,
+          ),
+        );
+      }
+    }
     for (const decal of decals) {
       root.add(decal);
       heatDecals.current.push(decal);
     }
-  }, [damage, modelId, rebuildToken, assets, root]);
+  }, [damage, damageSeed, modelId, rebuildToken, assets, root]);
 
   useEffect(() => {
     // 重建/切模型时清掉旧特效（材质/几何随 burst 释放）

@@ -52,6 +52,9 @@ export function ActionPanel() {
       case "reset-view":
         store.requestViewReset();
         break;
+      case "reroll-damage":
+        store.rerollDamage();
+        break;
       case "planned":
         store.setNotice(action.note);
         break;

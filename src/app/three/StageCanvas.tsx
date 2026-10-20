@@ -215,7 +215,11 @@ function StageRuntime() {
       const size = bounds.getSize(new THREE.Vector3());
       store.setHome([center.x, center.y, center.z], Math.max(size.length() * 0.5, 0.5));
       setStageFloor({ y: bounds.min.y, footprint: Math.max(size.x, size.z) });
-      store.requestViewReset();
+      if (store.preserveViewOnRebuild) {
+        useStageStore.setState({ preserveViewOnRebuild: false });
+      } else {
+        store.requestViewReset();
+      }
     }
     clockRef.current = 0;
 
