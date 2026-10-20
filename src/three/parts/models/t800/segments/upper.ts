@@ -297,6 +297,18 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
         bodyX: femur.bodyX,
         endScale: femur.endScale,
         endBottomX: femur.endBottomX,
+        // 外侧曲面装甲板：与骨段同一零件，凸台从中穿出（参考图的"外皮"做法）
+        shell: {
+          z0: 0.0355,
+          thickness: 0.005,
+          levels: [
+            { y: 0.2355, halfW: 0.085, bow: 0.022 },
+            { y: 0.15, halfW: 0.081, bow: 0.024 },
+            { y: 0.0, halfW: 0.073, bow: 0.023 },
+            { y: -0.15, halfW: 0.066, bow: 0.018 },
+            { y: -0.2355, halfW: 0.062, bow: 0.012 },
+          ],
+        },
         endTopScale: femur.endTopScale,
         padW: 0.05,
         padH: 0.05,
@@ -345,7 +357,6 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
   });
   layouts["t800.thigh.armor_side"] = instanceLayout(NODES.hip, [
     [0.055, 1.01, -0.0395],
-    [0.055, 1.01, 0.0395],
   ]);
   builder.add({
     id: "t800.thigh.lines",
@@ -437,7 +448,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "rubber",
     layer: 5,
     node: NODES.hip,
-    at: [-0.014, 1.0, 0.0305],
+    at: [-0.07, 1.0, 0.066],
     hint: "沿股骨后加强条走的中段线束（外露可见）",
   });
 
@@ -466,9 +477,6 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "大腿前缘 6 根细铬钢活塞杆成束排布：股四头肌的弧度由机构排列形成，不是肉块",
   });
   layouts["t800.thigh.piston_rods"] = instanceLayout(NODES.hip, [
-    [0.126, 1.0, 0.042],
-    [0.134, 1.0, 0.056],
-    [0.124, 1.0, 0.07],
     [0.126, 1.0, -0.042],
     [0.134, 1.0, -0.056],
     [0.124, 1.0, -0.07],
@@ -483,17 +491,13 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     layer: 5,
     node: NODES.hip,
     at: [0, 1.0, 0],
-    inst: 6,
+    inst: 2,
     layout: "t800.thigh.hose_bank",
-    instNodes: repeatNode(NODES.hip, 6),
+    instNodes: repeatNode(NODES.hip, 2),
     hint: "沿骨面走的软管束（参考图：大量波纹软管）",
   });
   layouts["t800.thigh.hose_bank"] = instanceLayout(NODES.hip, [
-    [0.1, 0.84, 0.047],
-    [0.055, 0.84, 0.047],
-    [0.01, 0.84, 0.047],
-    [0.1, 0.84, -0.047],
-    [0.055, 0.84, -0.047],
+    [0.09, 0.84, -0.047],
     [0.01, 0.84, -0.047],
   ]);
 
