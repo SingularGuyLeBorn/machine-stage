@@ -64,10 +64,7 @@ export function applyArmourSurface(
       .replace("#include <common>", `#include <common>\n${VERTEX_HEAD}`)
       .replace("#include <begin_vertex>", `#include <begin_vertex>\n${VERTEX_BODY}`);
 
-    let fragment = shader.fragmentShader.replace(
-      "#include <common>",
-      `#include <common>\n${FRAGMENT_HEAD}`,
-    );
+    let fragment = shader.fragmentShader.replace("#include <common>", `#include <common>\n${FRAGMENT_HEAD}`);
 
     if (zimmerit) {
       fragment = fragment.replace(

@@ -124,7 +124,57 @@ const bowMg: GeometryBuilder = (spec) => {
   return mergeGeometries(parts);
 };
 
+// ---------------------------------------------------------------------------
+// 吊篮护栏（Turmboden Geländer）：前方开口的环形扶手带 + 4 根立柱
+// 炮塔前方是炮闩/摇架（y 1.17~1.73），整圈扶手会横穿复进机与摇架，
+// 故按实车吊篮开口做成 270° 环带（开口朝前，±45°），扶手面 y 1.32。
+// 局部原点 = 炮塔回转中心（x -1.65 / z 0）。
+// ---------------------------------------------------------------------------
+const basketRail: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const rOuter = num(params, "rOuter", 0.82);
+  const rInner = num(params, "rInner", 0.79);
+  const h = num(params, "h", 0.03);
+  const gapDeg = num(params, "gapDeg", 90);
+  const gapCenterDeg = num(params, "gapCenterDeg", 180);
+  const b = Math.min(0.002, h * 0.2);
+
+  const halfGap = THREE.MathUtils.degToRad(gapDeg / 2);
+  const center = THREE.MathUtils.degToRad(gapCenterDeg);
+  const start = center + halfGap;
+  const end = center + Math.PI * 2 - halfGap;
+
+  const shape = new THREE.Shape();
+  shape.absarc(0, 0, rOuter - b, start, end, false);
+  shape.absarc(0, 0, rInner + b, end, start, true);
+  shape.closePath();
+  const band = new THREE.ExtrudeGeometry(shape, {
+    depth: Math.max(h - 2 * b, 0.001),
+    bevelEnabled: true,
+    bevelThickness: b,
+    bevelSize: b,
+    bevelSegments: 1,
+    steps: 1,
+    curveSegments: 64,
+  });
+  band.rotateX(-Math.PI / 2); // 平面 XY → 水平 XZ，挤出 +Z → +Y
+  band.translate(0, 1.305 + b, 0);
+
+  const parts: THREE.BufferGeometry[] = [band];
+  for (const deg of [135, 225, 45, 315]) {
+    const a = THREE.MathUtils.degToRad(deg);
+    const post = bevelBoxGeometry(0.03, 0.16, 0.03, 0.002);
+    post.translate(Math.cos(a) * 0.795, 1.245, Math.sin(a) * 0.795);
+    parts.push(post);
+  }
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
 export const tigerInteriorKitBuilders: Record<string, GeometryBuilder> = {
   steeringWheel,
   bowMg,
+  basketRail,
 };

@@ -172,8 +172,8 @@ export function makeInteriorLayouts(): Record<string, InstanceLayout> {
   layouts["interior.turretSeat"] = ({ index }) => {
     const list: [number, number, number][] = [
       [-1.32, 1.163, -0.44],
-      [-1.95, 1.163, -0.3],
-      [-1.95, 1.163, 0.35],
+      [-1.95, 1.163, -0.38],
+      [-1.95, 1.163, 0.43],
     ];
     const [x, y, z] = list[index] ?? list[0]!;
     const m = new THREE.Matrix4().makeTranslation(x, y, z);
@@ -767,7 +767,7 @@ function buildInteriorParts(): PartDefinition[] {
 
   add({
     id: "tiger.interior.ammo_case",
-    name_cn: "88mm 药筒",
+    name_cn: "8,8 cm 药筒",
     name_en: "8,8 cm Treibladungshülse",
     assembly: "interior",
     build_layer: 3,
@@ -785,12 +785,12 @@ function buildInteriorParts(): PartDefinition[] {
     instance_layout: "interior.ammoCase",
     mate: { type: "absolute" },
     source:
-      "88mm 药筒（8,8 cm KwK 36 定装弹）：⌀105×570、底缘 ⌀116×20，全高 590，底面 y 0.153（赞助板地板面 0.15，留 3mm）。92 发基数：左右赞助板各 46 发、内外两排（z ±1.18 / ±1.42）各 23 发、纵向间距 145（x -4.05 ~ -0.86），后排离防火隔板 27mm。药筒与弹丸分为两个零件，便于殉爆连锁时逐发抛出。",
+      "8,8 cm 药筒（8,8 cm KwK 36 定装弹）：⌀105×570、底缘 ⌀116×20，全高 590，底面 y 0.153（赞助板地板面 0.15，留 3mm）。92 发基数：左右赞助板各 46 发、内外两排（z ±1.18 / ±1.42）各 23 发、纵向间距 145（x -4.05 ~ -0.86），后排离防火隔板 27mm。药筒与弹丸分为两个零件，便于殉爆连锁时逐发抛出。",
   });
 
   add({
     id: "tiger.interior.ammo_projectile_ap",
-    name_cn: "88mm 穿甲弹丸（APCBC）",
+    name_cn: "8,8 cm 穿甲弹丸（APCBC）",
     name_en: "8,8 cm Pzgr. 39",
     assembly: "interior",
     build_layer: 3,
@@ -814,7 +814,7 @@ function buildInteriorParts(): PartDefinition[] {
 
   add({
     id: "tiger.interior.ammo_projectile_he",
-    name_cn: "88mm 榴弹丸（HE）",
+    name_cn: "8,8 cm 榴弹丸（HE）",
     name_en: "8,8 cm Sprgr. 43",
     assembly: "interior",
     build_layer: 3,
@@ -895,19 +895,14 @@ function buildInteriorParts(): PartDefinition[] {
     build_layer: 3,
     build_order: 435,
     geometry: {
-      type: "merge",
-      parts: [
-        { type: "tube", rOuter: 0.82, rInner: 0.79, h: 0.03, at: [0, 1.32, 0], segments: 40 },
-        { type: "box", w: 0.03, h: 0.16, d: 0.03, at: [0.8, 1.245, 0], bevel: 0.003 },
-        { type: "box", w: 0.03, h: 0.16, d: 0.03, at: [-0.8, 1.245, 0], bevel: 0.003 },
-        { type: "box", w: 0.03, h: 0.16, d: 0.03, at: [0, 1.245, 0.8], bevel: 0.003 },
-        { type: "box", w: 0.03, h: 0.16, d: 0.03, at: [0, 1.245, -0.8], bevel: 0.003 },
-      ],
+      type: "kit",
+      kit: "basketRail",
+      params: { rOuter: 0.82, rInner: 0.79, h: 0.03, gapDeg: 90, gapCenterDeg: 180 },
     },
     material: "steel",
     mate: { type: "absolute", position: [-1.65, 0, 0] },
     source:
-      "吊篮护栏（Turmboden Geländer）：扶手环 ⌀1640/⌀1580×30、中心 y 1.32；4 根立柱 30×160×30 落在吊篮地板面上方 5mm。护栏外缘离炮塔内壁 40mm，不随炮塔旋转卡死。",
+      "吊篮护栏（Turmboden Geländer）：扶手带 ⌀1640/⌀1580×30、中心 y 1.32，前方 90° 开口（开口朝炮闩/摇架，避免横穿复进机与摇架侧颊）；4 根立柱 30×160×30 落在吊篮地板面上方 5mm。护栏外缘离炮塔内壁 40mm，不随炮塔旋转卡死。",
   });
 
   add({
@@ -926,9 +921,9 @@ function buildInteriorParts(): PartDefinition[] {
       ],
     },
     material: "steel",
-    mate: { type: "absolute", position: [-2.28, 1.3, 0] },
+    mate: { type: "absolute", position: [-1.65, 1.3, -0.66] },
     source:
-      "炮塔回转电机（Turmdrehwerk）：机体 260×220×200、上方法兰 ⌀160×160、输出轴 ⌀60×120，中心 (x -2.4, z 0)，底面 y 1.19（离吊篮地板面 1.16 留 30mm，实车坐在变速箱上）。位于炮闩正下方、炮手与装填手之间。",
+      "炮塔回转电机（Turmdrehwerk）：机体 260×220×200、上方法兰 ⌀160×160、输出轴 ⌀60×120，中心 (x -1.65, z -0.66)，底面 y 1.19（离吊篮地板面 1.16 留 30mm）。旧位置 (x -2.28, z 0) 正在闩室/复进机正下方，补炮闩时让位到吊篮左侧、炮手席外侧：机体 x -1.78~-1.52、z -0.76~-0.56，整体落在吊篮地板（r 0.8）内；离炮手座垫外缘（x -1.77 / z -0.56）10mm、离护栏带内缘 30mm、离炮闩轴线 0.66m。",
   });
 
   add({
@@ -973,7 +968,7 @@ function buildInteriorParts(): PartDefinition[] {
     instance_layout: "interior.turretSeat",
     mate: { type: "absolute" },
     source:
-      "炮塔座席（Turmsitz）：立柱 ⌀110×300、座垫 360×60×360、靠背 60×340×360。三席：车长 (-1.32, -0.44) 在指挥塔正下方、炮手 (-1.95, -0.30) 朝前、装填手 (-1.95, +0.35) 朝后（转 180°）。座面 y 1.485、靠背顶 1.833，离顶盖内表面 1.811 留 22mm；立柱底离吊篮地板面 3mm。",
+      "炮塔座席（Turmsitz）：立柱 ⌀110×300、座垫 360×60×360、靠背 60×340×360。三席：车长 (-1.32, -0.44) 在指挥塔正下方、炮手 (-1.95, -0.38) 朝前、装填手 (-1.95, +0.43) 朝后（转 180°）。座面 y 1.485、靠背顶 1.833，离顶盖内表面 1.811 留 22mm；立柱底离吊篮地板面 3mm。炮手/装填手席各外移 80mm——炮身 450mm 后坐终点（闩体后缘 x -1.77）要穿过两席之间，座背内缘留 ≥40mm 净空。",
   });
 
   return parts;

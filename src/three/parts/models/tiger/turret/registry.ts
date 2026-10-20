@@ -3,7 +3,7 @@ import type { InstanceLayout } from "../../../assembler/assembler";
 import type { ModelRegistry, PartDefinition } from "../../../registry/types";
 
 // ============================================================================
-// models/tiger/turret —— 虎式 I 炮塔（L4 第三批：壳体 + 车长指挥塔 + 炮盾 + 炮管）
+// models/tiger/turret —— 虎式 I 炮塔（L4-c ~ L4-i：壳体 / 炮盾 / 炮管 / 炮闩 / 车长塔枪座）
 //
 // 坐标系沿用 L1~L4：+X 朝车尾、+Y 上、+Z 车体右侧；地面 GROUND_Y = -1.10。
 //
@@ -14,20 +14,23 @@ import type { ModelRegistry, PartDefinition } from "../../../registry/types";
 //   1. 虎 I 炮塔为马蹄形焊接壳体：正面 120mm、侧后 80mm、顶盖 25mm；平面外廓 1.88 宽
 //      （车体 1.925，实车炮塔略窄于车体），壁高 700 —— 顶盖顶面 1.836，指挥塔顶 1.999。
 //   2. 车长指挥塔在炮塔左后（车长位于火炮左侧），5 个周向观察缝；实车塔内另有潜望镜。
-//   3. 主炮 8.8 cm KwK 36 L/56 经炮盾（Blende）中央开口伸出，炮口带双室制退器；炮管轴线
+//   3. 主炮 8,8 cm KwK 36 L/56 经炮盾（Blende）中央开口伸出，炮口带双室制退器；炮管轴线
 //      y 1.45（座圈顶面以上 342mm），炮口到 x -6.47。
 //   4. 炮塔后段悬在发动机舱盖前段上方（实车同样如此）：壳体下沿 1.111 离舱盖顶面 1.105
 //      只有 6mm，但两者不接触——吃完这一 6mm 余量之前不要抬发动机舱盖。
 //
-// 建模口径（简化记录，L4-f / L5 待补）：
+// 建模口径（L4-i 现状）：
 //   1. 已完成：壳体 + 指挥塔 + 炮盾 + 炮管（L4-c）、装填手舱口 / 车长塔顶盖 / 后部逃生门 /
 //      手枪孔 ×2 / 抛壳窗 / 同轴机枪球座 + 枪管 / 炮长瞄准镜开口（L4-d）、
-//      烟雾弹发射器 ×6 / 左壁备用履带板 ×5 / 顶盖吊环 ×2（L4-e）。
-//   2. 本批不含：塔内潜望镜与顶盖内侧锁扣（L4-f）、炮管抽烟装置与俯仰耳轴 / 后坐复进机
-//      （L4-f）、车顶 MG34 防空枪架（L4-f）、焊缝与暗黄涂装（L5）。
+//      烟雾弹发射器 ×6 / 左壁备用履带板 ×4 / 顶盖吊环 ×2（L4-e）、车顶环形枪座 + MG34 +
+//      防盾（L4-f / L4-i）、炮闩 / 摇架 / 制退 / 复进 / 击针 / 抽壳 / 保险（L4-i）。
+//   2. 炮塔前壁拆成「U 形侧后壁 + 带 ⌀270 炮口的前壁板」，炮盾开 ⌀320 孔 + 空心炮口套环；
+//      炮管中空（膛径 ⌀88）并向后延伸 0.406m 穿墙进入药室。后坐/开闩/击发由
+//      GunCradle → GunRecoil → BreechBlock → FiringPin 节点驱动（测试已覆盖 450mm 后坐行程）。
 //   3. 炮塔内壁（r 0.86）与座圈内孔（r 0.825）之间留 35mm 环形台阶——战斗舱内饰（弹药架 /
-//      炮闩 / 吊篮，L3 第二批）按内壁 r 0.86、顶盖下表面 1.811 定位。
-//   4. 炮盾 / 炮管按静止姿态建模（炮管水平、俯仰角 0）；俯仰耳轴与后坐复进机随 L4-e。
+//      炮闩 / 吊篮）按内壁 r 0.86、顶盖下表面 1.811 定位。
+//   4. 炮盾 / 炮管按静止姿态建模（炮管水平、俯仰角 0）；俯仰动画需要更大的炮盾开口 +
+//      活动炮口盖，随 P3 炮塔回转/俯仰一起做（当前节点只有耳轴，不做旋转驱动）。
 // ============================================================================
 
 const TURRET_CONSTANTS: Record<string, number> = {
@@ -60,9 +63,43 @@ const TURRET_CONSTANTS: Record<string, number> = {
   TR_MANTLET_H: 0.56,
   TR_MANTLET_D: 0.86,
   TR_COLLAR_R: 0.16,
+  TR_COLLAR_RI: 0.118,
   TR_COLLAR_L: 0.1,
   TR_BARREL_L: 3.34,
   TR_BARREL_R: 0.105,
+  TR_GUN_BORE_R: 0.044,
+  TR_GUN_PORT_R: 0.135,
+  TR_GUN_TAIL_EXT: 0.406,
+
+  // —— 炮闩 / 摇架 / 后坐机（P0）——
+  TR_GUN_PIVOT_X: -2.4,
+  TR_BREECH_LEN: 0.42,
+  TR_BREECH_H: 0.2,
+  TR_BREECH_W: 0.32,
+  TR_CHAMBER_R: 0.078,
+  TR_CHAMBER_WALL: 0.017,
+  TR_CHAMBER_LEN: 0.35,
+  TR_BLOCK_LEN: 0.08,
+  TR_BLOCK_H: 0.15,
+  TR_BLOCK_W: 0.26,
+  TR_BLOCK_DROP: 0.16,
+  TR_CRADLE_FRONT: -2.657,
+  TR_CRADLE_REAR: -2.18,
+  TR_CRADLE_Z: 0.22,
+  TR_CRADLE_HH: 0.28,
+  TR_BREECH_X: -2.43,
+  TR_BLOCK_X: -2.26,
+  TR_FIRING_PIN_X: -2.14,
+  TR_EXTRACTOR_X: -2.32,
+  TR_EXTRACTOR_Y: 1.5,
+  TR_EXTRACTOR_Z: 0.115,
+  TR_SAFETY_X: -2.36,
+  TR_SAFETY_Y: 1.39,
+  TR_SAFETY_Z: -0.163,
+  TR_BRAKE_X: -2.387,
+  TR_BRAKE_Y: 1.66,
+  TR_RECUP_X: -2.492,
+  TR_RECUP_Y: 1.275,
 
   // —— 舱口 / 门 / 孔（L4-d）——
   TR_LOADER_HATCH_X: -1.25,
@@ -101,9 +138,12 @@ const TURRET_CONSTANTS: Record<string, number> = {
   TR_EYE_Z: 0.7,
 
   // —— 顶盖附件：对空 MG34 / 近防武器管 / 装填手潜望镜 / 排烟风扇罩（L4-f）——
-  TR_AA_X: -1.95,
-  TR_AA_Z: -0.1,
-  TR_AA_PIVOT_Y: 0.287,
+  // 对空枪移到车长塔环形枪座：枪口在车长正前方 0.46m，枪托伸到塔口上方（人探身可及）。
+  TR_AA_ARM: 0.46,
+  TR_AA_Z_OFF: 0.13,
+  TR_AA_PIVOT_UP: 0.329,
+  TR_AA_SHIELD_DX: 0.68,
+  TR_AA_SHIELD_UP: 0.369,
   TR_AA_PITCH: 10,
   TR_CD_X: -0.95,
   TR_CD_Z: 0.35,
@@ -218,6 +258,8 @@ function buildTurretParts(): PartDefinition[] {
         frontTh: c.TR_FRONT_T!,
         wallH: c.TR_WALL_H!,
         roofT: c.TR_ROOF_T!,
+        gunPortR: c.TR_GUN_PORT_R!,
+        gunPortY: c.TR_GUN_Y! - shellBottom,
       },
     },
     material: "armor_steel",
@@ -267,19 +309,20 @@ function buildTurretParts(): PartDefinition[] {
         h: c.TR_MANTLET_H!,
         d: c.TR_MANTLET_D!,
         collarR: c.TR_COLLAR_R!,
+        collarRi: c.TR_COLLAR_RI!,
         collarL: c.TR_COLLAR_L!,
       },
     },
     material: "armor_steel",
     mate: { type: "absolute", position: [mantletCX, c.TR_GUN_Y!, 0] },
     source:
-      "炮盾（Blende，120mm 铸造装甲）：860 宽 × 560 高 × 240 厚，盖住炮塔前壁中央（z ±0.43，两侧到壳体外面各剩 510mm 前壁直段）；内面离炮塔前壁外面 3mm（x -2.783 ~ -3.023）。中央炮口套环 ⌀320 × 100 前伸，炮管自套环前面 3mm 处起（x -3.126）。竖直方向盖住壳体高度（1.111 ~ 1.811）的 1.17 ~ 1.73 段，下留 59mm、上留 81mm 板边。同轴 MG34 球口 / 瞄准镜开口随 L4-d。",
+      "炮盾（Blende，120mm 铸造装甲）：860 宽 × 560 高 × 240 厚，盖住炮塔前壁中央（z ±0.43，两侧到壳体外面各剩 510mm 前壁直段）；内面离炮塔前壁外面 3mm（x -2.783 ~ -3.023）。**中央炮口是通孔**：炮盾板挖 ⌀320 孔 + ⌀320/⌀256 × 100 空心套环，炮管 ⌀210 基段从套环内穿过（环缝 13mm），后坐 450mm 全程不接触。竖直方向盖住壳体高度（1.111 ~ 1.811）的 1.17 ~ 1.73 段，下留 59mm、上留 81mm 板边。",
   });
 
-  // ===================== 8.8cm 炮管 =====================
+  // ===================== 8,8 cm KwK 36 炮管（中空） =====================
   add({
     id: "tiger.turret.gun_barrel",
-    name_cn: "8.8cm 炮管",
+    name_cn: "8,8 cm KwK 36 炮管",
     name_en: "8,8 cm KwK 36 L/56",
     assembly: "turret",
     build_layer: 4,
@@ -293,12 +336,185 @@ function buildTurretParts(): PartDefinition[] {
         rMid: 0.084,
         rFront: 0.062,
         brakeR: 0.092,
+        boreR: c.TR_GUN_BORE_R!,
+        tailExt: c.TR_GUN_TAIL_EXT!,
       },
     },
     material: "steel",
-    mate: { type: "absolute", position: [barrelX, c.TR_GUN_Y!, 0] },
+    node: "GunRecoil",
+    mate: { type: "absolute", position: [barrelX - c.TR_GUN_PIVOT_X!, 0, 0] },
     source:
-      "8,8 cm KwK 36 L/56 炮管：基段 ⌀210 → 中段 ⌀168 → 前段 ⌀124，炮口双室制退器 ⌀184 × 320（全长 3.34 m，自炮盾套环前面起）。炮口 x -6.466——伸出首装甲外面（-4.50）1.97 m（实车约 2.1 m）。轴线 y 1.45（座圈顶面以上 342mm）：炮管下缘离战斗室顶甲板（顶面 1.075）270mm、离驾驶员潜望镜（顶 1.048）无干涉。抽烟装置 / 俯仰耳轴 / 后坐复进机随 L4-d。",
+      "8,8 cm KwK 36 L/56 炮管（Rohr）：炮口段外径 ⌀210 → ⌀168 → ⌀124、双室制退器 ⌀184 × 320；炮口 x -6.466（伸出首装甲外面 1.97 m）。**炮膛是通的**：内径 ⌀88 从炮口一直通到尾端面，尾端再向后延伸 0.406m 穿进炮塔前壁炮口（x -2.72，止于闩室药室前 20mm）——从炮口看进去能看到闩室/药室。炮管与炮塔前壁炮口、炮盾炮口套环各留 ≥23mm 环缝；后坐时沿炮口滑动。轴线 y 1.45。",
+  });
+
+  // ===================== 炮闩 / 摇架 / 后坐机（P0） =====================
+  // 坐标基准：GunCradle 节点 = 耳轴中心（x -2.40 / y 1.45 / z 0）。
+  // 炮身（炮管 + 闩室 + 闩体 + 击针）挂在 GunRecoil（沿炮轴平移），
+  // 摇架 / 制退机 / 复进机挂在 GunCradle（不随炮身后坐）。
+  const gunPivotX = c.TR_GUN_PIVOT_X!;
+  const gunY = c.TR_GUN_Y!;
+
+  add({
+    id: "tiger.turret.gun_cradle",
+    name_cn: "火炮摇架",
+    name_en: "Wiege",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 514,
+    geometry: {
+      type: "kit",
+      kit: "gunCradle",
+      params: {
+        frontX: c.TR_CRADLE_FRONT! - gunPivotX,
+        rearX: c.TR_CRADLE_REAR! - gunPivotX,
+        halfH: c.TR_CRADLE_HH!,
+        zMid: c.TR_CRADLE_Z!,
+      },
+    },
+    material: "steel",
+    node: "GunCradle",
+    mate: { type: "absolute" },
+    source:
+      "火炮摇架（Wiege）：两片侧颊 477 × 560 × 30（内距 410）+ 耳轴座 ⌀100 + 下横梁；耳轴中心 (x -2.40, y 1.45)，炮身/闩室在颊板之间后坐 450mm。前缘 x -2.657 离炮塔前壁内面（-2.66）3mm；下缘 1.17 离吊篮地板面（1.16）10mm；上缘 1.73 离顶盖内表面（1.811）81mm。侧颊 z ±0.205~0.235，与闩室（z ±0.16）留 45mm，与炮手/装填手座椅留 ≥390mm。",
+  });
+
+  add({
+    id: "tiger.turret.recoil_brake",
+    name_cn: "制退机",
+    name_en: "Rücklaufbremse",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 515,
+    geometry: {
+      type: "kit",
+      kit: "recoilCylinder",
+      params: { r: 0.06, len: 0.44, flangeR: 0.068 },
+    },
+    material: "steel",
+    node: "GunCradle",
+    mate: { type: "absolute", position: [c.TR_BRAKE_X! - gunPivotX, c.TR_BRAKE_Y! - gunY, 0] },
+    source:
+      "制退机（Rücklaufbremse）：⌀120 × 440 液压筒（前后端盖 ⌀136 + 两侧安装耳），装在摇架上方、炮膛轴线上方 210mm；筒底离闩室顶面 50mm、顶离顶盖内表面 91mm。火炮后坐时，制退机筒固定在摇架上、活塞随炮身运动，液压阻尼让后坐「先快后慢」。安装耳外端离摇架颊板 5mm。",
+  });
+
+  add({
+    id: "tiger.turret.recuperator",
+    name_cn: "复进机",
+    name_en: "Vorholer",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 516,
+    geometry: {
+      type: "kit",
+      kit: "recoilCylinder",
+      params: { r: 0.055, len: 0.3, flangeR: 0.063 },
+    },
+    material: "steel",
+    node: "GunCradle",
+    mate: { type: "absolute", position: [c.TR_RECUP_X! - gunPivotX, c.TR_RECUP_Y! - gunY, 0] },
+    source:
+      "复进机（Vorholer）：⌀110 × 300 弹簧/液压复进筒（前后端盖 ⌀126 + 安装耳），装在摇架下方、炮膛轴线下方 175mm；筒顶离闩室底面 45mm、筒底离摇架下横梁 20mm、离吊篮地板 115mm。位置在闩体之前（后缘 -2.33）——闩体下落后不会撞到复进机，这是立楔式闩体能在本模型里全行程下落的前提；前端面离炮塔前壁内面 6mm。",
+  });
+
+  add({
+    id: "tiger.turret.breech_ring",
+    name_cn: "炮尾闩室",
+    name_en: "Verschlussstück",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 517,
+    geometry: {
+      type: "kit",
+      kit: "gunBreechRing",
+      params: {
+        len: c.TR_BREECH_LEN!,
+        h: c.TR_BREECH_H!,
+        w: c.TR_BREECH_W!,
+        chamberR: c.TR_CHAMBER_R!,
+        chamberWall: c.TR_CHAMBER_WALL!,
+        chamberLen: c.TR_CHAMBER_LEN!,
+        chamberCX: -0.095,
+      },
+    },
+    material: "steel",
+    node: "GunRecoil",
+    mate: { type: "absolute", position: [c.TR_BREECH_X! - gunPivotX, 0, 0] },
+    source:
+      "炮尾闩室（Verschlussstück）：420 × 200 × 320 框式闩室 + 药室筒（内 ⌀156、长 350、壁 17），药室筒前端伸进炮塔前壁炮口（x -2.70，外径 ⌀190 < 炮口 ⌀270）；后端面开闩口。闩室中心 x -2.43、炮膛轴线 y 1.45；顶面 1.55 离制退机筒底 50mm，底面 1.35 离复进机筒顶 45mm，两侧 z ±0.16 离开摇架颊板 45mm。**药室在炮管尾端面之后 20mm**：炮管炮膛 ⌀88 与药室 ⌀156 在闩室前方形成台阶，从炮口可以一直看进药室。",
+  });
+
+  add({
+    id: "tiger.turret.breech_block",
+    name_cn: "闩体",
+    name_en: "Verschlussblock (Fallblock)",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 518,
+    geometry: {
+      type: "kit",
+      kit: "breechBlock",
+      params: { len: c.TR_BLOCK_LEN!, h: c.TR_BLOCK_H!, w: c.TR_BLOCK_W! },
+    },
+    material: "steel",
+    node: "BreechBlock",
+    mate: { type: "absolute" },
+    source:
+      "立楔式闩体（Fallblock）：80 × 150 × 260 闩体 + 后端 ⌀80 击针座 + 两侧滑轨。静止时闭锁药室尾端（闩体前端 -2.30 离药室尾端 -2.35 留 50mm 装弹空间）；闩室框内上下各留 5mm、两侧各 10mm，闩体沿框内导轨下落 160mm 即完全让开药室（前快后慢、末端缓冲）。下落到最低点时闩体底面 1.21，仍高于吊篮地板（1.16）50mm，前方 20mm 处是复进机尾端（不撞）。",
+  });
+
+  add({
+    id: "tiger.turret.firing_pin",
+    name_cn: "击针与击针簧",
+    name_en: "Schlagbolzen mit Feder",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 519,
+    geometry: {
+      type: "kit",
+      kit: "firingPin",
+      params: { len: 0.09 },
+    },
+    material: "steel_worn",
+    node: "FiringPin",
+    mate: { type: "absolute", position: [c.TR_FIRING_PIN_X! - c.TR_BLOCK_X!, 0, 0] },
+    source:
+      "击针与击针簧（Schlagbolzen）：⌀12 × 90 击针 + ⌀34 弹簧（9 圈、丝径 ⌀7）+ 前端挡盘 ⌀52 + 后端击发帽 ⌀36。装在闩体后端击针座之后 15mm，与闩体同步后坐/下落；击发时击针沿炮轴前冲约 8mm 击打底火，簧压缩蓄能、击发后复位（节点 FiringPin 可平移驱动）。",
+  });
+
+  add({
+    id: "tiger.turret.breech_extractor",
+    name_cn: "抽壳钩",
+    name_en: "Auszieher",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 524,
+    geometry: { type: "kit", kit: "breechExtractor", params: {} },
+    material: "steel_worn",
+    node: "BreechBlock",
+    mate: {
+      type: "absolute",
+      position: [c.TR_EXTRACTOR_X! - c.TR_BLOCK_X!, c.TR_EXTRACTOR_Y! - gunY, c.TR_EXTRACTOR_Z!],
+    },
+    source:
+      "抽壳钩（Auszieher）：轴座 ⌀36 + 钩臂 + 钩爪，装在闩体前面上缘 z +0.115；爪尖离药室尾缘 6mm、离药室外圆 5mm（不接触）。开闩时钩爪先勾住药筒底缘，闩体下落把空药筒从药室抽出，再沿闩体下缘斜面抛出。",
+  });
+
+  add({
+    id: "tiger.turret.breech_safety",
+    name_cn: "炮闩保险",
+    name_en: "Sicherung",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 525,
+    geometry: { type: "kit", kit: "breechSafety", params: { shaftLen: 0.027 } },
+    material: "steel_worn",
+    node: "GunRecoil",
+    mate: {
+      type: "absolute",
+      position: [c.TR_SAFETY_X! - gunPivotX, c.TR_SAFETY_Y! - gunY, c.TR_SAFETY_Z!],
+    },
+    source:
+      "炮闩保险（Sicherung）：轴 ⌀16 + 拨柄 18 × 70 + 球头 ⌀22，装在闩室右侧外壁（z -0.163，轴外伸 27mm）。拨到「保险」位时挡住闩体下落与击针行程；炮手在炮尾右侧可直接操作。",
   });
 
   // ===================== 舱口 / 门 / 炮盾附件（L4-d） =====================
@@ -553,24 +769,30 @@ function buildTurretParts(): PartDefinition[] {
   // ---------------------------------------------------------------------------
 
   parts.push({
-    id: "tiger.turret.aa_mg_mount",
-    name_cn: "对空机枪枪架",
-    name_en: "Flieger-MG-Drehkranz",
+    id: "tiger.turret.aa_ring_mount",
+    name_cn: "车长塔环形枪座",
+    name_en: "Flieger-MG-Drehring",
     assembly: "turret",
     build_layer: 4,
     build_order: 547,
     geometry: {
       type: "kit",
-      kit: "aaMgMount",
-      params: { baseR: 0.085, baseT: 0.012, postR: 0.026, pivotY: c.TR_AA_PIVOT_Y!, cradleHalf: 0.0475 },
+      kit: "aaRingMount",
+      params: {
+        ringR: 0.315,
+        ringW: 0.03,
+        ringH: 0.036,
+        gapDeg: 70,
+        gapCenterDeg: 325,
+        armEndX: -c.TR_AA_ARM!,
+        pintleZ: -c.TR_AA_Z_OFF!,
+        armTop: c.TR_AA_PIVOT_UP! - 0.019,
+      },
     },
     material: "steel",
-    mate: {
-      type: "absolute",
-      position: [c.TR_AA_X!, roofTop + c.TR_JOINT!, c.TR_AA_Z!],
-    },
+    mate: { type: "absolute", position: [c.TR_CUPOLA_X!, roofTop, c.TR_CUPOLA_Z!] },
     source:
-      "车顶对空机枪枪架（Flieger-MG-Drehkranz 的立柱式）：底座盘 ⌀170 × 12 + 4 颗地脚螺栓 + ⌀52 立柱 + 俯仰加强环 + 两片耳轴托架（内距 90，⌀18 横销）。装在炮塔顶盖前右（x -1.95 / z -0.10），离车长塔外缘 377mm、离顶盖前缘 830mm；耳轴中心高出顶盖 290mm。实车对空枪座为车长塔顶的环形枪座，本模型改为立柱式以便俯仰展示，位置仍贴塔旁。",
+      "车长塔环形枪座（Flieger-MG-Drehring）：抱塔环 ⌀630/⌀570 × 36 + 4 只支脚（底面离顶盖 3mm）+ 前立柱 ⌀56（从环面升到 2.055）+ 悬臂 + 横臂 + 枪座立柱 ⌀48（顶 2.146）。环心 = 车长塔心 (x -1.30, z -0.42)、环底 1.848、环顶 1.884——**低于车长塔 5 个观察缝**（缝底 1.8865），不挡车长视线；环内径 ⌀570 与塔筒 ⌀520 留 25mm，不箍死；环朝车尾右后的排烟风扇罩方向留 70° 开口（整圈会切进罩圈）。枪座在塔心正前方 0.46m、向右偏 0.13m，车长从塔口探身即可握到枪尾握把（枪托端 x -1.25、z -0.55，正在塔口上方）。",
   });
 
   parts.push({
@@ -586,12 +808,35 @@ function buildTurretParts(): PartDefinition[] {
       params: { barrelLen: 0.44, pitch: c.TR_AA_PITCH! },
     },
     material: "steel",
+    node: "AaGun",
+    mate: { type: "absolute" },
+    source:
+      "车顶 MG34（含 Gurttrommel 34 双联弹鼓）：机匣 260 × 80 × 75 + 供弹盖 + 枪管 ⌀39 × 440（⌀66 散热套 + 两道箍）+ 双室枪口 + 木质枪托 240 + 握把 / 扳机护圈 / 准星 / 照门；双联弹鼓 ⌀176 × 52。耳轴 (x -1.76, y 2.165, z -0.55) 即枪座立柱上方 25mm（枪身耳轴座与立柱顶留 2mm 检视缝），抬头 10°；枪口 x -2.34、枪托端 x -1.25——**枪尾正落在车长塔口上方**，车长（塔内站位 x -1.30 / z -0.42）探身可及，不再出现旧版「枪在 x -1.95、人从 x -1.30 塔口够不着」。枪身最低点（握把底 2.057）离塔顶盖 2.034 留 23mm，开合塔盖不碰（塔盖铰链朝车尾）。",
+  });
+
+  parts.push({
+    id: "tiger.turret.aa_shield",
+    name_cn: "枪座防盾",
+    name_en: "Schutzschild (Flieger-MG)",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 549,
+    geometry: {
+      type: "kit",
+      kit: "aaShield",
+      params: { w: 0.42, h: 0.34, t: 0.008, slotW: 0.1, bottomH: 0.12, bracketLen: 0.176 },
+    },
+    material: "armor_steel",
     mate: {
       type: "absolute",
-      position: [c.TR_AA_X!, roofTop + c.TR_JOINT! + c.TR_AA_PIVOT_Y!, c.TR_AA_Z!],
+      position: [
+        c.TR_CUPOLA_X! - c.TR_AA_SHIELD_DX!,
+        roofTop + c.TR_AA_SHIELD_UP!,
+        c.TR_CUPOLA_Z! - c.TR_AA_Z_OFF!,
+      ],
     },
     source:
-      "车顶 MG34（含 Gurttrommel 34 双联弹鼓）：机匣 260 × 80 × 75 + 供弹盖 + 枪管 ⌀39 × 440（⌀66 散热套带前后两道箍）+ 双室枪口 ⌀56 × 50 + 木质枪托 240 + 握把 / 扳机护圈 / 准星 / 照门；弹鼓两只 ⌀176 × 52、轴沿枪宽方向、中间留 3mm、总宽 110，箍带 ⌀188 + 中央轴 ⌀24。以耳轴为原点抬头 10°，枪口朝车头前上方，枪尾离车长塔顶 196mm。",
+      "枪座防盾（Schutzschild）：420 宽 × 340 高 × 8 钢板，中央 100 宽顶部开口让炮管俯仰穿出；下挡板 120 高遮住车长胸腹，左右面板挡侧向破片。装在枪座悬臂前端（x -1.98），盾面离炮管 17mm、离炮塔顶盖（1.836）上方 364mm；后支架 176 长接枪座横臂（留 5mm 装配缝）。车长探身时上半身（塔口以上 0.3~0.5m）在盾后，正面与斜前方有遮挡。",
   });
 
   parts.push({
@@ -600,7 +845,7 @@ function buildTurretParts(): PartDefinition[] {
     name_en: "Nahverteidigungswaffe",
     assembly: "turret",
     build_layer: 4,
-    build_order: 549,
+    build_order: 550,
     geometry: {
       type: "kit",
       kit: "closeDefense",
@@ -621,7 +866,7 @@ function buildTurretParts(): PartDefinition[] {
     name_en: "Winkelspiegel (Ladeschütze)",
     assembly: "turret",
     build_layer: 4,
-    build_order: 550,
+    build_order: 551,
     geometry: {
       type: "kit",
       kit: "loaderPeriscope",
@@ -642,7 +887,7 @@ function buildTurretParts(): PartDefinition[] {
     name_en: "Entlüftungshaube",
     assembly: "turret",
     build_layer: 4,
-    build_order: 551,
+    build_order: 526,
     geometry: {
       type: "kit",
       kit: "ventCowl",
@@ -664,16 +909,59 @@ export function makeTurretRegistry(): ModelRegistry {
   return {
     model: "tiger",
     title: "虎式 I 炮塔（L4）",
-    subtitle: "炮塔壳体（壁 + 顶盖）/ 车长指挥塔 / 炮盾 / 8.8cm 炮管",
+    subtitle: "炮塔壳体（壁 + 顶盖）/ 车长指挥塔 / 炮盾 / 8,8 cm 炮管",
     source_notes: [
-      "公开资料：虎 I 炮塔为马蹄形焊接壳体，正面 120mm、侧后 80mm、顶盖 25mm；座圈内 ⌀1650（opening 即炮塔回转直径），车长指挥塔在左后、带 5 个观察缝；主炮 8.8 cm KwK 36 L/56 经炮盾伸出，炮口带双室制退器，全车炮口向前总长 8.45 m（车体 6.32 m）。",
+      "公开资料：虎 I 炮塔为马蹄形焊接壳体，正面 120mm、侧后 80mm、顶盖 25mm；座圈内 ⌀1650（opening 即炮塔回转直径），车长指挥塔在左后、带 5 个观察缝；主炮 8,8 cm KwK 36 L/56 经炮盾伸出，炮口带双室制退器，全车炮口向前总长 8.45 m（车体 6.32 m）。",
       "本模型口径（与 L4-b 座圈接口一致）：座圈圆心 x -1.65 / z 0、顶面 1.108；壳体下沿 1.111（离座圈 3mm）、壁高 700、顶盖顶面 1.836；炮塔外廓 1.88 宽（车体 1.925）、前壁外面 x -2.78；炮管轴线 y 1.45、炮口 x -6.466。",
       "实车与模型的差异（压缩比）：实车车体长 6.32 m、本模型 5.41 m，所以炮塔相对车体显得略靠后——座圈后缘离发动机隔板 45mm 是 L4-b 的既定口径，炮塔后段（半圆外缘 x -0.71）因此悬在发动机舱盖前段上方，与实车「炮塔后悬于发动机舱」一致。",
-      "简化记录（待补）：装填手舱口 / 后部逃生门 / 手枪孔 / 抛壳窗 / 焊接吊环 / 座圈滚道与螺栓圈（L4-d）；焊缝、暗黄涂装、战术编号（L5）；炮塔内部战斗舱（弹药架 / 炮闩 / 吊篮，L3 第二批）。",
+      "本模型口径（L4-i）：主炮统一写 8,8 cm KwK 36（德军官方 cm）；炮管膛径 88mm、药室 156mm、闩体 80×150×260，后坐 450mm、闩体下落 160mm。车长塔环形枪座抱塔环 ⌀630/⌀570（朝排烟风扇罩留 70° 开口），MG34 枪尾落在塔口上方 0.34m 处，防盾 420×340 遮住探出的上半身。简化记录（待补）：塔内潜望镜 5 具 / 顶盖内侧锁扣 / 炮管俯仰动画 / 战术编号（L5）。",
     ].join("\n"),
     constants: TURRET_CONSTANTS,
     assemblies: [{ id: "turret", name_cn: "炮塔", name_en: "turret", explode: [0, 2.6, 0] }],
-    nodes: [],
+    nodes: [
+      {
+        name: "GunCradle",
+        parent: "root",
+        pivot: ["TR_GUN_PIVOT_X", "TR_GUN_Y", 0],
+        note: "火炮摇架 / 耳轴：炮身、闩室、闩体在它上面后坐；俯仰（P3）绕此轴",
+      },
+      {
+        name: "GunRecoil",
+        parent: "GunCradle",
+        pivot: [0, 0, 0],
+        motion: "translate",
+        axis: "x",
+        note: "炮身后坐节点：+X 为后坐方向（击发循环驱动 0 → 450mm → 复进）",
+      },
+      {
+        name: "BreechBlock",
+        parent: "GunRecoil",
+        pivot: ["TR_BLOCK_X - TR_GUN_PIVOT_X", 0, 0],
+        motion: "translate",
+        axis: "y",
+        note: "立楔式闩体：沿 -Y 下落 160mm 开闩（前快后慢 + 末端缓冲）",
+      },
+      {
+        name: "FiringPin",
+        parent: "BreechBlock",
+        pivot: [0, 0, 0],
+        motion: "translate",
+        axis: "x",
+        note: "击针：-X 前冲 8mm 击发底火，簧力复位（节点原点与闩体中心重合，位移即绝对行程）",
+      },
+      {
+        name: "AaGun",
+        parent: "root",
+        pivot: [
+          "TR_CUPOLA_X - TR_AA_ARM",
+          "TR_RING_TOP + TR_JOINT + TR_WALL_H + TR_ROOF_T + TR_AA_PIVOT_UP",
+          "TR_CUPOLA_Z - TR_AA_Z_OFF",
+        ],
+        motion: "rotate",
+        axis: "z",
+        note: "车长塔环形枪座上的 MG34：绕耳轴俯仰（P3）",
+      },
+    ],
     materials: {},
     parts: buildTurretParts(),
   };
