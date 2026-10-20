@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { mulberry32 } from "./geometry";
+import { applyArmourSurface } from "./armourSurface";
 
 // ============================================================================
 // kernel/textures —— 程序化表面材质（去塑料感的材质层）
@@ -40,6 +41,8 @@ export interface MaterialSpec {
   emissiveIntensity?: number;
   doubleSided?: boolean;
   flatShading?: boolean;
+  /** 战术编号 / 贴花：canvas 文字贴图（透明底，白字黑边）。 */
+  decal?: string;
 }
 
 export interface TextureSet {
@@ -611,6 +614,35 @@ export function presetTextures(preset: Exclude<TexturePreset, "none">, repeat: [
   return set;
 }
 
+/** 战术编号贴花：透明底、白字黑描边；同一数字全局缓存。 */
+const decalCache = new Map<string, THREE.CanvasTexture>();
+
+function decalTexture(text: string): THREE.CanvasTexture | null {
+  const cached = decalCache.get(text);
+  if (cached) return cached;
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 256;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.font = "bold 188px 'Arial Narrow', Arial, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.lineWidth = 16;
+  context.strokeStyle = "rgba(16, 16, 14, 0.92)";
+  context.strokeText(text, 256, 136);
+  context.fillStyle = "#f3efe2";
+  context.fillText(text, 256, 136);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+  decalCache.set(text, texture);
+  return texture;
+}
+
 /** 由材质声明批量构建 THREE 材质库；返回 dispose 统一释放。
  *  金属三要素都在这里落地：metalness 分档 / roughness 不与全场一致 / envMapIntensity 让反射可见。 */
 export function createMaterialLibrary(specs: Record<string, MaterialSpec>): {
@@ -654,6 +686,22 @@ export function createMaterialLibrary(specs: Record<string, MaterialSpec>): {
       usedTextures.add(set.normalMap);
     }
     material.name = name;
+    if (spec.decal) {
+      const decal = decalTexture(spec.decal);
+      if (decal) {
+        material.map = decal;
+        material.transparent = true;
+        material.alphaTest = 0.06;
+        material.polygonOffset = true;
+        material.polygonOffsetFactor = -2;
+        material.polygonOffsetUnits = -2;
+        usedTextures.add(decal);
+      }
+    }
+    // L5 表面层：防磁涂层 + 迷彩 + 战场痕迹（只作用于装甲漆面，不动几何）
+    if (name === "armor_steel") {
+      applyArmourSurface(material, { zimmerit: true, camo: true, grime: true });
+    }
     materials[name] = material;
   }
   return {
@@ -662,6 +710,7 @@ export function createMaterialLibrary(specs: Record<string, MaterialSpec>): {
       for (const material of Object.values(materials)) material.dispose();
       for (const texture of usedTextures) texture.dispose();
       textureCache.clear();
+      decalCache.clear();
     },
   };
 }
