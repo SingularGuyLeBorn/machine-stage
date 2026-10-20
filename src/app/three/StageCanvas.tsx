@@ -235,8 +235,10 @@ function StageRuntime() {
     const state = store.machineState;
     const running =
       state === "running" ||
+      state === "driving" ||
       state === "firing" ||
       state === "mg_firing" ||
+      state === "aiming" ||
       state === "hit_light" ||
       state === "hit_heavy";
     // 切换机器状态时重置动画时钟：击发必须从 0s 开始，悬挂演示也应从头起步。

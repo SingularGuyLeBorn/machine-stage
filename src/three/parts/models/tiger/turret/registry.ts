@@ -63,7 +63,7 @@ const TURRET_CONSTANTS: Record<string, number> = {
   TR_MANTLET_H: 0.56,
   TR_MANTLET_D: 0.86,
   TR_COLLAR_R: 0.16,
-  TR_COLLAR_RI: 0.118,
+  TR_COLLAR_RI: 0.15,
   TR_COLLAR_L: 0.1,
   TR_BARREL_L: 3.34,
   TR_BARREL_R: 0.105,
@@ -86,7 +86,7 @@ const TURRET_CONSTANTS: Record<string, number> = {
   TR_CRADLE_FRONT: -2.657,
   TR_CRADLE_REAR: -2.18,
   TR_CRADLE_Z: 0.22,
-  TR_CRADLE_HH: 0.28,
+  TR_CRADLE_HH: 0.265,
   TR_BREECH_X: -2.43,
   TR_BLOCK_X: -2.26,
   TR_FIRING_PIN_X: -2.14,
@@ -164,12 +164,14 @@ export const TURRET_LAYOUTS = {
 function makeLayouts(): Record<string, InstanceLayout> {
   const layouts: Record<string, InstanceLayout> = {};
 
-  // 手枪孔 ×2：按后部圆弧 ±55° 摆放（几何轴沿 +X，随圆周转向）
+  // 手枪孔 ×2：按后部圆弧 ±55° 摆放（几何轴沿 +X，随圆周转向）。
+  // 挂 Turret 节点后布局是节点局部：把 mate 的座圈圆心/高度也包含进来。
   layouts[TURRET_LAYOUTS.pistolPort] = ({ index }) => {
     const deg = index === 0 ? TURRET_CONSTANTS.TR_PORT_ANGLE! : -TURRET_CONSTANTS.TR_PORT_ANGLE!;
     const a = THREE.MathUtils.degToRad(deg);
     return new THREE.Matrix4()
-      .makeRotationY(-a)
+      .makeTranslation(TURRET_CONSTANTS.TR_RING_X!, TURRET_CONSTANTS.TR_PORT_Y!, 0)
+      .multiply(new THREE.Matrix4().makeRotationY(-a))
       .multiply(new THREE.Matrix4().makeTranslation(TURRET_CONSTANTS.TR_PORT_RMID!, 0, 0));
   };
 
@@ -190,8 +192,8 @@ function makeLayouts(): Record<string, InstanceLayout> {
     if (side > 0) m.makeRotationY(yaw);
     else m.makeRotationX(Math.PI).multiply(new THREE.Matrix4().makeRotationY(yaw));
     m.multiply(new THREE.Matrix4().makeRotationZ(side > 0 ? -pitch : pitch));
-    // 平移只给 y / z——x 由 mate 的装配位（TR_SMOKE_X）提供，避免复合两次
-    m.setPosition(0, y, z);
+    // 挂 Turret 节点后布局自行包含 mate 的 x（TR_SMOKE_X）
+    m.setPosition(TURRET_CONSTANTS.TR_SMOKE_X!, y, z);
     return m;
   };
 
@@ -213,10 +215,21 @@ function makeLayouts(): Record<string, InstanceLayout> {
     return basis;
   };
 
-  // 顶部吊环 ×2：炮塔顶盖前段两角（z ±0.70）
+  // 顶部吊环 ×2：炮塔顶盖前段两角（z ±0.70）。
+  // 挂 Turret 节点后布局是节点局部：包含 mate 的 x / 顶盖高度。
   layouts[TURRET_LAYOUTS.roofEyes] = ({ index }) => {
     const z = TURRET_CONSTANTS.TR_EYE_Z!;
-    return new THREE.Matrix4().makeTranslation(0, 0, index === 0 ? z : -z);
+    const y =
+      TURRET_CONSTANTS.TR_RING_TOP! +
+      TURRET_CONSTANTS.TR_JOINT! +
+      TURRET_CONSTANTS.TR_WALL_H! +
+      TURRET_CONSTANTS.TR_ROOF_T! +
+      TURRET_CONSTANTS.TR_JOINT!;
+    return new THREE.Matrix4().makeTranslation(
+      TURRET_CONSTANTS.TR_EYE_X!,
+      y,
+      index === 0 ? z : -z,
+    );
   };
 
   // MG 弹壳静态落点（fx，构建时隐藏）：装填手舱口右前侧顶盖，2×6 一排
@@ -324,7 +337,7 @@ function buildTurretParts(): PartDefinition[] {
     material: "armor_steel",
     mate: { type: "absolute", position: [mantletCX, c.TR_GUN_Y!, 0] },
     source:
-      "炮盾（Blende，120mm 铸造装甲）：860 宽 × 560 高 × 240 厚，盖住炮塔前壁中央（z ±0.43，两侧到壳体外面各剩 510mm 前壁直段）；内面离炮塔前壁外面 3mm（x -2.783 ~ -3.023）。**中央炮口是通孔**：炮盾板挖 ⌀320 孔 + ⌀320/⌀256 × 100 空心套环，炮管 ⌀210 基段从套环内穿过（环缝 13mm），后坐 450mm 全程不接触。竖直方向盖住壳体高度（1.111 ~ 1.811）的 1.17 ~ 1.73 段，下留 59mm、上留 81mm 板边。",
+      "炮盾（Blende，120mm 铸造装甲）：860 宽 × 560 高 × 240 厚，盖住炮塔前壁中央（z ±0.43，两侧到壳体外面各剩 510mm 前壁直段）；内面离炮塔前壁外面 3mm（x -2.783 ~ -3.023）。**中央炮口是通孔**：炮盾板挖 ⌀320 孔 + ⌀320/⌀256 × 100 空心套环，炮管 ⌀210 基段从套环内穿过（环缝 45mm；为 ±3.5° 俯仰留量），后坐 450mm 全程不接触。竖直方向盖住壳体高度（1.111 ~ 1.811）的 1.17 ~ 1.73 段，下留 59mm、上留 81mm 板边。",
   });
 
   // ===================== 8,8 cm KwK 36 炮管（中空） =====================
@@ -605,6 +618,7 @@ function buildTurretParts(): PartDefinition[] {
     material: "steel",
     instances: 2,
     indexed: true,
+    instance_nodes: ["Turret", "Turret"],
     instance_layout: TURRET_LAYOUTS.pistolPort,
     mate: { type: "absolute", position: [c.TR_RING_X!, c.TR_PORT_Y!, 0] },
     source:
@@ -663,6 +677,7 @@ function buildTurretParts(): PartDefinition[] {
       bevel: 0.001,
     },
     material: "steel",
+    node: "CoaxBarrel",
     mate: {
       type: "absolute",
       position: [
@@ -674,6 +689,26 @@ function buildTurretParts(): PartDefinition[] {
     },
     source:
       "同轴机枪枪管（MG34 Lauf）：⌀44 × 300 枪管，自球座前面 3mm 起（x -3.149 ~ -3.449），与主炮平行。枪口 x -3.449，比主炮炮口（-6.466）短 3.02m——符合实车同轴机枪不伸出炮盾太远的比例。",
+  });
+
+  // 同轴机枪枪口焰（fx）
+  add({
+    id: "tiger.turret.coax_flash",
+    name_cn: "同轴机枪枪口焰",
+    name_en: "MG 34 Mündungsfeuer (koaxial, FX)",
+    assembly: "turret",
+    build_layer: 5,
+    build_order: 613,
+    geometry: { type: "kit", kit: "aaMgFlash" },
+    material: "muzzle_flash",
+    node: "CoaxBarrel",
+    mate: {
+      type: "absolute",
+      position: [mantletFace - c.TR_JOINT! - c.TR_COAX_L! - c.TR_JOINT! - c.TR_COAX_BARREL_L! - 0.005, c.TR_GUN_Y!, c.TR_COAX_Z!],
+    },
+    tags: ["fx"],
+    source:
+      "同轴 MG34 枪口焰（fx）：在枪口前方 5mm；每发 30ms，随 CoaxBarrel 短后坐 2mm。构建时隐藏；与车顶 MG34 共用 muzzle_flash 材质。",
   });
 
   // 炮长瞄准镜开口
@@ -714,6 +749,7 @@ function buildTurretParts(): PartDefinition[] {
     material: "steel",
     instances: 6,
     indexed: true,
+    instance_nodes: ["Turret", "Turret", "Turret", "Turret", "Turret", "Turret"],
     instance_layout: TURRET_LAYOUTS.smokeDischarger,
     mate: { type: "absolute", position: [c.TR_SMOKE_X!, 0, 0] },
     source:
@@ -742,6 +778,7 @@ function buildTurretParts(): PartDefinition[] {
     material: "steel_worn",
     instances: c.TR_SPARE_COUNT!,
     indexed: true,
+    instance_nodes: ["Turret", "Turret", "Turret", "Turret"],
     instance_layout: TURRET_LAYOUTS.spareTrack,
     mate: { type: "absolute" },
     source:
@@ -763,6 +800,7 @@ function buildTurretParts(): PartDefinition[] {
     material: "steel",
     instances: 2,
     indexed: true,
+    instance_nodes: ["Turret", "Turret"],
     instance_layout: TURRET_LAYOUTS.roofEyes,
     mate: {
       type: "absolute",
@@ -818,6 +856,7 @@ function buildTurretParts(): PartDefinition[] {
     material?: string;
     count?: number;
     layout?: string;
+    instanceNodes?: string[];
     tags?: string[];
     position?: [number, number, number];
     params?: Record<string, KitParam>;
@@ -912,6 +951,7 @@ function buildTurretParts(): PartDefinition[] {
       material: "case_brass",
       count: 12,
       layout: TURRET_LAYOUTS.aaCases,
+      instanceNodes: Array.from({ length: 12 }, () => "Turret"),
       tags: ["fx"],
       source:
         "7.92 × 57mm 弹壳 ×12（fx，构建时隐藏）：静态排布在装填手舱口右前顶盖（y 1.843，离顶盖 3mm）；机枪连射时由 AaGun 抛壳口抛出，做重力抛物线 + 顶盖弹跳，落点留在顶盖上。",
@@ -936,6 +976,7 @@ function buildTurretParts(): PartDefinition[] {
       ...(item.node ? { node: item.node } : {}),
       ...(item.count ? { instances: item.count, indexed: true } : {}),
       ...(item.layout ? { instance_layout: item.layout } : {}),
+      ...(item.instanceNodes ? { instance_nodes: item.instanceNodes } : {}),
       ...(item.tags ? { tags: item.tags } : {}),
       mate,
       source: item.source,
@@ -1050,7 +1091,8 @@ function buildTurretParts(): PartDefinition[] {
       "顶盖排烟风扇罩：⌀300 罩圈（壁厚 8 / 高 38）+ 蘑菇顶盖 ⌀324 × 10（离罩圈 3mm，4 根支撑爪）。装在顶盖后部（x -0.92 / z -0.20），离车长塔外缘 5mm、离顶盖后缘 21mm。实车炮塔顶后部有排烟风扇，抽除火炮发射后的硝烟（KwK 36 炮管无抽烟装置，故本批不设炮管抽烟装置）。",
   });
 
-  return parts;
+  // 所有没有自己骨骼节点的炮塔零件挂到 Turret：炮塔回转时壳体/舱盖/枪座一起动
+  return parts.map((part) => (part.node ? part : { ...part, node: "Turret" }));
 }
 
 export function makeTurretRegistry(): ModelRegistry {
@@ -1068,8 +1110,22 @@ export function makeTurretRegistry(): ModelRegistry {
     assemblies: [{ id: "turret", name_cn: "炮塔", name_en: "turret", explode: [0, 2.6, 0] }],
     nodes: [
       {
-        name: "GunCradle",
+        name: "Turret",
         parent: "root",
+        pivot: [0, 0, 0],
+        motion: "rotate",
+        axis: "y",
+        note: "炮塔回转节点：动画绕座圈中心 (-1.65, 0) 做「R·p + C - R·C」枢轴旋转",
+      },
+      {
+        name: "GunShift",
+        parent: "Turret",
+        pivot: [0.03, 0, 0],
+        note: "火炮总成后移 30mm 静态让位：给摇架/复进机 ±3.4° 俯仰留出前壁净空",
+      },
+      {
+        name: "GunCradle",
+        parent: "GunShift",
         pivot: ["TR_GUN_PIVOT_X", "TR_GUN_Y", 0],
         note: "火炮摇架 / 耳轴：炮身、闩室、闩体在它上面后坐；俯仰（P3）绕此轴",
       },
@@ -1099,7 +1155,7 @@ export function makeTurretRegistry(): ModelRegistry {
       },
       {
         name: "AaGun",
-        parent: "root",
+        parent: "Turret",
         pivot: [
           "TR_LOADER_HATCH_X - TR_AA_ARM",
           "TR_RING_TOP + TR_JOINT + TR_WALL_H + TR_ROOF_T + TR_AA_PIVOT_UP",
@@ -1125,6 +1181,14 @@ export function makeTurretRegistry(): ModelRegistry {
         motion: "translate",
         axis: "x",
         note: "MG34 供弹链步进节点：沿链路方向每发一节距 14mm",
+      },
+      {
+        name: "CoaxBarrel",
+        parent: "Turret",
+        pivot: [0, 0, 0],
+        motion: "translate",
+        axis: "x",
+        note: "同轴 MG34 枪管短后坐节点：每发 +X 2mm",
       },
     ],
     materials: {

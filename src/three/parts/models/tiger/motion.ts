@@ -1,9 +1,10 @@
 import * as THREE from "three";
 import { instanceKey, type AssembledModel } from "@/three/parts";
+import { makeTrackScroller, type TrackScroller } from "./running/registry";
 import { TIGER_MG_BELT_DIR, TIGER_MG_BELT_PITCH } from "./turret/kits";
 
 // ============================================================================
-// tiger/motion —— 虎式行动装置动画（整车悬挂起伏 + 单轮拆解）
+// tiger/motion —— 虎式行动装置动画（悬挂起伏 / 行进 / 单轮拆解）
 //
 // 为什么「起伏」做在整车而不是单轮：
 //   虎式没有托带轮，履带上支直接压在负重轮顶上；模型里履带是闭合刚性环，
@@ -19,7 +20,24 @@ import { TIGER_MG_BELT_DIR, TIGER_MG_BELT_PITCH } from "./turret/kits";
 export const TIGER_MOTION_PARTS = [
   "tiger.suspension.wheel",
   "tiger.suspension.hub_bolt",
+  "tiger.track.link",
+  "tiger.track.pin",
+  "tiger.track.pin_clip",
+  "tiger.track.sprocket",
+  "tiger.track.idler",
   "tiger.turret.aa_mg_case",
+  "tiger.hull.hatch_lid",
+];
+
+/** 行进动画改写过的实例件；切换出 driving 时一次性复位，避免停在滚动中途。 */
+const DRIVE_INSTANCE_PARTS = [
+  "tiger.track.link",
+  "tiger.track.pin",
+  "tiger.track.pin_clip",
+  "tiger.track.sprocket",
+  "tiger.track.idler",
+  "tiger.suspension.wheel",
+  "tiger.suspension.hub_bolt",
 ];
 
 /** 车体升沉幅度（米）。8mm ≈ 扭杆正常行程的观感尺度，再大就会看见履带离地。 */
@@ -137,6 +155,215 @@ export function animateTigerSuspension(assembled: AssembledModel, seconds: numbe
 }
 
 // ---------------------------------------------------------------------------
+// 行进演示（P3）——直驶（前进 / 倒退）+ 原地转向（右 / 左 / 回正）
+//
+// 差速关系：航向右转为正，右履带行程 = d − B·ψ、左履带 = d + B·ψ
+// （B = 履带中心线到车体纵轴的距离 TRACK_Z）。原地转向时 d=0，两侧履带
+// 等速反向：履带板沿同一条闭合轨迹反向滚动，负重轮/主动轮/诱导轮按各自
+// 节圆半径反算角速度，所以任意时刻轮齿与销的相位关系都与静态装配一致。
+// 航向 ψ 的旋转中心取炮塔座圈中心（≈车体中心），否则原地转向会绕着车尾甩。
+// ---------------------------------------------------------------------------
+interface TigerDrivePhase {
+  duration: number;
+  /** 前进速度 [起点, 终点]（m/s，正 = 前进）。 */
+  speed: [number, number];
+  /** 航向角速度 [起点, 终点]（rad/s，正 = 右转）。 */
+  yawRate: [number, number];
+}
+
+const DRIVE_PHASES: TigerDrivePhase[] = [
+  { duration: 1.2, speed: [0, 0.55], yawRate: [0, 0] },
+  { duration: 1.6, speed: [0.55, 0.55], yawRate: [0, 0] },
+  { duration: 1.2, speed: [0.55, 0], yawRate: [0, 0] },
+  { duration: 0.7, speed: [0, 0], yawRate: [0, 0] },
+  { duration: 1.2, speed: [0, -0.55], yawRate: [0, 0] },
+  { duration: 1.6, speed: [-0.55, -0.55], yawRate: [0, 0] },
+  { duration: 1.2, speed: [-0.55, 0], yawRate: [0, 0] },
+  { duration: 0.7, speed: [0, 0], yawRate: [0, 0] },
+  { duration: 0.5, speed: [0, 0], yawRate: [0, 0.3] },
+  { duration: 0.9, speed: [0, 0], yawRate: [0.3, 0.3] },
+  { duration: 0.5, speed: [0, 0], yawRate: [0.3, 0] },
+  { duration: 0.6, speed: [0, 0], yawRate: [0, 0] },
+  { duration: 0.5, speed: [0, 0], yawRate: [0, -0.3] },
+  { duration: 2.3, speed: [0, 0], yawRate: [-0.3, -0.3] },
+  { duration: 0.5, speed: [0, 0], yawRate: [-0.3, 0] },
+  { duration: 0.6, speed: [0, 0], yawRate: [0, 0] },
+  { duration: 0.5, speed: [0, 0], yawRate: [0, 0.3] },
+  { duration: 0.9, speed: [0, 0], yawRate: [0.3, 0.3] },
+  { duration: 0.5, speed: [0, 0], yawRate: [0.3, 0] },
+  { duration: 0.7, speed: [0, 0], yawRate: [0, 0] },
+];
+
+/** 18.4s 一循环，首尾距离/航向/速度全部归零，可无缝循环。 */
+export const TIGER_DRIVE_CYCLE = DRIVE_PHASES.reduce((sum, phase) => sum + phase.duration, 0);
+export const TIGER_DRIVE_SPEED = 0.55;
+export const TIGER_DRIVE_PIVOT_YAW = 0.3;
+
+export interface TigerDrivePose {
+  /** 前进行程（米，正 = 前进）。 */
+  distance: number;
+  /** 航向角（rad，正 = 右转）。 */
+  yaw: number;
+  speed: number;
+  acceleration: number;
+  yawRate: number;
+}
+
+/** 行进曲线：每段速度/角速度用 smoothstep 过渡，行程按解析积分累计。 */
+export function tigerDrivePoseAt(seconds: number): TigerDrivePose {
+  const cycle = ((seconds % TIGER_DRIVE_CYCLE) + TIGER_DRIVE_CYCLE) % TIGER_DRIVE_CYCLE;
+  let remaining = cycle;
+  let distance = 0;
+  let yaw = 0;
+  let speed = 0;
+  let acceleration = 0;
+  let yawRate = 0;
+  for (const phase of DRIVE_PHASES) {
+    const span = Math.min(remaining, phase.duration);
+    const u = phase.duration > 0 ? span / phase.duration : 1;
+    const blend = u * u * (3 - 2 * u);
+    const [v0, v1] = phase.speed;
+    const [w0, w1] = phase.yawRate;
+    // ∫ smoothstep = D·(u³ − u⁴/2)
+    const ease = phase.duration * (u ** 3 - u ** 4 / 2);
+    distance += v0 * span + (v1 - v0) * ease;
+    yaw += w0 * span + (w1 - w0) * ease;
+    if (remaining <= phase.duration) {
+      speed = v0 + (v1 - v0) * blend;
+      yawRate = w0 + (w1 - w0) * blend;
+      acceleration = ((v1 - v0) / phase.duration) * 6 * u * (1 - u);
+      break;
+    }
+    remaining -= phase.duration;
+  }
+  return { distance, yaw, speed, acceleration, yawRate };
+}
+
+const trackScrollers = new WeakMap<Record<string, number>, TrackScroller>();
+function scrollerOf(assembled: AssembledModel): TrackScroller {
+  let scroller = trackScrollers.get(assembled.constants);
+  if (!scroller) {
+    scroller = makeTrackScroller(assembled.constants);
+    trackScrollers.set(assembled.constants, scroller);
+  }
+  return scroller;
+}
+
+/** 是否还有行进位姿留在实例矩阵上；切出 driving 时只复位一次。 */
+let drivePoseDirty = false;
+const driveMatrix = new THREE.Matrix4();
+
+function resetDriveInstances(assembled: AssembledModel): void {
+  if (!drivePoseDirty) return;
+  for (const id of DRIVE_INSTANCE_PARTS) {
+    const handle = assembled.getPart(id);
+    if (!handle) continue;
+    for (const instance of handle.instances) {
+      handle.setInstanceMatrix(instance.index, instance.restMatrix);
+    }
+  }
+  drivePoseDirty = false;
+}
+
+export function animateTigerDriving(assembled: AssembledModel, seconds: number): void {
+  const pose = tigerDrivePoseAt(seconds);
+  drivePoseDirty = true;
+  const constants = assembled.constants;
+  const trackZ = constants.TRACK_Z ?? 1.49;
+  const pivotX = constants.TR_RING_X ?? -1.65;
+  const cos = Math.cos(pose.yaw);
+  const sin = Math.sin(pose.yaw);
+  const activity = Math.min(
+    1,
+    Math.abs(pose.speed) / 0.4 + Math.abs(pose.yawRate) / TIGER_DRIVE_PIVOT_YAW,
+  );
+
+  // 车体：直线时沿 -X 前进；原地转向绕座圈中心（根节点反向平移补偿）
+  assembled.root.position.set(
+    -pose.distance + pivotX * (1 - cos),
+    0.0012 * Math.sin(seconds * 9.1) * activity,
+    pivotX * sin,
+  );
+  assembled.root.rotation.set(
+    0.0008 * Math.sin(seconds * 6.3) * activity,
+    pose.yaw,
+    0.006 * Math.max(-1, Math.min(1, pose.acceleration / 0.7)),
+  );
+
+  // 差速行程：右转时左履带多走、右履带少走（原地转向即等速反向）
+  const rightDistance = pose.distance - trackZ * pose.yaw;
+  const leftDistance = pose.distance + trackZ * pose.yaw;
+  const links = constants.TRACK_LINKS ?? 96;
+  const scroller = scrollerOf(assembled);
+  const writeScroll = (partId: string, kind: "link" | "pin" | "clip") => {
+    const handle = assembled.getPart(partId);
+    if (!handle) return;
+    for (const instance of handle.instances) {
+      const distance = instance.index < links ? rightDistance : leftDistance;
+      handle.setInstanceMatrix(
+        instance.index,
+        scroller.matrixAt(kind, instance.index, distance, driveMatrix),
+      );
+    }
+  };
+  writeScroll("tiger.track.link", "link");
+  writeScroll("tiger.track.pin", "pin");
+  writeScroll("tiger.track.pin_clip", "clip");
+
+  // 主动轮 / 诱导轮 / 负重轮：角速度 = 履带行程 / 各自节圆半径
+  const spinAboutAxle = (partId: string, radius: number) => {
+    const handle = assembled.getPart(partId);
+    if (!handle) return;
+    for (const instance of handle.instances) {
+      const distance = instance.index === 0 ? rightDistance : leftDistance;
+      const rest = instance.restMatrix;
+      center.set(rest.elements[12], rest.elements[13], rest.elements[14]);
+      driveMatrix
+        .makeTranslation(center.x, center.y, center.z)
+        .multiply(rotate.makeRotationZ(distance / radius))
+        .multiply(translate.makeTranslation(-center.x, -center.y, -center.z))
+        .multiply(rest);
+      handle.setInstanceMatrix(instance.index, driveMatrix);
+    }
+  };
+  spinAboutAxle("tiger.track.sprocket", constants.SPROCKET_R ?? 0.4138);
+  spinAboutAxle("tiger.track.idler", constants.IDLER_R ?? 0.3);
+
+  const wheel = assembled.getPart("tiger.suspension.wheel");
+  if (!wheel) return;
+  const bolts = assembled.getPart("tiger.suspension.hub_bolt");
+  const half = wheel.instances.length / 2;
+  const wheelRadius = constants.WHEEL_R ?? 0.4;
+  const spinWheel = (
+    handle: NonNullable<ReturnType<AssembledModel["getPart"]>>,
+    index: number,
+    wheelIndex: number,
+  ) => {
+    const rest = handle.instances[index]!.restMatrix;
+    const wheelRest = wheel.instances[wheelIndex]!.restMatrix;
+    const distance = wheelIndex < half ? rightDistance : leftDistance;
+    center.set(wheelRest.elements[12], wheelRest.elements[13], wheelRest.elements[14]);
+    driveMatrix
+      .makeTranslation(center.x, center.y, center.z)
+      .multiply(rotate.makeRotationZ(distance / wheelRadius))
+      .multiply(translate.makeTranslation(-center.x, -center.y, -center.z))
+      .multiply(rest);
+    handle.setInstanceMatrix(index, driveMatrix);
+  };
+  for (const instance of wheel.instances) {
+    spinWheel(wheel, instance.index, instance.index);
+  }
+  if (bolts) {
+    const boltsPerWheel = Math.max(1, Math.round(constants.WHEEL_BOLT_COUNT ?? 6));
+    for (const instance of bolts.instances) {
+      const wheelIndex = Math.floor(instance.index / boltsPerWheel);
+      if (!wheel.instances[wheelIndex]) continue;
+      spinWheel(bolts, instance.index, wheelIndex);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 主炮击发循环（P3）——节点驱动：GunCradle → GunRecoil → BreechBlock → FiringPin。
 // 开闩（0.3–0.55s）→ 关闩（0.85–1.1s）→ 击针（1.1–1.28s）→ 后坐 450mm
 // （1.2–1.3s 先快，之后高阻尼 exp×cos 复进）→ 开闩抛壳（1.45–2.5s）→ 待装。
@@ -227,6 +454,8 @@ const MG_SHOT_COUNT = 10;
 const MG_BARREL_RECOIL = 0.006;
 const MG_CLIMB_PER_SHOT = 0.0045;
 const MG_FLASH_PART = "tiger.turret.aa_mg_flash";
+const MG_COAX_FLASH_PART = "tiger.turret.coax_flash";
+const MG_BOW_FLASH_PART = "tiger.hull.bow_mg_flash";
 const MG_CASE_PART = "tiger.turret.aa_mg_case";
 
 function latestMgShot(t: number): { index: number; since: number } | null {
@@ -275,6 +504,8 @@ export function animateTigerMg(assembled: AssembledModel, seconds: number): void
   const gun = assembled.getNode("AaGun");
   const barrel = assembled.getNode("AaBarrel");
   const feed = assembled.getNode("AaFeed");
+  const coax = assembled.getNode("CoaxBarrel");
+  const bow = assembled.getNode("BowMgBarrel");
 
   // 枪口上跳：每发加一个小角冲量、0.32s 时间常数回落（连射会累积，停火后回正）
   let climb = 0;
@@ -289,10 +520,16 @@ export function animateTigerMg(assembled: AssembledModel, seconds: number): void
     gun.updateMatrix();
   }
 
-  // 枪管短后坐：每发 6mm，50ms 内出—回
+  // 枪管短后坐：每发 6mm，50ms 内出—回；同轴 / 航向 MG34 同步短后坐 2mm
+  const phase = shot ? shot.since / 0.05 : 1;
   if (barrel) {
-    const phase = shot ? shot.since / 0.05 : 1;
     barrel.position.x = shot && phase < 1 ? MG_BARREL_RECOIL * Math.sin(Math.PI * phase) : 0;
+  }
+  if (coax) {
+    coax.position.x = shot && phase < 1 ? 0.002 * Math.sin(Math.PI * phase) : 0;
+  }
+  if (bow) {
+    bow.position.x = shot && phase < 1 ? 0.002 * Math.sin(Math.PI * phase) : 0;
   }
 
   // 供弹链：每发沿链路方向步进一节距（整链周期排列，回位即下一节到位）
@@ -304,14 +541,14 @@ export function animateTigerMg(assembled: AssembledModel, seconds: number): void
       .addScaledVector(TIGER_MG_BELT_DIR, step);
   }
 
-  // 枪口焰：每发 30ms（fx 件，默认隐藏）
-  const flash = assembled.getPart(MG_FLASH_PART);
-  if (flash) {
-    const on = !!shot && shot.since < 0.03;
+  // 枪口焰：每发 30ms（车顶 / 同轴 / 航向三处同步，fx 件默认隐藏）
+  const on = !!shot && shot.since < 0.03;
+  const flashScale = shot ? 0.85 + 0.35 * Math.sin(Math.PI * (shot.since / 0.03)) : 1;
+  for (const id of [MG_FLASH_PART, MG_COAX_FLASH_PART, MG_BOW_FLASH_PART]) {
+    const flash = assembled.getPart(id);
+    if (!flash) continue;
     flash.object.visible = on;
-    if (on && shot) {
-      flash.object.scale.setScalar(0.85 + 0.35 * Math.sin(Math.PI * (shot.since / 0.03)));
-    }
+    if (on) flash.object.scale.setScalar(flashScale);
   }
 
   // 车体轻微震颤（57 吨不会被 7.92mm 推动，只给高频微颤）
@@ -354,9 +591,59 @@ export function animateTigerMg(assembled: AssembledModel, seconds: number): void
           matrix.compose(position, quaternion, new THREE.Vector3(1, 1, 1));
         }
       }
-      cases.setInstanceMatrix(i, matrix);
+      // 弹壳挂在 Turret 节点上（fx 但会随炮塔回转）；写节点局部矩阵，由 syncInstances 合成
+      cases.instances[i]!.localMatrix.copy(matrix);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// 炮塔瞄准（P3）——炮塔回转绕座圈中心，炮管俯仰绕耳轴（小角度，套环留 45mm）
+// ---------------------------------------------------------------------------
+export const TIGER_AIM_CYCLE = 8;
+export const TIGER_TURRET_YAW = THREE.MathUtils.degToRad(36); // 前舱盖在瞄准时关闭，全行程可用
+export const TIGER_GUN_PITCH = 0.06; // ±3.4°
+
+const HATCH_LID_PART = "tiger.hull.hatch_lid";
+const HATCH_CLOSED_LIFT = 0.014;
+
+/**
+ * 舱盖盖板开/闭：打开姿态是注册表里的 90° 立起（便于看座舱）；炮塔回转/瞄准前
+ * 必须盖上，否则主炮长身管扫过前甲板时会切到立起的盖板（实测 ±15° 仍会撞）。
+ * 这里只改实例矩阵：关闭 = 平移回铰链 + 去掉 90° 立起旋转 + 抬 14mm 让开甲板。
+ */
+function setHatchLids(assembled: AssembledModel, closed: boolean): void {
+  const lids = assembled.getPart(HATCH_LID_PART);
+  if (!lids) return;
+  const matrix = new THREE.Matrix4();
+  for (const instance of lids.instances) {
+    if (!closed) {
+      lids.setInstanceMatrix(instance.index, instance.restMatrix);
+      continue;
+    }
+    const rest = instance.restMatrix;
+    matrix.makeTranslation(rest.elements[12], rest.elements[13] + HATCH_CLOSED_LIFT, rest.elements[14]);
+    lids.setInstanceMatrix(instance.index, matrix);
+  }
+}
+
+export function animateTigerAim(assembled: AssembledModel, seconds: number): void {
+  setHatchLids(assembled, true);
+  const t = ((seconds % TIGER_AIM_CYCLE) + TIGER_AIM_CYCLE) % TIGER_AIM_CYCLE;
+  const yaw = Math.sin(t * 0.55) * TIGER_TURRET_YAW;
+  const pitch = Math.sin(t * 1.3) * TIGER_GUN_PITCH;
+  const turret = assembled.getNode("Turret");
+  if (turret) {
+    const pivot = new THREE.Vector3(assembled.constants.TR_RING_X ?? -1.65, 0, 0);
+    const quaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+    turret.quaternion.copy(quaternion);
+    turret.position.copy(pivot).sub(pivot.clone().applyQuaternion(quaternion));
+    turret.updateMatrix();
+  }
+  const cradle = assembled.getNode("GunCradle");
+  if (cradle) cradle.rotation.z = pitch;
+  assembled.root.position.set(0, 0, 0);
+  assembled.root.rotation.set(0, 0, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +682,13 @@ export function animateTigerHit(
 
 /** 非射击状态统一隐藏所有 fx（主炮口焰 / MG 枪口焰 / 弹壳）。 */
 function hideTigerEffects(assembled: AssembledModel): void {
-  for (const id of [TIGER_FLASH_PART, MG_FLASH_PART, MG_CASE_PART]) {
+  for (const id of [
+    TIGER_FLASH_PART,
+    MG_FLASH_PART,
+    MG_COAX_FLASH_PART,
+    MG_BOW_FLASH_PART,
+    MG_CASE_PART,
+  ]) {
     const part = assembled.getPart(id);
     if (part) part.object.visible = false;
   }
@@ -403,11 +696,18 @@ function hideTigerEffects(assembled: AssembledModel): void {
 
 /**
  * 虎式动画总入口（catalog.animate）：按机器状态分流。
- * - running：悬挂演示；firing：主炮击发；mg_firing：MG34 连射；
- * - hit_light / hit_heavy：受击震荡（轻/重）；
+ * - running：悬挂演示；driving：行进演示；firing：主炮击发；mg_firing：MG34 连射；
+ * - aiming：炮塔回转 + 炮管俯仰；hit_light / hit_heavy：受击震荡（轻/重）；
  * - 其余状态：回到装配态（特效隐藏、节点由框架 resetNodes 复位）。
  */
 export function animateTiger(assembled: AssembledModel, seconds: number, state?: string): void {
+  setHatchLids(assembled, state === "aiming");
+  if (state !== "driving") resetDriveInstances(assembled);
+  if (state === "driving") {
+    hideTigerEffects(assembled);
+    animateTigerDriving(assembled, seconds);
+    return;
+  }
   if (state === "firing") {
     hideTigerEffects(assembled);
     animateTigerFiring(assembled, seconds);
@@ -416,6 +716,11 @@ export function animateTiger(assembled: AssembledModel, seconds: number, state?:
   if (state === "mg_firing") {
     hideTigerEffects(assembled);
     animateTigerMg(assembled, seconds);
+    return;
+  }
+  if (state === "aiming") {
+    hideTigerEffects(assembled);
+    animateTigerAim(assembled, seconds);
     return;
   }
   if (state === "hit_light" || state === "hit_heavy") {

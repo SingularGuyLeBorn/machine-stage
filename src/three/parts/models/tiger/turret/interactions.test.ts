@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { buildModel, detectStatic } from "@/three/parts";
 import { findModel } from "@/app/catalog";
-import { animateTigerFiring, animateTigerHit, animateTigerMg } from "../motion";
+import { animateTigerAim, animateTigerFiring, animateTigerHit, animateTigerMg } from "../motion";
 
 // ============================================================================
 // 火力/受击交互验收（P3 打磨）
@@ -34,6 +34,7 @@ describe("tiger/P3 火力与受击", () => {
     const built = build();
     built.resetNodes();
     animateTigerMg(built, 0.27);
+    built.syncInstances();
     const barrel = built.getNode("AaBarrel")!;
     const gun = built.getNode("AaGun")!;
     const feed = built.getNode("AaFeed")!;
@@ -67,6 +68,27 @@ describe("tiger/P3 火力与受击", () => {
         filter: (handle) =>
           (handle.assembly === "turret" || handle.assembly === "interior") &&
           !handle.def.tags?.includes("fx"),
+      });
+      for (const report of reports) {
+        failures.push(`t=${t}s ${report.a} ↔ ${report.b} @${report.depth_mm}mm [${report.form}]`);
+      }
+    }
+    expect(failures).toEqual([]);
+    built.dispose();
+  }, 180_000);
+
+  it("炮塔回转 ±36° + 炮管 ±3.4°：9 个时间点零干涉", () => {
+    const built = build();
+    const samples = [0, 0.7, 1.4, 2.1, 2.8, 3.5, 4.2, 5.6, 7.2];
+    const failures: string[] = [];
+    for (const t of samples) {
+      built.resetNodes();
+      animateTigerAim(built, t);
+      built.root.updateMatrixWorld(true);
+      built.syncInstances();
+      const reports = detectStatic(built, {
+        filter: (handle) =>
+          handle.assembly === "turret" || handle.assembly === "interior" || handle.assembly === "hull",
       });
       for (const report of reports) {
         failures.push(`t=${t}s ${report.a} ↔ ${report.b} @${report.depth_mm}mm [${report.form}]`);

@@ -325,9 +325,15 @@ RUNNING_CONSTANTS.TRACK_PIN_PITCH = trackPitchOf(RUNNING_CONSTANTS);
 // 矩阵工具
 // ---------------------------------------------------------------------------
 
-/** 由基向量搭正交矩阵（列 = X'/Y'/Z'）。 */
-function basis(x: THREE.Vector3, y: THREE.Vector3, z: THREE.Vector3, at: THREE.Vector3): THREE.Matrix4 {
-  return new THREE.Matrix4().set(x.x, y.x, z.x, at.x, x.y, y.y, z.y, at.y, x.z, y.z, z.z, at.z, 0, 0, 0, 1);
+/** 由基向量搭正交矩阵（列 = X'/Y'/Z'）；target 可选，滚动时复用以避免每帧分配。 */
+function basis(
+  x: THREE.Vector3,
+  y: THREE.Vector3,
+  z: THREE.Vector3,
+  at: THREE.Vector3,
+  target = new THREE.Matrix4(),
+): THREE.Matrix4 {
+  return target.set(x.x, y.x, z.x, at.x, x.y, y.y, z.y, at.y, x.z, y.z, z.z, at.z, 0, 0, 0, 1);
 }
 
 /** 侧向轴件（回转体轴沿 +Y 建模）：+Y → 车外侧。右件 rotX(+90°)，左件 rotX(-90°)。 */
@@ -350,6 +356,7 @@ function trackFrame(
   pitch: number,
   side: 1 | -1,
   constants: Record<string, number>,
+  target = new THREE.Matrix4(),
 ): THREE.Matrix4 {
   const here = path.at(s);
   const back = path.at(s - pitch);
@@ -359,7 +366,41 @@ function trackFrame(
   const x = new THREE.Vector3(dx / len, dy / len, 0);
   const y = new THREE.Vector3(-x.y, x.x, 0);
   const z = x.clone().cross(y);
-  return basis(x, y, z, new THREE.Vector3(here.x, here.y, side * constants.TRACK_Z));
+  return basis(x, y, z, new THREE.Vector3(here.x, here.y, side * constants.TRACK_Z), target);
+}
+
+/**
+ * 履带滚动器：把「销中心弧长偏移」映射成每块板/销/锁环的实例矩阵。
+ * 必须复用 trackFrame 的弦向取向——绕弧形段时若按切线取向，销会切进铰耳 12mm。
+ * link / pin / clip 的局部复合顺序与静态布局逐字一致，滚动到 offset=0 时等于 restMatrix。
+ */
+export interface TrackScroller {
+  pitch: number;
+  matrixAt(
+    kind: "link" | "pin" | "clip",
+    index: number,
+    distance: number,
+    target?: THREE.Matrix4,
+  ): THREE.Matrix4;
+}
+
+export function makeTrackScroller(constants: Record<string, number>): TrackScroller {
+  const path = trackPathOf(constants);
+  const pitch = trackPitchOf(constants);
+  const links = constants.TRACK_LINKS;
+  const pinTurn = new THREE.Matrix4().makeRotationX(Math.PI / 2);
+  const clipSeat = new THREE.Matrix4().makeTranslation(0, -0.3665, 0);
+  return {
+    pitch,
+    matrixAt(kind, index, distance, target = new THREE.Matrix4()) {
+      const side: 1 | -1 = index < links ? 1 : -1;
+      const k = index % links;
+      const frame = trackFrame(path, k * pitch + distance, pitch, side, constants, target);
+      if (kind === "link") return frame;
+      const pin = frame.multiply(pinTurn);
+      return kind === "pin" ? pin : pin.multiply(clipSeat);
+    },
+  };
 }
 
 /** 摆臂/扭杆/车轴的实例位姿基（车轴母线沿外侧，臂朝车头或车尾）。 */

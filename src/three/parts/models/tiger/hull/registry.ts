@@ -683,6 +683,7 @@ function buildHullParts(): PartDefinition[] {
       params: { r: c.HULL_MG_BARREL_R!, len: c.HULL_MG_BARREL_L! },
     },
     material: "steel",
+    node: "BowMgBarrel",
     mate: {
       type: "absolute",
       position: [
@@ -721,6 +722,26 @@ function buildHullParts(): PartDefinition[] {
     mate: { type: "absolute" },
     source:
       "随车备用履带板 ×3（Ersatzkette）：复用 L2 履带板 kit（Kgs 63/725/130 同一块板），板面贴首装甲板外面 3mm、触地面朝车体、导向齿朝车头，3 块沿竖直方向叠成一列（列心 x -4.535、y 0.557 ~ 0.933、车宽中段）。实车虎 I 在首上装甲与炮塔侧壁都挂备用履带板（725 × 130、约 60kg / 块）：既备损件、又给正面加一层「附加装甲」。",
+  });
+
+  // 航向机枪枪口焰（fx，与同轴/车顶 MG 共用材质）
+  add({
+    id: "tiger.hull.bow_mg_flash",
+    name_cn: "航向机枪枪口焰",
+    name_en: "MG 34 Mündungsfeuer (Bug, FX)",
+    assembly: "hull",
+    build_layer: 5,
+    build_order: 614,
+    geometry: { type: "kit", kit: "aaMgFlash" },
+    material: "muzzle_flash",
+    node: "BowMgBarrel",
+    mate: {
+      type: "absolute",
+      position: [-4.973, c.HULL_MG_HOLE_Y!, c.HULL_MG_HOLE_Z!],
+    },
+    tags: ["fx"],
+    source:
+      "航向 MG34 枪口焰（fx）：在车头枪口前方 5mm；每发 30ms，随 BowMgBarrel 短后坐 2mm。构建时隐藏；与车顶/同轴 MG 共用 muzzle_flash 材质。",
   });
 
   add({
@@ -1276,7 +1297,16 @@ export function makeHullRegistry(): ModelRegistry {
     ].join("\n"),
     constants: HULL_CONSTANTS,
     assemblies: [{ id: "hull", name_cn: "车体外壳", name_en: "hull shell", explode: [0, 1.5, 0] }],
-    nodes: [],
+    nodes: [
+      {
+        name: "BowMgBarrel",
+        parent: "root",
+        pivot: [0, 0, 0],
+        motion: "translate",
+        axis: "x",
+        note: "航向 MG34 枪管短后坐节点：每发 +X 2mm（车内机匣不动）",
+      },
+    ],
     materials: {
       armor_steel: {
         base: "#79683f",
@@ -1284,6 +1314,15 @@ export function makeHullRegistry(): ModelRegistry {
         roughness: 0.74,
         preset: "steel",
         envMapIntensity: 1.0,
+      },
+      muzzle_flash: {
+        base: "#ffe2a8",
+        metalness: 0,
+        roughness: 0.9,
+        preset: "none",
+        envMapIntensity: 0.2,
+        emissive: "#ff9a33",
+        emissiveIntensity: 5,
       },
       tactical_number: {
         base: "#f3efe2",
