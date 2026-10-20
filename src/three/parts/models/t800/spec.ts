@@ -109,7 +109,7 @@ export const BONES: Record<string, BoneSpec> = {
     key: "femur",
     name_cn: "股骨主骨",
     name_en: "Femur",
-    w: 0.096,
+    w: 0.115,
     d: 0.068,
     bore: 0.015,
     corner: 0.012,
@@ -128,7 +128,7 @@ export const BONES: Record<string, BoneSpec> = {
     key: "tibia",
     name_cn: "胫骨主骨",
     name_en: "Tibia",
-    w: 0.092,
+    w: 0.108,
     d: 0.068,
     bore: 0.014,
     corner: 0.012,
@@ -161,13 +161,13 @@ export const STUD = {
   bossBore: 0.002,
   bossBoreDepth: 0.0005,
   /** 安装凸台面半径 */
-  faceR: 0.016,
+  faceR: 0.017,
 } as const;
 
 /** 液压缸通用尺寸（局部 +Y = 缸轴，起点在 A 端球心）。 */
 export const CYL = {
   /** 耳环外半径 */
-  eyeOuter: 0.022,
+  eyeOuter: 0.02,
   /** 耳环孔半径（球头球半径 + 0.8mm） */
   eyeBore: 0.016,
   /** 耳环宽度（沿销轴） */
@@ -175,11 +175,11 @@ export const CYL = {
   /** 耳环颈起点（离球心） */
   eyeClear: 0.0135,
   /** 耳环颈半径 */
-  eyeNeckR: 0.016,
-  /** 耳环颈长 */
-  eyeNeckLen: 0.03,
+  eyeNeckR: 0.01,
+  /** 耳环颈长（颈末端留 2mm 缝再接活塞杆，避免杆端与耳环颈互相咬死） */
+  eyeNeckLen: 0.022,
   /** 耳环台肩半径 */
-  eyeCollarR: 0.019,
+  eyeCollarR: 0.018,
   eyeCollarH: 0.006,
   /** 缸底盖厚 */
   capH: 0.014,
@@ -208,7 +208,8 @@ export function cylinderLayout(spec: HydraulicSpec) {
   const barrelEnd = capEnd + spec.lc * span;
   const mouth = barrelEnd;
   const glandStart = mouth - CYL.glandH;
-  const rodStart = CYL.eyeClear + CYL.eyeNeckLen;
+  /** 杆起点：耳环颈末端再留 1.5mm 缝，避免杆端端面与耳环端面共面 */
+  const rodStart = CYL.eyeClear + CYL.eyeNeckLen + 0.0015;
   return {
     eyeEnd,
     capStart,
@@ -344,7 +345,7 @@ const CYLINDER_SEEDS: CylinderSeed[] = [
     child: "hip",
     a: "hip_flex_a",
     b: "hip_flex_b",
-    rBody: 0.044,
+    rBody: 0.02,
     lc: 0.45,
     // 杆端余量要留足（缩回极限时杆端不能顶到缸底）：lr 偏小
     lr: 0.47,
@@ -357,7 +358,7 @@ const CYLINDER_SEEDS: CylinderSeed[] = [
     child: "hip",
     a: "hip_ext_a",
     b: "hip_ext_b",
-    rBody: 0.044,
+    rBody: 0.02,
     lc: 0.45,
     lr: 0.5,
   },
@@ -369,7 +370,7 @@ const CYLINDER_SEEDS: CylinderSeed[] = [
     child: "knee",
     a: "knee_main_a",
     b: "knee_main_b",
-    rBody: 0.046,
+    rBody: 0.022,
     lc: 0.45,
     lr: 0.52,
   },
@@ -381,7 +382,7 @@ const CYLINDER_SEEDS: CylinderSeed[] = [
     child: "knee",
     a: "knee_comp_a",
     b: "knee_comp_b",
-    rBody: 0.04,
+    rBody: 0.018,
     lc: 0.42,
     lr: 0.48,
   },
@@ -393,7 +394,7 @@ const CYLINDER_SEEDS: CylinderSeed[] = [
     child: "ankle",
     a: "ankle_l_a",
     b: "ankle_l_b",
-    rBody: 0.044,
+    rBody: 0.02,
     lc: 0.4,
     // 杆长比例要保证：活塞全程不出缸口（>5mm 余量）且杆端不脱缸
     lr: 0.55,
@@ -406,7 +407,7 @@ const CYLINDER_SEEDS: CylinderSeed[] = [
     child: "ankle",
     a: "ankle_r_a",
     b: "ankle_r_b",
-    rBody: 0.044,
+    rBody: 0.02,
     lc: 0.4,
     // 杆长比例要保证：活塞全程不出缸口（>5mm 余量）且杆端不脱缸
     lr: 0.55,
@@ -532,7 +533,8 @@ export function cylinderDims(spec: HydraulicSpec): CylinderDims {
     L: length(spec),
     /** 缸膛：肌肉壳厚 ~52% 缸径 */
     bore: spec.rBody * 0.48,
-    rodR: spec.rBody * 0.42,
+    /** 活塞杆：细杆（"肌腱"），必须比耳环孔细 */
+    rodR: spec.rBody * 0.3,
     pistonR: spec.rBody * 0.48 - 0.001,
   };
 }

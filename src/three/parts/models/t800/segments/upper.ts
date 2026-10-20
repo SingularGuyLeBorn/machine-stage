@@ -298,8 +298,8 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
         endScale: femur.endScale,
         endBottomX: femur.endBottomX,
         endTopScale: femur.endTopScale,
-        padW: 0.034,
-        padH: 0.034,
+        padW: 0.05,
+        padH: 0.05,
         padT: 0.016,
         mounts: [
           mountKitParams("hip_flex_b", femurCenter),
@@ -324,7 +324,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "chrome",
     layer: 3,
     node: NODES.hip,
-    at: [0.1075, 1.21, 0],
+    at: [0.117, 1.21, 0],
     rot: [0, 90, 0],
     hint: "只护大腿上段正面的局部护板（不包全身），髋缸与骨面全露",
   });
@@ -344,8 +344,8 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "只在骨段两侧夹一条窄护条（宽 20mm，避开安装凸台），不遮骨架",
   });
   layouts["t800.thigh.armor_side"] = instanceLayout(NODES.hip, [
-    [0.055, 1.01, -0.0382],
-    [0.055, 1.01, 0.0382],
+    [0.055, 1.01, -0.0395],
+    [0.055, 1.01, 0.0395],
   ]);
   builder.add({
     id: "t800.thigh.lines",
@@ -363,17 +363,17 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "沿股骨前后侧走管，两端各有一个卡套接头",
   });
   layouts["t800.thigh.lines"] = instanceLayout(NODES.hip, [
-    [0.11, 1.0, 0.02],
-    [0.11, 1.0, -0.02],
-    [0.0, 1.0, 0.02],
-    [0.0, 1.0, -0.02],
+    [0.125, 1.0, 0.02],
+    [0.125, 1.0, -0.02],
+    [-0.013, 1.0, 0.02],
+    [-0.013, 1.0, -0.02],
   ]);
   builder.add({
     id: "t800.thigh.fittings",
     cn: "股骨管接头",
     en: "Femur line fitting",
     asm: "thigh",
-    geom: { type: "tube", rOuter: 0.0055, rInner: 0.0052, h: 0.014, segments: 16 },
+    geom: { type: "tube", rOuter: 0.0055, rInner: 0.0053, h: 0.014, segments: 16 },
     mat: "brass",
     layer: 4,
     node: NODES.hip,
@@ -384,21 +384,21 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "硬管两端卡套接头（内孔 0.2mm 间隙包住硬管）",
   });
   layouts["t800.thigh.fittings"] = instanceLayout(NODES.hip, [
-    [0.11, 1.14, 0.02],
-    [0.11, 0.86, 0.02],
-    [0.11, 1.14, -0.02],
-    [0.11, 0.86, -0.02],
-    [0.0, 1.14, 0.02],
-    [0.0, 0.86, 0.02],
-    [0.0, 1.14, -0.02],
-    [0.0, 0.86, -0.02],
+    [0.125, 1.14, 0.02],
+    [0.125, 0.86, 0.02],
+    [0.125, 1.14, -0.02],
+    [0.125, 0.86, -0.02],
+    [-0.013, 1.14, 0.02],
+    [-0.013, 0.86, 0.02],
+    [-0.013, 1.14, -0.02],
+    [-0.013, 0.86, -0.02],
   ]);
   builder.add({
     id: "t800.thigh.clamps",
     cn: "股骨管卡",
     en: "Femur line clamp",
     asm: "thigh",
-    geom: { type: "tube", rOuter: 0.0055, rInner: 0.0052, h: 0.008, segments: 16 },
+    geom: { type: "tube", rOuter: 0.0062, rInner: 0.0053, h: 0.008, segments: 16 },
     mat: "brass",
     layer: 4,
     node: NODES.hip,
@@ -409,10 +409,10 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "卡箍抱住硬管（内孔 0.2mm 间隙），把管固定在护甲上",
   });
   layouts["t800.thigh.clamps"] = instanceLayout(NODES.hip, [
-    [0.11, 1.07, 0.02],
-    [0.11, 0.93, 0.02],
-    [0.0, 1.07, -0.02],
-    [0.0, 0.93, -0.02],
+    [0.125, 1.07, 0.02],
+    [0.125, 0.93, 0.02],
+    [-0.013, 1.07, -0.02],
+    [-0.013, 0.93, -0.02],
   ]);
 
   builder.add({
@@ -424,7 +424,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "chrome",
     layer: 3,
     node: NODES.hip,
-    at: [0.0025, 1.0, 0],
+    at: [-0.007, 1.0, 0],
     rot: [0, -90, 0],
     hint: "股骨后侧的窄加强条（背面也只留一条，不包壳）",
   });
@@ -437,9 +437,65 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "rubber",
     layer: 5,
     node: NODES.hip,
-    at: [-0.006, 1.0, 0.0305],
+    at: [-0.014, 1.0, 0.0305],
     hint: "沿股骨后加强条走的中段线束（外露可见）",
   });
+
+  // ---- 大腿前缘：成束的细铬钢活塞杆（参考图：轮廓起伏来自密集杆+活塞的排列）----
+  builder.add({
+    id: "t800.thigh.piston_rods",
+    cn: "大腿前束活塞杆",
+    en: "Femur front piston rod bank",
+    asm: "thigh",
+    geom: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.006, h: 0.24, segments: 12, at: [0, 0, 0] },
+        { type: "cylinder", r: 0.008, h: 0.03, segments: 14, at: [0, 0.098, 0] },
+        { type: "cylinder", r: 0.0075, h: 0.024, segments: 12, at: [0, -0.108, 0] },
+        { type: "sphere", r: 0.007, segments: 12, at: [0, 0.122, 0] },
+      ],
+    },
+    mat: "chrome",
+    layer: 2,
+    node: NODES.hip,
+    at: [0, 1.0, 0],
+    inst: 6,
+    layout: "t800.thigh.piston_rods",
+    instNodes: repeatNode(NODES.hip, 6),
+    hint: "大腿前缘 6 根细铬钢活塞杆成束排布：股四头肌的弧度由机构排列形成，不是肉块",
+  });
+  layouts["t800.thigh.piston_rods"] = instanceLayout(NODES.hip, [
+    [0.126, 1.0, 0.042],
+    [0.134, 1.0, 0.056],
+    [0.124, 1.0, 0.07],
+    [0.126, 1.0, -0.042],
+    [0.134, 1.0, -0.056],
+    [0.124, 1.0, -0.07],
+  ]);
+  builder.add({
+    id: "t800.thigh.hose_bank",
+    cn: "大腿波纹软管束",
+    en: "Femur hose bank",
+    asm: "thigh",
+    geom: { type: "cylinder", r: 0.0045, h: 0.12, segments: 10 },
+    mat: "rubber",
+    layer: 5,
+    node: NODES.hip,
+    at: [0, 1.0, 0],
+    inst: 6,
+    layout: "t800.thigh.hose_bank",
+    instNodes: repeatNode(NODES.hip, 6),
+    hint: "沿骨面走的软管束（参考图：大量波纹软管）",
+  });
+  layouts["t800.thigh.hose_bank"] = instanceLayout(NODES.hip, [
+    [0.1, 0.84, 0.047],
+    [0.055, 0.84, 0.047],
+    [0.01, 0.84, 0.047],
+    [0.1, 0.84, -0.047],
+    [0.055, 0.84, -0.047],
+    [0.01, 0.84, -0.047],
+  ]);
 
   // ---- 膝部两根驱动缸（缸体挂大腿，活塞杆挂小腿）----
   for (const spec of T800_HYDRAULICS.filter((item) => item.parent === "hip")) {

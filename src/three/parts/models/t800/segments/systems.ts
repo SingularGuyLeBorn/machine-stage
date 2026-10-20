@@ -238,10 +238,10 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     hint: "硬管接头处的密封垫圈（实例族）",
   });
   layouts["t800.fasteners.washers"] = instanceLayout(NODES.knee, [
-    [0.02, 0.2515, 0.02],
-    [0.02, 0.4915, 0.02],
-    [0.02, 0.2515, -0.02],
-    [0.02, 0.4915, -0.02],
+    [0.0305, 0.2515, 0.02],
+    [0.0305, 0.4915, 0.02],
+    [0.0305, 0.2515, -0.02],
+    [0.0305, 0.4915, -0.02],
   ]);
   builder.add({
     id: "t800.hip.tie_rod",
