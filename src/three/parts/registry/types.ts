@@ -102,6 +102,10 @@ export interface PartDefinition {
   dual?: boolean;
   /** 穿模时的人工提示（缺省由检测器按 mate/constants 自动生成）。 */
   hint?: string;
+  /**
+   * 自由标签。支撑检测（solver/support）默认豁免 `fx`（特效件）与 `floating`（飞行件）——
+   * 这两类本来就不该有支撑邻居；其余标签供模型/检测扩展使用。
+   */
   tags?: string[];
   /** 尺寸/资料的出处注记。 */
   source?: string;
