@@ -14,6 +14,7 @@ import {
   type PartHandle,
 } from "@/three/parts";
 import { findModel, type ViewKey } from "../catalog";
+import type { CameraMode } from "../three/viewpoints";
 import { setDamageSeed } from "@/three/parts/models/tiger/damage/plan";
 import { resetTigerLidPose } from "@/three/parts/models/tiger/lids";
 
@@ -164,6 +165,8 @@ interface StageState {
   views: Record<ViewKey, boolean>;
   layout: PanelLayout;
   machineState: string;
+  /** 相机模式：自由视角 / 第一人称（驾驶员潜望镜 / 车长指挥塔）。 */
+  cameraMode: CameraMode;
   /** 战损形态（完好/破损/破碎）：只切预制变体，不影响碰撞与支撑检测。 */
   damage: DamageState;
   /** 随机破口种子：每次「随机破口」+1，重建时由 damage kit 读取。 */
@@ -203,6 +206,7 @@ interface StageState {
   closeIsolation(): void;
   stepReport(delta: number): void;
   setMachineState(state: string): void;
+  setCameraMode(mode: CameraMode): void;
   setDamage(state: DamageState): void;
   /** 换一组随机破口并切到破碎，触发重建。 */
   rerollDamage(): void;
@@ -285,6 +289,7 @@ export const useStageStore = create<StageState>((set, get) => ({
     drawer: { ...LAYOUT_DEFAULT.drawer },
   },
   machineState: "idle",
+  cameraMode: "orbit",
   damage: "intact",
   damageSeed: 0,
   lidOverrides: {},
@@ -318,6 +323,7 @@ export const useStageStore = create<StageState>((set, get) => ({
       scanKind: null,
       scanMs: null,
       machineState: model.states?.[0]?.id ?? "idle",
+      cameraMode: "orbit",
       damage: "intact",
       damageSeed: 0,
       lidOverrides: {},
@@ -449,6 +455,9 @@ export const useStageStore = create<StageState>((set, get) => ({
     if (allowed && !allowed.some((item) => item.id === state)) return;
     set({ machineState: state });
   },
+
+  // 相机模式与机器状态解耦：切状态不该把人从驾驶舱里踢出来。
+  setCameraMode: (mode) => set({ cameraMode: mode }),
 
   setDamage: (damage) => set({ damage }),
 
