@@ -478,6 +478,28 @@ const sponsonShell: GeometryBuilder = (spec) => {
   return merged;
 };
 
+// ---------------------------------------------------------------------------
+// 发动机舱盖外翼（上部车体后段）：把 30mm 阶梯甲板延伸到赞助板宽度
+// 局部系：原点 = 翼板下表面·前端·内缘；+x 向后、y 上。侧别 side = ±1。
+// 翼板坐在赞助板顶板（1.045~1.075）上方 3mm，顶面 1.105 与发动机舱盖齐平。
+// ---------------------------------------------------------------------------
+const engineDeckWing: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const side = num(params, "side", 1) < 0 ? -1 : 1;
+  const len = num(params, "len", 1.591);
+  const width = num(params, "width", 0.8145);
+  const t = num(params, "t", 0.027);
+
+  const parts: THREE.BufferGeometry[] = [];
+  const wing = bevelBoxGeometry(len, t, width, 0.003);
+  wing.translate(len / 2, t / 2, (side * width) / 2);
+  parts.push(wing);
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
 export const tigerHullKitBuilders: Record<string, GeometryBuilder> = {
   hullPlate,
   hatchLid,
@@ -489,4 +511,5 @@ export const tigerHullKitBuilders: Record<string, GeometryBuilder> = {
   liftingEye,
   trackGuard,
   sponsonShell,
+  engineDeckWing,
 };
