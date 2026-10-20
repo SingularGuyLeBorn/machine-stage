@@ -214,11 +214,11 @@ export function Viewport() {
               type="button"
               className="btn btn--sm"
               aria-pressed={cameraMode === "driver"}
-              title="驾驶员潜望镜：窄视场第一人称，再点一次回到自由视角"
+              title="驾驶席视角：眼点取自驾驶员座椅与仪表板，再点一次回到自由视角"
               onClick={() => setCameraMode(cameraMode === "driver" ? "orbit" : "driver")}
             >
               <Crosshair size={13} aria-hidden />
-              潜望镜
+              驾驶席
             </button>
           ) : null}
           <button type="button" className="btn btn--sm" title="回到初始方位" onClick={requestViewReset}>

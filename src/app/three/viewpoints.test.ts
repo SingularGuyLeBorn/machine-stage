@@ -29,19 +29,22 @@ function rotateTurret(built: ReturnType<typeof build>, yawRad: number) {
 }
 
 describe("app/three/viewpoints 第一人称", () => {
-  it("orbit 不接管相机；驾驶员眼点在左前潜望镜上方", () => {
+  it("orbit 不接管相机；驾驶席眼点落在座椅与仪表板之间", () => {
     const built = build();
     built.root.updateMatrixWorld(true);
     expect(firstPersonView("orbit", built)).toBeNull();
 
     const driver = firstPersonView("driver", built)!;
-    expect(driver.fov).toBeLessThan(30);
+    expect(driver.fov).toBeGreaterThan(40);
     expect(driver.position.z).toBeLessThan(0); // 驾驶员在左
-    expect(driver.position.x).toBeLessThan(-3.5);
-    expect(driver.position.y).toBeGreaterThan(1.1);
-    // 视线朝车头（-X），并略微下倾
-    expect(driver.target.x).toBeLessThan(driver.position.x);
-    expect(driver.target.y).toBeLessThan(driver.position.y);
+    expect(driver.position.x).toBeLessThan(-3.0);
+    expect(driver.position.x).toBeGreaterThan(-3.6);
+    // 坐着的眼睛：比坐垫高、比顶甲板（1.05）低
+    expect(driver.position.y).toBeGreaterThan(0.75);
+    expect(driver.position.y).toBeLessThan(1.0);
+    // 视线朝车头下方的仪表板——不是贴着一面装甲墙（fov 再窄也只剩白墙）
+    expect(driver.target.x).toBeLessThan(driver.position.x - 0.8);
+    expect(driver.target.y).toBeLessThan(driver.position.y - 0.4);
   });
 
   it("车长眼点在指挥塔口，炮塔回转时只转一个角度", () => {
