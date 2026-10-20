@@ -390,6 +390,54 @@ export function mirrorGeometry(geometry: THREE.BufferGeometry): THREE.BufferGeom
 }
 
 /** 几何合并：统一为非索引、补齐 normal/uv 后合并；传入的源几何不被释放。 */
+/** 直齿圆柱齿轮（梯形齿廓 + 中心孔，Shape→Extrude）：剖视/近景够用，不做渐开线。 */
+export function spurGearGeometry(
+  teeth: number,
+  pitchRadius: number,
+  width: number,
+  bore: number,
+  bevel = 0.0006,
+): THREE.BufferGeometry {
+  const moduleSize = (2 * pitchRadius) / teeth;
+  const tip = pitchRadius + moduleSize * 0.8;
+  const root = Math.max(pitchRadius - moduleSize, bore + 0.004);
+  const step = (Math.PI * 2) / teeth;
+  const tipHalf = step * 0.3;
+  const rootHalf = step * 0.44;
+  const shape = new THREE.Shape();
+  let first = true;
+  for (let i = 0; i < teeth; i++) {
+    const a = i * step;
+    const corners: [number, number][] = [
+      [root * Math.cos(a - rootHalf), root * Math.sin(a - rootHalf)],
+      [tip * Math.cos(a - tipHalf), tip * Math.sin(a - tipHalf)],
+      [tip * Math.cos(a + tipHalf), tip * Math.sin(a + tipHalf)],
+      [root * Math.cos(a + rootHalf), root * Math.sin(a + rootHalf)],
+    ];
+    for (const [x, y] of corners) {
+      if (first) {
+        shape.moveTo(x, y);
+        first = false;
+      } else {
+        shape.lineTo(x, y);
+      }
+    }
+  }
+  shape.closePath();
+  shape.holes.push(new THREE.Path().absarc(0, 0, bore, 0, Math.PI * 2, true));
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: Math.max(width - 2 * bevel, 0.001),
+    bevelEnabled: true,
+    bevelThickness: bevel,
+    bevelSize: bevel,
+    bevelSegments: 1,
+    steps: 1,
+    curveSegments: 32,
+  });
+  geometry.translate(0, 0, -width / 2 + bevel);
+  return geometry;
+}
+
 export function mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry {
   if (geometries.length === 0) throw new Error("kernel.mergeGeometries：空数组");
   if (geometries.length === 1) return geometries[0].clone();

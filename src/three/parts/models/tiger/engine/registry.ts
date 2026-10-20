@@ -790,6 +790,25 @@ function makeLayouts(): Record<string, InstanceLayout> {
   // 若漏掉，活塞销会顺着缸轴立着穿过连杆小头（实测 7.99mm 穿透）。
   layouts[ENGINE_LAYOUTS.pistonPin] = () => new THREE.Matrix4().makeRotationZ(deg2rad(-90));
 
+  // 气门组沿气门杆轴线的偏移：弹簧 / 弹簧座 / 锁夹都复用气门的列侧 + 倾角
+  const valveAlong = (index: number, along: number, constants: Record<string, number>) => {
+    const { pin, side } = cylinderInfo(Math.floor(index / 2), constants);
+    const exhaust = index % 2 === 1;
+    const lateral = (exhaust ? 1 : -1) * side * constants.VALVE_Z;
+    const tilt = (exhaust ? 1 : -1) * side * constants.VALVE_TILT;
+    return bankMatrix(
+      side,
+      constants.CYL_X1 - pin * constants.CYL_PITCH,
+      constants.VALVE_SEAT,
+      lateral,
+      tilt,
+      constants,
+    ).multiply(new THREE.Matrix4().makeTranslation(0, along, 0));
+  };
+  layouts["engine.valveSpring"] = ({ index, constants }) => valveAlong(index, 0.026, constants);
+  layouts["engine.valveRetainer"] = ({ index, constants }) => valveAlong(index, 0.06, constants);
+  layouts["engine.valveKeeper"] = ({ index, constants }) => valveAlong(index, 0.071, constants);
+
   // 气门：每缸 2 只（index 偶 = 进气 / 奇 = 排气），坐标随列侧镜像
   layouts[ENGINE_LAYOUTS.valve] = ({ index, constants }) => {
     const { pin, side } = cylinderInfo(Math.floor(index / 2), constants);
@@ -1980,6 +1999,58 @@ function buildParts(): PartDefinition[] {
     indexed: true,
     instance_layout: ENGINE_LAYOUTS.valve,
     source: "每缸进/排气门各 1；倾角 ±6°（进排气对置），杆顶 5mm 内藏于凸轮罩内",
+  });
+  add({
+    id: "tiger.valvetrain.valve_spring",
+    name_cn: "气门弹簧",
+    name_en: "Ventilfeder",
+    assembly: "valvetrain",
+    build_layer: 1,
+    build_order: 183,
+    geometry: {
+      type: "kit",
+      kit: "coilSpring",
+      params: { coilR: 0.0105, wireR: 0.0013, turns: 6, h: 0.03, perTurn: 10 },
+    },
+    material: "steel",
+    instances: 24,
+    indexed: true,
+    instance_layout: "engine.valveSpring",
+    mate: { type: "absolute" },
+    source:
+      "气门弹簧 ⌀24 × 30（簧丝 ⌀2.6 × 6 圈，TubeGeometry 沿螺旋线）：套在气门杆外（杆 ⌀16、弹簧内径 ⌀21 → 单边 2.5mm），下端坐缸盖弹簧座（y 0.026），上端顶弹簧座；24 只随气门倾角 ±6°。",
+  });
+  add({
+    id: "tiger.valvetrain.valve_retainer",
+    name_cn: "气门弹簧座",
+    name_en: "Ventilfederteller",
+    assembly: "valvetrain",
+    build_layer: 1,
+    build_order: 184,
+    geometry: { type: "tube", rOuter: 0.013, rInner: 0.0095, h: 0.006, segments: 18 },
+    material: "steel_worn",
+    instances: 24,
+    indexed: true,
+    instance_layout: "engine.valveRetainer",
+    mate: { type: "absolute" },
+    source:
+      "弹簧座 ⌀26 × 6（内孔 ⌀19 让锁夹）：压在弹簧上端（y 0.060~0.066），上表面离凸轮基圆 4mm；24 只。",
+  });
+  add({
+    id: "tiger.valvetrain.valve_keeper",
+    name_cn: "气门锁夹",
+    name_en: "Ventilkeil",
+    assembly: "valvetrain",
+    build_layer: 1,
+    build_order: 185,
+    geometry: { type: "tube", rOuter: 0.0092, rInner: 0.0081, h: 0.008, segments: 16 },
+    material: "steel",
+    instances: 24,
+    indexed: true,
+    instance_layout: "engine.valveKeeper",
+    mate: { type: "absolute" },
+    source:
+      "锁夹（两半合并成一个环件，剖视看是一圈楔形卡环）：卡在气门杆上端环槽外（杆 ⌀16、锁夹内径 ⌀16.2、外径 ⌀18.4），被弹簧座压住；锁夹顶面 y 0.072，离杆顶 12mm。",
   });
   add({
     id: "tiger.valvetrain.spark_plug",
