@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { InstanceLayout } from "../../../assembler/assembler";
-import type { ModelRegistry, PartDefinition } from "../../../registry/types";
+import type { ModelRegistry, NodeDef, PartDefinition } from "../../../registry/types";
 
 // ============================================================================
 // models/tiger/interior —— 虎式 I 内衬内饰（L3 第一批：驾驶舱 + 无线电员席）
@@ -62,7 +62,28 @@ const IN_CONSTANTS: Record<string, number> = {
   IN_DASH_X: -4.375,
   IN_DASH_Y: 0.23,
   IN_DASH_Z: -0.51,
+
+  // —— 仪表组（5 只表 + 真指针）——
+  // 表心 x 比仪表板面（IN_DASH_X + 20mm）再前 12mm：表背与板面留 2mm。
+  IN_GAUGE_X: -4.343,
+  IN_GAUGE_Y: 0.27,
+  IN_GAUGE_Z0: -0.8,
+  IN_GAUGE_PITCH: 0.14,
+  /** 指针盘面：表圈前端面（+16mm）+ 1.5mm 间隙 → 指针体中心。 */
+  IN_GAUGE_FACE_DX: 0.0175,
+  /** 指针有效长度：表盘内径 32mm，指针尖留 4mm 余量。 */
+  IN_GAUGE_NEEDLE_LEN: 0.026,
 };
+
+/** 仪表序号 → 表心世界坐标（布局与节点共用同一份派生，禁止两处各写一遍）。 */
+function gaugeCenter(index: number, c: Record<string, number>): [number, number, number] {
+  return [c.IN_GAUGE_X!, c.IN_GAUGE_Y!, c.IN_GAUGE_Z0! + index * c.IN_GAUGE_PITCH!];
+}
+
+/** 仪表指针节点名（5 只表各一个：针绕 X 轴摆动）。 */
+export function gaugeNodeName(index: number): string {
+  return `Gauge_${index + 1}`;
+}
 
 const AXIS_Z: [number, number, number] = [90, 0, 0];
 
@@ -84,7 +105,10 @@ export function makeInteriorLayouts(): Record<string, InstanceLayout> {
   layouts[INTERIOR_LAYOUTS.seatPair] = ({ index }) =>
     new THREE.Matrix4().makeTranslation(c.IN_SEAT_X, 0, side(index) * c.IN_SEAT_Z);
 
-  layouts[INTERIOR_LAYOUTS.gauge] = ({ index }) => laid(RX, -4.343, 0.27, -0.8 + index * 0.14);
+  layouts[INTERIOR_LAYOUTS.gauge] = ({ index, constants }) => {
+    const [x, y, z] = gaugeCenter(index, constants);
+    return laid(RX, x, y, z);
+  };
 
   layouts[INTERIOR_LAYOUTS.toggle] = ({ index }) => laid(RX, -4.343, 0.155, -0.8 + index * (0.565 / 7));
 
@@ -387,7 +411,6 @@ function buildInteriorParts(): PartDefinition[] {
       parts: [
         { type: "cylinder", r: 0.034, h: 0.018, at: [0, 0, 0], segments: 24, bevel: 0.002 },
         { type: "tube", rOuter: 0.038, rInner: 0.032, h: 0.008, at: [0, 0.012, 0], segments: 24 },
-        { type: "box", w: 0.03, h: 0.002, d: 0.004, at: [0.008, 0.02, 0], bevel: 0.001 },
       ],
     },
     material: "steel",
@@ -396,7 +419,72 @@ function buildInteriorParts(): PartDefinition[] {
     instance_layout: INTERIOR_LAYOUTS.gauge,
     mate: { type: "absolute" },
     source:
-      "仪表 ф76（车速/转速/油温/水温/油量 5 只）：轴向 +X 面向驾驶员，表背与仪表板面留 2mm；刻度与指针为装饰，真表芯待 M-C。",
+      "仪表 ф76（车速/转速/油温/水温/油量 5 只）：轴向 +X 面向驾驶员，表背与仪表板面留 2mm；" +
+      "表圈内孔 ф64，表盘（gauge_dial）坐在孔内、指针（gauge_needle）由节点驱动。",
+  });
+
+  add({
+    id: "tiger.interior.gauge_dial",
+    name_cn: "仪表表盘",
+    name_en: "gauge dial",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 409,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.03, h: 0.002, at: [0, 0.013, 0], segments: 32, bevel: 0.0006 },
+      ],
+    },
+    material: "interior_paint",
+    instances: 5,
+    indexed: true,
+    instance_layout: INTERIOR_LAYOUTS.gauge,
+    mate: { type: "absolute" },
+    source:
+      "表盘 ф60×2，坐在表圈内孔（ф64）里，径向留 2mm；正面在表圈前端面（+16mm）之后 2mm，" +
+      "指针压在盘面上。刻度留待贴图批次，本批只做盘面与真指针。",
+  });
+
+  add({
+    id: "tiger.interior.gauge_needle",
+    name_cn: "仪表指针",
+    name_en: "gauge needle",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 410,
+    geometry: {
+      type: "merge",
+      parts: [
+        // 轴套：压在盘面上（盘面前端面 x +14mm，留 0.2mm 间隙），沿 +X 出 5mm。
+        // 注意 merge 子件不支持旋转，圆柱轴恒为 +Y；轴套要沿 X，故用方块（倒角后近似圆台）。
+        {
+          type: "box",
+          w: 0.005,
+          h: 0.009,
+          d: 0.009,
+          at: ["IN_GAUGE_FACE_DX-0.0008", 0, 0],
+          bevel: 0.0015,
+        },
+        // 针体：沿 +Z 出针，绕 X 轴摆动 240°（-120°..+120°）。
+        {
+          type: "box",
+          w: 0.0018,
+          h: 0.004,
+          d: "IN_GAUGE_NEEDLE_LEN",
+          at: ["IN_GAUGE_FACE_DX", 0, "IN_GAUGE_NEEDLE_LEN/2+0.001"],
+          bevel: 0.0004,
+        },
+      ],
+    },
+    material: "interior_red",
+    instances: 5,
+    indexed: true,
+    instance_nodes: Array.from({ length: 5 }, (_, i) => gaugeNodeName(i)),
+    mate: { type: "absolute" },
+    source:
+      "真指针（替代原装饰针）：轴套 ф9×5 + 针体 1.8×4×26，红色。几何按世界朝向建（针沿 +Z、轴套沿 +X），" +
+      "节点绕 X 摆动即可在表盘平面内扫过；行程 240° 对应满量程。",
   });
 
   add({
@@ -405,7 +493,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "toggle switch",
     assembly: "interior",
     build_layer: 3,
-    build_order: 409,
+    build_order: 411,
     geometry: {
       type: "merge",
       parts: [
@@ -428,7 +516,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "pedal",
     assembly: "interior",
     build_layer: 3,
-    build_order: 410,
+    build_order: 412,
     geometry: {
       type: "merge",
       parts: [
@@ -452,7 +540,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "control lever",
     assembly: "interior",
     build_layer: 3,
-    build_order: 411,
+    build_order: 413,
     geometry: {
       type: "merge",
       parts: [
@@ -476,7 +564,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "handbrake lever",
     assembly: "interior",
     build_layer: 3,
-    build_order: 412,
+    build_order: 414,
     geometry: {
       type: "merge",
       parts: [
@@ -498,7 +586,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "periscope housing",
     assembly: "interior",
     build_layer: 3,
-    build_order: 413,
+    build_order: 415,
     geometry: {
       type: "merge",
       parts: [
@@ -521,7 +609,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "periscope prism",
     assembly: "interior",
     build_layer: 3,
-    build_order: 414,
+    build_order: 416,
     geometry: {
       type: "merge",
       parts: [{ type: "box", w: 0.05, h: 0.06, d: 0.08, at: [-0.1, 0.99, 0], bevel: 0.003 }],
@@ -540,7 +628,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "periscope eyepiece",
     assembly: "interior",
     build_layer: 3,
-    build_order: 415,
+    build_order: 417,
     geometry: { type: "tube", rOuter: 0.032, rInner: 0.024, h: 0.04, segments: 20 },
     material: "bakelite",
     instances: 2,
@@ -558,7 +646,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "Fu 5 radio set",
     assembly: "interior",
     build_layer: 3,
-    build_order: 416,
+    build_order: 418,
     geometry: {
       type: "merge",
       parts: [
@@ -579,7 +667,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "radio mount",
     assembly: "interior",
     build_layer: 3,
-    build_order: 417,
+    build_order: 419,
     geometry: {
       type: "merge",
       parts: [
@@ -600,7 +688,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "radio knob",
     assembly: "interior",
     build_layer: 3,
-    build_order: 418,
+    build_order: 420,
     geometry: {
       type: "merge",
       parts: [
@@ -623,7 +711,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "bow MG receiver",
     assembly: "interior",
     build_layer: 3,
-    build_order: 419,
+    build_order: 421,
     geometry: {
       type: "kit",
       kit: "bowMg",
@@ -641,7 +729,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "MG drum magazine",
     assembly: "interior",
     build_layer: 3,
-    build_order: 420,
+    build_order: 422,
     geometry: {
       type: "merge",
       parts: [
@@ -660,7 +748,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "MG grip",
     assembly: "interior",
     build_layer: 3,
-    build_order: 421,
+    build_order: 423,
     geometry: {
       type: "merge",
       parts: [{ type: "box", w: 0.025, h: 0.06, d: 0.03, at: [0, 0, 0], bevel: 0.004 }],
@@ -680,7 +768,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "fire extinguisher",
     assembly: "interior",
     build_layer: 3,
-    build_order: 422,
+    build_order: 424,
     geometry: {
       type: "merge",
       parts: [
@@ -702,7 +790,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "extinguisher clamp",
     assembly: "interior",
     build_layer: 3,
-    build_order: 423,
+    build_order: 425,
     geometry: {
       type: "merge",
       parts: [
@@ -725,7 +813,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "interior lamp",
     assembly: "interior",
     build_layer: 3,
-    build_order: 424,
+    build_order: 426,
     geometry: {
       type: "merge",
       parts: [
@@ -748,7 +836,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "stowage box",
     assembly: "interior",
     build_layer: 3,
-    build_order: 425,
+    build_order: 427,
     geometry: {
       type: "merge",
       parts: [
@@ -771,7 +859,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "Sicherungskasten",
     assembly: "interior",
     build_layer: 3,
-    build_order: 439,
+    build_order: 441,
     geometry: {
       type: "merge",
       parts: [
@@ -794,7 +882,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "8,8 cm Treibladungshülse",
     assembly: "interior",
     build_layer: 3,
-    build_order: 430,
+    build_order: 432,
     geometry: {
       type: "merge",
       parts: [
@@ -817,7 +905,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "8,8 cm Pzgr. 39",
     assembly: "interior",
     build_layer: 3,
-    build_order: 431,
+    build_order: 433,
     geometry: {
       type: "merge",
       parts: [
@@ -841,7 +929,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "8,8 cm Sprgr. 43",
     assembly: "interior",
     build_layer: 3,
-    build_order: 432,
+    build_order: 434,
     geometry: {
       type: "merge",
       parts: [
@@ -865,7 +953,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "Munitionshalterung",
     assembly: "interior",
     build_layer: 3,
-    build_order: 433,
+    build_order: 435,
     geometry: {
       type: "merge",
       parts: [
@@ -902,7 +990,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "Turmboden",
     assembly: "interior",
     build_layer: 3,
-    build_order: 434,
+    build_order: 436,
     geometry: { type: "tube", rOuter: 0.8, rInner: 0.34, h: 0.02, segments: 40 },
     node: "Turret",
     material: "armor_steel",
@@ -917,7 +1005,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "Turmboden Geländer",
     assembly: "interior",
     build_layer: 3,
-    build_order: 435,
+    build_order: 437,
     geometry: {
       type: "kit",
       kit: "basketRail",
@@ -936,7 +1024,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "Turmdrehwerk",
     assembly: "interior",
     build_layer: 3,
-    build_order: 436,
+    build_order: 438,
     geometry: {
       type: "merge",
       parts: [
@@ -958,7 +1046,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "Turmlüfter",
     assembly: "interior",
     build_layer: 3,
-    build_order: 437,
+    build_order: 439,
     geometry: {
       type: "merge",
       parts: [
@@ -980,7 +1068,7 @@ function buildInteriorParts(): PartDefinition[] {
     name_en: "Turmsitz",
     assembly: "interior",
     build_layer: 3,
-    build_order: 438,
+    build_order: 440,
     geometry: {
       type: "merge",
       parts: [
@@ -1002,6 +1090,25 @@ function buildInteriorParts(): PartDefinition[] {
   return parts;
 }
 
+/**
+ * 内饰节点：5 只仪表指针各一个旋转节点（绕车体 X 轴摆动 = 在表盘平面内扫过）。
+ * 指针零件用 instance_nodes 骑在节点上，节点由 motion.ts 的 animateTigerGauges 驱动。
+ */
+function buildInteriorNodes(): NodeDef[] {
+  return Array.from({ length: 5 }, (_, i) => ({
+    name: gaugeNodeName(i),
+    parent: "root",
+    pivot: ["IN_GAUGE_X", "IN_GAUGE_Y", `IN_GAUGE_Z0+${i}*IN_GAUGE_PITCH`] as [
+      string,
+      string,
+      string,
+    ],
+    motion: "rotate" as const,
+    axis: "x" as const,
+    note: `第 ${i + 1} 只仪表指针（车速/转速/油温/水温/油量）`,
+  }));
+}
+
 export function makeInteriorRegistry(): ModelRegistry {
   return {
     model: "tiger",
@@ -1016,7 +1123,7 @@ export function makeInteriorRegistry(): ModelRegistry {
     ].join("\n"),
     constants: IN_CONSTANTS,
     assemblies: [{ id: "interior", name_cn: "内衬内饰", name_en: "interior", explode: [0, 0.6, 0] }],
-    nodes: [],
+    nodes: buildInteriorNodes(),
     materials: {
       interior_paint: {
         base: "#c8c1af",

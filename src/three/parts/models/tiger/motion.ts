@@ -953,6 +953,88 @@ function hideTigerEffects(assembled: AssembledModel): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 仪表（P4 深度拟真）—— 5 只表全部由车辆状态驱动，不是贴图
+//
+// 行程 240°：零位 -120°、满量程 +120°。表心与节点见 interior/registry 的
+// IN_GAUGE_* 常量（单一真值源），这里只负责「值 → 指针角」。
+// 车速是展示尺度：行进演示的 0.55 m/s 对应表盘满量程 38 km/h（虎式公路极速 38）。
+// ---------------------------------------------------------------------------
+export const GAUGE_SWEEP = (Math.PI * 4) / 3;
+
+export interface TigerGaugeSignals {
+  /** 车速（km/h，展示尺度）。 */
+  speedKmh: number;
+  rpm: number;
+  oilTempC: number;
+  waterTempC: number;
+  /** 油量 0..1。 */
+  fuel: number;
+}
+
+/** 发动机是否处于「在转」的状态（点火之后的常通工况）。 */
+const ENGINE_RUNNING_STATES = new Set([
+  "running",
+  "driving",
+  "firing",
+  "mg_firing",
+  "aiming",
+  "refuel",
+]);
+
+export function tigerGaugeSignals(seconds: number, state?: string): TigerGaugeSignals {
+  const driving = state === "driving";
+  const starting = state === "engine_start";
+  const running = starting || ENGINE_RUNNING_STATES.has(state ?? "");
+
+  const speedKmh = driving
+    ? (Math.abs(tigerDrivePoseAt(seconds).speed) / TIGER_DRIVE_SPEED) * 38
+    : 0;
+
+  const rpm = starting ? tigerEngineRpmAt(seconds) : running ? TIGER_IDLE_RPM : 0;
+
+  // 水温与 EngineHud 同源：冷车 18°C，点火后指数升温；其它在转工况按热车怠速 78°C。
+  const waterTempC = starting
+    ? seconds < TIGER_CRANK_END
+      ? 18 + (seconds / TIGER_CRANK_END) * 7
+      : 25 + 55 * (1 - Math.exp(-(seconds - TIGER_CRANK_END) / 7))
+    : running
+      ? 78
+      : 18;
+  const oilTempC = running ? waterTempC - 6 : 18;
+
+  // 加油状态油量上升（3s 加满），其余按 72% 常载。
+  const fuel =
+    state === "refuel" ? Math.min(1, 0.35 + 0.62 * Math.min(1, seconds / 3)) : 0.72;
+
+  return { speedKmh, rpm, oilTempC, waterTempC, fuel };
+}
+
+/** 值 → 指针角（rad，绕 X 轴）。0 = 零位 -120°，满量程 +120°。 */
+export function gaugeNeedleAngle(value: number, max: number): number {
+  const ratio = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
+  return -Math.PI / 2 + (ratio - 0.5) * GAUGE_SWEEP;
+}
+
+export function animateTigerGauges(
+  assembled: AssembledModel,
+  seconds: number,
+  state?: string,
+): void {
+  const signals = tigerGaugeSignals(seconds, state);
+  const angles = [
+    gaugeNeedleAngle(signals.speedKmh, 38),
+    gaugeNeedleAngle(signals.rpm, 3000),
+    gaugeNeedleAngle(signals.oilTempC, 120),
+    gaugeNeedleAngle(signals.waterTempC, 120),
+    gaugeNeedleAngle(signals.fuel, 1),
+  ];
+  for (let i = 0; i < angles.length; i++) {
+    const needle = assembled.getNode(`Gauge_${i + 1}`);
+    if (needle) needle.rotation.x = angles[i]!;
+  }
+}
+
 /**
  * 虎式动画总入口（catalog.animate）：按机器状态分流。
  * - running：悬挂演示；driving：行进演示；firing：主炮击发；mg_firing：MG34 连射；
@@ -965,6 +1047,8 @@ function hideTigerEffects(assembled: AssembledModel): void {
 export function animateTiger(assembled: AssembledModel, seconds: number, state?: string): void {
   setHatchLids(assembled, state === "aiming");
   animateFuelLids(assembled, state, seconds);
+  // 仪表是「常通」系统：发动机在转就一直在读数，不受下面的分支早退影响。
+  animateTigerGauges(assembled, seconds, state);
   if (state !== "driving") resetDriveInstances(assembled);
   if (state === "refuel") {
     hideTigerEffects(assembled);
