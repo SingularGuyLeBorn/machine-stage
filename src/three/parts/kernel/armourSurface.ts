@@ -21,6 +21,13 @@ export interface ArmourSurfaceOptions {
   grime: boolean;
 }
 
+/** 淋雨湿润度（0=干 / 1=湿）：全局 uniform，雨天视图开关切换。 */
+const wetUniform = { value: 0 };
+
+export function setArmourWet(wet: boolean): void {
+  wetUniform.value = wet ? 1 : 0;
+}
+
 const VERTEX_HEAD = /* glsl */ `
 varying vec3 vArmourWorld;
 varying vec3 vArmourNormal;
@@ -40,6 +47,7 @@ const VERTEX_BODY = /* glsl */ `
 `;
 
 const FRAGMENT_HEAD = /* glsl */ `
+uniform float uWet;
 varying vec3 vArmourWorld;
 varying vec3 vArmourNormal;
 float armourHash(vec3 p) {
@@ -69,6 +77,7 @@ export function applyArmourSurface(
 ): void {
   const { zimmerit, camo, grime } = options;
   material.onBeforeCompile = (shader) => {
+    shader.uniforms.uWet = wetUniform;
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", `#include <common>\n${VERTEX_HEAD}`)
       .replace("#include <begin_vertex>", `#include <begin_vertex>\n${VERTEX_BODY}`);
@@ -121,6 +130,8 @@ export function applyArmourSurface(
         /* glsl */ `#include <color_fragment>
         {
           ${verticalMask}
+          // 淋雨：竖直面压暗 10%，低洼处更深（雨水聚在凹处）
+          diffuseColor.rgb *= mix(1.0, 0.90, uWet * armourVertical);
           ${
             zimmerit
               ? `// 防磁棱的高度场同时压暗谷底，让凹凸在平光下也可读
@@ -205,6 +216,7 @@ export function applyArmourSurface(
           0.40,
           1.0
         );
+        roughnessFactor = mix(roughnessFactor, max(0.28, roughnessFactor - 0.22), uWet);
       }`,
     );
 
