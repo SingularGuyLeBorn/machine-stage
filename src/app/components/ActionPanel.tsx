@@ -14,6 +14,7 @@ export function ActionPanel() {
   const machineState = useStageStore((state) => state.machineState);
   const damage = useStageStore((state) => state.damage);
   const views = useStageStore((state) => state.views);
+  const cameraMode = useStageStore((state) => state.cameraMode);
   const scanPhase = useStageStore((state) => state.scanPhase);
 
   const model = findModel(modelId);
@@ -55,6 +56,10 @@ export function ActionPanel() {
       case "reroll-damage":
         store.rerollDamage();
         break;
+      case "camera":
+        // 再点一次同一模式 = 回到自由视角（和机构按钮的「再点停机」同一手感）
+        store.setCameraMode(store.cameraMode === action.mode ? "orbit" : action.mode);
+        break;
       case "planned":
         store.setNotice(action.note);
         break;
@@ -65,6 +70,7 @@ export function ActionPanel() {
     if (action.kind === "machine-state") return machineState === action.state;
     if (action.kind === "damage") return damage === action.level;
     if (action.kind === "view-toggle") return views[action.view];
+    if (action.kind === "camera") return cameraMode === action.mode;
     return false;
   };
 

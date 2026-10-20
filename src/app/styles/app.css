@@ -556,9 +556,88 @@
   inset: 0;
 }
 
+/* ---------- 第一人称潜望镜浮层 ----------
+   视觉逻辑：光学器件看到的是一块窄窗，窗外的装甲/舱内全黑。
+   用「窗口 + 9999px 外扩阴影」做遮罩，不用额外 DOM 拼四条黑边。 */
+
+.periscope {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.periscope__window {
+  position: relative;
+  width: min(78%, 900px);
+  height: min(60%, 560px);
+  border-radius: 20px;
+  /* 窗内轻微暗角（光学镜筒的边缘失光），窗外全黑 */
+  box-shadow:
+    0 0 0 9999px rgba(7, 9, 12, 0.945),
+    inset 0 0 90px 24px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 2px rgba(226, 232, 240, 0.14);
+}
+
+/* 分划板：中心细十字 + 左右短横线，像军用瞄准镜的蚀刻分划 */
+.periscope__window::before,
+.periscope__window::after {
+  content: "";
+  position: absolute;
+  background: rgba(226, 232, 240, 0.34);
+}
+
+.periscope__window::before {
+  left: 50%;
+  top: calc(50% - 34px);
+  width: 1px;
+  height: 68px;
+  transform: translateX(-0.5px);
+}
+
+.periscope__window::after {
+  top: 50%;
+  left: calc(50% - 34px);
+  width: 68px;
+  height: 1px;
+  transform: translateY(-0.5px);
+}
+
+.periscope__label,
+.periscope__hint {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(232, 238, 246, 0.86);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.periscope__label {
+  top: 18px;
+  font-weight: 600;
+}
+
+.periscope__hint {
+  bottom: 18px;
+  color: rgba(232, 238, 246, 0.55);
+}
+
+.periscope__exit {
+  position: absolute;
+  right: 20px;
+  bottom: 14px;
+  pointer-events: auto;
+}
+
 .viewport__overlay {
   position: absolute;
-  z-index: 2;
+  /* 高于 .periscope 的黑遮罩：第一人称里工具条/图例仍要看得见点得着 */
+  z-index: 6;
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
@@ -611,7 +690,7 @@
 /* 当前零件信息：视口左侧中部（零件树默认收起后的主信息入口） */
 .part-card {
   position: absolute;
-  z-index: 4;
+  z-index: 6;
   left: 56px;
   top: 50%;
   transform: translateY(-50%);

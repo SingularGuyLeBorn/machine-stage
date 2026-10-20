@@ -1659,3 +1659,22 @@ tsc / build ✓。零件/实例仍为 223 / 1998，227 报告 / 未豁免 0，�
 
 > 2026-10-20 存档清理：`docs/screenshots/`（109MB）与 `docs/recordings/`（17MB）已按用户要求删除，
 > 上文提到的截图 / 录屏文件名只作历史记录保留，需要时从 git 历史里 checkout 回来。
+
+### 合并第一人称潜望镜视角 + 接管 worktree 清理（2026-10-21）
+
+另一会话留下的未提交改动（`viewpoints.ts` + 相机接管 + 遮罩浮层）是合理的，本轮以「接管者」身份合并，
+并修掉两处会立刻露馅的问题：
+
+- **眼点变换错了**：`assembled.instanceMatrix()` 给的已经是含节点本帧位姿的 root 局部矩阵，
+  原实现又乘了一次 Turret 世界矩阵 → 炮塔回转时车长眼点绕座圈转**两倍**角度（瞄准演示里会被甩飞）；
+  而且完全没乘 root 矩阵 → 行进 / 受击时车体走了，视角留在原地。现在统一在 `firstPersonView()`
+  内乘 `root.matrixWorld`，删掉 `follow` 字段；新增 `viewpoints.test.ts` 3 条把这两点钉住
+  （炮塔转 60° 后眼点误差 < 20mm；root 平移 1.4m 眼点同步平移）。
+- **浮层文案重复 / 遮罩盖住工具条**：`窄视场 · 窄视场，向前看…` 去掉前缀；`.viewport__overlay`、
+  `.part-card` 提到 z-index 6，第一人称里「舱盖 / 透视 / 复位」仍可看见可点击；
+  `.periscope__window` 补 `position: relative`，分划板十字改为锚在镜窗自身。
+- 浏览器实测：驾驶员潜望镜 / 车长指挥塔两个视角都能进能退；行进演示中眼点跟车走
+  （root x −0.51m 时相机 x 同步），瞄准时相机与指挥塔世界位置差 13mm（缓动滞后，非偏移）。
+- 磁盘清理：`docs/screenshots`（109MB）、`docs/recordings`（17MB）、`dist/` 已删，worktree 6.6MB；
+  单测与门禁脚本保留。
+- 门禁：**150 tests / tsc / build ✓；227 报告未豁免 0；悬空 0/0；242 件 / 2060 实例**。

@@ -16,6 +16,7 @@ import {
   tigerInstanceLabel,
 } from "@/three/parts/models/tiger/motion";
 import { TIGER_LIDS, type TigerLidSpec } from "@/three/parts/models/tiger/lids";
+import type { CameraMode } from "./three/viewpoints";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -35,6 +36,7 @@ export type StageAction =
   | { id: string; group: string; label: string; kind: "scan"; scanKind: "static" | "sweep" }
   | { id: string; group: string; label: string; kind: "reset-view" }
   | { id: string; group: string; label: string; kind: "reroll-damage" }
+  | { id: string; group: string; label: string; kind: "camera"; mode: CameraMode }
   | { id: string; group: string; label: string; kind: "planned"; note: string };
 
 export interface StageStateDef {
@@ -72,6 +74,8 @@ export interface StageModel {
   instanceLabel?: (partId: string, index: number, count: number) => string | null;
   /** 可交互盖板（点击开合 / 悬停提示 / 视口一键开合）。 */
   lids?: readonly TigerLidSpec[];
+  /** 支持的相机模式（缺省只有自由视角；有潜望镜的车才登记 driver/commander）。 */
+  cameras?: CameraMode[];
   /** 主角数字（状态栏/参数面板展示，必须由求解器或常量算出）。 */
   readouts?: (assembled: AssembledModel) => Array<{ label: string; value: string }>;
   actions?: StageAction[];
@@ -148,6 +152,7 @@ export const CATALOG: StageModel[] = [
     detachOffset: tigerDetachOffset,
     instanceLabel: tigerInstanceLabel,
     lids: TIGER_LIDS,
+    cameras: ["orbit", "driver", "commander"],
     states: [
       { id: "idle", label: "停机", hint: "悬挂静止，可拖构建滑杆看装配" },
       {
@@ -239,6 +244,9 @@ export const CATALOG: StageModel[] = [
       { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
       { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
       { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "cam-driver", group: "视角", label: "驾驶员潜望镜", kind: "camera", mode: "driver" },
+      { id: "cam-commander", group: "视角", label: "车长指挥塔", kind: "camera", mode: "commander" },
+      { id: "cam-orbit", group: "视角", label: "自由视角", kind: "camera", mode: "orbit" },
       { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
       { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
       { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },

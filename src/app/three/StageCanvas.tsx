@@ -15,6 +15,7 @@ import { faultFromError, useStageStore } from "../state/stageStore";
 import { applyDamage, applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
 import { TigerVfx } from "./vfx/TigerVfx";
 import { applyTigerLidPose, effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
+import { firstPersonView, type CameraMode } from "./viewpoints";
 
 // ============================================================================
 // StageCanvas —— 中栏 3D 视口
@@ -478,23 +479,77 @@ function ContactShadow({ y, scale }: { y: number; scale: number }) {
   );
 }
 
-/** 相机聚焦：零件树 / 穿模报告点击 → 平滑飞行；重置视角 → 回到初始方位。 */
+/** 相机聚焦：零件树 / 穿模报告点击 → 平滑飞行；重置视角 → 回到初始方位。
+ *  第一人称（潜望镜）时接管相机：关掉 OrbitControls，眼点由 viewpoints 从零件包围盒派生；
+ *  退出时先记住的自由视角原路飞回，不把人甩到别的方位。 */
 function CameraRig() {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls) as
-    { target: THREE.Vector3; update: () => void } | null | undefined;
+    { target: THREE.Vector3; update: () => void; enabled: boolean } | null | undefined;
   const focus = useStageStore((state) => state.focus);
+  const cameraMode = useStageStore((state) => state.cameraMode);
+  const assembled = useStageStore((state) => state.assembled);
   const flight = useRef<{
     fromPosition: THREE.Vector3;
     toPosition: THREE.Vector3;
     fromTarget: THREE.Vector3;
     toTarget: THREE.Vector3;
+    fromFov: number;
+    toFov: number;
     duration: number;
     elapsed: number;
   } | null>(null);
+  /** 进入第一人称前的自由视角（退出时飞回来）。 */
+  const savedView = useRef<{
+    position: THREE.Vector3;
+    target: THREE.Vector3;
+    fov: number;
+  } | null>(null);
+  const previousMode = useRef<CameraMode>("orbit");
+  /** 第一人称视线目标（平滑用）。 */
+  const lookTarget = useRef(new THREE.Vector3(0, 0.8, 0));
+  const perspective = camera as THREE.PerspectiveCamera;
+
+  // 模式切换：进第一人称存下自由视角并交出控制权；回自由视角把相机交还 OrbitControls。
+  useEffect(() => {
+    if (!controls) return;
+    const entering = cameraMode !== "orbit" && previousMode.current === "orbit";
+    const leaving = cameraMode === "orbit" && previousMode.current !== "orbit";
+    if (entering) {
+      savedView.current = {
+        position: camera.position.clone(),
+        target: controls.target.clone(),
+        fov: perspective.fov,
+      };
+      flight.current = null;
+      controls.enabled = false;
+      // 视线目标从当前朝向前方 1m 起算，避免进第一人称时先甩一下
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      lookTarget.current.copy(camera.position).addScaledVector(forward, 1);
+    } else if (leaving) {
+      const back = savedView.current;
+      controls.enabled = true;
+      // target 先接到当前视线，避免 OrbitControls 接管瞬间把镜头拉向旧目标
+      controls.target.copy(lookTarget.current);
+      if (back) {
+        flight.current = {
+          fromPosition: camera.position.clone(),
+          toPosition: back.position.clone(),
+          fromTarget: controls.target.clone(),
+          toTarget: back.target.clone(),
+          fromFov: perspective.fov,
+          toFov: back.fov,
+          duration: 0.6,
+          elapsed: 0,
+        };
+      }
+      savedView.current = null;
+    }
+    previousMode.current = cameraMode;
+  }, [cameraMode, camera, controls, perspective]);
 
   useEffect(() => {
-    if (!focus || !controls) return;
+    if (!focus || !controls || cameraMode !== "orbit") return;
     const target = new THREE.Vector3(focus.center[0], focus.center[1], focus.center[2]);
     const currentTarget = controls.target.clone();
     const direction = focus.resetAngle
@@ -510,12 +565,28 @@ function CameraRig() {
       toPosition: target.clone().addScaledVector(direction, distance),
       fromTarget: currentTarget,
       toTarget: target,
+      fromFov: fov,
+      toFov: fov,
       duration: 0.55,
       elapsed: 0,
     };
-  }, [focus, camera, controls]);
+  }, [focus, camera, controls, cameraMode]);
 
   useFrame((_state, delta) => {
+    // —— 第一人称：眼点由零件包围盒派生（已是世界空间），窄视场，平滑跟随 ——
+    const view = firstPersonView(cameraMode, assembled);
+    if (view) {
+      const k = 1 - Math.exp(-12 * delta);
+      camera.position.lerp(view.position, k);
+      lookTarget.current.lerp(view.target, k);
+      if (Math.abs(perspective.fov - view.fov) > 1e-3) {
+        perspective.fov += (view.fov - perspective.fov) * k;
+        perspective.updateProjectionMatrix();
+      }
+      camera.lookAt(lookTarget.current);
+      return;
+    }
+
     const current = flight.current;
     if (!current || !controls) return;
     current.elapsed += delta;
@@ -523,6 +594,10 @@ function CameraRig() {
     const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
     camera.position.lerpVectors(current.fromPosition, current.toPosition, eased);
     controls.target.lerpVectors(current.fromTarget, current.toTarget, eased);
+    if (Math.abs(current.toFov - perspective.fov) > 1e-3) {
+      perspective.fov = current.fromFov + (current.toFov - current.fromFov) * eased;
+      perspective.updateProjectionMatrix();
+    }
     camera.lookAt(controls.target);
     controls.update();
     if (t >= 1) flight.current = null;
