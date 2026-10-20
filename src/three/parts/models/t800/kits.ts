@@ -193,7 +193,13 @@ interface BoneKitParams {
   endBottomX?: number;
   /** 外侧曲面装甲板：随本体一起的"腿形体量"（层：y / 半宽 / 外鼓） */
   shell?: {
-    levels: Array<{ y: number; halfW: number; bow: number }>;
+    levels: Array<{
+      y: number;
+      halfW: number;
+      bow: number;
+      bulgeF?: number;
+      bulgeB?: number;
+    }>;
     z0: number;
     thickness: number;
     xOffset?: number;
@@ -291,22 +297,32 @@ function boneKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeomet
  * 各层的 (半宽, 外鼓量) 沿 Y 变化，就得到"上宽下窄 / 中段鼓"的渐变外形。
  */
 function armorShell(
-  levels: Array<{ y: number; halfW: number; bow: number }>,
+  levels: Array<{
+    y: number;
+    halfW: number;
+    bow: number;
+    /** 前缘鼓出（股四头肌的肚子） */
+    bulgeF?: number;
+    /** 后缘鼓出（腓肠肌的肚子） */
+    bulgeB?: number;
+  }>,
   z0: number,
   thickness: number,
   xOffset = 0,
-  segments = 9,
+  segments = 24,
 ): THREE.BufferGeometry {
-  const profileOf = (halfW: number, bow: number): Array<[number, number]> => {
+  const profileOf = (halfW: number, bow: number, bulgeF: number, bulgeB: number): Array<[number, number]> => {
+    const xRear = -halfW - bulgeB;
+    const xFront = halfW + bulgeF;
     const pts: Array<[number, number]> = [
-      [-halfW, 0],
-      [halfW, 0],
+      [xRear, 0],
+      [xFront, 0],
     ];
     for (let i = 1; i < segments; i++) {
       const t = i / segments;
-      // 二次贝塞尔：P0=(halfW,0) P1=(0,bow) P2=(-halfW,0)
+      // 二次贝塞尔：P0=(xFront,0) P1=(0,bow) P2=(xRear,0)
       const mt = 1 - t;
-      const x = mt * mt * halfW + 2 * mt * t * 0 + t * t * -halfW;
+      const x = mt * mt * xFront + 2 * mt * t * 0 + t * t * xRear;
       const z = mt * mt * 0 + 2 * mt * t * bow + t * t * 0;
       pts.push([x, z]);
     }
@@ -316,7 +332,9 @@ function armorShell(
   const positions: number[] = [];
   const indices: number[] = [];
   const ringSize = segments + 1; // 每层轮廓点数（首尾不重复）
-  const profiles = levels.map((lvl) => profileOf(lvl.halfW, lvl.bow));
+  const profiles = levels.map((lvl) =>
+    profileOf(lvl.halfW, lvl.bow, lvl.bulgeF ?? 0, lvl.bulgeB ?? 0),
+  );
 
   for (let li = 0; li < levels.length; li++) {
     for (const [x, z] of profiles[li]) {

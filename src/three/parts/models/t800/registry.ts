@@ -30,9 +30,11 @@ import {
 
 /** 铬钢骨架材质库。 */
 const materials: ModelRegistry["materials"] = {
-  chrome: { base: "#c9ced4", metalness: 0.95, roughness: 0.18, preset: "steel", envMapIntensity: 1.35 },
-  bone: { base: "#c2c8ce", metalness: 0.95, roughness: 0.2, preset: "steel", envMapIntensity: 1.35 },
-  dark_chrome: { base: "#7c838c", metalness: 0.92, roughness: 0.3, preset: "steel" },
+  chrome: { base: "#d9dee4", metalness: 0.98, roughness: 0.11, preset: "steel", envMapIntensity: 1.5 },
+  bone: { base: "#ced4db", metalness: 0.97, roughness: 0.15, preset: "steel", envMapIntensity: 1.45 },
+  /** 镜面铬：关节盘 / 球头座 / 销轴（参考图里这两三个圆盘是最亮的焦点） */
+  mirror: { base: "#eef1f4", metalness: 1, roughness: 0.035, preset: "steel", envMapIntensity: 1.8 },
+  dark_chrome: { base: "#6d747d", metalness: 0.9, roughness: 0.32, preset: "steel" },
   gunmetal: { base: "#3f454d", metalness: 0.86, roughness: 0.42, preset: "steel_rough" },
   frame: { base: "#23272d", metalness: 0.72, roughness: 0.55, preset: "steel_rough" },
   rubber: { base: "#101216", metalness: 0.02, roughness: 0.9, preset: "rubber" },

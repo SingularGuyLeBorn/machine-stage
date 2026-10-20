@@ -530,8 +530,32 @@ export function planPairs(assembled: AssembledModel, options: ClippingOptions = 
   return { bodies, pairs };
 }
 
+/**
+ * three-mesh-bvh 的三角形求交遇到**共面**三角形时会打一条 console.warn。
+ * 一台 11 万面的模型，几何里大量「贴合面」对 → 几万条警告把主线程堵死一秒以上
+ * （表现就是「进模型卡一下」）。这里在精检窗口内把这类警告静音，检完立刻还原，
+ * 其余警告照常输出，不吞异常信息。
+ */
+function withCoplanarWarningsSilenced<T>(fn: () => T): T {
+  const original = console.warn;
+  console.warn = (...args: unknown[]) => {
+    const first = String(args[0] ?? "");
+    if (first.includes("coplanar")) return;
+    original(...args);
+  };
+  try {
+    return fn();
+  } finally {
+    console.warn = original;
+  }
+}
+
 /** 静态装配检测：全量实例对。 */
 export function detectStatic(assembled: AssembledModel, options: ClippingOptions = {}): ClippingReport[] {
+  return withCoplanarWarningsSilenced(() => detectStaticInner(assembled, options));
+}
+
+function detectStaticInner(assembled: AssembledModel, options: ClippingOptions = {}): ClippingReport[] {
   const minDepthM = options.minDepthM ?? 0.0005;
   // 详情预算只控制每对在交线上的采样密度（默认给足，让全部候选对都按高密度采样；
   // 真正吃时间的只有「确有三角面相交」的对，数量由几何决定）。

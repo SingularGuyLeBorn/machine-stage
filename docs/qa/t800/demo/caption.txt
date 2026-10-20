@@ -1,0 +1,1 @@
+T-800 right leg · iso 45° · t=0.00s · hip/knee/ankle 0.0/0.0/0.0 deg · knee_main rod 200.3 mm

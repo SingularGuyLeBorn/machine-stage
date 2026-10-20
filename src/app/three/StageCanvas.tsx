@@ -1,6 +1,6 @@
 import { ContactShadows, Environment, Grid, Html, Lightformer, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { EffectComposer, N8AO, Vignette } from "@react-three/postprocessing";
+import { EffectComposer, Vignette } from "@react-three/postprocessing";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import {
@@ -42,7 +42,7 @@ export function StageCanvas() {
   return (
     <Canvas
       shadows
-      dpr={[1, 2]}
+      dpr={[1, 1.5]}
       camera={{ position: [4.6, 3.4, 5.2], fov: 34, near: 0.05, far: 200 }}
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
     >
@@ -65,14 +65,14 @@ function Studio() {
         castShadow
         position={[5.5, 8.5, 4.5]}
         intensity={1.7}
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[1024, 1024]}
         shadow-bias={-0.0006}
         shadow-normalBias={0.012}
       >
         <orthographicCamera attach="shadow-camera" args={[-5, 5, 5, -5, 0.1, 40]} />
       </directionalLight>
       <directionalLight position={[-6, 3.5, -4.5]} intensity={0.34} color="#dfe7f2" />
-      <Environment resolution={256} frames={1}>
+      <Environment resolution={128} frames={1}>
         <color attach="background" args={["#aab2bc"]} />
         <Lightformer
           form="rect"
@@ -122,8 +122,10 @@ function SceneEnvIntensity({ value }: { value: number }) {
 
 function StageEffects() {
   return (
-    <EffectComposer multisampling={4}>
-      <N8AO halfRes quality="medium" aoRadius={0.45} intensity={1.15} distanceFalloff={0.9} color="#26303c" />
+    // 说明：这里原本挂着 N8AO 全屏环境光遮蔽。它第一次编译着色器要 ~1.5s，
+    // 正好是"进模型卡一秒"的元凶；而接地阴影（ContactShadows）+ 环境暗底
+    // 已经把体量关系交代清楚了，所以直接去掉这一 pass。
+    <EffectComposer multisampling={2}>
       <Vignette offset={0.32} darkness={0.28} />
     </EffectComposer>
   );
@@ -165,14 +167,19 @@ function StageRuntime() {
     // effect 里抛出的异常会冒泡到 React，没有边界就是整页白屏。
     let library: ReturnType<typeof createMaterialLibrary>;
     let next: AssembledModel;
+    const tMat = performance.now();
     try {
       library = createMaterialLibrary(registry.materials);
+      const tBuild = performance.now();
       next = buildModel(registry, {
         builders: model.builders,
         materials: library.materials,
         instanceLayouts: model.layouts,
         warnMissingLayout: false,
       });
+      console.log(
+        `[perf] 材质库 ${Math.round(tBuild - tMat)}ms · 装配 ${Math.round(performance.now() - tBuild)}ms`,
+      );
     } catch (error) {
       useStageStore.getState().reportFault(faultFromError(`装配 ${model.title}`, error));
       return;
@@ -394,7 +401,7 @@ function ContactShadow({ y, scale }: { y: number; scale: number }) {
       blur={2.4}
       far={4}
       frames={2}
-      resolution={512}
+      resolution={256}
     />
   );
 }
