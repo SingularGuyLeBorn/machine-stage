@@ -7,6 +7,7 @@ import { makeT800Layouts, makeT800Registry, t800Builders } from "../src/three/pa
 import { animateT800, t800Pose, t800Stroke } from "../src/three/parts/models/t800/motion";
 import { CYL, T800_HYDRAULICS, cylinderDims, cylinderLayout } from "../src/three/parts/models/t800/spec";
 import { detectStatic } from "../src/three/parts/solver/detect";
+import { partitionExpectedContacts } from "../src/three/parts/solver/whitelist";
 import { validateRegistry } from "../src/three/parts/registry/validate";
 import type { PartHandle } from "../src/three/parts/assembler/assembler";
 
@@ -36,13 +37,17 @@ const atRest = (t: number) => {
 // ---- 静态 ----
 atRest(0);
 const staticReports = detectStatic(model, { minDepthM: 0.0005 });
+const rules = registry.expectedContacts ?? [];
+const staticPartition = partitionExpectedContacts(staticReports, rules);
 const instanceCount = model.parts.reduce((n, p) => n + p.instances.length, 0);
 console.log(`零件定义 ${registry.parts.length} / 实例 ${instanceCount}`);
-console.log(`静态穿模报告: ${staticReports.length}`);
-for (const r of staticReports.slice(0, 25)) {
+console.log(
+  `静态穿模报告 ${staticReports.length}（未豁免 ${staticPartition.active.length} / 已豁免 ${staticPartition.expected.length}）`,
+);
+for (const r of staticPartition.active.slice(0, 25)) {
   console.log(
-    `  ${r.a} ↔ ${r.b}  ${r.depth_mm?.toFixed(2) ?? "?"}mm  ${r.form ?? ""}  ` +
-      `@(${r.point.map((v) => (v * 1000).toFixed(0)).join(",")})mm  交线${(r.intersection_mm ?? 0).toFixed(1)}mm`,
+    `  ${r.report.a} ↔ ${r.report.b}  ${r.report.depth_mm?.toFixed(2) ?? "?"}mm  ${r.report.form ?? ""}  ` +
+      `@(${r.report.point.map((v) => (v * 1000).toFixed(0)).join(",")})mm  交线${(r.report.intersection_mm ?? 0).toFixed(1)}mm`,
   );
 }
 
@@ -53,13 +58,19 @@ for (let i = 0; i < FRAMES; i++) {
   const reports = detectStatic(model, { minDepthM: 0.0005 });
   for (const r of reports) sweepReports.push(r);
 }
-console.log(`扫掠 ${FRAMES} 帧穿模报告: ${sweepReports.length}`);
+const sweepPartition = partitionExpectedContacts(sweepReports, rules);
+console.log(
+  `扫掠 ${FRAMES} 帧穿模报告 ${sweepReports.length}（未豁免 ${sweepPartition.active.length} / 已豁免 ${sweepPartition.expected.length}）`,
+);
 const seen = new Set<string>();
-for (const r of sweepReports) {
-  const key = `${r.a}|${r.b}`;
+for (const r of sweepPartition.active) {
+  const key = `${r.report.a}|${r.report.b}`;
   if (seen.has(key)) continue;
   seen.add(key);
-  console.log(`  ${r.a} ↔ ${r.b}  ${r.depth_mm?.toFixed(2) ?? "?"}mm  ${r.form ?? ""}`);
+  console.log(
+    `  ${r.report.a} ↔ ${r.report.b}  ${r.report.depth_mm?.toFixed(2) ?? "?"}mm  ${r.report.form ?? ""}  ` +
+      `@(${r.report.point.map((v) => (v * 1000).toFixed(0)).join(",")})mm`,
+  );
 }
 
 // ---- 悬空：AABB 支撑邻接（≤2mm 或包含）----
@@ -191,13 +202,13 @@ for (const a of audit) {
 }
 
 // ---- 结论 ----
-const unexempt = staticReports.length + sweepReports.length;
+const unexempt = staticPartition.active.length + sweepPartition.active.length;
 const hydraulicOk = audit.every(
   (a) => a.minEngagement > 5 && a.minTipClearance > 5 && a.minExposed > 5,
 );
 const partsOk = registry.parts.length >= 130;
 console.log(
-  `\n门禁：穿模 ${unexempt}（静态 ${staticReports.length} + 扫掠 ${sweepReports.length}）· ` +
+  `\n门禁：未豁免穿模 ${unexempt}（静态 ${staticPartition.active.length} + 扫掠 ${sweepPartition.active.length}）· ` +
     `悬空候选 ${floating.length} · 液压行程 ${hydraulicOk ? "PASS" : "FAIL"} · ` +
     `零件数 ${registry.parts.length} ${partsOk ? "PASS" : "FAIL"}`,
 );

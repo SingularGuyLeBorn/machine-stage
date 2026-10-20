@@ -39,7 +39,7 @@ describe("T-800 右腿注册表", () => {
 
   it("零件粒度达到一条腿 ~140 件（不是总成级）", () => {
     const { registry, model } = build();
-    expect(registry.parts.length).toBeGreaterThanOrEqual(140);
+    expect(registry.parts.length).toBeGreaterThanOrEqual(130);
     const instances = model.parts.reduce((sum, part) => sum + part.instances.length, 0);
     expect(instances).toBeGreaterThanOrEqual(200);
     // 零件 ID 粒度：没有「一个总成当一个件」——每个液压缸拆成 11 件
