@@ -2132,64 +2132,35 @@ function buildInteriorParts(): PartDefinition[] {
 
   add({
     id: "tiger.interior.coax_mg",
-    name_cn: "同轴机枪 MG34",
-    name_en: "MG 34 (koaxial)",
+    name_cn: "同轴机枪机匣",
+    name_en: "MG 34 Gehäuse (koaxial)",
     assembly: "interior",
     build_layer: 3,
     build_order: 479,
     geometry: {
       type: "merge",
       parts: [
-        // 机匣 300×100×90
+        // 机匣 300×100×90：位于炮架后方的炮长/装填手之间，与 L4 球座同一枪线（z +0.24）
         { type: "box", w: 0.3, h: 0.1, d: 0.09, at: [0, 0, 0], bevel: 0.005 },
-        { type: "box", w: 0.22, h: 0.022, d: 0.07, at: [0, 0.058, 0], bevel: 0.004 },
-        // 枪管（向前 130，止于防盾内表面后 20mm）
-        { type: "cylinder", r: 0.016, h: 0.13, at: [-0.155, 0.008, 0], segments: 16, bevel: 0.002 },
-        // 枪管套
-        { type: "cylinder", r: 0.026, h: 0.11, at: [-0.06, 0.008, 0], segments: 16, bevel: 0.002 },
-        // 弹链箱（机匣上方）
-        { type: "box", w: 0.14, h: 0.08, d: 0.07, at: [-0.02, 0.1, 0], bevel: 0.004 },
+        { type: "box", w: 0.22, h: 0.02, d: 0.07, at: [0, 0.058, 0], bevel: 0.004 },
+        // 供弹口（朝炮架一侧，弹链从帆布袋横向送入）
+        { type: "box", w: 0.1, h: 0.05, d: 0.03, at: [0.01, 0.02, -0.055], bevel: 0.003 },
         // 握把 + 扳机
-        { type: "box", w: 0.04, h: 0.09, d: 0.03, at: [0.16, -0.03, 0], bevel: 0.003 },
-        // 枪架（伸向炮架，留 3.5mm 名义缝）
-        {
-          type: "box",
-          w: 0.06,
-          h: 0.05,
-          d: 0.055,
-          at: [0.06, -0.05, -0.055],
-          bevel: 0.003,
-        },
-        // 准星
-        { type: "box", w: 0.018, h: 0.04, d: 0.012, at: [-0.21, 0.03, 0], bevel: 0.002 },
+        { type: "box", w: 0.04, h: 0.09, d: 0.03, at: [0.19, -0.03, 0], bevel: 0.003 },
+        { type: "box", w: 0.03, h: 0.012, d: 0.022, at: [0.16, 0.02, 0], bevel: 0.002 },
+        // 枪架摇臂：从机匣前脸接到炮架后缘（x -2.15）
+        { type: "box", w: 0.09, h: 0.04, d: 0.03, at: [-0.195, -0.005, 0.0], bevel: 0.003 },
+        // 照门
+        { type: "box", w: 0.016, h: 0.03, d: 0.01, at: [0.13, 0.04, 0], bevel: 0.002 },
       ],
     },
     material: "steel_worn",
-    mate: { type: "absolute", position: [-2.46, 1.6, 0.35] },
-    node: "Turret",
+    // 挂在火炮摇架上（俯仰时随机炮一起动）：mate 是 GunCradle 节点局部系
+    // （摇架转轴 x -2.4 / y 1.45 / z 0），世界坐标 -1.91 / 1.36 / 0.24
+    mate: { type: "absolute", position: [0.49, -0.15, 0.24] },
+    node: "GunCradle",
     source:
-      "同轴 MG34（机匣 300×100×90 + 枪管套 + 弹链箱 + 握把 + 枪架）：架在主炮右侧 z +0.35、枪线 y 1.60（高出炮线 150mm，装填手不用低头就能换弹链）；枪管止于防盾内表面后 20mm，枪架离炮架侧面 3.5mm；离高低机手轮顶 60mm、离装填手席靠背 40mm。枪口段在防盾外侧单独成件。",
-  });
-
-  add({
-    id: "tiger.interior.coax_muzzle",
-    name_cn: "同轴机枪枪口段",
-    name_en: "MG 34 Mündung (koaxial)",
-    assembly: "interior",
-    build_layer: 3,
-    build_order: 480,
-    geometry: {
-      type: "merge",
-      parts: [
-        { type: "cylinder", r: 0.017, h: 0.1, at: [0, 0, 0], segments: 16, bevel: 0.002 },
-        { type: "cylinder", r: 0.026, h: 0.05, at: [-0.075, 0, 0], segments: 16, bevel: 0.002 },
-      ],
-    },
-    material: "steel_worn",
-    mate: { type: "absolute", position: [-3.09, 1.6, 0.35] },
-    node: "Turret",
-    source:
-      "同轴机枪枪口段（枪管 100 + 消焰罩 50）：伸出防盾前面（x -3.023）17mm，后座离防盾面 17mm——防盾挡住两段之间的空隙，外观上是一条连续的枪管。",
+      "同轴 MG34 机匣（300×100×90 + 供弹口 + 握把 + 枪架）：紧贴在炮架后缘（机匣前脸 -2.06，离炮架 40mm），与 L4 球座同一枪线 z +0.24、低 30mm——枪管/球座在防盾外，机匣在防盾内，两者之间被炮架与防盾挡住，看不到断口。供弹口朝炮架一侧（弹链袋挂在装填手侧），机匣顶 1.37 离装填手坐垫 83mm（俯仰 ±3.4° 时抬 30mm 仍不碰）。",
   });
 
   add({
@@ -2222,6 +2193,75 @@ function buildInteriorParts(): PartDefinition[] {
     mate: { type: "absolute" },
     source:
       "机油压力管 ⌀12：从后隔板接线盒底部左角（盒底 0.79，起点离盒 15mm）沿左侧板内表面下沿一路向前，过座椅靠背顶（0.57）上方 50mm、方向盘轮缘（0.526）上方 48mm，在仪表板左上角接管；全程离壁 160~180mm，避开采暖/线束带（y 0.767 以上）。",
+  });
+
+  // ---- 装填链演示件（fx：构建时隐藏，不参与穿模/支撑检测，由 motion.ts 摆位）----
+  add({
+    id: "tiger.interior.loading_round_case",
+    name_cn: "装填药筒（演示）",
+    name_en: "Treibladungshülse (Ladevorgang)",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 482,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.051, h: 0.4, at: [0, 0, 0], segments: 20, bevel: 0.003 },
+        { type: "cylinder", r: 0.055, h: 0.022, at: [0, -0.19, 0], segments: 20, bevel: 0.002 },
+        { type: "tube", rOuter: 0.052, rInner: 0.044, h: 0.05, at: [0, 0.215, 0], segments: 20 },
+      ],
+    },
+    material: "case_brass",
+    mate: { type: "absolute", position: [-1.15, 1.7, 0.3] },
+    node: "Turret",
+    tags: ["fx"],
+    source:
+      "装填演示药筒（与待发药筒同口径 ⌀102×400，筒口收口环 ⌀104/⌀88）：局部 +Y = 弹头方向，动画里整支横转 90° 送进炮膛；它是演示件（tags fx），构建时隐藏、不参与穿模/支撑检测。",
+  });
+
+  add({
+    id: "tiger.interior.loading_round_shell",
+    name_cn: "装填弹丸（演示）",
+    name_en: "Panzergranate (Ladevorgang)",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 483,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.044, h: 0.19, at: [0, 0.385, 0], segments: 20, bevel: 0.002 },
+        { type: "cylinder", r: 0.044, h: 0.08, rTop: 0.02, at: [0, 0.52, 0], segments: 20, bevel: 0.002 },
+        { type: "cylinder", r: 0.0455, h: 0.02, at: [0, 0.3, 0], segments: 20, bevel: 0.001 },
+      ],
+    },
+    material: "steel_worn",
+    mate: { type: "absolute", position: [-1.15, 1.7, 0.3] },
+    node: "Turret",
+    tags: ["fx"],
+    source:
+      "装填演示弹丸（Pzgr. 39 ⌀88×190 + 风帽锥 80 + 弹带）：与药筒同一演示坐标，动画中与药筒同步（同一条矩阵），弹底坐在筒口 y 0.29。",
+  });
+
+  add({
+    id: "tiger.interior.ejected_case",
+    name_cn: "抛出的空药筒",
+    name_en: "Auswurfhülse",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 484,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.051, h: 0.4, at: [0, 0, 0], segments: 20, bevel: 0.003 },
+        { type: "cylinder", r: 0.055, h: 0.022, at: [0, -0.19, 0], segments: 20, bevel: 0.002 },
+      ],
+    },
+    material: "case_brass",
+    mate: { type: "absolute", position: [-2.25, 1.42, 0] },
+    node: "Turret",
+    tags: ["fx"],
+    source:
+      "抛壳演示件：击发后闩体下开，抽筒钩把空筒从膛底拉到 x -2.25 后自由落体，翻滚落到吊篮地板（面 1.16）上停住；演示件（tags fx），构建时隐藏。",
   });
 
   return parts;

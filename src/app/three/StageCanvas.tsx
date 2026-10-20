@@ -249,6 +249,7 @@ function StageRuntime() {
       state === "mg_firing" ||
       state === "aiming" ||
       state === "refuel" ||
+      state === "loading" ||
       state === "engine_start" ||
       state === "burning" ||
       state === "detonation" ||

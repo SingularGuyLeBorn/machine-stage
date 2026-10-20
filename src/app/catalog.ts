@@ -171,6 +171,11 @@ export const CATALOG: StageModel[] = [
         hint: "开闩 → 关闩 → 击针 → 后坐 450mm → 复进 → 开闩抛壳，6s 循环；看车体后坐与炮口焰",
       },
       {
+        id: "loading",
+        label: "装填演示",
+        hint: "取弹 → 递弹 → 推入炮膛 → 关闩闭锁 → 击发 → 抛壳落地：5.2s 完整装填链（演示弹为 fx 件，不参与穿模/支撑）",
+      },
+      {
         id: "mg_firing",
         label: "机枪连射",
         hint: "MG34 10 发连射：枪管短后坐、枪口上跳、供弹链步进、弹壳抛出/弹跳；3.2s 循环",
@@ -228,6 +233,7 @@ export const CATALOG: StageModel[] = [
       { id: "engine-start", group: "机构", label: "发动机启动", kind: "machine-state", state: "engine_start" },
       { id: "refuel", group: "勤务", label: "加油（开盖）", kind: "machine-state", state: "refuel" },
       { id: "cannon-fire", group: "火力", label: "主炮击发", kind: "machine-state", state: "firing" },
+      { id: "loading-run", group: "火力", label: "装填演示", kind: "machine-state", state: "loading" },
       { id: "mg-fire", group: "火力", label: "机枪连射", kind: "machine-state", state: "mg_firing" },
       { id: "aim", group: "火炮", label: "炮塔瞄准", kind: "machine-state", state: "aiming" },
       { id: "hit-light", group: "受击", label: "轻击（小口径）", kind: "machine-state", state: "hit_light" },
@@ -252,10 +258,11 @@ export const CATALOG: StageModel[] = [
       { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
     ],
     notes: [
-      "L1–L5 已装配到 281 件 / 2149 实例；主炮闩 / 中空炮管 / 双油箱 / 战损三态 / 多相爆炸已落地。",
+      "L1–L5 已装配到 283 件 / 2151 实例；主炮闩 / 中空炮管 / 双油箱 / 战损三态 / 多相爆炸已落地。",
       "仪表盘是活的：5 只表各有一条真指针（gauge_needle，骑在 Gauge_1..5 节点上），车速/转速/油温/水温/油量全部按车辆状态驱动——发动机启动看转速爬升与水温升温，行进看车速，加油看油量上升。",
       "加油路径：甲板开盖（静态开盖展示）→ ⌀140 甲板孔 → 加注管 → 软管 → 油箱通孔加油颈；开「透视」可看到整条路径。",
       "主炮击发是节点驱动的机械演示（后坐 450mm + 开闩 + 击针 + 炮口焰）；机枪连射含枪管短后坐/枪口上跳/供弹链/弹壳。",
+      "装填演示（火力组）是一条 5.2s 的完整链：待发弹架取弹 → 横转 90° 递到炮闩 → 推入炮膛 → 关闩闭锁 → 击发（后坐/炮口焰）→ 开闩抛壳，空筒翻滚落到吊篮地板。演示弹是 fx 件，构建时隐藏、不参与穿模/支撑。",
       "爆炸/燃烧用 vendored three.quarks 粒子（初焰闪→火球→冲击波→火花/破片→烟→焦痕）；轻击=穿甲穿孔，重击=榴弹全相，殉爆再叠加炮塔掀飞与火势蔓延。",
       "破碎形态由 damageSeed 随机：单穿孔 / 大口径爆裂 / 双孔，位置在安全区内抖动；战损组「随机破口」换一组并保持相机。",
       "舱盖可交互：悬停盖板出现提示，单击开/合；前舱盖默认开启，视口右上「舱盖」可一键全开/全合。装填手舱口与车长塔顶盖在炮塔顶甲板上开了真孔，开盖能看进战斗室；加油口底座也可点击开盖。",
