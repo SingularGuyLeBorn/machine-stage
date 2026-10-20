@@ -2,6 +2,7 @@ import { KJ } from "./constants";
 import { HYDRAULICS, jointOrigin, type Side, type Vec3 } from "./rig";
 import {
   KingJoeParts,
+  absMate,
   addHydraulic,
   addNozzles,
   addAntigravity,
@@ -178,6 +179,33 @@ function addLegStructure(builder: KingJoeParts, side: Side): void {
     node: hip,
     mate: mateAt(hip, [legX, thighPlateY + 0.25, -0.335]),
   });
+  if (side === "l") {
+    // 战损演示件：外挂板浮贴在大腿外甲外 2mm，可在 damagePanelL 节点上整块脱落
+    builder.add({
+      id: pid("legs", "thigh_applique"),
+      name_cn: "左大腿外挂装甲板",
+      name_en: "left thigh applique armor",
+      assembly: "legs",
+      layer: 4,
+      geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.44, h: 0.4, t: 0.03, corner: 0.05 } },
+      material: "silver_bright",
+      node: "damagePanelL",
+      mate: absMate([0, 0, 0], [0, -90, 0]),
+      source: "外挂板内表面距大腿外甲 2mm，由四颗暗销固定；受击时沿外下方脱落",
+    });
+    builder.add({
+      id: pid("legs", "thigh_applique_stripe"),
+      name_cn: "外挂板金饰条",
+      name_en: "applique gold stripe",
+      assembly: "legs",
+      layer: 5,
+      geometry: { type: "box", w: 0.09, h: 0.3, d: 0.01, bevel: 0.002 },
+      material: "gold",
+      node: "damagePanelL",
+      mate: absMate([0, 0, 0.021], [0, -90, 0]),
+      source: "贴在外挂板外表面 1mm 处，随装甲板一起脱落",
+    });
+  }
   // —— 膝：筒 / 球 / 衬套 / 金色膝甲 ——
   builder.add({
     id: pid("legs", `knee_tube_${side}`),

@@ -27,6 +27,11 @@ describe("kingjoe registry", () => {
     expect(counts.get("ship")).toBeGreaterThan(40);
   });
 
+  it("战损外挂装甲板逐件存在", () => {
+    const ids = new Set(registry.parts.map((part) => part.id));
+    expect(ids.has("kingjoe.legs.thigh_applique")).toBe(true);
+  });
+
   it("足底四角减震垫逐件存在", () => {
     const ids = new Set(registry.parts.map((part) => part.id));
     for (const side of ["l", "r"]) {

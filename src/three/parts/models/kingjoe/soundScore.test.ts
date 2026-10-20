@@ -59,6 +59,16 @@ describe("kingjoe sound score", () => {
     expect(ofKind(crippled, "footstep")[0]!.t).toBeCloseTo(0.4, 1);
   });
 
+  it("战损：撞击 → 液压喷溅 → 装甲落地", () => {
+    const events = score("damaged", 2, "idle");
+    expect(ofKind(events, "unlock")).toHaveLength(1);
+    expect(ofKind(events, "servo")).toHaveLength(1);
+    expect(ofKind(events, "servo")[0]!.t).toBeCloseTo(0.35, 1);
+    const steps = ofKind(events, "footstep");
+    expect(steps).toHaveLength(1);
+    expect(steps[0]!.t).toBeCloseTo(1.25, 1);
+  });
+
   it("同一状态同一时间点不重复发声", () => {
     expect(kingJoeSoundEvents("combining", "combining", 3, 3)).toEqual([]);
     expect(kingJoeSoundEvents("idle", "idle", 0, 0)).toEqual([]);

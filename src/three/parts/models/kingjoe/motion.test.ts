@@ -11,6 +11,7 @@ const states: KingJoeState[] = [
   "firing",
   "separation",
   "crippled",
+  "damaged",
 ];
 const keyframes = [0, 1, 2, 3, 4.2, 5.5, 7.2, 8.2, 9.5];
 
@@ -45,6 +46,22 @@ describe("kingjoe motion", () => {
       animateKingJoe(model, t, "combining");
       model.root.updateMatrixWorld(true);
       expect(detectStatic(model, { minDepthM: 0.0005 }), `combining t=${t}`).toEqual([]);
+    }
+    model.dispose();
+  }, 120_000);
+
+  it("战损：装甲板脱落、液压喷溅与战后姿态零穿模", () => {
+    const registry = makeKingJoeRegistry();
+    const model = buildModel(registry, {
+      builders: kingjoeModelBuilders,
+      instanceLayouts: makeKingJoeLayouts(),
+      warnMissingLayout: false,
+    });
+    for (const t of [0, 0.3, 0.6, 1, 1.4, 1.8, 2.6]) {
+      model.resetNodes();
+      animateKingJoe(model, t, "damaged");
+      model.root.updateMatrixWorld(true);
+      expect(detectStatic(model, { minDepthM: 0.0005 }), `damaged t=${t}`).toEqual([]);
     }
     model.dispose();
   }, 120_000);
