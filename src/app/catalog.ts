@@ -130,8 +130,8 @@ export const CATALOG: StageModel[] = [
   {
     id: "tiger",
     title: "虎式坦克 Tiger I",
-    subtitle: "M-B 进行中：HL230 发动机 + 行动装置（L2）",
-    milestone: "M-B",
+    subtitle: "L1–L5 全层 · 主炮闩 / 中空炮管 / 车长塔枪座 · 表面质感",
+    milestone: "M-C",
     status: "ready",
     registry: makeTigerRegistry(),
     layouts: makeTigerLayouts(),

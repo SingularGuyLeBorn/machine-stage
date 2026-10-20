@@ -213,9 +213,11 @@ function makeLayouts(): Record<string, InstanceLayout> {
   layouts["hull.weldRear"] = ({ index }) =>
     new THREE.Matrix4().makeTranslation(0.899, 1.116, -0.84 + index * 0.24);
 
+  // 铆钉带随赞助板通长：板 x -4.50 ~ 0.91、中心 -1.795；51 颗 × 间距 0.105 = 5.25，
+  // 两端各留 80mm 板边（旧版中心在 x 0，整条偏后 1.795、后端悬出车尾）。
   layouts["hull.sponsonRivets"] = ({ index }) =>
     new THREE.Matrix4()
-      .makeTranslation(0, 0.9, index === 0 ? 1.781 : -1.781)
+      .makeTranslation(-1.795, 0.9, index === 0 ? 1.781 : -1.781)
       .multiply(new THREE.Matrix4().makeRotationX(index === 0 ? Math.PI / 2 : -Math.PI / 2));
 
   layouts["hull.balkenkreuz"] = ({ index }) =>
@@ -1149,14 +1151,14 @@ function buildHullParts(): PartDefinition[] {
     assembly: "hull",
     build_layer: 5,
     build_order: 608,
-    geometry: { type: "rivets", count: 34, spacing: 0.105, radius: 0.009 },
+    geometry: { type: "rivets", count: 51, spacing: 0.105, radius: 0.009 },
     material: "armor_steel",
     instances: 2,
     indexed: true,
     instance_layout: "hull.sponsonRivets",
     mate: { type: "absolute" },
     source:
-      "赞助板铆钉带：34 颗 ⌀18 半球铆钉、间距 105（总长 3.47），沿赞助板外壁 z ±1.78 上缘 y 0.90 通长布置；铆钉基面离壁面 1mm（半球凸出 9）。左右各一条。",
+      "赞助板铆钉带：51 颗 ⌀18 半球铆钉、间距 105（总长 5.25），沿赞助板外壁 z ±1.78 上缘 y 0.90 通长布置；带中心 x -1.795 = 赞助板壳体中心（-4.50 ~ 0.91），两端各留 80mm 板边。铆钉基面离壁面 1mm（半球凸出 9）。左右各一条。",
   });
 
   // 防滑纹：赞助板顶板前段

@@ -61,7 +61,14 @@ export function makeTigerRegistry(): ModelRegistry {
       ...hull.assemblies,
       ...turret.assemblies,
     ],
-    nodes: [...engine.nodes, ...running.nodes],
+    nodes: [
+      ...engine.nodes,
+      ...running.nodes,
+      ...transmission.nodes,
+      ...interior.nodes,
+      ...hull.nodes,
+      ...turret.nodes,
+    ],
     materials: {
       ...engine.materials,
       ...running.materials,
