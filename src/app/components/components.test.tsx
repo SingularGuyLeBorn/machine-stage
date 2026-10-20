@@ -12,6 +12,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import { FaultPanel } from "./FaultPanel";
 import { ModelList } from "./ModelList";
 import { ParamsPanel } from "./ParamsPanel";
+import { PartInfoCard } from "./PartInfoCard";
 import { PartTree } from "./PartTree";
 import { StateMachine } from "./StateMachine";
 
@@ -95,10 +96,20 @@ describe("ModelList", () => {
 });
 
 describe("PartTree", () => {
+  const openTree = () => fireEvent.click(screen.getByRole("button", { name: "展开零件树" }));
+
+  it("面板默认收起，展开后才渲染零件树", () => {
+    render(<PartTree />);
+    expect(screen.getByText("3 个注册零件")).toBeDefined();
+    expect(screen.queryByText("测试总成")).toBeNull();
+    openTree();
+    expect(screen.getByText("测试总成")).toBeDefined();
+  });
+
   it("按总成折叠渲染零件，点击 → 选中", () => {
     render(<PartTree />);
+    openTree();
     expect(screen.getByText("测试总成")).toBeDefined();
-    expect(screen.getByText("3 个注册零件")).toBeDefined();
     const pillar = screen.getByText("立柱").closest("button")!;
     fireEvent.click(pillar);
     expect(useStageStore.getState().selectedPart).toBe("test.frame.pillar");
@@ -108,12 +119,14 @@ describe("PartTree", () => {
 
   it("折叠总成后零件隐藏", () => {
     render(<PartTree />);
+    openTree();
     fireEvent.click(screen.getByText("测试总成"));
     expect(screen.queryByText("立柱")).toBeNull();
   });
 
   it("点零件 → 选中 + 打开单件隔离小视图", () => {
     render(<PartTree />);
+    openTree();
     fireEvent.click(screen.getByText("立柱").closest("button")!);
     expect(useStageStore.getState().selectedPart).toBe("test.frame.pillar");
     expect(useStageStore.getState().isolation).toEqual({ kind: "part", partId: "test.frame.pillar" });
@@ -121,12 +134,27 @@ describe("PartTree", () => {
 
   it("外部选中（视口点实体 / 报告点选）会展开所在总成并滚入视野", () => {
     render(<PartTree />);
+    openTree();
     fireEvent.click(screen.getByText("测试总成")); // 手动收起
     expect(screen.queryByText("立柱")).toBeNull();
     // 模拟视口选中：store 变化 → 左树自动展开
     act(() => useStageStore.getState().selectPart("test.frame.pillar"));
     expect(screen.getByText("立柱")).toBeDefined();
     expect(screen.getByText("立柱").closest("button")!.getAttribute("aria-current")).toBe("true");
+  });
+});
+
+describe("PartInfoCard", () => {
+  it("选中零件后在中部卡片显示名称 / partId / 层，并可隔离或清除", () => {
+    act(() => useStageStore.getState().selectPart("test.frame.pillar"));
+    render(<PartInfoCard />);
+    expect(screen.getByText("立柱")).toBeDefined();
+    expect(screen.getByText("test.frame.pillar")).toBeDefined();
+    expect(screen.getByText("传动支撑")).toBeDefined();
+    fireEvent.click(screen.getByText("隔离查看"));
+    expect(useStageStore.getState().isolation).toEqual({ kind: "part", partId: "test.frame.pillar" });
+    fireEvent.click(screen.getByLabelText("清除选中"));
+    expect(useStageStore.getState().selectedPart).toBeNull();
   });
 });
 

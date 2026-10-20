@@ -6,6 +6,7 @@ import { useStageStore } from "../state/stageStore";
 import { ClippingDock } from "./ClippingPanel";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { IsolationView } from "./IsolationView";
+import { PartInfoCard } from "./PartInfoCard";
 
 // ============================================================================
 // Viewport —— 中栏：3D 视口 + 视口工具条 + 穿模报告抽屉 + 隔离小视图 + 读数图例
@@ -56,6 +57,7 @@ export function Viewport() {
 
       <ClippingDock />
       <IsolationView />
+      <PartInfoCard />
 
       <div className="viewport__overlay viewport__overlay--tl">
         {inspectInstance ? (
@@ -173,15 +175,6 @@ export function Viewport() {
           <span>
             三角面 <span className="num">{stats ? stats.triangles.toLocaleString("en-US") : "—"}</span>
           </span>
-          {selectedPart ? (
-            <span className="viewport__selection" title={selectedPart}>
-              选中{" "}
-              <span className="num">
-                {selectedPart}
-                {selectedInstance !== null ? `[${selectedInstance}]` : ""}
-              </span>
-            </span>
-          ) : null}
           {readouts.map((readout) => (
             <span key={readout.label}>
               {readout.label} <span className="num">{readout.value}</span>

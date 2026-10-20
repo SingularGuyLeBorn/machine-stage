@@ -102,7 +102,8 @@ function useUnionBounds(entries: Array<{ handle: PartHandle; matrices: THREE.Mat
 
 function boundRadius(bounds: THREE.Box3): number {
   if (bounds.isEmpty()) return 0.05;
-  return Math.max(bounds.getSize(new THREE.Vector3()).length() * 0.5, 0.02);
+  // 下限 5mm：螺栓/贴花这类小件也要能占到画面的大部分高度
+  return Math.max(bounds.getSize(new THREE.Vector3()).length() * 0.5, 0.005);
 }
 
 /** 相机自动框选（换目标 / 换报告都重来一次）。 */
@@ -116,17 +117,21 @@ function FitView({ bounds, token }: { bounds: THREE.Box3; token: string }) {
     const center = bounds.getCenter(new THREE.Vector3());
     const radius = boundRadius(bounds);
     const direction = new THREE.Vector3(0.9, 0.62, 1).normalize();
-    const fov = (camera as THREE.PerspectiveCamera).fov ?? 32;
-    const distance = Math.max((radius * 1.9) / Math.tan(THREE.MathUtils.degToRad(fov / 2)), 0.03);
+    const perspective = camera as THREE.PerspectiveCamera;
+    const vFov = THREE.MathUtils.degToRad(perspective.fov ?? 32);
+    const aspect = perspective.aspect || 1;
+    // 以较小的视场角为准，保证宽/高两个方向都不裁切；1.25 = 留一圈边
+    const fitFov = Math.min(vFov, 2 * Math.atan(Math.tan(vFov / 2) * aspect));
+    const distance = Math.max((radius / Math.sin(fitFov / 2)) * 1.25, 0.006);
     camera.position.copy(center).addScaledVector(direction, distance);
     camera.lookAt(center);
     if (controls) {
       controls.target.copy(center);
       controls.update();
     }
-    // bounds/token 是唯一触发源；camera/controls 由 r3f 提供、生命周期稳定
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bounds, token]);
+    // 换目标/换报告/换画布尺寸（aspect）都重新取景；controls 挂载后也要再跑一次，
+    // 否则 OrbitControls 会把 target 拉回原点，小件会跑到画面角落（旧版"看不清"的根因）。
+  }, [bounds, token, camera, controls]);
 
   return null;
 }
@@ -265,7 +270,7 @@ export function IsolationView() {
       </header>
 
       <div className="iso__canvas">
-        <Canvas dpr={[1, 2]} camera={{ position: [0.6, 0.4, 0.6], fov: 32, near: 0.01, far: 20 }}>
+        <Canvas dpr={[1, 2]} camera={{ position: [0.6, 0.4, 0.6], fov: 32, near: 0.001, far: 20 }}>
           <color attach="background" args={["#eef1f5"]} />
           <ambientLight intensity={0.55} />
           <directionalLight position={[2.5, 3, 2]} intensity={1.5} />
@@ -290,7 +295,7 @@ export function IsolationView() {
           ) : null}
           {pair && report ? <PenetrationMarker report={report} radius={boundRadius(bounds)} /> : null}
           <FitView bounds={bounds} token={token} />
-          <OrbitControls makeDefault enableDamping dampingFactor={0.12} minDistance={0.02} maxDistance={8} />
+          <OrbitControls makeDefault enableDamping dampingFactor={0.12} minDistance={0.005} maxDistance={8} />
         </Canvas>
       </div>
       <span className="iso__hint">拖动旋转 · 滚轮缩放 · 右下角可拖大</span>

@@ -223,6 +223,33 @@
   letter-spacing: 0.02em;
 }
 
+.panel__toggle {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.panel__toggle:hover {
+  border-color: var(--line);
+  background: var(--panel-hover);
+  color: var(--text-2);
+}
+
+.panel__chevron {
+  transition: transform 0.14s ease;
+}
+
+.panel__chevron[data-open="true"] {
+  transform: rotate(90deg);
+}
+
 .panel__count {
   margin-left: auto;
   font-size: 11px;
@@ -578,6 +605,108 @@
   height: 26px;
 }
 
+/* 当前零件信息：视口左侧中部（零件树默认收起后的主信息入口） */
+.part-card {
+  position: absolute;
+  z-index: 4;
+  left: 56px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(330px, 42%);
+  padding: 12px 14px;
+  pointer-events: auto;
+}
+
+.part-card__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.part-card__assembly {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.part-card__close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.part-card__close:hover {
+  border-color: var(--line);
+  background: var(--panel-hover);
+  color: var(--text-2);
+}
+
+.part-card__name {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.part-card__en {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.part-card__id {
+  display: block;
+  padding: 3px 7px;
+  overflow-wrap: anywhere;
+  border-radius: var(--radius-sm);
+  background: var(--panel-sub);
+  color: var(--text-2);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.part-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.part-card__meta b {
+  color: var(--text);
+  font-family: var(--mono);
+  font-weight: 600;
+}
+
+.part-card__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+@media (max-width: 1180px) {
+  .part-card {
+    width: min(270px, 48%);
+  }
+}
+
 /* 实例检查器：视口左上角，选中重复件里的单实例时出现 */
 .instance-card {
   min-width: 208px;
@@ -635,15 +764,6 @@
 
 .viewport__legend .num {
   color: var(--text-2);
-}
-
-.viewport__selection {
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  border-left: 1px solid var(--line);
-  padding-left: var(--sp-3);
 }
 
 .loading {
@@ -1248,8 +1368,8 @@
   bottom: 46px;
   display: flex;
   flex-direction: column;
-  width: 380px;
-  height: 292px;
+  width: 420px;
+  height: 320px;
   min-width: 280px;
   min-height: 210px;
   max-width: 74%;

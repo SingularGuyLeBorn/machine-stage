@@ -68,6 +68,8 @@ export function PartTree() {
   const hoverPart = useStageStore((state) => state.hoverPart);
   const tree = useMemo(() => buildTree(modelId), [modelId]);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // 面板默认收起：左栏只留模型库，视口点选零件的详情走左侧中部卡片
+  const [open, setOpen] = useState(false);
   const rowRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const toggle = (groupId: string) =>
@@ -76,78 +78,90 @@ export function PartTree() {
   // 反向联动：视口点选 / 报告点选 / 飞行到零件后，左树要能看见它——
   // 自动展开所在总成，并把该行滚进视野。
   useEffect(() => {
-    if (!selectedPart) return;
+    if (!selectedPart || !open) return;
     const group = tree.groups.find((item) => item.parts.some((part) => part.id === selectedPart));
     if (group && collapsed[group.id]) {
       setCollapsed((previous) => ({ ...previous, [group.id]: false }));
       return; // 展开后重跑一次，再滚动
     }
     rowRefs.current.get(selectedPart)?.scrollIntoView?.({ block: "nearest" });
-  }, [selectedPart, tree, collapsed]);
+  }, [selectedPart, tree, collapsed, open]);
 
   return (
-    <section className="panel panel--grow">
+    <section className={`panel${open ? " panel--grow" : ""}`}>
       <header className="panel__head">
+        <button
+          type="button"
+          className="panel__toggle"
+          aria-expanded={open}
+          aria-label={open ? "收起零件树" : "展开零件树"}
+          title={open ? "收起零件树" : "展开零件树"}
+          onClick={() => setOpen((value) => !value)}
+        >
+          <ChevronRight size={13} className="panel__chevron" data-open={open} aria-hidden />
+        </button>
         <h2 className="panel__title">零件树</h2>
         <span className="panel__count">{tree.total} 个注册零件</span>
       </header>
-      <div className="panel__body">
-        {tree.groups.length === 0 ? <div className="empty">该模型尚未登记注册表</div> : null}
-        <div className="tree">
-          {tree.groups.map((group) => {
-            const open = !collapsed[group.id];
-            return (
-              <div key={group.id}>
-                <button
-                  type="button"
-                  className="tree__group-head"
-                  aria-expanded={open}
-                  onClick={() => toggle(group.id)}
-                >
-                  <span className="tree__chevron" data-open={open}>
-                    <ChevronRight size={13} aria-hidden />
-                  </span>
-                  {group.nameCn}
-                  <span className="badge badge--plain">
-                    {group.parts.length} 件 · L{group.layers.join("/")}
-                  </span>
-                </button>
-                {open ? (
-                  <div className="tree__group-body">
-                    {group.parts.map((part) => (
-                      <button
-                        key={part.id}
-                        type="button"
-                        className="tree__part"
-                        ref={(element) => {
-                          if (element) rowRefs.current.set(part.id, element);
-                          else rowRefs.current.delete(part.id);
-                        }}
-                        aria-current={part.id === selectedPart}
-                        title={`${part.id} · ${BUILD_LAYER_LABELS[part.layer]?.name_cn ?? ""}`}
-                        onMouseEnter={() => hoverPart(part.id)}
-                        onMouseLeave={() => hoverPart(null)}
-                        onClick={() => {
-                          selectPart(part.id);
-                          requestFocus(part.id);
-                          openPartIsolation(part.id);
-                        }}
-                      >
-                        <span className="tree__layer" data-layer={part.layer} />
-                        <span className="tree__name">{part.nameCn}</span>
-                        <span className="tree__meta">
-                          {part.instances ? `×${part.instances}` : part.dual ? "L/R" : ""}
-                          <span className="num">{part.order}</span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
+      {open ? (
+        <div className="panel__body">
+          {tree.groups.length === 0 ? <div className="empty">该模型尚未登记注册表</div> : null}
+          <div className="tree">
+            {tree.groups.map((group) => {
+              const open = !collapsed[group.id];
+              return (
+                <div key={group.id}>
+                  <button
+                    type="button"
+                    className="tree__group-head"
+                    aria-expanded={open}
+                    onClick={() => toggle(group.id)}
+                  >
+                    <span className="tree__chevron" data-open={open}>
+                      <ChevronRight size={13} aria-hidden />
+                    </span>
+                    {group.nameCn}
+                    <span className="badge badge--plain">
+                      {group.parts.length} 件 · L{group.layers.join("/")}
+                    </span>
+                  </button>
+                  {open ? (
+                    <div className="tree__group-body">
+                      {group.parts.map((part) => (
+                        <button
+                          key={part.id}
+                          type="button"
+                          className="tree__part"
+                          ref={(element) => {
+                            if (element) rowRefs.current.set(part.id, element);
+                            else rowRefs.current.delete(part.id);
+                          }}
+                          aria-current={part.id === selectedPart}
+                          title={`${part.id} · ${BUILD_LAYER_LABELS[part.layer]?.name_cn ?? ""}`}
+                          onMouseEnter={() => hoverPart(part.id)}
+                          onMouseLeave={() => hoverPart(null)}
+                          onClick={() => {
+                            selectPart(part.id);
+                            requestFocus(part.id);
+                            openPartIsolation(part.id);
+                          }}
+                        >
+                          <span className="tree__layer" data-layer={part.layer} />
+                          <span className="tree__name">{part.nameCn}</span>
+                          <span className="tree__meta">
+                            {part.instances ? `×${part.instances}` : part.dual ? "L/R" : ""}
+                            <span className="num">{part.order}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      ) : null}
     </section>
   );
 }
