@@ -6,6 +6,7 @@ import {
   cylinderGeometry,
   latheGeometry,
   mergeGeometries,
+  spurGearGeometry,
   tubeGeometry,
 } from "../../../kernel/geometry";
 import type { GeometryBuilder } from "../../../assembler/geometry";
@@ -1039,6 +1040,37 @@ const caseShell: GeometryBuilder = (spec) => {
   return geometry;
 };
 
+// ---------------------------------------------------------------------------
+// 气门弹簧 / 直齿圆柱齿轮（正时齿轮组）
+// ---------------------------------------------------------------------------
+const coilSpring: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const coilR = num(params, "coilR", 0.0105);
+  const wireR = num(params, "wireR", 0.0013);
+  const turns = num(params, "turns", 6);
+  const height = num(params, "h", 0.03);
+  const perTurn = num(params, "perTurn", 10);
+  const total = Math.max(8, Math.round(turns * perTurn));
+  const points: THREE.Vector3[] = [];
+  for (let i = 0; i <= total; i++) {
+    const angle = (i / perTurn) * Math.PI * 2;
+    points.push(new THREE.Vector3(Math.cos(angle) * coilR, (i / total) * height, Math.sin(angle) * coilR));
+  }
+  const curve = new THREE.CatmullRomCurve3(points, false, "catmullrom", 0.1);
+  return new THREE.TubeGeometry(curve, total * 2, wireR, 6, false);
+};
+
+const spurGear: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  return spurGearGeometry(
+    num(params, "teeth", 24),
+    num(params, "r", 0.06),
+    num(params, "w", 0.016),
+    num(params, "bore", 0.014),
+    num(params, "bevel", 0.0006),
+  );
+};
+
 export const tigerKitBuilders: Record<string, GeometryBuilder> = {
   borePlate,
   siameseBlock,
@@ -1055,6 +1087,8 @@ export const tigerKitBuilders: Record<string, GeometryBuilder> = {
   bearingSupport,
   caseShell,
   fanFrame,
+  coilSpring,
+  spurGear,
 };
 
 /** 皮带中线长度（kits.beltLoop 与读数共用同一公式）。 */
