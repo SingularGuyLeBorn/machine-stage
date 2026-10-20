@@ -8,7 +8,7 @@ import os from "node:os";
 //   · 生产构建 + ?qa=1 只读场景钩子
 //   · 四体编队 / 合体对接特写 / 合体成品 / 怪光线 / 残缺合体截图
 //   · rAF 实测 FPS
-//   · canvas.captureStream(60) + MediaRecorder 录制合体全程（随后 ffmpeg 转 MP4）
+//   · canvas.captureStream(60) + MediaRecorder 录制合体全程（画面 + Web Audio 音轨，随后 ffmpeg 转 MP4）
 // ============================================================================
 
 const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
@@ -34,6 +34,7 @@ const chrome = spawn(
     "--hide-scrollbars",
     "--force-device-scale-factor=1",
     "--enable-unsafe-swiftshader",
+    "--autoplay-policy=no-user-gesture-required",
     "--disable-dev-shm-usage",
     "about:blank",
   ],
@@ -244,20 +245,62 @@ async function main() {
   await setCamera([14.5, 10.2, 18.5], [0, 5.4, -1.0]);
   await setState("formation");
   await sleep(600);
-  await evaluate(`(() => {
-    const canvas = document.querySelector("canvas");
-    if (!canvas) throw new Error("no canvas");
-    const stream = canvas.captureStream(60);
-    const rec = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp9", videoBitsPerSecond: 14000000 });
-    window.__recChunks = [];
-    window.__recFrames = 0;
-    rec.ondataavailable = (event) => { if (event.data.size) window.__recChunks.push(event.data); };
-    rec.start(200);
-    window.__rec = rec;
-    const tick = () => { window.__recFrames++; if (window.__rec && window.__rec.state === "recording") requestAnimationFrame(tick); };
-    requestAnimationFrame(tick);
-    return true;
-  })()`);
+  // CDP 注入真实点击，给 AudioContext 一个可信用户手势；否则无头环境可能一直 suspended。
+  await send("Input.dispatchMouseEvent", {
+    type: "mousePressed",
+    x: 800,
+    y: 500,
+    button: "left",
+    clickCount: 1,
+  });
+  await send("Input.dispatchMouseEvent", {
+    type: "mouseReleased",
+    x: 800,
+    y: 500,
+    button: "left",
+    clickCount: 1,
+  });
+  await sleep(200);
+  await evaluate(
+    `(async () => {
+      const canvas = document.querySelector("canvas");
+      if (!canvas) throw new Error("no canvas");
+      const stream = canvas.captureStream(60);
+      const audio = window.__kingjoeAudio;
+      let audioState = "none";
+      if (audio?.ensure) {
+        const ctx = audio.ensure();
+        if (ctx && ctx.state !== "running") {
+          try { await ctx.resume(); } catch { /* 无音频设备时退回静音录屏 */ }
+        }
+        audioState = ctx?.state ?? "none";
+        if (audioState === "running") {
+          for (const track of audio.stream?.getAudioTracks?.() ?? []) stream.addTrack(track);
+        }
+      }
+      window.__recAudioState = audioState;
+      window.__recAudioTracks = stream.getAudioTracks().length;
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+        ? "video/webm;codecs=vp9,opus"
+        : "video/webm;codecs=vp9";
+      const rec = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: 14000000,
+        audioBitsPerSecond: 128000,
+      });
+      window.__recChunks = [];
+      window.__recFrames = 0;
+      window.__recErrors = [];
+      rec.ondataavailable = (event) => { if (event.data.size) window.__recChunks.push(event.data); };
+      rec.onerror = (event) => window.__recErrors.push(String(event.error ?? event));
+      rec.start(200);
+      window.__rec = rec;
+      const tick = () => { window.__recFrames++; if (window.__rec && window.__rec.state === "recording") requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+      return { audioState, audioTracks: window.__recAudioTracks };
+    })()`,
+    true,
+  );
   await sleep(500);
   await setState("combining");
   await sleep(10200);
@@ -271,16 +314,30 @@ async function main() {
         let binary = "";
         const chunk = 8192;
         for (let i = 0; i < buffer.length; i += chunk) binary += String.fromCharCode.apply(null, buffer.subarray(i, i + chunk));
-        resolve({ base64: btoa(binary), frames: window.__recFrames, bytes: buffer.length });
+        resolve({
+          base64: btoa(binary),
+          frames: window.__recFrames,
+          bytes: buffer.length,
+          audioTracks: window.__recAudioTracks ?? 0,
+          chunks: window.__recChunks.length,
+          errors: window.__recErrors ?? [],
+          mimeType: rec.mimeType,
+          audioState: window.__recAudioState ?? "none",
+        });
       };
       rec.stop();
     })`,
     true,
   );
+  if (!video.bytes) {
+    throw new Error(
+      `录屏为空（frames=${video.frames} chunks=${video.chunks} errors=${JSON.stringify(video.errors)} audio=${video.audioState}）`,
+    );
+  }
   const webm = path.join(RECS, "kingjoe-combine-raw.webm");
   fs.writeFileSync(webm, Buffer.from(video.base64, "base64"));
   console.log(
-    `recording raw ${path.relative(ROOT, webm)} bytes=${video.bytes} capturedFrames=${video.frames}`,
+    `recording raw ${path.relative(ROOT, webm)} bytes=${video.bytes} capturedFrames=${video.frames} audioTracks=${video.audioTracks} chunks=${video.chunks} mime=${video.mimeType} audio=${video.audioState}`,
   );
 
   // 10) 收尾：状态与错误
@@ -297,7 +354,15 @@ async function main() {
       {
         stats,
         fps,
-        recording: { bytes: video.bytes, frames: video.frames },
+        recording: {
+          bytes: video.bytes,
+          frames: video.frames,
+          audioTracks: video.audioTracks,
+          chunks: video.chunks,
+          mimeType: video.mimeType,
+          audioState: video.audioState,
+          errors: video.errors,
+        },
         final,
         pageErrors,
         consoleErrors,

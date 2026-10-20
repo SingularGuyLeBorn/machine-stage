@@ -1368,16 +1368,18 @@ y 1.078~1.105（顶面与舱盖齐平，下表面离赞助板顶板 1.075 留 3m
 | 动画   | idle / formation / combining / robot / firing / separation / crippled / scanning 八态；状态驱动时钟（catalog `animatedStates`） |
 | 合体   | 编队收敛 → 自下而上三段阻尼对接 → 电弧 → 销入槽 → 锁环过冲咔哒 → 双臂展开；可逆分离                                             |
 | 特效   | 4 条电弧链/对接面、锁死闪光、锁环蓝光、怪光线双发射口、16 只喷口焰；均为场景级 FX，不参与零件检测                               |
+| 音效   | Web Audio 实时合成：三段锁环咔哒 + 双肩锁死、重踏步、展臂伺服、充能/怪光线；事件谱与 motion 相位绑定，无外部音频资产            |
 | 质感   | 银铬佩丹尼姆合金（钢拉丝纹理/机加工痕）、金环、彩瓷胸板、黑缝发光、肩荚鼓筒                                                     |
-| 门禁   | `vitest` **118 passed**；`tsc` / `build` ✓；静态穿模 **0**、悬空 **0**；全状态 30fps 扫掠 **0**                                 |
+| 门禁   | `vitest` **123 passed**；`tsc` / `build` ✓；静态穿模 **0**、悬空 **0**；全状态 30fps 扫掠 **0**                                 |
 
 ### 验收证据
 
 - 静态/悬空：`npx vite-node scripts/diag-kingjoe.ts` → `static clipping=0 / unsupported=0`。
 - 全程扫掠：`npx vite-node scripts/diag-sweep-kj.ts` —— combining 10s@30fps / separation 4s / robot 6s / firing 3s / formation 3s / crippled 3s，均为 **0 reports**，悬空 0。
-- 浏览器：生产构建 + `?qa=1`，`node scripts/capture-kingjoe.mjs`；headless Chrome rAF **57.3 fps**，录屏 610 帧 / 10.7s，转码为 60fps H.264。
+- 浏览器：生产构建 + `?qa=1`，`node scripts/capture-kingjoe.mjs`；headless Chrome rAF **56.9 fps**，录屏 609 帧 / 10.7s，含 1 条 Opus 音轨（45 chunks）。
+- 音轨校验：转码 AAC 48kHz 后 `volumedetect` 峰值 -12.7dB、均值 -39.1dB；`silencedetect` 在 **3.58 / 5.57 / 7.78 / 9.58s** 检出四次锁死脉冲，与 motion 的 3.0 / 5.0 / 7.2 / 9.0s 锁环相位一致（录屏从 formation 起 0.5s 后进入合体）。
 - 截图：`docs/screenshots/kingjoe-idle.jpg`、`kingjoe-formation.jpg`、`kingjoe-docking-closeup.jpg`、`kingjoe-lock-closeup.jpg`、`kingjoe-docking-wide.jpg`、`kingjoe-combined.jpg`、`kingjoe-robot.jpg`、`kingjoe-firing.jpg`、`kingjoe-separation.jpg`、`kingjoe-crippled.jpg`。
-- 录屏：`docs/recordings/kingjoe-combine-60fps.mp4`（60fps / 10.7s / 938×734，四体编队 → 合体全程）；缩略拼图 `docs/qa/kingjoe-combine-contact.jpg`。
+- 录屏：`docs/recordings/kingjoe-combine-60fps.mp4`（60fps H.264 + AAC / 10.7s / 938×734 / 832KB，四体编队 → 合体全程音效与咔哒）；缩略拼图 `docs/qa/kingjoe-combine-contact.jpg`。
 
 ### 关键口径 / 设计取舍
 
@@ -1386,6 +1388,7 @@ y 1.078~1.105（顶面与舱盖齐平，下表面离赞助板顶板 1.075 留 3m
 - **液压杆求解**：杆节点每帧按「缸筒出口 E' → 耳环 C'」的真实距离平移 + 转向；回缩部分滑进缸筒内孔，不对缸体做伸缩缩放。膝/髋/踝/肩/肘均接入。
 - **状态驱动时钟**：框架原来只有 `machineState === "running"` 推进时钟；`catalog.animatedStates` + `animate(…, state)` 让一个模型可以有多个可动形态（这是本里程碑唯一需要动 app 层的框架改动）。
 - **装配器修复**：`instances` 未显式声明 `instance_nodes` 时也应继承 `def.node`；否则腹/胸/头的实例件（瓷片、肩荚短筒、对接销）会掉在模型原点，四体错位。这个修复对虎式无影响（虎式实例件均无 node）。
+- **声音跟着机构相位走**：`soundScore.ts` 是纯函数事件谱（3.0/5.0/7.2s 三段锁环、7.4s 展臂、9.0s 双肩锁死、每 3s 重踏步、2.8s 怪光线循环），`audio.ts` 只用 Web Audio 合成，不加载音频资产；锁环用带通噪声双脉冲 + 92Hz 低频回弹，踏步用 64→38Hz 下滑。浏览器首次点击解锁 AudioContext；无头录屏用 CDP 注入可信点击并等待 `resume()`，只有 `running` 才接入音轨，避免静音轨卡住 MediaRecorder。
 - **腰部是唯一相对运动节点**：腰鼓/齿圈/下轴承固定在 stomach；上腹/胸/头作为 `waist` 节点的子树绕腰枢轴旋转（转身 ±4°、弯腰 ±1.2°），胸↔腹接口两侧同步旋转，腿↔腹锁死接口保持不动。合体/分离时腰节点归零，接口仍刚性对齐。
 - **残缺合体**：隐藏腿部飞船（腿零件仍在树里，节点下移出场）；躯干降下、前倾、双臂下垂，并启用临时地面承影盘；不是行走 IK。
 
@@ -1394,13 +1397,13 @@ y 1.078~1.105（顶面与舱盖齐平，下表面离赞助板顶板 1.075 留 3m
 1. **定义件 570 vs 计划 ~580（差 10）**：四体为 **Ship 100 / Chest 198（含双臂）/ Stomach 100 / Legs 172**。所有机构件（液压 7–8 件/缸、对接销/座/锁/钩、喷口 4 件、三指三节、对接环座/锁环/导轨）逐件；Ship/Stomach 已补到 100 件（背部接缝、紧固件圈、耳荚端盖、腰部制动块、腹部角撑、徽章/能量缝）。差额不再是「总成级糊弄」，而是胸体因双臂略超 180、其余体没有为凑满 580 继续加无支撑小件。
 2. **腰部转角受包络限制**：`waist` 节点只做 ±4° 转身 / ±1.2° 侧倾 / 射击 ±1.6° 俯仰；腰鼓与上腹之间仅留约 4cm 轴向间隙，液压与线缆包络不允许更大弯腰，且暂无重心转移 / 根位移。
 3. **步行/爬行无地面 IK**：脚底随关节角度抬落，站立脚有轻微滑动；残缺形态是低姿态撑地，不是位移爬行。
-4. **音频缺失**：锁死「咔哒」目前是视觉闪光 + 锁环过冲，没有声音资产。
+4. **双臂↔胸只有锁环，没有锥销导向**：双臂归属 King Chest，肩轴/转毂/锁环/凸爪/编码器逐件，但肩关节需绕 X 连续转动，尚未做 4 销 + 端面 + 传感器的轴向对接面。
 5. **视觉**：铬钢在灰棚里仍偏灰，头部/小腿比例与参考图还有差距；下一轮做头冠/小腿鼓包与更强的高光对比。
 
 ### 复现命令
 
 ```bash
-npm test                     # 118 tests
+npm test                     # 123 tests
 npm run build                # tsc + vite build
 npx vite-node scripts/diag-kingjoe.ts     # 静态零穿模 / 零悬空
 npx vite-node scripts/diag-sweep-kj.ts    # 六态 30fps 扫掠

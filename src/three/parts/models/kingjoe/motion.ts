@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { AssembledModel } from "../../assembler/assembler";
 import { KJ } from "./constants";
 import { HYDRAULICS, hydraulicLength, hydraulicNodeName, nodeOrigin, type Side } from "./rig";
+import { getKingJoeAudio } from "./audio";
 import { getKingJoeFx, type KingJoeFxFrame } from "./fx";
 
 // ============================================================================
@@ -659,6 +660,7 @@ export function animateKingJoe(
   assembled.syncInstances();
   assembled.root.updateMatrixWorld(true);
   getKingJoeFx(assembled).update(assembled, fxFrame);
+  getKingJoeAudio(assembled).update(effective, t);
   void scratchQ;
   void scratchE;
   void TAU;

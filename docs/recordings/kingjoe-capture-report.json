@@ -9,10 +9,15 @@
       "triangles": 305710
     }
   },
-  "fps": 57.3,
+  "fps": 56.9,
   "recording": {
-    "bytes": 4573672,
-    "frames": 610
+    "bytes": 4644611,
+    "frames": 609,
+    "audioTracks": 1,
+    "chunks": 45,
+    "mimeType": "video/webm;codecs=vp9,opus",
+    "audioState": "running",
+    "errors": []
   },
   "final": {
     "reports": 0,
