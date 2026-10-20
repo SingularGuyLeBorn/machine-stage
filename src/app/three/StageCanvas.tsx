@@ -14,6 +14,7 @@ import { findModel, type StageModel } from "../catalog";
 import { faultFromError, useStageStore } from "../state/stageStore";
 import { applyDamage, applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
 import { Weather } from "./Weather";
+import { setArmourWet } from "@/three/parts/kernel/armourSurface";
 import { TigerVfx } from "./vfx/TigerVfx";
 import { applyTigerLidPose, effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
 import { firstPersonView, type CameraMode } from "./viewpoints";
@@ -272,6 +273,7 @@ function StageRuntime() {
     // 停机时传 0：悬挂回到装配态（否则会停在上一帧的抬起位）
     model.animate?.(assembled, running ? clockRef.current : 0, state);
     // 舱盖/加油口盖是交互件：用真实帧时间平滑开合，不跟机器状态时钟走
+    setArmourWet(store.views.rain);
     if (store.modelId === "tiger") {
       applyTigerLidPose(assembled, state, store.lidOverrides, delta);
       const wiper = store.views.rain ? assembled.getNode("VisorWiper") : null;

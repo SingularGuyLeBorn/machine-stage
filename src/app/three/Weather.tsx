@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { AssembledModel } from "@/three/parts";
@@ -32,6 +32,23 @@ interface MudParticle {
 
 export function Weather({ assembled }: { assembled: AssembledModel | null }) {
   const rainEnabled = useStageStore((state) => state.views.rain);
+
+  // 圆形泥点贴图（32×32 径向渐变）：Points 默认方块，近景会露馅
+  const mudTexture = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 32;
+    const ctx = canvas.getContext("2d")!;
+    const gradient = ctx.createRadialGradient(16, 16, 2, 16, 16, 15);
+    gradient.addColorStop(0, "rgba(255,255,255,1)");
+    gradient.addColorStop(0.6, "rgba(255,255,255,0.92)");
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 32, 32);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }, []);
+  useEffect(() => () => mudTexture.dispose(), [mudTexture]);
 
   const rain = useMemo(() => {
     const positions = new Float32Array(RAIN_COUNT * 2 * 3);
@@ -148,7 +165,15 @@ export function Weather({ assembled }: { assembled: AssembledModel | null }) {
         <lineBasicMaterial color="#aebccb" transparent opacity={0.5} depthWrite={false} />
       </lineSegments>
       <points ref={mudRef} geometry={mud.geometry} frustumCulled={false}>
-        <pointsMaterial color="#4d3a26" size={0.042} sizeAttenuation transparent opacity={0.95} />
+        <pointsMaterial
+          color="#4d3a26"
+          size={0.05}
+          map={mudTexture}
+          alphaTest={0.3}
+          sizeAttenuation
+          transparent
+          opacity={0.95}
+        />
       </points>
     </group>
   );
