@@ -1608,3 +1608,15 @@ tsc / build ✓。零件/实例仍为 223 / 1998，227 报告 / 未豁免 0，�
 - 特写：`m-fuel-cap-closed-close.png` / `m-fuel-cap-open-close.png`；剖切 `m-fuel-path-cutaway.png`
   现在是在「加油」状态下拍的开盖路径。
 - 口径：**240 件 / 2050 实例**；**137 tests / tsc / build ✓；227 未豁免 0；悬空 0/0**。
+
+### 破碎形态/位置随机化（2026-10-20，用户：不能只有一个地方，搞个随机的）
+
+- 新 `damage/plan.ts`：每块装甲板按 `damageSeed` 在安全区内随机破口中心，三种形态：
+  `penetration` 单穿孔 / `blast` 大口径爆裂（更大入口、2.15× 出口翻卷）/ `double` 主孔 + 副孔。
+  seed=0 固定原始中心/单孔，保证测试与既有截图可复现。
+- `damagePlate` 支持多破口洞形与多组翻卷/裂纹/碟形；`dentPlate` 的凹陷中心也随计划移动。
+- 战损组新增「随机破口」：`damageSeed+1`、切破碎、重建；重建时保持当前相机
+  （`preserveViewOnRebuild`）。VFX 的热影响/掉漆圈按同一计划定位，双孔形态副孔也有小圈。
+- 对比图 `m-damage-random-compare.png`（seed 0/1/2），另有 `m-damage-random-0/1/2` 与
+  `m-damage-random-ui.png`（UI 按钮点击后 seed=1、相机未跳）。
+- 门禁：**138 tests / tsc / build ✓；227 未豁免 0；悬空 0/0；240 件 / 2050 实例**。

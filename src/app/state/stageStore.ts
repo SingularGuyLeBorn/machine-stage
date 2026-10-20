@@ -14,6 +14,7 @@ import {
   type PartHandle,
 } from "@/three/parts";
 import { findModel, type ViewKey } from "../catalog";
+import { setDamageSeed } from "@/three/parts/models/tiger/damage/plan";
 
 // ============================================================================
 // stageStore —— 展示台单一状态源
@@ -164,6 +165,10 @@ interface StageState {
   machineState: string;
   /** 战损形态（完好/破损/破碎）：只切预制变体，不影响碰撞与支撑检测。 */
   damage: DamageState;
+  /** 随机破口种子：每次「随机破口」+1，重建时由 damage kit 读取。 */
+  damageSeed: number;
+  /** 重掷破口时重建不重置相机（避免用户刚对准又被拉回默认视角）。 */
+  preserveViewOnRebuild: boolean;
   focus: FocusRequest | null;
   /** 整机包围盒基准（构建完成后写入；重置视角用）。 */
   home: { center: [number, number, number]; radius: number } | null;
@@ -196,6 +201,8 @@ interface StageState {
   stepReport(delta: number): void;
   setMachineState(state: string): void;
   setDamage(state: DamageState): void;
+  /** 换一组随机破口并切到破碎，触发重建。 */
+  rerollDamage(): void;
   requestFocus(partId: string): void;
   focusPoint(center: [number, number, number], radius?: number, resetAngle?: boolean): void;
   setHome(center: [number, number, number], radius: number): void;
@@ -274,6 +281,8 @@ export const useStageStore = create<StageState>((set, get) => ({
   },
   machineState: "idle",
   damage: "intact",
+  damageSeed: 0,
+  preserveViewOnRebuild: false,
   focus: null,
   home: null,
   notice: null,
@@ -282,6 +291,7 @@ export const useStageStore = create<StageState>((set, get) => ({
   setModel: (modelId) => {
     const model = findModel(modelId);
     if (model.status !== "ready" || model.id === get().modelId) return;
+    setDamageSeed(0);
     set({
       modelId,
       overrides: {},
@@ -302,6 +312,8 @@ export const useStageStore = create<StageState>((set, get) => ({
       scanMs: null,
       machineState: model.states?.[0]?.id ?? "idle",
       damage: "intact",
+      damageSeed: 0,
+      preserveViewOnRebuild: false,
       views: { ...VIEWS_DEFAULT },
       focus: null,
       home: null,
@@ -431,6 +443,17 @@ export const useStageStore = create<StageState>((set, get) => ({
   },
 
   setDamage: (damage) => set({ damage }),
+
+  rerollDamage: () => {
+    const seed = get().damageSeed + 1;
+    setDamageSeed(seed);
+    set({
+      damageSeed: seed,
+      damage: "broken",
+      preserveViewOnRebuild: true,
+      rebuildToken: get().rebuildToken + 1,
+    });
+  },
 
   requestFocus: (partId) => {
     const assembled = get().assembled;

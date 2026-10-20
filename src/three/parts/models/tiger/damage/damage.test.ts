@@ -4,6 +4,7 @@ import { buildModel } from "@/three/parts";
 import { findModel } from "@/app/catalog";
 import { applyDamage } from "@/app/three/pose";
 import { irregularBreachLoop } from "./kits";
+import { getDamagePlan } from "./plan";
 import {
   animateTiger,
   animateTigerBurning,
@@ -44,6 +45,23 @@ const DAMAGE_PARTS = [
 ];
 
 describe("tiger/P3 战损三态", () => {
+  it("破口计划：seed 0 固定，重掷后产生多种形态/多个位置", () => {
+    const base = getDamagePlan("front", 0);
+    expect(base.kind).toBe("penetration");
+    expect(base.x).toBeCloseTo(0.42);
+    expect(base.y).toBeCloseTo(0.12);
+    const variants = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((seed) =>
+      getDamagePlan("front", seed),
+    );
+    expect(new Set(variants.map((plan) => plan.kind)).size).toBeGreaterThan(1);
+    expect(new Set(variants.map((plan) => plan.x.toFixed(3))).size).toBeGreaterThan(2);
+    // 双孔形态必须带副孔；爆裂形态半径明显大于单孔
+    const double = variants.find((plan) => plan.kind === "double");
+    if (double) expect(double.secondary).toBeDefined();
+    const blast = variants.find((plan) => plan.kind === "blast");
+    if (blast) expect(blast.radius).toBeGreaterThan(base.radius * 1.1);
+  });
+
   it("破口轮廓是径向噪声的撕裂多边形，不是正圆", () => {
     const loop = irregularBreachLoop(0, 0, 0.2, 11, 18);
     expect(loop.length).toBe(18);
