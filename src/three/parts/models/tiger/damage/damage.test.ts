@@ -124,25 +124,59 @@ describe("tiger/P3 战损三态", () => {
 });
 
 describe("tiger/P3 发动机 / 事故特效", () => {
-  it("发动机启动：曲轴/活塞运动、排气烟可见、rpm 到达怠速", () => {
+  it("发动机冷启动：预热不转 → 起动机拖动 → 点火 → 怠速", () => {
     expect(tigerEngineRpmAt(0)).toBe(0);
-    expect(tigerEngineRpmAt(0.6)).toBeGreaterThan(50);
-    expect(tigerEngineRpmAt(4)).toBeGreaterThan(TIGER_IDLE_RPM - 20);
-    expect(tigerEngineRpmAt(4)).toBeLessThan(TIGER_IDLE_RPM + 20);
-    expect(tigerCrankAngleAt(4)).toBeGreaterThan(tigerCrankAngleAt(1));
-    expect(tigerCrankAngleAt(0)).toBe(0);
+    // 预热 1.6s：曲轴不转，车体只有燃油泵 tick
+    expect(tigerEngineRpmAt(0.8)).toBe(0);
+    expect(tigerCrankAngleAt(0.8)).toBe(0);
+    // 起动机拖动：约 165rpm，曲轴开始转
+    expect(tigerEngineRpmAt(2.4)).toBeGreaterThan(100);
+    expect(tigerCrankAngleAt(2.4)).toBeGreaterThan(0.5);
+    // 点火：转速跳变
+    expect(tigerEngineRpmAt(3.3)).toBeLessThan(220);
+    expect(tigerEngineRpmAt(3.5)).toBeGreaterThan(240);
+    // 怠速
+    expect(tigerEngineRpmAt(8)).toBeGreaterThan(TIGER_IDLE_RPM - 20);
+    expect(tigerEngineRpmAt(8)).toBeLessThan(TIGER_IDLE_RPM + 20);
 
     const built = build();
     built.resetNodes();
-    animateTigerEngine(built, 2);
+    animateTigerEngine(built, 1.0);
     const crank = built.getNode("Crank")!;
+    expect(Math.abs(crank.rotation.x)).toBeLessThan(1e-9);
+    const smoke = built.getPart("tiger.effects.exhaust_smoke")!;
+    expect(smoke.object.visible).toBe(false);
+
+    built.resetNodes();
+    animateTigerEngine(built, 2.4);
     expect(Math.abs(crank.rotation.x)).toBeGreaterThan(0.5);
     const piston = built.getNode("Piston_1")!;
     const rest = built.nodeRest.get("Piston_1")!;
     const restPosition = new THREE.Vector3().setFromMatrixPosition(rest);
     expect(piston.position.distanceTo(restPosition)).toBeGreaterThan(0.001);
-    const smoke = built.getPart("tiger.effects.exhaust_smoke")!;
     expect(smoke.object.visible).toBe(true);
+    built.dispose();
+  });
+
+  it("加油路径贯通：甲板盖 → 加注管 → 油箱颈，同轴且上下衔接", () => {
+    const built = build();
+    built.root.updateMatrixWorld(true);
+    const filler = built.getPart("tiger.engine.fuel_filler")!;
+    const cap = built.getPart("tiger.hull.fuel_cap")!;
+    const tank = built.getPart("tiger.engine.fuel_tank_r")!;
+    expect(filler.instances.length).toBe(2);
+    expect(cap.instances.length).toBe(2);
+    const fillerPos = new THREE.Vector3().setFromMatrixPosition(filler.instances[0]!.restMatrix);
+    const capPos = new THREE.Vector3().setFromMatrixPosition(cap.instances[0]!.restMatrix);
+    expect(Math.abs(fillerPos.x - capPos.x)).toBeLessThan(0.001);
+    expect(Math.abs(fillerPos.z - capPos.z)).toBeLessThan(0.001);
+
+    const fillerBox = built.partBounds(filler, new THREE.Box3());
+    const capBox = built.partBounds(cap, new THREE.Box3());
+    const tankBox = built.partBounds(tank, new THREE.Box3());
+    // 上端穿甲板孔接到盖底座；下端套在油箱颈上
+    expect(capBox.min.y - fillerBox.max.y).toBeLessThan(0.02);
+    expect(fillerBox.min.y - tankBox.max.y).toBeLessThan(0.01);
     built.dispose();
   });
 

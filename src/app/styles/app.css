@@ -1706,3 +1706,43 @@
     height: 250px;
   }
 }
+
+/* 发动机冷启动 HUD（预热/拖动/点火/暖机/怠速 + 水温/转速） */
+.engine-hud {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #e39a4a;
+  font-weight: 600;
+}
+.engine-hud__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff9a3c;
+  box-shadow: 0 0 7px #ff9a3c;
+  animation: engine-hud-pulse 1.2s ease-in-out infinite;
+}
+.engine-hud__bar {
+  display: inline-flex;
+  width: 64px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.engine-hud__bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #6aa9ff, #ffb347, #ff5a36);
+  transition: width 0.2s linear;
+}
+@keyframes engine-hud-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}

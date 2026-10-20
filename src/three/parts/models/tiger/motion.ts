@@ -743,53 +743,68 @@ function writeExhaustSmoke(
 }
 
 // ---------------------------------------------------------------------------
-// 发动机启动（P0）——起动机拖动 → 逐缸点火 → 怠速
+// 发动机启动（P0）——预热 → 起动机拖动 → 点火 → 暖机 → 怠速
 // 节点：Crank / Cam_L / Cam_R / Fan_L / Fan_R / Piston_1..12 / Rod_1..12
 // 曲柄连杆运动学直接调用 engine/kinematics（与静态装配同一套公式）。
+// 冷启动不允许“一摁就着”：0–1.6s 只通电/泵油（曲轴不转，车体轻微 tick）；
+// 1.6–3.4s 起动机拖动（165rpm 不均匀压缩脉冲 + 车体抖动，未点火）；
+// 3.4s 点火（转速跳到 260、排气白烟、车体一扭）；3.4–5.4s 暖机；之后 650rpm 怠速。
 // ---------------------------------------------------------------------------
 export const TIGER_ENGINE_CYCLE = 12;
-export const TIGER_STARTER_END = 1.1;
-export const TIGER_RUNUP_END = 3.2;
+export const TIGER_PREHEAT_END = 1.6;
+export const TIGER_CRANK_END = 3.4;
+export const TIGER_RUNUP_END = 5.4;
 export const TIGER_IDLE_RPM = 650;
+const CRANK_RPM = 165;
+const IGNITION_RPM = 260;
 
 const RPM_TO_RAD = Math.PI / 30;
 
-/** 发动机转速（rpm）：起动机 0→180，点火爬升 180→650，之后怠速微抖。 */
+/** 发动机转速（rpm）：预热 0；拖动 165±脉冲；点火 260 → 650；之后怠速微抖。 */
 export function tigerEngineRpmAt(seconds: number): number {
   if (seconds <= 0) return 0;
-  if (seconds < TIGER_STARTER_END) {
-    const u = seconds / TIGER_STARTER_END;
-    return 180 * u + 22 * Math.sin(seconds * 2 * Math.PI * 5) * u;
+  if (seconds < TIGER_PREHEAT_END) return 0;
+  if (seconds < TIGER_CRANK_END) {
+    const dt = seconds - TIGER_PREHEAT_END;
+    return CRANK_RPM + 18 * Math.sin(dt * 2 * Math.PI * 2.2) + 6 * Math.sin(dt * 2 * Math.PI * 5.3);
   }
   if (seconds < TIGER_RUNUP_END) {
-    const u = (seconds - TIGER_STARTER_END) / (TIGER_RUNUP_END - TIGER_STARTER_END);
+    const u = (seconds - TIGER_CRANK_END) / (TIGER_RUNUP_END - TIGER_CRANK_END);
     const s = u * u * (3 - 2 * u);
-    return 180 + (TIGER_IDLE_RPM - 180) * s;
+    return IGNITION_RPM + (TIGER_IDLE_RPM - IGNITION_RPM) * s;
   }
   return TIGER_IDLE_RPM + 14 * Math.sin((seconds - TIGER_RUNUP_END) * 2 * Math.PI * 0.8);
 }
 
-/** 曲轴累计转角（rad）：分段解析积分，保证每次采样与 rpm 曲线自洽。 */
+/** 曲轴累计转角（rad）：分段解析积分；预热段严格为 0（起动机还没啮合）。 */
 export function tigerCrankAngleAt(seconds: number): number {
-  if (seconds <= 0) return 0;
-  const w180 = 180 * RPM_TO_RAD;
+  if (seconds <= TIGER_PREHEAT_END) return 0;
+  const wCrank = CRANK_RPM * RPM_TO_RAD;
+  const wIgnition = IGNITION_RPM * RPM_TO_RAD;
   const wIdle = TIGER_IDLE_RPM * RPM_TO_RAD;
-  if (seconds < TIGER_STARTER_END) {
-    const u = seconds / TIGER_STARTER_END;
-    return 0.5 * w180 * TIGER_STARTER_END * u * u + 0.06 * Math.sin(seconds * 2 * Math.PI * 5) * u;
-  }
-  const angle1 =
-    0.5 * w180 * TIGER_STARTER_END + 0.06 * Math.sin(TIGER_STARTER_END * 2 * Math.PI * 5);
-  const dt = seconds - TIGER_STARTER_END;
-  const runup = TIGER_RUNUP_END - TIGER_STARTER_END;
+  const crankSpan = TIGER_CRANK_END - TIGER_PREHEAT_END;
+  const crankDt = Math.min(seconds, TIGER_CRANK_END) - TIGER_PREHEAT_END;
+  const modA = 2 * Math.PI * 2.2;
+  const modB = 2 * Math.PI * 5.3;
+  const angleCrank =
+    wCrank * crankDt +
+    ((18 * RPM_TO_RAD) / modA) * (1 - Math.cos(modA * crankDt)) +
+    ((6 * RPM_TO_RAD) / modB) * (1 - Math.cos(modB * crankDt));
+  if (seconds < TIGER_CRANK_END) return angleCrank;
+  const angleAtIgnition =
+    wCrank * crankSpan +
+    ((18 * RPM_TO_RAD) / modA) * (1 - Math.cos(modA * crankSpan)) +
+    ((6 * RPM_TO_RAD) / modB) * (1 - Math.cos(modB * crankSpan));
+  const runup = TIGER_RUNUP_END - TIGER_CRANK_END;
+  const dt = seconds - TIGER_CRANK_END;
   if (seconds < TIGER_RUNUP_END) {
     const u = dt / runup;
-    return angle1 + w180 * dt + 0.5 * (wIdle - w180) * runup * u * u;
+    return angleAtIgnition + wIgnition * dt + 0.5 * (wIdle - wIgnition) * runup * u * u;
   }
-  const angle2 = angle1 + w180 * runup + 0.5 * (wIdle - w180) * runup;
+  const angleIdle = angleAtIgnition + wIgnition * runup + 0.5 * (wIdle - wIgnition) * runup;
   const idleDt = seconds - TIGER_RUNUP_END;
   const mod = 2 * Math.PI * 0.8;
-  return angle2 + wIdle * idleDt + ((14 * RPM_TO_RAD) / mod) * (1 - Math.cos(mod * idleDt));
+  return angleIdle + wIdle * idleDt + ((14 * RPM_TO_RAD) / mod) * (1 - Math.cos(mod * idleDt));
 }
 
 export function animateTigerEngine(assembled: AssembledModel, seconds: number): void {
@@ -833,16 +848,37 @@ export function animateTigerEngine(assembled: AssembledModel, seconds: number): 
     }
   }
 
-  // 启动瞬间车体一扭；怠速时高频微颤（57 吨只给 1–2mm）
-  const jolt = seconds > TIGER_STARTER_END ? Math.exp(-4 * (seconds - TIGER_STARTER_END)) : 0;
-  assembled.root.position.set(0, 0.0012 * Math.sin(angle * 2), 0);
+  // 预热：只有燃油泵/继电器轻微 tick，曲轴不转；拖动：车体抖动逐渐建立；
+  // 点火：3.4s 一次明显“扭一下”；怠速：1mm 级微颤。
+  const preheat = seconds < TIGER_PREHEAT_END;
+  const cranking = seconds >= TIGER_PREHEAT_END && seconds < TIGER_CRANK_END;
+  const running = seconds >= TIGER_CRANK_END;
+  const crankBuild = THREE.MathUtils.smoothstep(seconds, TIGER_PREHEAT_END, TIGER_PREHEAT_END + 0.6);
+  const preheatTick = preheat ? 0.00022 * Math.sin(seconds * 39) : 0;
+  const crankShiver = cranking
+    ? 0.0013 * Math.sin(angle * 2) * crankBuild + 0.00045 * Math.sin(seconds * 47) * crankBuild
+    : 0;
+  const idleShiver = running ? 0.0011 * Math.sin(angle * 2) : 0;
+  const jolt = running ? Math.exp(-5 * (seconds - TIGER_CRANK_END)) : 0;
+  assembled.root.position.set(0, preheatTick + crankShiver + idleShiver, 0);
   assembled.root.rotation.set(
-    0.0006 * Math.sin(angle * 1.3),
+    (cranking || running ? 0.0004 * Math.sin(angle * 1.3) : 0) +
+      0.00025 * (preheat ? Math.sin(seconds * 39) : 0),
     0,
-    0.0025 * jolt * Math.sin((seconds - TIGER_STARTER_END) * 26),
+    0.0026 * jolt * Math.sin((seconds - TIGER_CRANK_END) * 26) +
+      (cranking ? 0.0005 * Math.sin(seconds * 53) * crankBuild : 0),
   );
 
-  writeExhaustSmoke(assembled.getPart(ENGINE_SMOKE_PART), seconds, seconds < TIGER_RUNUP_END ? 1.35 : 0.75);
+  const smoke = assembled.getPart(ENGINE_SMOKE_PART);
+  if (preheat) {
+    if (smoke) smoke.object.visible = false;
+  } else {
+    let intensity = 0.7;
+    if (cranking) intensity = 0.2 + 0.08 * Math.sin(seconds * 7);
+    else if (seconds < TIGER_CRANK_END + 1.0) intensity = 1.9;
+    else if (seconds < TIGER_RUNUP_END) intensity = 1.1;
+    writeExhaustSmoke(smoke, seconds, intensity);
+  }
 }
 
 // ---------------------------------------------------------------------------

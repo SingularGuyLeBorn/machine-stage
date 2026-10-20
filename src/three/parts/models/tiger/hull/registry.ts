@@ -230,14 +230,18 @@ function makeLayouts(): Record<string, InstanceLayout> {
   layouts["hull.balkenkreuz"] = ({ index }) =>
     new THREE.Matrix4().makeTranslation(-2.2, 0.55, index === 0 ? 1.783 : -1.783);
 
-  // 加油口盖：与发动机舱内 L1 油箱的加油颈同轴（世界 x 0.616 / z ±0.802），
-  // 且在散热格栅（x -0.21 ~ 0.45、z ±0.19 ~ ±0.85）之外，避免盖住百叶。
-  layouts["hull.fuelCap"] = ({ index, constants }) =>
-    new THREE.Matrix4().makeTranslation(
+  // 加油口盖：与发动机舱内 L1 加注管/油箱颈同轴（世界 x 0.616 / z ±0.802），
+  // 且在散热格栅（x -0.21 ~ 0.45、z ±0.19 ~ ±0.85）之外。左盖绕 Y 转 180°，
+  // 让两边的盖盘都向外侧掀开（几何里的铰链在 +Z 边）。
+  layouts["hull.fuelCap"] = ({ index, constants }) => {
+    const m = new THREE.Matrix4().makeTranslation(
       0.616,
       constants.HULL_DECK_UNDER! + constants.HULL_DECK_T! + 0.001,
       index === 0 ? 0.802 : -0.802,
     );
+    if (index === 1) m.multiply(new THREE.Matrix4().makeRotationY(Math.PI));
+    return m;
+  };
 
   // 战术编号：右件在 z +1.783、左件在 z -1.783 并绕 Y 转 180°（法线朝外）
   layouts["hull.tacticalNumber"] = ({ index }) => {
@@ -564,18 +568,47 @@ function buildHullParts(): PartDefinition[] {
     assembly: "hull",
     build_layer: 4,
     build_order: 506,
-    geometry: { type: "box", w: deckW, h: c.HULL_DECK_T!, d: sideOuter * 2, bevel: 0.004 },
+    geometry: {
+      type: "kit",
+      kit: "hullPlate",
+      params: {
+        w: deckW,
+        h: sideOuter * 2,
+        t: c.HULL_DECK_T!,
+        // 两个 ⌀140 加注孔：正对甲板加注口（x 0.616 / z ±0.802），加注管从孔中穿过
+        holes: [
+          [0.616 - deckCX, 0.802, 0.07],
+          [0.616 - deckCX, -0.802, 0.07],
+        ],
+      },
+    },
     material: "armor_steel",
-    mate: { type: "absolute", position: [deckCX, (deckUnder + deckTop) / 2, 0] },
+    mate: {
+      type: "absolute",
+      position: [deckCX, (deckUnder + deckTop) / 2, 0],
+      rotation: [90, 0, 0],
+    },
     damage: {
       damaged: {
         type: "merge",
         parts: [
-          { type: "box", w: deckW, h: c.HULL_DECK_T!, d: sideOuter * 2, bevel: 0.004 },
           {
             type: "kit",
-            kit: "damageScarH",
-            params: { t: c.HULL_DECK_T!, at: [0.545, 0.35], r: 0.13 },
+            kit: "hullPlate",
+            params: {
+              w: deckW,
+              h: sideOuter * 2,
+              t: c.HULL_DECK_T!,
+              holes: [
+                [0.616 - deckCX, 0.802, 0.07],
+                [0.616 - deckCX, -0.802, 0.07],
+              ],
+            },
+          },
+          {
+            type: "kit",
+            kit: "damageScarV",
+            params: { t: c.HULL_DECK_T!, at: [0.545, 0.35], r: 0.13, plane: "z-" },
           },
         ],
       },
@@ -586,17 +619,21 @@ function buildHullParts(): PartDefinition[] {
           w: deckW,
           h: sideOuter * 2,
           t: c.HULL_DECK_T!,
+          holes: [
+            [0.616 - deckCX, 0.802, 0.07],
+            [0.616 - deckCX, -0.802, 0.07],
+          ],
           breach: [0.545, 0.35, 0.19],
           innerSide: 1,
           ribs: 4,
           pipe: true,
           wires: 2,
-          orient: "xz",
+          orient: "xy",
         },
       },
     },
     source:
-      "发动机舱盖（Motorabdeckung，厚 25）：下表面 y 1.08、上表面 1.105，x -0.741 ~ 0.91，z 取满宽 ±0.9625（后缘盖住后装甲板顶面、两侧盖住发动机舱侧围，俯视无透缝；后边线与车尾外面齐平）。抬高 30mm 的原因：L1 空滤顶 1.056 / 卡箍顶 1.053 高于战斗室顶下表面 1.05，整体抬高后留 24mm（阶梯甲板，对应实车发动机舱盖高出车体顶面的做法）。战损变体：破损 = 顶部凹陷裂痕；破碎 = 540mm 破洞，露出散热器芯、冷却水管与线束。散热格栅 / 风扇盖 / 排气口随 L5。",
+      "发动机舱盖（Motorabdeckung，厚 25）：下表面 y 1.08、上表面 1.105，x -0.741 ~ 0.91，z 取满宽 ±0.9625（后缘盖住后装甲板顶面、两侧盖住发动机舱侧围，俯视无透缝；后边线与车尾外面齐平）。抬高 30mm 的原因：L1 空滤顶 1.056 / 卡箍顶 1.053 高于战斗室顶下表面 1.05，整体抬高后留 24mm（阶梯甲板，对应实车发动机舱盖高出车体顶面的做法）。**开两个 ⌀140 加油孔**（x 0.616、z ±0.802）：上面是甲板加注口（开盖），下面是 L1 加注管与油箱颈——加油路径贯通。战损变体：破损 = 顶部凹陷裂痕；破碎 = 540mm 破洞，露出散热器芯、冷却水管与线束。散热格栅 / 风扇盖 / 排气口随 L5。",
   });
 
   add({
@@ -1055,22 +1092,14 @@ function buildHullParts(): PartDefinition[] {
     assembly: "hull",
     build_layer: 4,
     build_order: 548,
-    geometry: {
-      type: "merge",
-      parts: [
-        { type: "tube", rOuter: 0.088, rInner: 0.064, h: 0.02, at: [0, 0.01, 0], segments: 28 },
-        { type: "cylinder", r: 0.067, h: 0.052, at: [0, 0.042, 0], segments: 24, bevel: 0.002 },
-        { type: "cylinder", r: 0.086, h: 0.016, at: [0, 0.076, 0], segments: 28, bevel: 0.002 },
-        { type: "cylinder", r: 0.02, h: 0.022, at: [0, 0.095, 0], segments: 12, bevel: 0.001 },
-      ],
-    },
+    geometry: { type: "kit", kit: "fuelFillerCap" },
     material: "steel_worn",
     instances: 2,
     indexed: true,
     instance_layout: "hull.fuelCap",
     mate: { type: "absolute" },
     source:
-      "燃油加注口 ×2：与 L1 左右燃油箱的加油颈同轴（x 0.132 / z ±0.786），底座圈 ⌀176 × 20 + 颈管 ⌀134 × 52 + 盖盘 ⌀172 × 16 + 提钮 ⌀40 × 22，坐在发动机舱盖顶面（y 1.105）上 1mm。",
+      "燃油加注口 ×2（展示为开盖状态）：底座圈 ⌀180 × 20 + 通孔颈管 ⌀136/⌀104 × 62 + 铰链 + 68° 掀起盖盘 ⌀164 × 14 + 提手 + 防丢链。位置 x 0.616 / z ±0.802，正对发动机舱盖上的 ⌀140 加油孔；往下依次是加注管（L1）、软管与油箱颈——油箱 → 加注管 → 甲板孔 → 加油口，路径连续。左盖绕 Y 转 180°，两边都向外开。",
   });
 
   add({
