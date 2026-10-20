@@ -77,6 +77,9 @@ describe("tiger/interior 机械丛林", () => {
       "cupola_periscope",
       "spare_drum",
       "first_aid_kit",
+      "coax_mg",
+      "basket_strut",
+      "oil_pressure_line",
       "grab_handle",
       "data_plate",
       "warning_label",
@@ -126,6 +129,11 @@ describe("tiger/interior 机械丛林", () => {
       "tiger.interior.pedal": built.getPart("tiger.interior.pedal")!.instances.length,
       "tiger.interior.data_plate": built.getPart("tiger.interior.data_plate")!.instances.length,
       "tiger.interior.grab_handle": built.getPart("tiger.interior.grab_handle")!.instances.length,
+      "tiger.interior.fire_extinguisher": built.getPart("tiger.interior.fire_extinguisher")!
+        .instances.length,
+      "tiger.interior.extinguisher_clamp": built.getPart("tiger.interior.extinguisher_clamp")!
+        .instances.length,
+      "tiger.interior.basket_strut": built.getPart("tiger.interior.basket_strut")!.instances.length,
     };
     expect(counts).toEqual({
       "tiger.interior.cable_clamp": 3,
@@ -135,6 +143,9 @@ describe("tiger/interior 机械丛林", () => {
       "tiger.interior.pedal": 3,
       "tiger.interior.data_plate": 6,
       "tiger.interior.grab_handle": 4,
+      "tiger.interior.fire_extinguisher": 2,
+      "tiger.interior.extinguisher_clamp": 4,
+      "tiger.interior.basket_strut": 4,
     });
   });
 

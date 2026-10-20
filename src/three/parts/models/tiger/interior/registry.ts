@@ -150,8 +150,27 @@ export function makeInteriorLayouts(): Record<string, InstanceLayout> {
 
   layouts[INTERIOR_LAYOUTS.eyepiece] = ({ index }) => laid(RX, -3.855, 0.93, side(index) * 0.66);
 
-  layouts[INTERIOR_LAYOUTS.clamp] = ({ index }) =>
-    new THREE.Matrix4().makeTranslation(-2.95, index === 0 ? -0.09 : 0.09, -0.83);
+  layouts[INTERIOR_LAYOUTS.clamp] = ({ index }) => {
+    // 4 只：左右两侧各一具灭火器（瓶心 z ±0.83），每具上下两道箍；右侧箍转 180° 让耳板朝壁
+    const side = index < 2 ? -1 : 1;
+    const y = index % 2 === 0 ? -0.09 : 0.09;
+    const rot = side > 0 ? new THREE.Matrix4().makeRotationY(Math.PI) : null;
+    return laid(rot, -2.95, y, side * 0.83);
+  };
+  layouts["interior.extinguisherPair"] = ({ index }) =>
+    new THREE.Matrix4().makeTranslation(-2.95, 0, (index % 2 === 0 ? -1 : 1) * 0.83);
+  // 吊篮支柱 4 根：从护栏带上沿（1.335）顶到顶甲内表面（1.811）下 6mm，绕座圈 r 0.80 均布，
+  // 避开前方复进机开口（135°~225°）与右后排风管。
+  layouts["interior.basketStrut"] = ({ index }) => {
+    const spots: [number, number, number][] = [
+      [-0.957, 1.34, 0.4],
+      [-1.789, 1.34, 0.788],
+      [-2.216, 1.34, -0.566],
+      [-1.25, 1.34, -0.693],
+    ];
+    const [x, y, z] = spots[index % spots.length]!;
+    return new THREE.Matrix4().makeTranslation(x, y, z);
+  };
 
   layouts[INTERIOR_LAYOUTS.lamp] = ({ index }) => {
     const list: [number, number][] = [
@@ -933,9 +952,12 @@ function buildInteriorParts(): PartDefinition[] {
       ],
     },
     material: "interior_red",
-    mate: { type: "absolute", position: [-2.95, 0, -0.83] },
+    instances: 2,
+    indexed: true,
+    instance_layout: "interior.extinguisherPair",
+    mate: { type: "absolute" },
     source:
-      "手提灭火器（瓶体 ф110 × 280，阀头 50×30）：挂在左侧板内表面（z -0.90）前 40mm，瓶底 y -0.17；两只卡箍分上下抱住瓶体。",
+      "手提灭火器 2 只（瓶体 ф110 × 280，阀头 50×30）：左右侧板内表面（z ±0.90）前 40mm 各一具，瓶底 y -0.17；两具各用上下两道卡箍抱住。左侧靠近装填手席、右侧靠近机电员席，两舷乘员都能一步拿到。",
   });
 
   add({
@@ -953,12 +975,12 @@ function buildInteriorParts(): PartDefinition[] {
       ],
     },
     material: "steel",
-    instances: 2,
+    instances: 4,
     indexed: true,
     instance_layout: INTERIOR_LAYOUTS.clamp,
     mate: { type: "absolute" },
     source:
-      "卡箍（内径 114，环抱 ф110 瓶体，径向 2mm）：两只（y -0.09 / +0.09），耳板外侧 -0.898 —— 离侧板内表面（L4-a 的 z -0.90）2mm、离瓶体表面（-0.885）3mm。",
+      "卡箍 4 只（内径 114，环抱 ф110 瓶体，径向 2mm）：两具灭火器各上下两道（y ∓0.09），右侧两只绕 Y 转 180° 让耳板朝壁；耳板外侧 -0.898，离侧板内表面（z ±0.90）2mm、离瓶体表面 3mm。",
   });
 
   add({
@@ -2080,6 +2102,126 @@ function buildInteriorParts(): PartDefinition[] {
     mate: { type: "absolute" },
     source:
       "随机工具 5 件（扳手/梅花扳手/螺丝刀等，长 240，朝向走 layout：绕 X 转 90° 让长度沿 Z 横插）：插在工具架的 5 个卡槽里（y 0.3，z -0.24~-0.04 与 0.16~0.26），杆面离挡条前缘 6mm、离后隔板 26mm。",
+  });
+
+  // ===================== 第四批：吊篮支柱 / 同轴机枪 / 油压管路 =====================
+  add({
+    id: "tiger.interior.basket_strut",
+    name_cn: "吊篮支柱",
+    name_en: "Turmbodenstrebe",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 478,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.02, h: 0.44, at: [0, 0.24, 0], segments: 14, bevel: 0.002 },
+        { type: "box", w: 0.07, h: 0.02, d: 0.07, at: [0, 0.01, 0], bevel: 0.003 },
+        { type: "box", w: 0.06, h: 0.02, d: 0.06, at: [0, 0.45, 0], bevel: 0.003 },
+      ],
+    },
+    material: "interior_paint",
+    instances: 4,
+    indexed: true,
+    instance_nodes: Array.from({ length: 4 }, () => "Turret"),
+    instance_layout: "interior.basketStrut",
+    mate: { type: "absolute" },
+    source:
+      "吊篮支柱 ⌀40 × 440，4 根绕座圈 r 0.80 均布（30°/100°/225°/300°），从护栏带上沿（1.335）上方 5mm 顶到顶甲内表面（1.811）下 6mm；顶板 60×20×60 托住顶甲、底板 70×20×70 坐在护栏上。前方 135°~225° 的复进机开口不设柱；避开车长塔周向潜望镜、瞄具线管与右后排风管。",
+  });
+
+  add({
+    id: "tiger.interior.coax_mg",
+    name_cn: "同轴机枪 MG34",
+    name_en: "MG 34 (koaxial)",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 479,
+    geometry: {
+      type: "merge",
+      parts: [
+        // 机匣 300×100×90
+        { type: "box", w: 0.3, h: 0.1, d: 0.09, at: [0, 0, 0], bevel: 0.005 },
+        { type: "box", w: 0.22, h: 0.022, d: 0.07, at: [0, 0.058, 0], bevel: 0.004 },
+        // 枪管（向前 130，止于防盾内表面后 20mm）
+        { type: "cylinder", r: 0.016, h: 0.13, at: [-0.155, 0.008, 0], segments: 16, bevel: 0.002 },
+        // 枪管套
+        { type: "cylinder", r: 0.026, h: 0.11, at: [-0.06, 0.008, 0], segments: 16, bevel: 0.002 },
+        // 弹链箱（机匣上方）
+        { type: "box", w: 0.14, h: 0.08, d: 0.07, at: [-0.02, 0.1, 0], bevel: 0.004 },
+        // 握把 + 扳机
+        { type: "box", w: 0.04, h: 0.09, d: 0.03, at: [0.16, -0.03, 0], bevel: 0.003 },
+        // 枪架（伸向炮架，留 3.5mm 名义缝）
+        {
+          type: "box",
+          w: 0.06,
+          h: 0.05,
+          d: 0.055,
+          at: [0.06, -0.05, -0.055],
+          bevel: 0.003,
+        },
+        // 准星
+        { type: "box", w: 0.018, h: 0.04, d: 0.012, at: [-0.21, 0.03, 0], bevel: 0.002 },
+      ],
+    },
+    material: "steel_worn",
+    mate: { type: "absolute", position: [-2.46, 1.6, 0.35] },
+    node: "Turret",
+    source:
+      "同轴 MG34（机匣 300×100×90 + 枪管套 + 弹链箱 + 握把 + 枪架）：架在主炮右侧 z +0.35、枪线 y 1.60（高出炮线 150mm，装填手不用低头就能换弹链）；枪管止于防盾内表面后 20mm，枪架离炮架侧面 3.5mm；离高低机手轮顶 60mm、离装填手席靠背 40mm。枪口段在防盾外侧单独成件。",
+  });
+
+  add({
+    id: "tiger.interior.coax_muzzle",
+    name_cn: "同轴机枪枪口段",
+    name_en: "MG 34 Mündung (koaxial)",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 480,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.017, h: 0.1, at: [0, 0, 0], segments: 16, bevel: 0.002 },
+        { type: "cylinder", r: 0.026, h: 0.05, at: [-0.075, 0, 0], segments: 16, bevel: 0.002 },
+      ],
+    },
+    material: "steel_worn",
+    mate: { type: "absolute", position: [-3.09, 1.6, 0.35] },
+    node: "Turret",
+    source:
+      "同轴机枪枪口段（枪管 100 + 消焰罩 50）：伸出防盾前面（x -3.023）17mm，后座离防盾面 17mm——防盾挡住两段之间的空隙，外观上是一条连续的枪管。",
+  });
+
+  add({
+    id: "tiger.interior.oil_pressure_line",
+    name_cn: "机油压力管",
+    name_en: "Öldruckleitung",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 481,
+    geometry: {
+      type: "kit",
+      kit: "cableRun",
+      params: {
+        points: [
+          [-0.88, 0.78, -0.62],
+          [-1.0, 0.72, -0.66],
+          [-1.6, 0.66, -0.72],
+          [-2.4, 0.64, -0.74],
+          [-3.2, 0.62, -0.72],
+          [-3.9, 0.58, -0.62],
+          [-4.22, 0.52, -0.45],
+          [-4.31, 0.46, -0.3],
+        ],
+        strands: 1,
+        r: 0.006,
+        segments: 96,
+      },
+    },
+    material: "cable_rubber",
+    mate: { type: "absolute" },
+    source:
+      "机油压力管 ⌀12：从后隔板接线盒底部左角（盒底 0.79，起点离盒 15mm）沿左侧板内表面下沿一路向前，过座椅靠背顶（0.57）上方 50mm、方向盘轮缘（0.526）上方 48mm，在仪表板左上角接管；全程离壁 160~180mm，避开采暖/线束带（y 0.767 以上）。",
   });
 
   return parts;
