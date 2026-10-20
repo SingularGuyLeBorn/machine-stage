@@ -839,6 +839,26 @@ function buildTurretParts(): PartDefinition[] {
       "枪座防盾（Schutzschild）：420 宽 × 340 高 × 8 钢板，中央 100 宽顶部开口让炮管俯仰穿出；下挡板 120 高遮住车长胸腹，左右面板挡侧向破片。装在枪座悬臂前端（x -1.98），盾面离炮管 17mm、离炮塔顶盖（1.836）上方 364mm；后支架 176 长接枪座横臂（留 5mm 装配缝）。车长探身时上半身（塔口以上 0.3~0.5m）在盾后，正面与斜前方有遮挡。",
   });
 
+  // 炮口焰（特效）：炮口前 35mm 起，动画 in/out 只切 visible/scale；fx 标签豁免支撑检测
+  add({
+    id: "tiger.turret.muzzle_flash",
+    name_cn: "炮口焰（特效）",
+    name_en: "Mündungsfeuer (FX)",
+    assembly: "turret",
+    build_layer: 5,
+    build_order: 612,
+    geometry: { type: "kit", kit: "muzzleFlash", params: { coreR: 0.1 } },
+    material: "muzzle_flash",
+    node: "GunRecoil",
+    mate: {
+      type: "absolute",
+      position: [barrelX - c.TR_BARREL_L! - c.TR_GUN_PIVOT_X! - 0.005, 0, 0],
+    },
+    tags: ["fx"],
+    source:
+      "炮口焰（Mündungsfeuer，特效件）：核心球 ⌀200 + 前向锥 ⌀240 × 420 + 6 片径向星芒，几何整体在炮口前方 35mm 之外（不碰炮管制退器）；挂 GunRecoil 节点，随炮身后坐。只由击发动画切 visible 与 scale（1.16–1.55s），不参与静态装配语义；tags: [\"fx\"] 让悬空检测豁免。",
+  });
+
   parts.push({
     id: "tiger.turret.close_defense",
     name_cn: "近防武器管",
@@ -962,7 +982,17 @@ export function makeTurretRegistry(): ModelRegistry {
         note: "车长塔环形枪座上的 MG34：绕耳轴俯仰（P3）",
       },
     ],
-    materials: {},
+    materials: {
+      muzzle_flash: {
+        base: "#ffe2a8",
+        metalness: 0,
+        roughness: 0.9,
+        preset: "none",
+        envMapIntensity: 0.2,
+        emissive: "#ff9a33",
+        emissiveIntensity: 5,
+      },
+    },
     parts: buildTurretParts(),
   };
 }

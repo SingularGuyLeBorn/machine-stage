@@ -144,6 +144,7 @@ function StageRuntime() {
   // 阴影板切在机体中间、网格从模型腰部穿出）。
   const [stageFloor, setStageFloor] = useState<{ y: number; footprint: number } | null>(null);
   const clockRef = useRef(0);
+  const lastStateRef = useRef<string | null>(null);
   const assembled = scene?.assembled ?? null;
 
   // ---- 注册表 → 场景 ----
@@ -183,6 +184,10 @@ function StageRuntime() {
         object.receiveShadow = true;
       }
     });
+    // 特效件（tags: fx）默认不可见，由动画在需要时切 visible；否则首帧会先闪一下。
+    for (const handle of next.parts) {
+      if (handle.def.tags?.includes("fx")) handle.object.visible = false;
+    }
     let triangles = 0;
     for (const handle of next.parts) {
       const geometry = handle.geometry;
@@ -196,8 +201,12 @@ function StageRuntime() {
     // 重建时保留当前构建进度（改参数不该把玩家从 L2 拉回整车）
     store.setBuildIndex(store.buildIndex);
     store.attach(next);
-    // 全车体包围盒 → 复位视角基准 + 地面锚点
-    const bounds = new THREE.Box3().setFromObject(next.root);
+    // 全车体包围盒 → 复位视角基准 + 地面锚点（排除 fx 特效件，避免炮口焰把取景拉远）
+    const bounds = new THREE.Box3();
+    for (const handle of next.parts) {
+      if (handle.def.tags?.includes("fx")) continue;
+      bounds.union(next.partBounds(handle, new THREE.Box3()));
+    }
     if (!bounds.isEmpty()) {
       const center = bounds.getCenter(new THREE.Vector3());
       const size = bounds.getSize(new THREE.Vector3());
@@ -223,13 +232,19 @@ function StageRuntime() {
     if (!assembled) return;
     const store = useStageStore.getState();
     const model = findModel(store.modelId);
-    const running = store.machineState === "running";
+    const state = store.machineState;
+    const running = state === "running" || state === "firing";
+    // 切换机器状态时重置动画时钟：击发必须从 0s 开始，悬挂演示也应从头起步。
+    if (state !== lastStateRef.current) {
+      lastStateRef.current = state;
+      clockRef.current = 0;
+    }
     if (running) {
       clockRef.current += Math.min(delta, 0.05);
     }
     assembled.resetNodes();
     // 停机时传 0：悬挂回到装配态（否则会停在上一帧的抬起位）
-    model.animate?.(assembled, running ? clockRef.current : 0);
+    model.animate?.(assembled, running ? clockRef.current : 0, state);
     assembled.syncInstances();
     const motionParts = motionPartsOf(model);
     if (store.views.explode) applyExplode(assembled, 1, motionParts);

@@ -130,3 +130,97 @@ export function animateTigerSuspension(assembled: AssembledModel, seconds: numbe
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// 主炮击发循环（P3）——节点驱动：GunCradle → GunRecoil → BreechBlock → FiringPin。
+// 开闩（0.3–0.55s）→ 关闩（0.85–1.1s）→ 击针（1.1–1.28s）→ 后坐 450mm
+// （1.2–1.3s 先快，之后高阻尼 exp×cos 复进）→ 开闩抛壳（1.45–2.5s）→ 待装。
+// 全车后坐反应只给 6mm 下沉 / 0.2° 点头——57 吨车体是「沉一下」，不是弹跳。
+// ---------------------------------------------------------------------------
+export const TIGER_FIRE_CYCLE = 6;
+export const TIGER_RECOIL_DISTANCE = 0.45;
+export const TIGER_BLOCK_DROP = 0.16;
+export const TIGER_FLASH_PART = "tiger.turret.muzzle_flash";
+/** 炮口焰可见窗口（秒）：击发瞬间 → 后坐峰之后。 */
+const FLASH_START = 1.16;
+const FLASH_END = 1.55;
+
+const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
+const smoothstep = (edge0: number, edge1: number, value: number): number => {
+  const u = clamp01((value - edge0) / (edge1 - edge0));
+  return u * u * (3 - 2 * u);
+};
+const easeOutCubic = (u: number): number => 1 - (1 - clamp01(u)) ** 3;
+
+/** 闩体位置（0 = 闭锁，-160mm = 全开）：循环首尾闭合，开/闭都带缓入缓出。 */
+export function tigerBreechBlockOffset(t: number): number {
+  if (t < 0.3) return 0;
+  if (t < 0.55) return -TIGER_BLOCK_DROP * smoothstep(0.3, 0.55, t);
+  if (t < 0.85) return -TIGER_BLOCK_DROP;
+  if (t < 1.1) return -TIGER_BLOCK_DROP * (1 - smoothstep(0.85, 1.1, t));
+  if (t < 1.45) return 0;
+  if (t < 1.7) return -TIGER_BLOCK_DROP * smoothstep(1.45, 1.7, t);
+  if (t < 2.2) return -TIGER_BLOCK_DROP;
+  if (t < 2.5) return -TIGER_BLOCK_DROP * (1 - smoothstep(2.2, 2.5, t));
+  return 0;
+}
+
+/** 炮身后坐位移（米）：0 → 450mm（100ms 先快）→ 液压阻尼复进（缓冲器限制前向过冲 4mm）。 */
+export function tigerRecoilOffset(t: number): number {
+  if (t < 1.2) return 0;
+  if (t < 1.3) return TIGER_RECOIL_DISTANCE * easeOutCubic((t - 1.2) / 0.1);
+  const u = t - 1.3;
+  // 液压复进：高阻尼 cos 回位；闩室/前壁的安全余量只允许 4mm 前向过冲
+  return Math.max(-0.004, TIGER_RECOIL_DISTANCE * Math.exp(-3.8 * u) * Math.cos(2.4 * u));
+}
+
+/** 击针行程（米，-X 为前冲）：击发前后各 120ms 的短促脉冲。 */
+export function tigerFiringPinOffset(t: number): number {
+  if (t < 1.1 || t > 1.28) return 0;
+  if (t < 1.16) return -0.008 * smoothstep(1.1, 1.16, t);
+  return -0.008 * (1 - smoothstep(1.16, 1.28, t));
+}
+
+export function animateTigerFiring(assembled: AssembledModel, seconds: number): void {
+  const t = ((seconds % TIGER_FIRE_CYCLE) + TIGER_FIRE_CYCLE) % TIGER_FIRE_CYCLE;
+  const recoil = assembled.getNode("GunRecoil");
+  if (recoil) recoil.position.x = tigerRecoilOffset(t);
+  const block = assembled.getNode("BreechBlock");
+  if (block) block.position.y = tigerBreechBlockOffset(t);
+  const pin = assembled.getNode("FiringPin");
+  if (pin) pin.position.x = tigerFiringPinOffset(t);
+
+  // 后坐力传全车：57 吨「沉一下」——6mm 下沉 + 0.2° 点头，随复进阻尼回位
+  const kick = clamp01(tigerRecoilOffset(t) / TIGER_RECOIL_DISTANCE);
+  assembled.root.position.y = -0.006 * kick;
+  assembled.root.rotation.z = -0.0035 * kick;
+  assembled.root.rotation.x = 0;
+
+  // 炮口焰：只在击发窗口可见；尺度随压力峰值起伏（特效件 fx，不参与支撑检测）
+  const flash = assembled.getPart(TIGER_FLASH_PART);
+  if (flash) {
+    const u = (t - FLASH_START) / (FLASH_END - FLASH_START);
+    const visible = u >= 0 && u <= 1;
+    flash.object.visible = visible;
+    if (visible) {
+      const scale = 0.7 + 0.6 * Math.sin(Math.PI * u);
+      flash.object.scale.setScalar(scale);
+    }
+  }
+}
+
+/**
+ * 虎式动画总入口（catalog.animate）：按机器状态分流。
+ * - running：悬挂演示（车体浮沉 + 48 轮转动）；
+ * - firing：主炮击发循环；
+ * - 其余状态：回到装配态（炮口焰隐藏、节点由框架 resetNodes 复位）。
+ */
+export function animateTiger(assembled: AssembledModel, seconds: number, state?: string): void {
+  if (state === "firing") {
+    animateTigerFiring(assembled, seconds);
+    return;
+  }
+  animateTigerSuspension(assembled, seconds);
+  const flash = assembled.getPart(TIGER_FLASH_PART);
+  if (flash) flash.object.visible = false;
+}

@@ -2,15 +2,17 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { buildModel, detectStatic, validateRegistry } from "@/three/parts";
 import { findModel } from "@/app/catalog";
+import { animateTigerFiring } from "../motion";
 
 // ============================================================================
-// 主炮闩 / 炮架验收（P0）
+// 主炮闩 / 炮架验收（P0 + P3 引信）
 //
 // 1. 注册表契约：新增 8 件炮闩机构 + 3 件车长塔枪座无校验错误。
 // 2. 炮管是通的：整个回转体没有落在轴线上的顶点（旧版两端有 r≈0 的中心点 = 实心）。
 // 3. 后坐 + 开闩是「可动画的」：把 GunRecoil 推 450mm、闩体下落 160mm、击针前冲 8mm，
 //    炮塔 + 内饰子集静态检测必须 0 报告（座席/吊篮/摇架/复进机都让开了）。
-// 4. 人机工程：对空 MG34 枪尾落在车长塔口范围内（枪座到塔心 < 0.5m），防盾在枪前方。
+// 4. 主炮击发全循环的 15 个时间点同样零干涉（含阻尼复进的前向过冲与闩体下落重叠段）。
+// 5. 人机工程：对空 MG34 枪尾落在车长塔口范围内（枪座到塔心 < 0.5m），防盾在枪前方。
 // ============================================================================
 
 const model = findModel("tiger");
@@ -94,6 +96,26 @@ describe("tiger/turret 主炮闩验收", () => {
     ).toEqual([]);
     built.dispose();
   }, 120_000);
+
+  it("主炮击发全循环：15 个时间点炮塔/内饰零干涉", () => {
+    const built = build();
+    const samples = [0, 0.45, 0.7, 0.95, 1.1, 1.2, 1.25, 1.3, 1.45, 1.7, 2.1, 2.4, 3.0, 4.0, 5.5];
+    const failures: string[] = [];
+    for (const t of samples) {
+      built.resetNodes();
+      animateTigerFiring(built, t);
+      built.root.updateMatrixWorld(true);
+      built.syncInstances();
+      const reports = detectStatic(built, {
+        filter: (handle) => handle.assembly === "turret" || handle.assembly === "interior",
+      });
+      for (const report of reports) {
+        failures.push(`t=${t}s ${report.a} ↔ ${report.b} @${report.depth_mm}mm [${report.form}]`);
+      }
+    }
+    expect(failures).toEqual([]);
+    built.dispose();
+  }, 180_000);
 
   it("人机工程：MG34 枪尾落在车长塔口上方，防盾在枪前方且高于顶盖", () => {
     const built = build();
