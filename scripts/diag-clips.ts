@@ -8,6 +8,7 @@ import { writeFileSync } from "node:fs";
 import { buildModel } from "../src/three/parts/assembler/assembler";
 import { makeTigerLayouts, makeTigerRegistry, tigerBuilders } from "../src/three/parts/models/tiger/registry";
 import { detectStatic, planPairs } from "../src/three/parts/solver/detect";
+import { detectUnsupportedParts } from "../src/three/parts/solver/support";
 import type { ClippingReport } from "../src/three/parts/solver/report";
 import {
   DEFAULT_MAX_DEPTH_MM,
@@ -214,6 +215,22 @@ if (process.argv.includes("--recheck")) {
   ].join("\n");
   writeFileSync("docs/qa/whitelist-recheck.md", doc, "utf8");
   console.log(`--- 豁免规则复核已写入 docs/qa/whitelist-recheck.md（漏网 ${leaks.length} 条） ---`);
+}
+
+// ---- 悬空检测（P1）：每个实例必须有支撑邻居（AABB 最近距离 ≤ 20mm）----
+{
+  const started = performance.now();
+  const unsupported = detectUnsupportedParts(model, { maxGapM: 0.02 });
+  const ms = Math.round(performance.now() - started);
+  const parts = new Set(unsupported.map((report) => report.partId));
+  console.log(
+    `
+--- 悬空检测（支撑阈值 20mm）: ${unsupported.length} 实例 / ${parts.size} 零件（${ms} ms） ---`,
+  );
+  for (const report of unsupported.slice(0, 20)) {
+    console.log(`  ${report.gap_mm.toFixed(1)}mm  ${report.ref}  <- 最近 ${report.nearest}`);
+  }
+  if (unsupported.length === 0) console.log("  （全部实例都有支撑邻居）");
 }
 
 model.dispose();
