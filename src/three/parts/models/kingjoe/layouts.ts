@@ -189,6 +189,24 @@ const shoulderAxles: InstanceLayout = ({ index }) =>
     .makeTranslation(index === 0 ? -2.3 : 2.3, 0, 0)
     .multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
 
+const shoulderDockRings: InstanceLayout = ({ index }) =>
+  new THREE.Matrix4()
+    .makeTranslation(index === 0 ? -2.16 : 2.16, 0, 0)
+    .multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
+
+const shoulderFaceSeals: InstanceLayout = ({ index }) =>
+  new THREE.Matrix4()
+    .makeTranslation(index === 0 ? -2.1415 : 2.1415, 0, 0)
+    .multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
+
+const shoulderDockSensors: InstanceLayout = ({ index }) => {
+  const side = index < 2 ? -1 : 1;
+  const diagonal = index % 2 === 0 ? 1 : -1;
+  return new THREE.Matrix4()
+    .makeTranslation(side * 2.1415, diagonal * 0.212, diagonal * 0.212)
+    .multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
+};
+
 const fingerGap3: InstanceLayout = ({ index }) =>
   new THREE.Matrix4().makeTranslation((index - 1) * 0.13, 0, 0);
 
@@ -242,6 +260,9 @@ export const KINGJOE_LAYOUTS: Record<string, InstanceLayout> = {
   kjWristCaps: wristCaps,
   kjBackRibs: backRibs,
   kjShoulderAxles: shoulderAxles,
+  kjShoulderDockRings: shoulderDockRings,
+  kjShoulderFaceSeals: shoulderFaceSeals,
+  kjShoulderDockSensors: shoulderDockSensors,
   kjMirrorX066: mirrorX(0.66),
   kjMirrorX072: mirrorX(0.72),
   kjMirrorX098: mirrorX(0.98),

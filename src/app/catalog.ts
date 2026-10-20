@@ -211,7 +211,7 @@ export const CATALOG: StageModel[] = [
     readouts: (assembled) => [
       { label: "定义零件", value: `${assembled.parts.length} 件` },
       { label: "合体高度", value: "8.16 m" },
-      { label: "对接面", value: "3 轴向 + 2 肩锁" },
+      { label: "对接面", value: "3 轴向 + 2 肩对接" },
       { label: "锥销 / 锁环", value: "12 / 5 组" },
     ],
     notes: [
