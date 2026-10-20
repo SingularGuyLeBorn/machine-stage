@@ -75,7 +75,7 @@ export function addStomachParts(builder: KingJoeParts): void {
     geometry: { type: "cylinder", r: 0.065, h: 0.035, segments: 16, bevel: 0.003 },
     material: "sensor_red",
     node: A,
-    mate: absMate([0, 0.60, 0]),
+    mate: absMate([0, 0.6, 0]),
   });
   builder.add({
     id: pid(A, "waist_bearing_lower"),
@@ -141,7 +141,7 @@ export function addStomachParts(builder: KingJoeParts): void {
     geometry: { type: "kit", kit: "kjTorus", params: { radius: 0.422, tube: 0.01, segments: 32 } },
     material: "rubber",
     node: A,
-    mate: absMate([0, 0.60, 0]),
+    mate: absMate([0, 0.6, 0]),
   });
   builder.add({
     id: pid(A, "waist_flange"),

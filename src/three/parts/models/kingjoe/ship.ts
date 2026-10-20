@@ -1,12 +1,5 @@
 import { KJ } from "./constants";
-import {
-  KingJoeParts,
-  addAntigravity,
-  addNozzles,
-  mateAt,
-  pid,
-  rivetStripPart,
-} from "./helpers";
+import { KingJoeParts, addAntigravity, addNozzles, mateAt, pid, rivetStripPart } from "./helpers";
 
 // ============================================================================
 // models/kingjoe/ship —— King Ship（头部飞船）
@@ -148,7 +141,10 @@ export function addShipParts(builder: KingJoeParts): void {
   });
 
   // —— 两只圆形副眼 / 额头发光体 ——
-  for (const [suffix, x] of [["l", -0.22], ["r", 0.22]] as const) {
+  for (const [suffix, x] of [
+    ["l", -0.22],
+    ["r", 0.22],
+  ] as const) {
     builder.add({
       id: pid(A, `sensor_housing_${suffix}`),
       name_cn: "副眼座",
@@ -210,7 +206,10 @@ export function addShipParts(builder: KingJoeParts): void {
     indexed: true,
     instance_layout: "kjCrestFins",
   });
-  for (const [suffix, sx] of [["l", -1], ["r", 1]] as const) {
+  for (const [suffix, sx] of [
+    ["l", -1],
+    ["r", 1],
+  ] as const) {
     builder.add({
       id: pid(A, `ear_pod_${suffix}`),
       name_cn: "耳荚",

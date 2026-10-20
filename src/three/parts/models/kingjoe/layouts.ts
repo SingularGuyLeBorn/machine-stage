@@ -16,7 +16,9 @@ const TAU = Math.PI * 2;
 function ringLayout(radius: number, offsetDeg = 0): InstanceLayout {
   return ({ index, count }) => {
     const angle = (index / Math.max(count, 1)) * TAU + THREE.MathUtils.degToRad(offsetDeg);
-    return new THREE.Matrix4().makeRotationY(angle).multiply(new THREE.Matrix4().makeTranslation(radius, 0, 0));
+    return new THREE.Matrix4()
+      .makeRotationY(angle)
+      .multiply(new THREE.Matrix4().makeTranslation(radius, 0, 0));
   };
 }
 
@@ -27,8 +29,10 @@ const dockLugs: InstanceLayout = ({ index, count }) =>
 const dockHooks = ringLayout(0.55, 0);
 const agPosts = ringLayout(0.26, 0);
 
-const mirrorX = (offset: number): InstanceLayout => ({ index }) =>
-  new THREE.Matrix4().makeTranslation(index === 0 ? -offset : offset, 0, 0);
+const mirrorX =
+  (offset: number): InstanceLayout =>
+  ({ index }) =>
+    new THREE.Matrix4().makeTranslation(index === 0 ? -offset : offset, 0, 0);
 
 const agPostsSmall = ringLayout(0.156, 0);
 const agPostsSmall04 = ringLayout(0.104, 0);
@@ -65,9 +69,11 @@ for (const spec of HYDRAULICS) {
   const L = hydraulicLength(spec);
   const local = new THREE.Matrix4().makeTranslation(0, L + 0.06, 0);
   clevisPins[`kjClevisPin_${spec.id}_${spec.side}`] = ({ index }) =>
-    local.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, 0)).multiply(
-      new THREE.Matrix4().makeTranslation(index === 0 ? -0.105 : 0.105, 0, 0),
-    ).multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
+    local
+      .clone()
+      .multiply(new THREE.Matrix4().makeTranslation(0, 0, 0))
+      .multiply(new THREE.Matrix4().makeTranslation(index === 0 ? -0.105 : 0.105, 0, 0))
+      .multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
   // 注：液压布局不引用节点名，保留 hydraulicNodeName 的调用点给 tree-shaking 与类型检查
   void hydraulicNodeName(spec.id, spec.side);
 }
@@ -121,7 +127,6 @@ export const MOSAIC_COUNTS = {
   rose: MOSAIC_SLOTS.filter((slot) => slot.color === "rose").length,
   amber: MOSAIC_SLOTS.filter((slot) => slot.color === "amber").length,
 };
-
 
 const shoulderBosses: InstanceLayout = ({ index }) =>
   new THREE.Matrix4()
@@ -177,8 +182,7 @@ const wristCaps: InstanceLayout = ({ index }) =>
     .makeTranslation(index === 0 ? -0.15 : 0.15, 0, 0)
     .multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
 
-const backRibs: InstanceLayout = ({ index }) =>
-  new THREE.Matrix4().makeTranslation((index - 1) * 0.55, 0, 0);
+const backRibs: InstanceLayout = ({ index }) => new THREE.Matrix4().makeTranslation((index - 1) * 0.55, 0, 0);
 
 const shoulderAxles: InstanceLayout = ({ index }) =>
   new THREE.Matrix4()
@@ -199,7 +203,6 @@ const emitterLenses: InstanceLayout = ({ index }) =>
     .makeRotationZ((index / 4) * TAU)
     .multiply(new THREE.Matrix4().makeTranslation(0.075, 0, 0));
 
-
 const visorSlats: InstanceLayout = ({ index, count }) =>
   new THREE.Matrix4().makeTranslation((index - (count - 1) / 2) * 0.12, 0, 0);
 const crestFins: InstanceLayout = ({ index, count }) =>
@@ -211,13 +214,13 @@ const shipCheeks: InstanceLayout = ({ index }) =>
 const shipAntennae: InstanceLayout = ({ index }) =>
   new THREE.Matrix4().makeTranslation(index === 0 ? -0.55 : 0.55, 0, 0);
 
-
 export const KINGJOE_LAYOUTS: Record<string, InstanceLayout> = {
   kjDockPins: dockPins,
   kjDockDowels: dockDowels,
   kjDockLugs: dockLugs,
   kjDockHooks: dockHooks,
   kjMirrorX07: mirrorX(0.7),
+  kjMirrorX074: mirrorX(0.74),
   kjMirrorX058: mirrorX(0.58),
   kjMirrorX056: mirrorX(0.56),
   kjMirrorX02: mirrorX(0.2),

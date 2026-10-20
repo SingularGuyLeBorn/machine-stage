@@ -1,0 +1,44 @@
+import { describe, expect, it } from "vitest";
+import { buildModel, detectStatic, detectUnsupportedParts, validateRegistry } from "@/three/parts";
+import { makeKingJoeRegistry, makeKingJoeLayouts, kingjoeModelBuilders } from "./registry";
+
+const registry = makeKingJoeRegistry();
+const model = buildModel(registry, {
+  builders: kingjoeModelBuilders,
+  instanceLayouts: makeKingJoeLayouts(),
+  warnMissingLayout: false,
+});
+
+describe("kingjoe registry", () => {
+  it("四体注册表通过契约校验", () => {
+    const issues = validateRegistry(registry);
+    expect(issues.filter((issue) => issue.level === "error")).toEqual([]);
+    expect(registry.assemblies.map((a) => a.id).sort()).toEqual(["chest", "legs", "ship", "stomach"]);
+    expect(registry.parts.length).toBeGreaterThanOrEqual(450);
+    expect(new Set(registry.parts.map((p) => p.id)).size).toBe(registry.parts.length);
+  });
+
+  it("四体都有足量零件级定义（不是总成级）", () => {
+    const counts = new Map<string, number>();
+    for (const part of registry.parts) counts.set(part.assembly, (counts.get(part.assembly) ?? 0) + 1);
+    expect(counts.get("legs")).toBeGreaterThan(100);
+    expect(counts.get("chest")).toBeGreaterThan(100);
+    expect(counts.get("stomach")).toBeGreaterThan(40);
+    expect(counts.get("ship")).toBeGreaterThan(40);
+  });
+
+  it("装配态零穿模", () => {
+    model.resetNodes();
+    model.syncInstances();
+    model.root.updateMatrixWorld(true);
+    const reports = detectStatic(model, { minDepthM: 0.0005 });
+    expect(reports).toEqual([]);
+  });
+
+  it("装配态零悬空", () => {
+    model.resetNodes();
+    model.syncInstances();
+    model.root.updateMatrixWorld(true);
+    expect(detectUnsupportedParts(model)).toEqual([]);
+  });
+});

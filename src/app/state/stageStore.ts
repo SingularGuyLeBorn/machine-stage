@@ -466,7 +466,7 @@ export const useStageStore = create<StageState>((set, get) => ({
       try {
         // 静态检测必须在装配态：悬挂动画把负重轮抬起时扫，会凭空多出一堆报告
         assembled.resetNodes();
-        model.animate?.(assembled, 0);
+        model.animate?.(assembled, 0, previousState);
         raw =
           kind === "sweep"
             ? detectSweep(assembled, {
@@ -475,7 +475,7 @@ export const useStageStore = create<StageState>((set, get) => ({
                 filter,
                 applyPose: (t) => {
                   assembled.resetNodes();
-                  model.animate?.(assembled, t);
+                  model.animate?.(assembled, t, previousState);
                 },
               })
             : detectStatic(assembled, { filter });
@@ -483,7 +483,7 @@ export const useStageStore = create<StageState>((set, get) => ({
         state.reportFault(faultFromError("穿模检测", error));
       }
       assembled.resetNodes();
-      if (model.animate) model.animate(assembled, 0);
+      if (model.animate) model.animate(assembled, 0, previousState);
       const reports = filterReportsByProgress(raw, modelId, state.buildIndex);
       set({
         allReports: raw,

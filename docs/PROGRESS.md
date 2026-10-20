@@ -1350,3 +1350,60 @@ y 1.078~1.105（顶面与舱盖齐平，下表面离赞助板顶板 1.075 留 3m
 
 门禁：222 件 / 1997 实例；227 报告 / 未豁免 0；悬空 0 / 0；vitest 113；tsc / build ✓。
 截图 `docs/screenshots/m-l5-number.png`（「132」+ 铁十字 + 防磁纹 + 迷彩同框）。
+
+---
+
+## M-G · 金古桥 King Joe（四体分离合体，2026-10-21）
+
+> 「机械的合」：四艘飞船带着电弧、以阻尼感的精准咔哒咬合成型。
+> 本里程碑第一次把框架从「单台机器」推到「多体 + 变形合体」。
+
+### 交付
+
+| 项     | 结果                                                                                                                            |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| 四体   | King Ship / King Chest（含双臂）/ King Stomach / King Legs，四个独立 assembly + 独立节点运动                                    |
+| 零件级 | **469 个定义件 / 663 个实例 / 265,722 三角面**；缸体/活塞/活塞杆/耳环/销轴、锥销/承座/锁环/锁爪/锁钩、喷管/叶片/作动器逐件      |
+| 对接   | 3 对轴向接口（腿↔腹↔胸↔头）+ 双肩锁；锥形销 45mm 入 56mm 承座孔、锁环 30°、端面密封/传感器/锁钩留 5–15mm 间隙                   |
+| 动画   | idle / formation / combining / robot / firing / separation / crippled / scanning 八态；状态驱动时钟（catalog `animatedStates`） |
+| 合体   | 编队收敛 → 自下而上三段阻尼对接 → 电弧 → 销入槽 → 锁环过冲咔哒 → 双臂展开；可逆分离                                             |
+| 特效   | 4 条电弧链/对接面、锁死闪光、锁环蓝光、怪光线双发射口、16 只喷口焰；均为场景级 FX，不参与零件检测                               |
+| 质感   | 银铬佩丹尼姆合金（钢拉丝纹理/机加工痕）、金环、彩瓷胸板、黑缝发光、肩荚鼓筒                                                     |
+| 门禁   | `vitest` **118 passed**；`tsc` / `build` ✓；静态穿模 **0**、悬空 **0**；全状态 30fps 扫掠 **0**                                 |
+
+### 验收证据
+
+- 静态/悬空：`npx vite-node scripts/diag-kingjoe.ts` → `static clipping=0 / unsupported=0`。
+- 全程扫掠：`npx vite-node scripts/diag-sweep-kj.ts` —— combining 10s@30fps / separation 4s / robot 6s / firing 3s / formation 3s / crippled 3s，均为 **0 reports**，悬空 0。
+- 浏览器：生产构建 + `?qa=1`，`node scripts/capture-kingjoe.mjs`；headless Chrome rAF **57.1 fps**，录屏 613 帧/10.7s。
+- 截图：`docs/screenshots/kingjoe-idle.png`、`kingjoe-formation.png`、`kingjoe-docking-closeup.png`、`kingjoe-lock-closeup.png`、`kingjoe-docking-wide.png`、`kingjoe-combined.png`、`kingjoe-firing.png`、`kingjoe-separation.png`、`kingjoe-crippled.png`。
+- 录屏：`docs/recordings/kingjoe-combine-60fps.mp4`（60fps / 10.7s / 938×734，四体编队 → 合体全程）；缩略拼图 `docs/qa/kingjoe-combine-contact.png`。
+
+### 关键口径 / 设计取舍
+
+- **肩荚鼓筒**：参考图是巨型圆筒 + 金色端环；先做过方盒肩荚，视觉不像，改为 r490mm×860mm 鼓筒（两端金环），并把肩轴/液压/四联短筒重新对位。
+- **对接基盘与承座**：先把「上模块承力块 → 锥销/锁环」与「下模块基盘 → 环座/锥销座/锁钩」做成各自成组的结构；锁爪与锁钩轴向留 7.5mm、锁环 30° 咬合，扫掠不穿插。
+- **液压杆求解**：杆节点每帧按「缸筒出口 E' → 耳环 C'」的真实距离平移 + 转向；回缩部分滑进缸筒内孔，不对缸体做伸缩缩放。膝/髋/踝/肩/肘均接入。
+- **状态驱动时钟**：框架原来只有 `machineState === "running"` 推进时钟；`catalog.animatedStates` + `animate(…, state)` 让一个模型可以有多个可动形态（这是本里程碑唯一需要动 app 层的框架改动）。
+- **装配器修复**：`instances` 未显式声明 `instance_nodes` 时也应继承 `def.node`；否则腹/胸/头的实例件（瓷片、肩荚短筒、对接销）会掉在模型原点，四体错位。这个修复对虎式无影响（虎式实例件均无 node）。
+- **合体期刚性躯干**：轴向锁死后的胸/腹/腿接口是刚性连接；若在腰/胸节点上加旋转，接口环/锁爪会互穿。因此机器人步行只做髋/膝/踝与手臂摆动、脊柱不扭；腰部转轴机构仍有完整零件（轴承/齿圈/减速器/编码器/密封），但当前不是独立动画节点。
+- **残缺合体**：隐藏腿部飞船（腿零件仍在树里，节点下移出场）；躯干降下、前倾、双臂下垂，并启用临时地面承影盘；不是行走 IK。
+
+### 已知边界（下一轮优先）
+
+1. **定义件 469 vs 计划 ~580**：所有机构件（液压 7–8 件/缸、对接销/座/锁/钩、喷口 4 件、三指三节）已逐件；差额主要是四体各自的紧固件/线束族没有铺满，以及反重力发生器简化为「框+核心+6 线圈+极板」。不为凑数增加无支撑小件；后续按层补 fastener 族/管路。
+2. **腰部未做成独立动画节点**：齿圈/轴承/电机都是零件，但躯干作为整体移动；要做真实弯腰需把腹部上段拆成 waist 节点并重排对接接口。
+3. **步行/爬行无地面 IK**：脚底随关节角度抬落，站立脚有轻微滑动；残缺形态是低姿态撑地，不是位移爬行。
+4. **音频缺失**：锁死「咔哒」目前是视觉闪光 + 锁环过冲，没有声音资产。
+5. **视觉**：铬钢在灰棚里仍偏灰，头部/小腿比例与参考图还有差距；下一轮做头冠/小腿鼓包与更强的高光对比。
+
+### 复现命令
+
+```bash
+npm test                     # 118 tests
+npm run build                # tsc + vite build
+npx vite-node scripts/diag-kingjoe.ts     # 静态零穿模 / 零悬空
+npx vite-node scripts/diag-sweep-kj.ts    # 六态 30fps 扫掠
+npm run preview -- --port 4173
+node scripts/capture-kingjoe.mjs          # 截图 + 60fps 录屏（需本机 Chrome）
+```

@@ -34,8 +34,7 @@ export function makeKingJoeRegistry(): ModelRegistry {
   return {
     model: "kingjoe",
     title: "金古桥 King Joe",
-    subtitle:
-      "四体分离合体 · 佩丹尼姆镜面装甲 · 锥销/锁环对接 · 反重力 · 怪光线",
+    subtitle: "四体分离合体 · 佩丹尼姆镜面装甲 · 锥销/锁环对接 · 反重力 · 怪光线",
     source_notes: [
       "原作：宇宙ロボット キングジョー（『ウルトラセブン』第14/15話，1968，圆谷）。",
       "公开设定：身高 55m / 体重 48000t / 四体分离合体 / 额头破坏光线 / 佩丹尼姆合金。",
