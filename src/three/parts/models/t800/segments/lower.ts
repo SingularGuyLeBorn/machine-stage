@@ -52,8 +52,8 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "两片叉耳 cast 在股骨末端，夹住膝关节盘",
   });
   layouts["t800.knee.socket"] = instanceLayout(NODES.hip, [
-    [JOINT_X.knee, JOINT_Y.knee, -0.036],
-    [JOINT_X.knee, JOINT_Y.knee, 0.036],
+    [JOINT_X.knee, JOINT_Y.knee, -0.0343],
+    [JOINT_X.knee, JOINT_Y.knee, 0.0343],
   ]);
   builder.add({
     id: "t800.knee.disc",
@@ -113,8 +113,8 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
   layouts["t800.knee.bushings"] = instanceLayout(
     NODES.hip,
     [
-      [JOINT_X.knee, JOINT_Y.knee, -0.036],
-      [JOINT_X.knee, JOINT_Y.knee, 0.036],
+      [JOINT_X.knee, JOINT_Y.knee, -0.0343],
+      [JOINT_X.knee, JOINT_Y.knee, 0.0343],
     ],
     Z90,
   );
@@ -143,8 +143,8 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
   layouts["t800.knee.circlips"] = instanceLayout(
     NODES.hip,
     [
-      [JOINT_X.knee, JOINT_Y.knee, -0.0485],
-      [JOINT_X.knee, JOINT_Y.knee, 0.0485],
+      [JOINT_X.knee, JOINT_Y.knee, -0.0488],
+      [JOINT_X.knee, JOINT_Y.knee, 0.0488],
     ],
     Z90,
   );
@@ -157,7 +157,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "chrome",
     layer: 3,
     node: NODES.knee,
-    at: [0.0335, 0.575, 0],
+    at: [0.0245, 0.575, 0],
     rot: [0, 90, 0],
     hint: "盖住胫骨上端，把前侧补偿缸的冲击面保护起来",
   });
@@ -189,8 +189,8 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "把前后护罩固定在胫骨上的支架（实例族）",
   });
   layouts["t800.knee.guard_bracket"] = instanceLayout(NODES.knee, [
-    [0.0335, 0.47, 0],
-    [-0.0945, 0.52, 0],
+    [0.0245, 0.3594, 0],
+    [-0.093, 0.51, 0],
   ]);
   builder.add({
     id: "t800.knee.boot",
@@ -201,7 +201,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "rubber",
     layer: 4,
     node: NODES.knee,
-    at: [JOINT_X.knee, JOINT_Y.knee, 0.0535],
+    at: [JOINT_X.knee, JOINT_Y.knee, 0.0545],
     rot: [90, 0, 0],
     hint: "膝销外端的防尘端盖（内孔 0.5mm 间隙套在销轴上）",
   });
@@ -238,7 +238,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
         endBottomX: tibia.endBottomX,
         // 外侧曲面装甲板：膝细 → 腓肠肌中段鼓 → 踝细（轮廓起伏由真实渐变造型给出）
         shell: {
-          z0: 0.0355,
+          z0: 0.039,
           thickness: 0.005,
           xOffset: 0.03,
           levels: [
@@ -278,7 +278,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "chrome",
     layer: 3,
     node: NODES.knee,
-    at: [0.0235, 0.44, 0],    rot: [0, 90, 0],
+    at: [0.0245, 0.45, 0],    rot: [0, 90, 0],
     hint: "只护胫骨上段正面的局部护板，其余全露",
   });
   builder.add({
@@ -286,19 +286,13 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     cn: "胫骨侧护条",
     en: "Tibia side strip",
     asm: "shin",
-    geom: { type: "plate", w: 0.024, h: 0.22, t: 0.006, bevel: 0.002 },
+    geom: { type: "plate", w: 0.016, h: 0.22, t: 0.006, bevel: 0.002 },
     mat: "chrome",
     layer: 3,
     node: NODES.knee,
-    at: [0, 0.375, 0],
-    inst: 2,
-    layout: "t800.shin.armor_side",
-    instNodes: repeatNode(NODES.knee, 2),
+    at: [0.0125, 0.375, -0.0398],
     hint: "只在骨段两侧夹一条窄护条，不遮骨架",
   });
-  layouts["t800.shin.armor_side"] = instanceLayout(NODES.knee, [
-    [0, 0.375, -0.0395],
-  ]);
   builder.add({
     id: "t800.shin.lines",
     cn: "胫骨液压硬管",
@@ -314,10 +308,10 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     instNodes: repeatNode(NODES.knee, 4),
   });
   layouts["t800.shin.lines"] = instanceLayout(NODES.knee, [
-    [0.0305, 0.38, 0.02],
-    [0.0305, 0.38, -0.02],
-    [-0.1005, 0.38, 0.02],
-    [-0.1005, 0.38, -0.02],
+    [0.0277, 0.38, 0.024],
+    [0.0277, 0.38, -0.024],
+    [-0.008, 0.38, -0.0427],
+    [-0.0365, 0.38, -0.0427],
   ]);
   builder.add({
     id: "t800.shin.fittings",
@@ -334,14 +328,14 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     instNodes: repeatNode(NODES.knee, 8),
   });
   layouts["t800.shin.fittings"] = instanceLayout(NODES.knee, [
-    [0.0305, 0.5, 0.02],
-    [0.0305, 0.26, 0.02],
-    [0.0305, 0.5, -0.02],
-    [0.0305, 0.26, -0.02],
-    [-0.1005, 0.5, 0.02],
-    [-0.1005, 0.26, 0.02],
-    [-0.1005, 0.5, -0.02],
-    [-0.1005, 0.26, -0.02],
+    [0.0277, 0.5, 0.024],
+    [0.0277, 0.26, 0.024],
+    [0.0277, 0.5, -0.024],
+    [0.0277, 0.26, -0.024],
+    [-0.008, 0.5, -0.0427],
+    [-0.008, 0.26, -0.0427],
+    [-0.0365, 0.5, -0.0427],
+    [-0.0365, 0.26, -0.0427],
   ]);
   builder.add({
     id: "t800.shin.clamps",
@@ -358,10 +352,10 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     instNodes: repeatNode(NODES.knee, 4),
   });
   layouts["t800.shin.clamps"] = instanceLayout(NODES.knee, [
-    [0.0305, 0.44, 0.02],
-    [0.0305, 0.32, 0.02],
-    [-0.1005, 0.44, -0.02],
-    [-0.1005, 0.32, -0.02],
+    [0.0277, 0.44, 0.024],
+    [0.0277, 0.32, -0.024],
+    [-0.008, 0.44, -0.0427],
+    [-0.0365, 0.32, -0.0427],
   ]);
 
   builder.add({
@@ -369,11 +363,11 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     cn: "胫骨后加强条",
     en: "Tibia rear rib",
     asm: "shin",
-    geom: { type: "plate", w: 0.025, h: 0.18, t: 0.006, bevel: 0.002 },
+    geom: { type: "plate", w: 0.025, h: 0.12, t: 0.006, bevel: 0.002 },
     mat: "chrome",
     layer: 3,
     node: NODES.knee,
-    at: [-0.0935, 0.375, 0],
+    at: [0.0245, 0.28, 0],
     rot: [0, -90, 0],
     hint: "胫骨后侧的窄加强条（背面也只留一条，不包壳）",
   });
@@ -382,11 +376,11 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     cn: "小腿传感线束",
     en: "Shin harness",
     asm: "shin",
-    geom: { type: "cylinder", r: 0.005, h: 0.16, segments: 12 },
+    geom: { type: "cylinder", r: 0.005, h: 0.12, segments: 12 },
     mat: "rubber",
     layer: 5,
     node: NODES.knee,
-    at: [-0.1015, 0.375, 0],
+    at: [0.035, 0.28, 0],
     hint: "沿胫骨后加强条走的下段线束（外露可见）",
   });
 
@@ -415,8 +409,12 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "小腿后缘 6 根后置活塞杆成束排布：腓肠肌的弧度由真实机构排列形成",
   });
   layouts["t800.shin.piston_rods"] = instanceLayout(NODES.knee, [
-    [-0.098, 0.34, -0.042],
-    [-0.098, 0.34, -0.058],
+    [-0.0975, 0.34, -0.0403],
+    [-0.1015, 0.34, -0.0243],
+    [-0.1025, 0.34, -0.0083],
+    [-0.1025, 0.34, 0.0083],
+    [-0.1015, 0.34, 0.0243],
+    [-0.0975, 0.34, 0.0403],
   ]);
   builder.add({
     id: "t800.shin.hose_bank",
@@ -434,8 +432,8 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "沿小腿走的软管束（参考图：大量波纹软管）",
   });
   layouts["t800.shin.hose_bank"] = instanceLayout(NODES.knee, [
-    [-0.015, 0.28, -0.06],
-    [-0.075, 0.28, -0.06],
+    [-0.058, 0.28, -0.041],
+    [-0.08, 0.28, -0.041],
   ]);
 
   // ===================== 踝关节 =====================
@@ -451,7 +449,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
         r: JOINT_STD.cheekR,
         boreR: JOINT_STD.cheekBore,
         thickness: JOINT_STD.cheekT,
-        top: JOINT_STD.cheekTop,
+        top: 0.0545,
       },
     },
     mat: "gunmetal",
@@ -463,8 +461,8 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     instNodes: repeatNode(NODES.knee, 2),
   });
   layouts["t800.ankle.socket"] = instanceLayout(NODES.knee, [
-    [0, JOINT_Y.ankle, -0.036],
-    [0, JOINT_Y.ankle, 0.036],
+    [0, JOINT_Y.ankle, -0.0343],
+    [0, JOINT_Y.ankle, 0.0343],
   ]);
   builder.add({
     id: "t800.ankle.disc",
@@ -523,8 +521,8 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
   layouts["t800.ankle.bushings"] = instanceLayout(
     NODES.knee,
     [
-      [0, JOINT_Y.ankle, -0.036],
-      [0, JOINT_Y.ankle, 0.036],
+      [0, JOINT_Y.ankle, -0.0343],
+      [0, JOINT_Y.ankle, 0.0343],
     ],
     Z90,
   );
@@ -552,8 +550,8 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
   layouts["t800.ankle.circlips"] = instanceLayout(
     NODES.knee,
     [
-      [0, JOINT_Y.ankle, -0.0485],
-      [0, JOINT_Y.ankle, 0.0485],
+      [0, JOINT_Y.ankle, -0.0488],
+      [0, JOINT_Y.ankle, 0.0488],
     ],
     Z90,
   );
@@ -566,7 +564,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "servo",
     layer: 5,
     node: NODES.knee,
-    at: [0.01, 0.24, -0.0465],
+    at: [0.01, 0.24, -0.0485],
     rot: [90, 0, 0],
     hint: "读取踝关节转角（与髋/膝传感器同一总线）",
   });
@@ -638,7 +636,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "bone",
     layer: 1,
     node: NODES.ankle,
-    at: [-0.112, 0.035, 0],
+    at: [-0.1047, 0.0365, 0],
     hint: "跟骨承担踝冲击，向后下方撑住足底",
   });
   builder.add({
@@ -646,7 +644,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     cn: "跖骨",
     en: "Metatarsal",
     asm: "foot",
-    geom: { type: "box", w: 0.14, h: 0.038, d: 0.024, bevel: 0.005 },
+    geom: { type: "box", w: 0.1, h: 0.038, d: 0.024, bevel: 0.005 },
     mat: "chrome",
     layer: 1,
     node: NODES.ankle,
@@ -656,9 +654,9 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     instNodes: repeatNode(NODES.ankle, 3),
   });
   layouts["t800.foot.metatarsals"] = instanceLayout(NODES.ankle, [
-    [0.155, 0.04, -0.032],
-    [0.155, 0.04, 0],
-    [0.155, 0.04, 0.032],
+    [0.1275, 0.0305, -0.032],
+    [0.1275, 0.0305, 0],
+    [0.1275, 0.0305, 0.032],
   ]);
   builder.add({
     id: "t800.ankle.stop_pin",
@@ -669,7 +667,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "chrome",
     layer: 2,
     node: NODES.knee,
-    at: [-0.005, 0.19, 0],
+    at: [-0.005, 0.1875, 0],
     rot: [0, 0, 90],
     hint: "踝背屈限位销，限制足部相对小腿的最大转角",
   });
@@ -682,7 +680,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "chrome",
     layer: 1,
     node: NODES.ankle,
-    at: [0.255, 0.032, 0],
+    at: [0.21, 0.0295, 0],
   });
   builder.add({
     id: "t800.foot.heel_plate",
@@ -693,7 +691,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "chrome",
     layer: 3,
     node: NODES.ankle,
-    at: [-0.141, 0.035, 0],
+    at: [-0.1362, 0.035, 0],
     rot: [0, 90, 0],
     hint: "包住跟骨后端的护板（1mm 间隙）",
   });
@@ -706,7 +704,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "dark_chrome",
     layer: 3,
     node: NODES.ankle,
-    at: [0.255, 0.0655, 0],
+    at: [0.2455, 0.05, 0],
     rot: [0, 90, 0],
     hint: "盖在趾骨顶面（0.5mm 胶层）",
   });
@@ -728,7 +726,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     cn: "减震垫",
     en: "Damping pad",
     asm: "foot",
-    geom: { type: "box", w: 0.1, h: 0.012, d: 0.06, bevel: 0.003 },
+    geom: { type: "box", w: 0.1, h: 0.012, d: 0.007, bevel: 0.002 },
     mat: "rubber",
     layer: 3,
     node: NODES.ankle,
@@ -739,8 +737,8 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "前后两块减震垫，抬足时接地",
   });
   layouts["t800.foot.pads"] = instanceLayout(NODES.ankle, [
-    [0.12, 0.015, -0.034],
-    [0.12, 0.015, 0.034],
+    [0.12, 0.0175, -0.016],
+    [0.12, 0.0175, 0.016],
   ]);
   builder.add({
     id: "t800.foot.studs",
@@ -758,10 +756,10 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "四颗防滑钉，钉尖低于足底 10mm",
   });
   layouts["t800.foot.studs"] = instanceLayout(NODES.ankle, [
-    [0.19, -0.005, -0.03],
-    [0.19, -0.005, 0.03],
-    [0.06, -0.005, -0.03],
-    [0.06, -0.005, 0.03],
+    [0.19, -0.0065, -0.03],
+    [0.19, -0.0065, 0.03],
+    [0.06, -0.0065, -0.03],
+    [0.06, -0.0065, 0.03],
   ]);
 
   // ===================== 踝部两根驱动缸 =====================

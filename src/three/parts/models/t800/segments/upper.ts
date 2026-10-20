@@ -35,8 +35,8 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "frame",
     layer: 1,
     node: NODES.base,
-    at: [0, 1.53, 0],
-    hint: "骨盆是开放框板（前侧挖空看穿内部），不是整块壳",
+    at: [0, 1.5062, 0],
+    hint: "骨盆开放框板坐在髋轭顶面上（前侧挖空看穿内部）",
   });
   builder.add({
     id: "t800.hip.yoke",
@@ -46,10 +46,12 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     geom: {
       type: "merge",
       parts: [
-        { type: "box", w: 0.018, h: 0.15, d: 0.11, bevel: 0.004, at: [-0.13, 0, 0] },
-        { type: "box", w: 0.018, h: 0.15, d: 0.11, bevel: 0.004, at: [0.13, 0, 0] },
-        { type: "box", w: 0.28, h: 0.016, d: 0.11, bevel: 0.004, at: [0, 0.067, 0] },
+        { type: "box", w: 0.018, h: 0.13, d: 0.11, bevel: 0.004, at: [-0.13, 0, 0] },
+        { type: "box", w: 0.018, h: 0.13, d: 0.11, bevel: 0.004, at: [0.13, 0, 0] },
+        { type: "box", w: 0.28, h: 0.016, d: 0.11, bevel: 0.004, at: [0, 0.0663, 0] },
         { type: "box", w: 0.28, h: 0.014, d: 0.1, bevel: 0.004, at: [0, -0.0645, 0] },
+        { type: "box", w: 0.024, h: 0.132, d: 0.02, bevel: 0.003, at: [0, -0.0065, 0.036] },
+        { type: "box", w: 0.024, h: 0.132, d: 0.02, bevel: 0.003, at: [0, -0.0065, -0.036] },
         {
           type: "kit",
           kit: "t800Boss",
@@ -79,7 +81,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "dark_chrome",
     layer: 4,
     node: NODES.base,
-    at: [0.158, 1.42, 0],
+    at: [0.159, 1.42, 0],
     rot: [0, 0, 90],
     hint: "把髋部加强板锁在髋轭上的螺栓头",
   });
@@ -92,7 +94,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "chrome",
     layer: 3,
     node: NODES.base,
-    at: [0.149, 1.42, 0],
+    at: [0.1475, 1.42, 0],
     rot: [0, 90, 0],
   });
   builder.add({
@@ -193,7 +195,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     cn: "髋密封",
     en: "Hip seal",
     asm: "hip",
-    geom: { type: "tube", rOuter: 0.021, rInner: 0.0162, h: 0.004, segments: 28 },
+    geom: { type: "tube", rOuter: 0.021, rInner: 0.0145, h: 0.004, segments: 28 },
     mat: "rubber",
     layer: 4,
     node: NODES.base,
@@ -217,7 +219,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     cn: "髋保持环",
     en: "Hip retainer ring",
     asm: "hip",
-    geom: { type: "tube", rOuter: 0.021, rInner: 0.0163, h: 0.005, segments: 28 },
+    geom: { type: "tube", rOuter: 0.021, rInner: 0.0145, h: 0.005, segments: 28 },
     mat: "dark_chrome",
     layer: 4,
     node: NODES.base,
@@ -245,7 +247,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "servo",
     layer: 5,
     node: NODES.base,
-    at: [0.11, 1.44, 0.074],
+    at: [0.128, 1.462, 0.0695],
     rot: [90, 0, 0],
     hint: "读取髋关节转角，驱动伺服阀闭环",
   });
@@ -258,7 +260,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "dark_chrome",
     layer: 4,
     node: NODES.base,
-    at: [-0.13, 1.5367, -0.06],
+    at: [-0.13, 1.5157, -0.06],
     hint: "骨盆基座板的固定螺栓圈（与躯干接口，避开阀块）",
   });
 
@@ -299,7 +301,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
         endBottomX: femur.endBottomX,
         // 外侧曲面装甲板：与骨段同一零件，凸台从中穿出（参考图的"外皮"做法）
         shell: {
-          z0: 0.0355,
+          z0: 0.039,
           thickness: 0.005,
           levels: [
             { y: 0.2355, halfW: 0.082, bow: 0.022, bulgeF: 0.004, bulgeB: 0.004 },
@@ -340,7 +342,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "chrome",
     layer: 3,
     node: NODES.hip,
-    at: [0.117, 1.21, 0],
+    at: [0.118, 1.21, 0],
     rot: [0, 90, 0],
     hint: "只护大腿上段正面的局部护板（不包全身），髋缸与骨面全露",
   });
@@ -353,15 +355,9 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "chrome",
     layer: 3,
     node: NODES.hip,
-    at: [0, 1.01, 0],
-    inst: 2,
-    layout: "t800.thigh.armor_side",
-    instNodes: repeatNode(NODES.hip, 2),
+    at: [0.0985, 1.01, -0.0398],
     hint: "只在骨段两侧夹一条窄护条（宽 20mm，避开安装凸台），不遮骨架",
   });
-  layouts["t800.thigh.armor_side"] = instanceLayout(NODES.hip, [
-    [0.055, 1.01, -0.0395],
-  ]);
   builder.add({
     id: "t800.thigh.lines",
     cn: "股骨液压硬管",
@@ -378,10 +374,10 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "沿股骨前后侧走管，两端各有一个卡套接头",
   });
   layouts["t800.thigh.lines"] = instanceLayout(NODES.hip, [
-    [0.125, 1.0, 0.02],
-    [0.125, 1.0, -0.02],
-    [-0.013, 1.0, 0.02],
-    [-0.013, 1.0, -0.02],
+    [-0.0112, 1.0, 0.024],
+    [-0.0112, 1.0, -0.024],
+    [0.0778, 1.0, -0.0427],
+    [0.0535, 1.0, -0.0427],
   ]);
   builder.add({
     id: "t800.thigh.fittings",
@@ -399,14 +395,14 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "硬管两端卡套接头（内孔 0.2mm 间隙包住硬管）",
   });
   layouts["t800.thigh.fittings"] = instanceLayout(NODES.hip, [
-    [0.125, 1.14, 0.02],
-    [0.125, 0.86, 0.02],
-    [0.125, 1.14, -0.02],
-    [0.125, 0.86, -0.02],
-    [-0.013, 1.14, 0.02],
-    [-0.013, 0.86, 0.02],
-    [-0.013, 1.14, -0.02],
-    [-0.013, 0.86, -0.02],
+    [-0.0112, 1.14, 0.024],
+    [-0.0112, 0.86, 0.024],
+    [-0.0112, 1.14, -0.024],
+    [-0.0112, 0.86, -0.024],
+    [0.0778, 1.14, -0.0427],
+    [0.0778, 0.86, -0.0427],
+    [0.0535, 1.14, -0.0427],
+    [0.0535, 0.86, -0.0427],
   ]);
   builder.add({
     id: "t800.thigh.clamps",
@@ -424,10 +420,10 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "卡箍抱住硬管（内孔 0.2mm 间隙），把管固定在护甲上",
   });
   layouts["t800.thigh.clamps"] = instanceLayout(NODES.hip, [
-    [0.125, 1.07, 0.02],
-    [0.125, 0.93, 0.02],
-    [-0.013, 1.07, -0.02],
-    [-0.013, 0.93, -0.02],
+    [-0.0112, 1.07, 0.024],
+    [-0.0112, 0.93, -0.024],
+    [0.0778, 1.07, -0.0427],
+    [0.0535, 0.93, -0.0427],
   ]);
 
   builder.add({
@@ -439,7 +435,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "chrome",
     layer: 3,
     node: NODES.hip,
-    at: [-0.007, 1.0, 0],
+    at: [-0.008, 1.0, 0],
     rot: [0, -90, 0],
     hint: "股骨后侧的窄加强条（背面也只留一条，不包壳）",
   });
@@ -452,7 +448,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "rubber",
     layer: 5,
     node: NODES.hip,
-    at: [-0.07, 1.0, 0.066],
+    at: [-0.0185, 1.0, 0],
     hint: "沿股骨后加强条走的中段线束（外露可见）",
   });
 
@@ -481,9 +477,12 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "大腿前缘 6 根细铬钢活塞杆成束排布：股四头肌的弧度由机构排列形成，不是肉块",
   });
   layouts["t800.thigh.piston_rods"] = instanceLayout(NODES.hip, [
-    [0.126, 1.0, -0.042],
-    [0.134, 1.0, -0.056],
-    [0.124, 1.0, -0.07],
+    [0.121, 1.0, -0.0403],
+    [0.125, 1.0, -0.0243],
+    [0.126, 1.0, -0.0083],
+    [0.126, 1.0, 0.0083],
+    [0.125, 1.0, 0.0243],
+    [0.121, 1.0, 0.0403],
   ]);
   builder.add({
     id: "t800.thigh.hose_bank",
@@ -501,8 +500,8 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "沿骨面走的软管束（参考图：大量波纹软管）",
   });
   layouts["t800.thigh.hose_bank"] = instanceLayout(NODES.hip, [
-    [0.09, 0.84, -0.047],
-    [0.01, 0.84, -0.047],
+    [0.028, 0.84, -0.041],
+    [0.008, 0.84, -0.041],
   ]);
 
   // ---- 膝部两根驱动缸（缸体挂大腿，活塞杆挂小腿）----

@@ -6,7 +6,8 @@ import { buildModel } from "../src/three/parts/assembler/assembler";
 import { makeT800Layouts, makeT800Registry, t800Builders } from "../src/three/parts/models/t800/registry";
 import { animateT800, t800Pose, t800Stroke } from "../src/three/parts/models/t800/motion";
 import { CYL, T800_HYDRAULICS, cylinderDims, cylinderLayout } from "../src/three/parts/models/t800/spec";
-import { detectStatic } from "../src/three/parts/solver/detect";
+import { detectStatic, getBVH } from "../src/three/parts/solver/detect";
+import { MeshBVH } from "three-mesh-bvh";
 import { partitionExpectedContacts } from "../src/three/parts/solver/whitelist";
 import { validateRegistry } from "../src/three/parts/registry/validate";
 import type { PartHandle } from "../src/three/parts/assembler/assembler";
@@ -23,7 +24,7 @@ const model = buildModel(registry, {
   warnMissingLayout: false,
 });
 
-const SUPPORT_MM = 2;
+const SUPPORT_MM = 3;
 const CYCLE = 5.4;
 const FRAMES = 24;
 
@@ -75,13 +76,16 @@ for (const r of sweepPartition.active) {
 
 // ---- 悬空：AABB 支撑邻接（≤2mm 或包含）----
 atRest(0);
-interface Body {
+interface FloatingBody {
   ref: string;
   handle: PartHandle;
+  geometry: THREE.BufferGeometry;
+  matrix: THREE.Matrix4;
   box: THREE.Box3;
+  bvh: MeshBVH;
   exempt: boolean;
 }
-const bodies: Body[] = [];
+const bodies: FloatingBody[] = [];
 for (const handle of model.parts) {
   const geom = handle.geometry;
   if (!geom.boundingBox) geom.computeBoundingBox();
@@ -93,7 +97,10 @@ for (const handle of model.parts) {
     bodies.push({
       ref: inst.index === 0 && handle.instances.length === 1 ? handle.partId : `${handle.partId}[${inst.index}]`,
       handle,
+      geometry: geom,
+      matrix: m.clone(),
       box,
+      bvh: getBVH(geom),
       exempt: (handle.def.tags ?? []).some((tag) =>
         ["fixed-base", "effect", "fx", "hotspot", "flight", "flyer", "projectile"].includes(tag),
       ),
@@ -101,11 +108,69 @@ for (const handle of model.parts) {
   }
 }
 
+/**
+ * 悬空判定（真实表面距离版）。
+ *
+ * 原来只看 AABB 间距 —— 两个包围盒挨着、实体却没接上的零件会被误判成"有支撑"，
+ * 于是「关节盘插销够不到骨段插座」「骨盆框板悬在髋轭上方」这类真悬空全放过去了。
+ * 现在改成：AABB 只做粗筛（≤25mm 的才算候选），最终用 BVH 最近面点量真实表面间距
+ * （在 A 的表面采样：包围盒八角 + 顶点抽样），阈值 3mm（覆盖设计配合间隙 1~2mm，
+ * 超过 3mm 就是肉眼可见的悬空）。
+ */
+const CANDIDATE_MM = 25;
+
 function gapMm(a: THREE.Box3, b: THREE.Box3): number {
   const dx = Math.max(a.min.x - b.max.x, b.min.x - a.max.x, 0);
   const dy = Math.max(a.min.y - b.max.y, b.min.y - a.max.y, 0);
   const dz = Math.max(a.min.z - b.max.z, b.min.z - a.max.z, 0);
   return Math.sqrt(dx * dx + dy * dy + dz * dz) * 1000;
+}
+
+/** 两个零件的真实表面最近距离（mm）：A 表面采样 → B 的 BVH 最近面点。 */
+function surfaceGapMm(a: FloatingBody, b: FloatingBody): number {
+  const inv = new THREE.Matrix4().copy(b.matrix).invert();
+  const hit = { point: new THREE.Vector3(), distance: 0, faceIndex: 0 };
+  let best = Infinity;
+  const pos = a.geometry.attributes.position;
+  const stride = Math.max(1, Math.floor(pos.count / 40));
+  const world = new THREE.Vector3();
+  const test = (p: THREE.Vector3) => {
+    world.copy(p).applyMatrix4(a.matrix);
+    const local = world.clone().applyMatrix4(inv);
+    b.bvh.closestPointToPoint(local, hit as never, 0, Infinity);
+    const d = hit.point.clone().applyMatrix4(b.matrix).distanceTo(world) * 1000;
+    if (d < best) best = d;
+  };
+  for (const x of [a.box.min.x, a.box.max.x]) {
+    for (const y of [a.box.min.y, a.box.max.y]) {
+      for (const z of [a.box.min.z, a.box.max.z]) test(new THREE.Vector3(x, y, z));
+    }
+  }
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i += stride) {
+    v.fromBufferAttribute(pos, i);
+    test(v);
+  }
+  // 三角面重心抽样：回转体的顶点全落在端环上，只采顶点会漏掉「侧面贴住」的真实间距
+  const index = a.geometry.index;
+  const triCount = index ? Math.floor(index.count / 3) : Math.floor(pos.count / 3);
+  if (triCount > 0) {
+    const triStride = Math.max(1, Math.floor(triCount / 40));
+    const at = (tri: number, corner: number) =>
+      index
+        ? index.getX(tri * 3 + corner)
+        : tri * 3 + corner;
+    for (let t = 0; t < triCount; t += triStride) {
+      const p0 = new THREE.Vector3().fromBufferAttribute(pos, at(t, 0));
+      const p1 = new THREE.Vector3().fromBufferAttribute(pos, at(t, 1));
+      const p2 = new THREE.Vector3().fromBufferAttribute(pos, at(t, 2));
+      test(p0.clone().add(p1).multiplyScalar(0.5));
+      test(p1.clone().add(p2).multiplyScalar(0.5));
+      test(p2.clone().add(p0).multiplyScalar(0.5));
+      test(p0.clone().add(p1).add(p2).multiplyScalar(1 / 3));
+    }
+  }
+  return best;
 }
 
 const floating: Array<{ ref: string; nearest: string; gap: number }> = [];
@@ -116,7 +181,9 @@ for (const body of bodies) {
   for (const other of bodies) {
     if (other === body) continue;
     if (other.handle === body.handle && other.ref === body.ref) continue;
-    const g = gapMm(body.box, other.box);
+    if (gapMm(body.box, other.box) > CANDIDATE_MM) continue;
+    // 双向量：只从 A 采样会漏掉「B 的大平面贴在 A 中间」这种接触（A 是平板时角点离接触区很远）
+    const g = Math.min(surfaceGapMm(body, other), surfaceGapMm(other, body));
     if (g < best) {
       best = g;
       bestRef = other.ref;
@@ -124,7 +191,7 @@ for (const body of bodies) {
   }
   if (best > SUPPORT_MM) floating.push({ ref: body.ref, nearest: bestRef, gap: best });
 }
-console.log(`悬空候选（无 ≤${SUPPORT_MM}mm 支撑邻居）: ${floating.length}`);
+console.log(`悬空候选（真实表面间距 > ${SUPPORT_MM}mm）: ${floating.length}`);
 for (const f of floating.slice(0, 40)) {
   console.log(`  ${f.ref}  最近 ${f.nearest} = ${f.gap.toFixed(1)}mm`);
   const body = bodies.find((item) => item.ref === f.ref);
@@ -219,7 +286,7 @@ if (process.argv.includes("--write")) {
     "",
     `- 零件定义：${registry.parts.length}，实例：${instanceCount}`,
     `- 静态穿模：${staticReports.length}；扫掠 ${FRAMES} 帧：${sweepReports.length}`,
-    `- 悬空候选（无 ≤${SUPPORT_MM}mm AABB 支撑邻居）：${floating.length}`,
+    `- 悬空候选（真实表面间距 > ${SUPPORT_MM}mm，无支撑邻居）：${floating.length}`,
     "",
     "## 悬空清单（人工审）",
     "",
