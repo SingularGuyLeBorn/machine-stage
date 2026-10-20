@@ -176,6 +176,11 @@ export const CATALOG: StageModel[] = [
         hint: "冷启动：预热 1.6s（曲轴不转）→ 起动机拖动 1.8s（171rpm + 轻微抖动）→ 点火（白烟 + 车体一扭）→ 暖机 → 650rpm 怠速；视口右下显示水温/转速",
       },
       {
+        id: "refuel",
+        label: "加油",
+        hint: "左右燃油加注口盖绕外缘铰链掀起 72°，露出颈孔与下方加注管；再点一次合盖",
+      },
+      {
         id: "burning",
         label: "发动机起火",
         hint: "发动机舱持续燃烧：quarks 火焰 + 烟柱 + 点光闪烁，车体轻微震颤",
@@ -211,6 +216,7 @@ export const CATALOG: StageModel[] = [
       { id: "suspension-run", group: "机构", label: "悬挂演示", kind: "machine-state", state: "running" },
       { id: "drive-run", group: "机构", label: "行进演示", kind: "machine-state", state: "driving" },
       { id: "engine-start", group: "机构", label: "发动机启动", kind: "machine-state", state: "engine_start" },
+      { id: "refuel", group: "勤务", label: "加油（开盖）", kind: "machine-state", state: "refuel" },
       { id: "cannon-fire", group: "火力", label: "主炮击发", kind: "machine-state", state: "firing" },
       { id: "mg-fire", group: "火力", label: "机枪连射", kind: "machine-state", state: "mg_firing" },
       { id: "aim", group: "火炮", label: "炮塔瞄准", kind: "machine-state", state: "aiming" },
@@ -232,7 +238,7 @@ export const CATALOG: StageModel[] = [
       { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
     ],
     notes: [
-      "L1–L5 已装配到 239 件 / 2048 实例；主炮闩 / 中空炮管 / 双油箱 / 战损三态 / 多相爆炸已落地。",
+      "L1–L5 已装配到 240 件 / 2050 实例；主炮闩 / 中空炮管 / 双油箱 / 战损三态 / 多相爆炸已落地。",
       "加油路径：甲板开盖（静态开盖展示）→ ⌀140 甲板孔 → 加注管 → 软管 → 油箱通孔加油颈；开「透视」可看到整条路径。",
       "主炮击发是节点驱动的机械演示（后坐 450mm + 开闩 + 击针 + 炮口焰）；机枪连射含枪管短后坐/枪口上跳/供弹链/弹壳。",
       "爆炸/燃烧用 vendored three.quarks 粒子（初焰闪→火球→冲击波→火花/破片→烟→焦痕）；轻击=穿甲穿孔，重击=榴弹全相，殉爆再叠加炮塔掀飞与火势蔓延。",
