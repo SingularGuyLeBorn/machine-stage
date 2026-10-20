@@ -27,6 +27,15 @@ describe("kingjoe registry", () => {
     expect(counts.get("ship")).toBeGreaterThan(40);
   });
 
+  it("足底四角减震垫逐件存在", () => {
+    const ids = new Set(registry.parts.map((part) => part.id));
+    for (const side of ["l", "r"]) {
+      for (const corner of ["front_outer", "front_inner", "rear_outer", "rear_inner"]) {
+        expect(ids.has(`kingjoe.legs.foot_damper_${corner}_${side}`)).toBe(true);
+      }
+    }
+  });
+
   it("装配态零穿模", () => {
     model.resetNodes();
     model.syncInstances();

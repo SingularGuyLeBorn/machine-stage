@@ -110,6 +110,12 @@ function flashOf(timeSinceLock: number): number {
   return Math.exp(-timeSinceLock * 10);
 }
 
+/** 脚落地后的冲击包络：0.14s 衰减，超出 0.4 个步态周期归零。 */
+function stepImpulse(phase: number, cycle: number): number {
+  if (phase > 0.4) return 0;
+  return Math.exp(-Math.pow((phase * cycle) / 0.14, 2));
+}
+
 function setNode(
   assembled: AssembledModel,
   name: string,
@@ -502,7 +508,7 @@ function poseSeparation(
   return { arcs, flashes, thruster };
 }
 
-function poseRobot(assembled: AssembledModel, t: number): void {
+function poseRobot(assembled: AssembledModel, t: number): { left: number; right: number } {
   const cycle = 6;
   const u = (t % cycle) / cycle;
   const step = Math.sin(u * TAU);
@@ -526,6 +532,10 @@ function poseRobot(assembled: AssembledModel, t: number): void {
   setArm(assembled, "r", -armSwing, 0, 5 + 2 * Math.abs(step), 0, 6);
   setAxialLocks(assembled, 30);
   setShoulderLocks(assembled, 18);
+  return {
+    left: stepImpulse((u - 0.5 + 1) % 1, cycle),
+    right: t < 0.5 ? 0 : stepImpulse(u, cycle),
+  };
 }
 
 function fireCycle(t: number): { beam: number; charge: number } {
@@ -623,7 +633,7 @@ export function animateKingJoe(
       break;
     }
     case "robot": {
-      poseRobot(assembled, t);
+      fxFrame.steps = poseRobot(assembled, t);
       break;
     }
     case "firing": {
