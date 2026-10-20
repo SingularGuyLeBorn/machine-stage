@@ -48,6 +48,13 @@ const damagePanel: NodeDef = {
   note: "左大腿外挂装甲板：战损时沿外下方脱落",
 };
 
+const shipRudders: NodeDef[] = [
+  { name: "shipRudder0", parent: "ship", pivot: [-0.6, 0.8, -0.62], motion: "rotate", axis: "x" },
+  { name: "shipRudder1", parent: "ship", pivot: [0.6, 0.8, -0.62], motion: "rotate", axis: "x" },
+  { name: "shipRudder2", parent: "ship", pivot: [-0.27, 0.82, -0.62], motion: "rotate", axis: "y" },
+  { name: "shipRudder3", parent: "ship", pivot: [0.27, 0.82, -0.62], motion: "rotate", axis: "y" },
+];
+
 const locks: NodeDef[] = [
   { name: "stomachLock", parent: "stomach", pivot: [0, -0.06, 0], motion: "rotate", axis: "y" },
   { name: "chestLock", parent: "chest", pivot: [0, -0.06, 0], motion: "rotate", axis: "y" },
@@ -150,6 +157,7 @@ export const KINGJOE_NODES: NodeDef[] = [
   ...modules,
   waist,
   damagePanel,
+  ...shipRudders,
   ...locks,
   ...nozzles,
   ...legNodes("l"),

@@ -1,18 +1,18 @@
 {
   "stats": {
-    "parts": 583,
-    "instances": 782,
+    "parts": 595,
+    "instances": 794,
     "reports": 0,
     "state": "idle",
     "stats": {
-      "parts": 583,
-      "triangles": 311830
+      "parts": 595,
+      "triangles": 316930
     }
   },
   "fps": 57.2,
   "recording": {
-    "bytes": 4793214,
-    "frames": 608,
+    "bytes": 4820679,
+    "frames": 607,
     "audioTracks": 1,
     "chunks": 45,
     "mimeType": "video/webm;codecs=vp9,opus",
@@ -23,7 +23,7 @@
     "reports": 0,
     "modelId": "kingjoe",
     "machineState": "idle",
-    "buildIndex": 583
+    "buildIndex": 595
   },
   "pageErrors": [],
   "consoleErrors": []
