@@ -1,0 +1,2 @@
+declare const _default: "\n#ifdef SOFT_PARTICLES\n\n    uniform sampler2D depthTexture;\n    uniform vec4 projParams;\n    uniform vec2 softParams;\n\n    varying vec4 projPosition;\n    varying float linearDepth;\n\n    #define SOFT_NEAR_FADE softParams.x\n    #define SOFT_INV_FADE_DISTANCE softParams.y\n\n    #define zNear projParams.x\n    #define zFar projParams.y\n\n    float linearize_depth(float d)\n    {\n        return (zFar * zNear) / (zFar - d * (zFar - zNear));\n    }\n\n#endif\n";
+export default _default;

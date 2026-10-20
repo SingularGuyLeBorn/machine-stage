@@ -4,6 +4,7 @@ import {
   parseInstanceKey,
   resolveSpec,
   type AssembledModel,
+  type DamageState,
   type PartHandle,
 } from "@/three/parts";
 
@@ -84,6 +85,12 @@ export function applyExplode(
       object.matrix
         .copy(scratchMatrixA.makeTranslation(localOffset.x, localOffset.y, localOffset.z))
         .multiply(handle.instances[0].localMatrix);
+      // 战损变体与完好件同父节点/同局部 TRS：爆炸偏移也要跟上
+      for (const variant of Object.values(handle.damageObjects)) {
+        if (!variant) continue;
+        variant.matrixAutoUpdate = false;
+        variant.matrix.copy(object.matrix);
+      }
     } else {
       const animated = motionParts.has(handle.partId);
       for (const instance of handle.instances) {
@@ -115,6 +122,13 @@ export function clearExplode(
         handle.object.matrixAutoUpdate = true;
         handle.object.updateMatrix();
         touched = true;
+      }
+      for (const variant of Object.values(handle.damageObjects)) {
+        if (variant && !variant.matrixAutoUpdate) {
+          variant.matrixAutoUpdate = true;
+          variant.updateMatrix();
+          touched = true;
+        }
       }
     } else {
       if (motionParts.has(handle.partId)) continue;
@@ -335,6 +349,14 @@ export function applyDetach(
           .premultiply(scratchMatrixA.makeTranslation(offset[0], offset[1], offset[2])),
       );
     }
+  }
+}
+
+/** 战损形态：只切预制变体的可见性；碰撞/支撑检测仍按完好几何。 */
+export function applyDamage(assembled: AssembledModel, state: DamageState): void {
+  for (const handle of assembled.parts) {
+    if (Object.keys(handle.damageObjects).length === 0) continue;
+    handle.setDamageState(state);
   }
 }
 

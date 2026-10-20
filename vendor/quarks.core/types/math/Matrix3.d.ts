@@ -1,0 +1,33 @@
+import { Matrix4 } from './Matrix4';
+import { Vector3 } from './Vector3';
+import { Vector2 } from './Vector2';
+declare class Matrix3 {
+    elements: number[];
+    constructor(n11?: number, n12?: number, n13?: number, n21?: number, n22?: number, n23?: number, n31?: number, n32?: number, n33?: number);
+    set(n11: number, n12: number, n13: number, n21: number, n22: number, n23: number, n31: number, n32: number, n33: number): this;
+    identity(): this;
+    copy(m: Matrix3): this;
+    extractBasis(xAxis: Vector3, yAxis: Vector3, zAxis: Vector3): this;
+    setFromMatrix4(m: Matrix4): this;
+    multiply(m: Matrix3): this;
+    premultiply(m: Matrix3): this;
+    multiplyMatrices(a: Matrix3, b: Matrix3): this;
+    multiplyScalar(s: number): this;
+    determinant(): number;
+    invert(): this;
+    transpose(): this;
+    getNormalMatrix(matrix4: Matrix4): this;
+    transposeIntoArray(r: number[]): this;
+    setUvTransform(tx: number, ty: number, sx: number, sy: number, rotation: number, cx: number, cy: number): this;
+    scale(sx: number, sy: number): this;
+    rotate(theta: number): this;
+    translate(tx: number, ty: number): this;
+    makeTranslation(x: number | Vector2, y: number): this;
+    makeRotation(theta: number): this;
+    makeScale(x: number, y: number): this;
+    equals(matrix: Matrix3): boolean;
+    fromArray(array: number[], offset?: number): this;
+    toArray(array?: number[], offset?: number): number[];
+    clone(): Matrix3;
+}
+export { Matrix3 };

@@ -230,6 +230,15 @@ function makeLayouts(): Record<string, InstanceLayout> {
   layouts["hull.balkenkreuz"] = ({ index }) =>
     new THREE.Matrix4().makeTranslation(-2.2, 0.55, index === 0 ? 1.783 : -1.783);
 
+  // 加油口盖：与发动机舱内 L1 油箱的加油颈同轴（世界 x 0.616 / z ±0.802），
+  // 且在散热格栅（x -0.21 ~ 0.45、z ±0.19 ~ ±0.85）之外，避免盖住百叶。
+  layouts["hull.fuelCap"] = ({ index, constants }) =>
+    new THREE.Matrix4().makeTranslation(
+      0.616,
+      constants.HULL_DECK_UNDER! + constants.HULL_DECK_T! + 0.001,
+      index === 0 ? 0.802 : -0.802,
+    );
+
   // 战术编号：右件在 z +1.783、左件在 z -1.783 并绕 Y 转 180°（法线朝外）
   layouts["hull.tacticalNumber"] = ({ index }) => {
     const m = new THREE.Matrix4().makeTranslation(
@@ -347,8 +356,46 @@ function buildHullParts(): PartDefinition[] {
       position: [(c.HULL_FRONT_INNER! + frontOuter) / 2, shellCY, 0],
       rotation: [0, -90, 0],
     },
+    damage: {
+      damaged: {
+        type: "merge",
+        parts: [
+          {
+            type: "kit",
+            kit: "hullPlate",
+            params: {
+              w: sideOuter * 2,
+              h: shellH,
+              t: c.HULL_FRONT_T!,
+              holes: [[c.HULL_MG_HOLE_Z!, c.HULL_MG_HOLE_Y! - shellCY, c.HULL_MG_HOLE_R!]],
+            },
+          },
+          {
+            type: "kit",
+            kit: "damageScarV",
+            params: { t: c.HULL_FRONT_T!, at: [0.42, 0.12], r: 0.14, plane: "z+" },
+          },
+        ],
+      },
+      broken: {
+        type: "kit",
+        kit: "damagePlate",
+        params: {
+          w: sideOuter * 2,
+          h: shellH,
+          t: c.HULL_FRONT_T!,
+          holes: [[c.HULL_MG_HOLE_Z!, c.HULL_MG_HOLE_Y! - shellCY, c.HULL_MG_HOLE_R!]],
+          breach: [0.42, 0.12, 0.2],
+          innerSide: -1,
+          ribs: 3,
+          pipe: true,
+          wires: 3,
+          orient: "xy",
+        },
+      },
+    },
     source:
-      "前装甲板（Bugplatte，厚 100；实车 9° 倾角，本模型垂直）：内表面 x -4.40（L3 仪表板 / 踏板 / 机枪球孔基准）、外表面 -4.50，z ±0.9625（贯通全宽）、y -0.335 ~ 1.045。⌀100 航向机枪球孔（y 0.16、z 0.78）：车内枪管段穿入孔内 90mm（枪口 -4.49），车外由 L4-e 的 Kugelblende 50 球座 + MG34 枪管接出；驾驶员观察窗见 L4-d。",
+      "前装甲板（Bugplatte，厚 100；实车 9° 倾角，本模型垂直）：内表面 x -4.40（L3 仪表板 / 踏板 / 机枪球孔基准）、外表面 -4.50，z ±0.9625（贯通全宽）、y -0.335 ~ 1.045。⌀100 航向机枪球孔（y 0.16、z 0.78）：车内枪管段穿入孔内 90mm（枪口 -4.49），车外由 L4-e 的 Kugelblende 50 球座 + MG34 枪管接出；驾驶员观察窗见 L4-d。战损变体：破损 = 左上凹陷 + 裂痕；破碎 = z -0.42 / y 0.47 处 400mm 破口，露出加强肋、转向管路与线束。",
   });
 
   // ===================== 后装甲板 =====================
@@ -451,8 +498,62 @@ function buildHullParts(): PartDefinition[] {
     },
     material: "armor_steel",
     mate: { type: "absolute", position: [roofCX, (roofUnder + roofTop) / 2, 0], rotation: [90, 0, 0] },
+    damage: {
+      damaged: {
+        type: "merge",
+        parts: [
+          {
+            type: "kit",
+            kit: "hullPlate",
+            params: {
+              w: roofW,
+              h: sideOuter * 2,
+              t: c.HULL_ROOF_T!,
+              holes: [
+                [roofLocalX(c.HULL_TURRET_X!), 0, c.HULL_TURRET_R!],
+                [roofLocalX(c.HULL_HATCH_X!), c.HULL_HATCH_Z!, c.HULL_HATCH_R!],
+                [roofLocalX(c.HULL_HATCH_X!), -c.HULL_HATCH_Z!, c.HULL_HATCH_R!],
+              ],
+              rects: [
+                [roofLocalX(c.HULL_PERI_X!), c.HULL_PERI_Z!, c.HULL_PERI_W!, c.HULL_PERI_H!],
+                [roofLocalX(c.HULL_PERI_X!), -c.HULL_PERI_Z!, c.HULL_PERI_W!, c.HULL_PERI_H!],
+              ],
+            },
+          },
+          {
+            type: "kit",
+            kit: "damageScarV",
+            params: { t: c.HULL_ROOF_T!, at: [-1.35, 0.15], r: 0.12, plane: "z-" },
+          },
+        ],
+      },
+      broken: {
+        type: "kit",
+        kit: "damagePlate",
+        params: {
+          w: roofW,
+          h: sideOuter * 2,
+          t: c.HULL_ROOF_T!,
+          holes: [
+            [roofLocalX(c.HULL_TURRET_X!), 0, c.HULL_TURRET_R!],
+            [roofLocalX(c.HULL_HATCH_X!), c.HULL_HATCH_Z!, c.HULL_HATCH_R!],
+            [roofLocalX(c.HULL_HATCH_X!), -c.HULL_HATCH_Z!, c.HULL_HATCH_R!],
+          ],
+          rects: [
+            [roofLocalX(c.HULL_PERI_X!), c.HULL_PERI_Z!, c.HULL_PERI_W!, c.HULL_PERI_H!],
+            [roofLocalX(c.HULL_PERI_X!), -c.HULL_PERI_Z!, c.HULL_PERI_W!, c.HULL_PERI_H!],
+          ],
+          breach: [-1.35, 0.15, 0.22],
+          innerSide: 1,
+          ribs: 3,
+          pipe: true,
+          wires: 2,
+          orient: "xy",
+        },
+      },
+    },
     source:
-      "战斗室顶甲板（Dachplatte，厚 25）：下表面 y 1.05（L3 潜望镜法兰顶 1.048 留 2mm、吊灯杆顶 1.045 留 5mm）、上表面 1.075，x -4.50 ~ -0.783、z ±0.9625 —— 边线取满车体箱、盖住前板与侧板上缘（各留 5mm 板缝），避免板边与墙顶之间露通缝。开炮塔座圈孔 ⌀1650（圆心 x -1.65 / z 0）：后缘离顶甲板后边 42mm、两侧到侧板外面各留 137.5mm；开驾驶员 / 无线电员舱盖孔 ⌀440 ×2（x -3.32、z ±0.66）；开潜望镜窗 170 × 130 ×2（x -3.95、z ±0.66，比潜望镜体 160 × 120 每边放大 5mm）。舱盖盖板 / 铰链 / 观察窗随 L4-d。",
+      "战斗室顶甲板（Dachplatte，厚 25）：下表面 y 1.05（L3 潜望镜法兰顶 1.048 留 2mm、吊灯杆顶 1.045 留 5mm）、上表面 1.075，x -4.50 ~ -0.783、z ±0.9625 —— 边线取满车体箱、盖住前板与侧板上缘（各留 5mm 板缝），避免板边与墙顶之间露通缝。开炮塔座圈孔 ⌀1650（圆心 x -1.65 / z 0）：后缘离顶甲板后边 42mm、两侧到侧板外面各留 137.5mm；开驾驶员 / 无线电员舱盖孔 ⌀440 ×2（x -3.32、z ±0.66）；开潜望镜窗 170 × 130 ×2（x -3.95、z ±0.66，比潜望镜体 160 × 120 每边放大 5mm）。舱盖盖板 / 铰链 / 观察窗随 L4-d。战损变体：破损 = 前部凹陷裂痕；破碎 = 440mm 破洞，露出顶甲板下的加强肋与线束。",
   });
 
   // ===================== 发动机舱盖（阶梯甲板，L4-b） =====================
@@ -466,8 +567,36 @@ function buildHullParts(): PartDefinition[] {
     geometry: { type: "box", w: deckW, h: c.HULL_DECK_T!, d: sideOuter * 2, bevel: 0.004 },
     material: "armor_steel",
     mate: { type: "absolute", position: [deckCX, (deckUnder + deckTop) / 2, 0] },
+    damage: {
+      damaged: {
+        type: "merge",
+        parts: [
+          { type: "box", w: deckW, h: c.HULL_DECK_T!, d: sideOuter * 2, bevel: 0.004 },
+          {
+            type: "kit",
+            kit: "damageScarH",
+            params: { t: c.HULL_DECK_T!, at: [0.545, 0.35], r: 0.13 },
+          },
+        ],
+      },
+      broken: {
+        type: "kit",
+        kit: "damagePlate",
+        params: {
+          w: deckW,
+          h: sideOuter * 2,
+          t: c.HULL_DECK_T!,
+          breach: [0.545, 0.35, 0.19],
+          innerSide: 1,
+          ribs: 4,
+          pipe: true,
+          wires: 2,
+          orient: "xz",
+        },
+      },
+    },
     source:
-      "发动机舱盖（Motorabdeckung，厚 25）：下表面 y 1.08、上表面 1.105，x -0.741 ~ 0.91，z 取满宽 ±0.9625（后缘盖住后装甲板顶面、两侧盖住发动机舱侧围，俯视无透缝；后边线与车尾外面齐平）。抬高 30mm 的原因：L1 空滤顶 1.056 / 卡箍顶 1.053 高于战斗室顶下表面 1.05，整体抬高后留 24mm（阶梯甲板，对应实车发动机舱盖高出车体顶面的做法）。散热格栅 / 风扇盖 / 排气口随 L5。",
+      "发动机舱盖（Motorabdeckung，厚 25）：下表面 y 1.08、上表面 1.105，x -0.741 ~ 0.91，z 取满宽 ±0.9625（后缘盖住后装甲板顶面、两侧盖住发动机舱侧围，俯视无透缝；后边线与车尾外面齐平）。抬高 30mm 的原因：L1 空滤顶 1.056 / 卡箍顶 1.053 高于战斗室顶下表面 1.05，整体抬高后留 24mm（阶梯甲板，对应实车发动机舱盖高出车体顶面的做法）。战损变体：破损 = 顶部凹陷裂痕；破碎 = 540mm 破洞，露出散热器芯、冷却水管与线束。散热格栅 / 风扇盖 / 排气口随 L5。",
   });
 
   add({
@@ -918,6 +1047,32 @@ function buildHullParts(): PartDefinition[] {
   });
 
   // 牵引钩 ×4（前 2 后 2）
+  // 加油口（外部可见，正对发动机舱内左右燃油箱的加油颈）
+  add({
+    id: "tiger.hull.fuel_cap",
+    name_cn: "燃油加注口",
+    name_en: "Kraftstoff-Einfüllstutzen",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 548,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "tube", rOuter: 0.088, rInner: 0.064, h: 0.02, at: [0, 0.01, 0], segments: 28 },
+        { type: "cylinder", r: 0.067, h: 0.052, at: [0, 0.042, 0], segments: 24, bevel: 0.002 },
+        { type: "cylinder", r: 0.086, h: 0.016, at: [0, 0.076, 0], segments: 28, bevel: 0.002 },
+        { type: "cylinder", r: 0.02, h: 0.022, at: [0, 0.095, 0], segments: 12, bevel: 0.001 },
+      ],
+    },
+    material: "steel_worn",
+    instances: 2,
+    indexed: true,
+    instance_layout: "hull.fuelCap",
+    mate: { type: "absolute" },
+    source:
+      "燃油加注口 ×2：与 L1 左右燃油箱的加油颈同轴（x 0.132 / z ±0.786），底座圈 ⌀176 × 20 + 颈管 ⌀134 × 52 + 盖盘 ⌀172 × 16 + 提钮 ⌀40 × 22，坐在发动机舱盖顶面（y 1.105）上 1mm。",
+  });
+
   add({
     id: "tiger.hull.tow_hook",
     name_cn: "牵引钩",
@@ -1280,6 +1435,22 @@ function buildHullParts(): PartDefinition[] {
       "巴尔干十字（Balkenkreuz）：横臂 260×60、竖臂 60×260，厚 6（凸出漆面 3mm），画在赞助板外壁 z ±1.783、x -2.20、y 0.55。1943 年西线/东线虎式的标准识别标志，白漆描边式样此处按实心白十字简化。",
   });
 
+  // ================= P3 战损特效（fx，构建时隐藏，动画切可见） =================
+  add({
+    id: "tiger.effects.exhaust_smoke",
+    name_cn: "排气烟（特效）",
+    name_en: "Auspuffrauch (FX)",
+    assembly: "hull",
+    build_layer: 5,
+    build_order: 620,
+    geometry: { type: "kit", kit: "smokePuff", params: { r: 0.34 } },
+    material: "smoke_dark",
+    instances: 16,
+    indexed: true,
+    mate: { type: "absolute", position: [0.993, 1.06, 0.32] },
+    tags: ["fx"],
+    source: "发动机启动/怠速排气烟：16 团烟沿两根排气管（x 0.993 / z ±0.32）上飘，动画逐实例写矩阵。",
+  });
   return parts;
 }
 
@@ -1331,6 +1502,15 @@ export function makeHullRegistry(): ModelRegistry {
         preset: "none",
         envMapIntensity: 0.8,
         decal: "132",
+      },
+      smoke_dark: {
+        base: "#7a7972",
+        metalness: 0,
+        roughness: 1,
+        preset: "none",
+        opacity: 0.13,
+        depthWrite: false,
+        doubleSided: true,
       },
     },
     parts: buildHullParts(),

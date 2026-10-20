@@ -33,6 +33,10 @@ export interface MaterialSpec {
   preset?: TexturePreset;
   repeat?: [number, number];
   opacity?: number;
+  /** 透明件是否写深度（烟尘默认 false，避免遮挡后面的火星）。 */
+  depthWrite?: boolean;
+  /** 火焰/火花用加色混合；默认普通混合。 */
+  blending?: "normal" | "additive";
   envMapIntensity?: number;
   /** > 0 时改用 MeshPhysicalMaterial 并开启清漆（漆面罩壳的「亮膜」层）。 */
   clearcoat?: number;
@@ -656,8 +660,13 @@ export function createMaterialLibrary(specs: Record<string, MaterialSpec>): {
       color: new THREE.Color(spec.base),
       metalness: spec.metalness,
       roughness: spec.roughness,
-      transparent: spec.opacity !== undefined && spec.opacity < 1,
+      transparent:
+        (spec.opacity !== undefined && spec.opacity < 1) ||
+        spec.blending === "additive" ||
+        Boolean(spec.decal),
       opacity: spec.opacity ?? 1,
+      depthWrite: spec.depthWrite ?? !(spec.opacity !== undefined && spec.opacity < 1),
+      blending: spec.blending === "additive" ? THREE.AdditiveBlending : THREE.NormalBlending,
       envMapIntensity: spec.envMapIntensity ?? 1,
       side: spec.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
       flatShading: spec.flatShading ?? false,

@@ -1,0 +1,15 @@
+import { FunctionValueGenerator } from './ValueGenerator';
+import { PiecewiseFunction } from './PiecewiseFunction';
+import { Bezier } from './Bezier';
+import { FunctionJSON } from './FunctionJSON';
+import { GeneratorMemory } from './GeneratorMemory';
+export declare class PiecewiseBezier extends PiecewiseFunction<Bezier> implements FunctionValueGenerator {
+    constructor(curves?: Array<[Bezier, number]>);
+    genValue(memory: GeneratorMemory, t?: number): number;
+    toSVG(length: number, segments: number): string;
+    type: 'function';
+    toJSON(): FunctionJSON;
+    static fromJSON(json: FunctionJSON): PiecewiseBezier;
+    clone(): FunctionValueGenerator;
+    startGen(memory: GeneratorMemory): void;
+}

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { instanceKey, type AssembledModel } from "@/three/parts";
+import { pistonPinTravel, rodSwingRad, type CrankTrainGeometry } from "./engine/kinematics";
 import { makeTrackScroller, type TrackScroller } from "./running/registry";
 import { TIGER_MG_BELT_DIR, TIGER_MG_BELT_PITCH } from "./turret/kits";
 
@@ -27,6 +28,7 @@ export const TIGER_MOTION_PARTS = [
   "tiger.track.idler",
   "tiger.turret.aa_mg_case",
   "tiger.hull.hatch_lid",
+  "tiger.effects.exhaust_smoke",
 ];
 
 /** 行进动画改写过的实例件；切换出 driving 时一次性复位，避免停在滚动中途。 */
@@ -541,14 +543,18 @@ export function animateTigerMg(assembled: AssembledModel, seconds: number): void
       .addScaledVector(TIGER_MG_BELT_DIR, step);
   }
 
-  // 枪口焰：每发 30ms（车顶 / 同轴 / 航向三处同步，fx 件默认隐藏）
-  const on = !!shot && shot.since < 0.03;
-  const flashScale = shot ? 0.85 + 0.35 * Math.sin(Math.PI * (shot.since / 0.03)) : 1;
+  // 枪口焰：每发 60ms（车顶 / 同轴 / 航向三处同步；30ms 在 60fps 下只有 2 帧，肉眼易漏）
+  const on = !!shot && shot.since < 0.06;
+  const flashScale = shot ? 1.05 + 0.5 * Math.sin(Math.PI * Math.min(1, shot.since / 0.06)) : 1;
   for (const id of [MG_FLASH_PART, MG_COAX_FLASH_PART, MG_BOW_FLASH_PART]) {
     const flash = assembled.getPart(id);
     if (!flash) continue;
     flash.object.visible = on;
-    if (on) flash.object.scale.setScalar(flashScale);
+    if (on) {
+      // 前机枪（同轴 / 航向）离镜头远、枪口小：放大 2.4× 才看得清「前面那挺也在打」
+      const boost = id === MG_FLASH_PART ? 1 : 2.4;
+      flash.object.scale.setScalar(flashScale * boost);
+    }
   }
 
   // 车体轻微震颤（57 吨不会被 7.92mm 推动，只给高频微颤）
@@ -663,24 +669,222 @@ export function animateTigerHit(
     assembled.root.position.y = 0;
     assembled.root.rotation.x = 0;
     assembled.root.rotation.z = 0;
-    return;
+  } else {
+    if (grade === "light") {
+      const env = Math.exp(-8 * since);
+      const shake = Math.sin(26 * since) * env;
+      assembled.root.position.y = 0.0018 * shake;
+      assembled.root.rotation.z = -0.0009 * shake;
+      assembled.root.rotation.x = 0.0006 * Math.cos(26 * 1.3 * since) * env;
+    } else {
+      const env = Math.exp(-2.4 * since);
+      const body = Math.exp(-3.1 * since) * Math.cos(6.2 * since);
+      assembled.root.position.y = -0.02 * body + 0.003 * Math.sin(22 * since) * env;
+      assembled.root.rotation.z = -0.018 * body + 0.0015 * Math.sin(19 * since) * env;
+      assembled.root.rotation.x = 0.007 * Math.exp(-2.6 * since) * Math.sin(5.2 * since);
+    }
   }
-  if (grade === "light") {
-    const env = Math.exp(-8 * since);
-    const shake = Math.sin(26 * since) * env;
-    assembled.root.position.y = 0.0018 * shake;
-    assembled.root.rotation.z = -0.0009 * shake;
-    assembled.root.rotation.x = 0.0006 * Math.cos(26 * 1.3 * since) * env;
-    return;
-  }
-  const env = Math.exp(-2.4 * since);
-  const body = Math.exp(-3.1 * since) * Math.cos(6.2 * since);
-  assembled.root.position.y = -0.02 * body + 0.003 * Math.sin(22 * since) * env;
-  assembled.root.rotation.z = -0.018 * body + 0.0015 * Math.sin(19 * since) * env;
-  assembled.root.rotation.x = 0.007 * Math.exp(-2.6 * since) * Math.sin(5.2 * since);
 }
 
-/** 非射击状态统一隐藏所有 fx（主炮口焰 / MG 枪口焰 / 弹壳）。 */
+// ---------------------------------------------------------------------------
+// 排气烟 fx（爆炸/火焰/烟柱改由 three.quarks 粒子系统在 app/three/vfx 里做）
+// ---------------------------------------------------------------------------
+const ENGINE_SMOKE_PART = "tiger.effects.exhaust_smoke";
+const TIGER_FX_PARTS = [ENGINE_SMOKE_PART];
+
+const fxMatrix = new THREE.Matrix4();
+const fxQuat = new THREE.Quaternion();
+const fxEuler = new THREE.Euler();
+const fxPosition = new THREE.Vector3();
+const fxScale = new THREE.Vector3();
+const frac = (value: number): number => value - Math.floor(value);
+
+/** 烟柱：逐实例从 origin 上飘、扩散、由小到大再到零（避免循环时突现突灭）。 */
+function writeSmokePlume(
+  handle: NonNullable<ReturnType<AssembledModel["getPart"]>>,
+  origin: (index: number) => THREE.Vector3,
+  seconds: number,
+  options: { rate: number; rise: number; spread: number; scale: number; seed?: number },
+): void {
+  const count = Math.max(1, handle.instances.length);
+  for (let i = 0; i < count; i++) {
+    const phase = frac(i / count + seconds * options.rate + (options.seed ?? 0));
+    const grow = Math.sin(Math.PI * phase) ** 0.65;
+    const base = origin(i);
+    const angle = i * 2.399 + phase * 2.4;
+    fxPosition.set(
+      base.x + Math.cos(angle) * options.spread * phase,
+      base.y + phase * options.rise,
+      base.z + Math.sin(angle) * options.spread * phase,
+    );
+    const size = options.scale * (0.35 + 1.25 * phase) * grow;
+    fxScale.setScalar(Math.max(0.0001, size));
+    fxQuat.setFromEuler(fxEuler.set(phase * 1.7 + i, i * 2.1, phase * 0.8));
+    fxMatrix.compose(fxPosition, fxQuat, fxScale);
+    handle.setInstanceMatrix(i, fxMatrix);
+  }
+}
+
+
+/** 排气烟：两根排气管交替出烟（instance 偶数 → 右管，奇数 → 左管）。 */
+function writeExhaustSmoke(
+  handle: ReturnType<AssembledModel["getPart"]>,
+  seconds: number,
+  intensity: number,
+): void {
+  if (!handle) return;
+  handle.object.visible = true;
+  writeSmokePlume(
+    handle,
+    (index) => fxPosition.set(0.993, 1.06, index % 2 === 0 ? 0.32 : -0.32).clone(),
+    seconds,
+    { rate: 0.5, rise: 1.3, spread: 0.22, scale: 0.42 * intensity, seed: 0.13 },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 发动机启动（P0）——起动机拖动 → 逐缸点火 → 怠速
+// 节点：Crank / Cam_L / Cam_R / Fan_L / Fan_R / Piston_1..12 / Rod_1..12
+// 曲柄连杆运动学直接调用 engine/kinematics（与静态装配同一套公式）。
+// ---------------------------------------------------------------------------
+export const TIGER_ENGINE_CYCLE = 12;
+export const TIGER_STARTER_END = 1.1;
+export const TIGER_RUNUP_END = 3.2;
+export const TIGER_IDLE_RPM = 650;
+
+const RPM_TO_RAD = Math.PI / 30;
+
+/** 发动机转速（rpm）：起动机 0→180，点火爬升 180→650，之后怠速微抖。 */
+export function tigerEngineRpmAt(seconds: number): number {
+  if (seconds <= 0) return 0;
+  if (seconds < TIGER_STARTER_END) {
+    const u = seconds / TIGER_STARTER_END;
+    return 180 * u + 22 * Math.sin(seconds * 2 * Math.PI * 5) * u;
+  }
+  if (seconds < TIGER_RUNUP_END) {
+    const u = (seconds - TIGER_STARTER_END) / (TIGER_RUNUP_END - TIGER_STARTER_END);
+    const s = u * u * (3 - 2 * u);
+    return 180 + (TIGER_IDLE_RPM - 180) * s;
+  }
+  return TIGER_IDLE_RPM + 14 * Math.sin((seconds - TIGER_RUNUP_END) * 2 * Math.PI * 0.8);
+}
+
+/** 曲轴累计转角（rad）：分段解析积分，保证每次采样与 rpm 曲线自洽。 */
+export function tigerCrankAngleAt(seconds: number): number {
+  if (seconds <= 0) return 0;
+  const w180 = 180 * RPM_TO_RAD;
+  const wIdle = TIGER_IDLE_RPM * RPM_TO_RAD;
+  if (seconds < TIGER_STARTER_END) {
+    const u = seconds / TIGER_STARTER_END;
+    return 0.5 * w180 * TIGER_STARTER_END * u * u + 0.06 * Math.sin(seconds * 2 * Math.PI * 5) * u;
+  }
+  const angle1 =
+    0.5 * w180 * TIGER_STARTER_END + 0.06 * Math.sin(TIGER_STARTER_END * 2 * Math.PI * 5);
+  const dt = seconds - TIGER_STARTER_END;
+  const runup = TIGER_RUNUP_END - TIGER_STARTER_END;
+  if (seconds < TIGER_RUNUP_END) {
+    const u = dt / runup;
+    return angle1 + w180 * dt + 0.5 * (wIdle - w180) * runup * u * u;
+  }
+  const angle2 = angle1 + w180 * runup + 0.5 * (wIdle - w180) * runup;
+  const idleDt = seconds - TIGER_RUNUP_END;
+  const mod = 2 * Math.PI * 0.8;
+  return angle2 + wIdle * idleDt + ((14 * RPM_TO_RAD) / mod) * (1 - Math.cos(mod * idleDt));
+}
+
+export function animateTigerEngine(assembled: AssembledModel, seconds: number): void {
+  const angle = tigerCrankAngleAt(seconds);
+  const crank = assembled.getNode("Crank");
+  if (crank) crank.rotation.x = angle;
+  for (const name of ["Cam_L", "Cam_R"]) {
+    const cam = assembled.getNode(name);
+    if (cam) cam.rotation.x = angle / 2;
+  }
+  for (const name of ["Fan_L", "Fan_R"]) {
+    const fan = assembled.getNode(name);
+    if (fan) fan.rotation.x = angle * 1.55;
+  }
+
+  const constants = assembled.constants;
+  const crankR = constants.CRANK_R ?? 0.0725;
+  const rodLength = constants.ROD_L ?? 0.29;
+  const halfV = constants.HALF_V ?? 30;
+  const beta = THREE.MathUtils.degToRad(halfV);
+  const geometry: CrankTrainGeometry = { crankR, rodLength, bankAngleDeg: halfV };
+  for (let i = 0; i < 12; i++) {
+    const pin = Math.floor(i / 2);
+    const side: 1 | -1 = (i + 1) % 2 === 1 ? -1 : 1;
+    const bank = side * halfV;
+    const phi0 = THREE.MathUtils.degToRad(pin * 60) - beta * side;
+    const phi = THREE.MathUtils.degToRad(pin * 60) + angle - beta * side;
+    const travel = pistonPinTravel(phi, geometry) - pistonPinTravel(phi0, geometry);
+    const piston = assembled.getNode(`Piston_${i + 1}`);
+    const pistonRest = assembled.nodeRest.get(`Piston_${i + 1}`);
+    if (piston && pistonRest) {
+      piston.position.set(
+        pistonRest.elements[12],
+        pistonRest.elements[13] + travel * Math.cos(THREE.MathUtils.degToRad(bank)),
+        pistonRest.elements[14] + travel * Math.sin(THREE.MathUtils.degToRad(bank)),
+      );
+    }
+    const rod = assembled.getNode(`Rod_${i + 1}`);
+    if (rod) {
+      rod.rotation.x += rodSwingRad(phi, geometry) - rodSwingRad(phi0, geometry);
+    }
+  }
+
+  // 启动瞬间车体一扭；怠速时高频微颤（57 吨只给 1–2mm）
+  const jolt = seconds > TIGER_STARTER_END ? Math.exp(-4 * (seconds - TIGER_STARTER_END)) : 0;
+  assembled.root.position.set(0, 0.0012 * Math.sin(angle * 2), 0);
+  assembled.root.rotation.set(
+    0.0006 * Math.sin(angle * 1.3),
+    0,
+    0.0025 * jolt * Math.sin((seconds - TIGER_STARTER_END) * 26),
+  );
+
+  writeExhaustSmoke(assembled.getPart(ENGINE_SMOKE_PART), seconds, seconds < TIGER_RUNUP_END ? 1.35 : 0.75);
+}
+
+// ---------------------------------------------------------------------------
+// 燃烧 / 殉爆（P3）
+// ---------------------------------------------------------------------------
+export const TIGER_DETONATION_IMPACT = 0.65;
+
+export function animateTigerBurning(assembled: AssembledModel, seconds: number): void {
+  assembled.root.position.set(0, 0.001 * Math.sin(seconds * 13), 0);
+  assembled.root.rotation.set(
+    0.0006 * Math.sin(seconds * 7.3),
+    0,
+    0.0009 * Math.sin(seconds * 5.1),
+  );
+  // 火焰/烟柱由 three.quarks 粒子在 app/three/vfx 里叠加，这里只保留车体震颤
+}
+
+export function animateTigerDetonation(assembled: AssembledModel, seconds: number): void {
+  const t = seconds;
+  const since = t - TIGER_DETONATION_IMPACT;
+  const progress = smoothstep(TIGER_DETONATION_IMPACT, TIGER_DETONATION_IMPACT + 0.85, t);
+  const settle =
+    since > 0 ? 0.05 * Math.exp(-3 * since) * Math.sin(10 * since) : 0;
+  const turret = assembled.getNode("Turret");
+  if (turret) {
+    const pivot = new THREE.Vector3(assembled.constants.TR_RING_X ?? -1.65, 1.1, 0);
+    const tilt = new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(0.035 * progress, 0.16 * progress, 0.06 * progress),
+    );
+    turret.quaternion.copy(tilt);
+    turret.position
+      .copy(pivot)
+      .sub(pivot.clone().applyQuaternion(tilt))
+      .add(new THREE.Vector3(0, 0.85 * progress + settle, 0));
+    turret.updateMatrix();
+  }
+  // 车体被殉爆冲击：下沉 + 高频颤
+  assembled.root.position.set(0, -0.015 * Math.exp(-3 * Math.max(0, since)) * Math.cos(6 * Math.max(0, since)), 0);
+  assembled.root.rotation.set(0, 0, -0.012 * Math.exp(-2.6 * Math.max(0, since)));
+}
+
+/** 非射击状态统一隐藏所有 fx（炮口焰 / 弹壳 / 烟尘 / 火灾 / 命中火花）。 */
 function hideTigerEffects(assembled: AssembledModel): void {
   for (const id of [
     TIGER_FLASH_PART,
@@ -688,6 +892,7 @@ function hideTigerEffects(assembled: AssembledModel): void {
     MG_COAX_FLASH_PART,
     MG_BOW_FLASH_PART,
     MG_CASE_PART,
+    ...TIGER_FX_PARTS,
   ]) {
     const part = assembled.getPart(id);
     if (part) part.object.visible = false;
@@ -697,7 +902,10 @@ function hideTigerEffects(assembled: AssembledModel): void {
 /**
  * 虎式动画总入口（catalog.animate）：按机器状态分流。
  * - running：悬挂演示；driving：行进演示；firing：主炮击发；mg_firing：MG34 连射；
- * - aiming：炮塔回转 + 炮管俯仰；hit_light / hit_heavy：受击震荡（轻/重）；
+ * - aiming：炮塔回转 + 炮管俯仰；engine_start：起动机拖动→点火→怠速；
+ * - burning：发动机舱起火（车体震颤；火焰/烟柱由 quarks VFX 叠加）；
+ * - detonation：弹药殉爆（炮塔掀飞 + 车体冲击；火球/烟柱由 quarks VFX 叠加）；
+ * - hit_light / hit_heavy：受击震荡（轻/重；命中火花/爆炸由 quarks VFX 叠加）；
  * - 其余状态：回到装配态（特效隐藏、节点由框架 resetNodes 复位）。
  */
 export function animateTiger(assembled: AssembledModel, seconds: number, state?: string): void {
@@ -721,6 +929,21 @@ export function animateTiger(assembled: AssembledModel, seconds: number, state?:
   if (state === "aiming") {
     hideTigerEffects(assembled);
     animateTigerAim(assembled, seconds);
+    return;
+  }
+  if (state === "engine_start") {
+    hideTigerEffects(assembled);
+    animateTigerEngine(assembled, seconds);
+    return;
+  }
+  if (state === "burning") {
+    hideTigerEffects(assembled);
+    animateTigerBurning(assembled, seconds);
+    return;
+  }
+  if (state === "detonation") {
+    hideTigerEffects(assembled);
+    animateTigerDetonation(assembled, seconds);
     return;
   }
   if (state === "hit_light" || state === "hit_heavy") {

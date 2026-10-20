@@ -9,6 +9,7 @@ import {
   type AssembledModel,
   type ClippingReport,
   type ContactPartition,
+  type DamageState,
   type OverlapForm,
   type PartHandle,
 } from "@/three/parts";
@@ -161,6 +162,8 @@ interface StageState {
   views: Record<ViewKey, boolean>;
   layout: PanelLayout;
   machineState: string;
+  /** 战损形态（完好/破损/破碎）：只切预制变体，不影响碰撞与支撑检测。 */
+  damage: DamageState;
   focus: FocusRequest | null;
   /** 整机包围盒基准（构建完成后写入；重置视角用）。 */
   home: { center: [number, number, number]; radius: number } | null;
@@ -192,6 +195,7 @@ interface StageState {
   closeIsolation(): void;
   stepReport(delta: number): void;
   setMachineState(state: string): void;
+  setDamage(state: DamageState): void;
   requestFocus(partId: string): void;
   focusPoint(center: [number, number, number], radius?: number, resetAngle?: boolean): void;
   setHome(center: [number, number, number], radius: number): void;
@@ -269,6 +273,7 @@ export const useStageStore = create<StageState>((set, get) => ({
     drawer: { ...LAYOUT_DEFAULT.drawer },
   },
   machineState: "idle",
+  damage: "intact",
   focus: null,
   home: null,
   notice: null,
@@ -296,6 +301,7 @@ export const useStageStore = create<StageState>((set, get) => ({
       scanKind: null,
       scanMs: null,
       machineState: model.states?.[0]?.id ?? "idle",
+      damage: "intact",
       views: { ...VIEWS_DEFAULT },
       focus: null,
       home: null,
@@ -423,6 +429,8 @@ export const useStageStore = create<StageState>((set, get) => ({
     if (allowed && !allowed.some((item) => item.id === state)) return;
     set({ machineState: state });
   },
+
+  setDamage: (damage) => set({ damage }),
 
   requestFocus: (partId) => {
     const assembled = get().assembled;

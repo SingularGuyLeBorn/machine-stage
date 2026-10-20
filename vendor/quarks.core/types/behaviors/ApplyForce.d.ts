@@ -1,0 +1,22 @@
+import { Behavior } from './Behavior';
+import { Particle } from '../Particle';
+import { ValueGenerator } from '../functions';
+import { Vector3 } from '../math';
+export declare class ApplyForce implements Behavior {
+    direction: Vector3;
+    magnitude: ValueGenerator;
+    type: string;
+    magnitudeValue: number;
+    memory: {
+        data: never[];
+        dataCount: number;
+    };
+    constructor(direction: Vector3, magnitude: ValueGenerator);
+    initialize(particle: Particle): void;
+    update(particle: Particle, delta: number): void;
+    frameUpdate(delta: number): void;
+    toJSON(): any;
+    static fromJSON(json: any): Behavior;
+    clone(): Behavior;
+    reset(): void;
+}
