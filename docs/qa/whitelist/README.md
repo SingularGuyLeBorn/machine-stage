@@ -55,10 +55,11 @@
 | `port-flange-bolt-seat`   |     48 | `cylinder.head` ↔ `cylinder.port_flange_bolt`                                                        | 缸盖进/排气法兰螺栓头坐在法兰外面、杆埋进 18mm 法兰（法兰加宽到 78mm 留座） |
 | `endplate-bolt-seat`      |     38 | `crankcase.endplate_front/_rear`、`shell` ↔ `endplate_bolt`                                          | 前后端板各 12 颗绕曲轴轴线 ⌀290：杆穿端板拧进机体端面螺孔（守门 14mm）      |
 | `sender-thread-seat`      |      2 | `crankcase.shell` ↔ `oil_pressure_sender` / `cooling.coolant_temp_sender`                            | 传感器螺纹杆拧进机体侧壁螺孔：外壳坐在壁外、杆只埋 6mm（壁厚 19mm 不穿）    |
+| `gear-rim-on-blank`       |      7 | `transmission.gear_rim` ↔ `transmission.main_shaft` / `layshaft`                                     | 齿圈过盈套在齿轮坯外（内孔比坯小 1mm 压装；齿圈按坯径缩放，齿根探入坯体 ≤2.4mm，守门 3mm） |
 
-合计 227 条 = 未豁免 0 + 已豁免 227（`npx tsx scripts/diag-clips.ts` 与浏览器内
+合计 234 条 = 未豁免 0 + 已豁免 234（`npx tsx scripts/diag-clips.ts` 与浏览器内
 `reportPartition` 双口径一致）。深度分层：>10mm 4 条（端板螺栓穿端板拧进机体端面螺孔，
-守门 14mm）、2–10mm 160 条、≤2mm 63 条，227 条全部为实测深度（0 条测不出）。
+守门 14mm）、2–10mm 162 条、≤2mm 68 条，227 条全部为实测深度（0 条测不出）。
 守门：豁免族内若冒出超过守门值的深度即判真缺陷照报——注入测试（油尺推进曲轴箱壁 5mm）
 只多报那一条。
 
