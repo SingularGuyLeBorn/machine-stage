@@ -40,6 +40,18 @@ export const INTERIOR_LAYOUTS = {
   lamp: "interior.lamp",
   radioKnob: "interior.radioKnob",
   mgGrip: "interior.mgGrip",
+  // —— L3 第三批：线束 / 战斗室 / 生活痕迹 ——
+  cableClamp: "interior.cableClamp",
+  junctionBox: "interior.junctionBox",
+  relayBox: "interior.relayBox",
+  breaker: "interior.breaker",
+  dataPlate: "interior.dataPlate",
+  warningLabel: "interior.warningLabel",
+  grabHandle: "interior.grabHandle",
+  floorMat: "interior.floorMat",
+  personalKit: "interior.personalKit",
+  toolRow: "interior.toolRow",
+  cupolaPeriscope: "interior.cupolaPeriscope",
 } as const;
 
 const IN_CONSTANTS: Record<string, number> = {
@@ -73,6 +85,12 @@ const IN_CONSTANTS: Record<string, number> = {
   IN_GAUGE_FACE_DX: 0.0175,
   /** 指针有效长度：表盘内径 32mm，指针尖留 4mm 余量。 */
   IN_GAUGE_NEEDLE_LEN: 0.026,
+
+  // —— 战斗室基准（L4 炮塔接口，本批线束 / 待发弹 / 塔内设备用）——
+  IN_RING_X: -1.65,
+  IN_CUPOLA_X: -1.3,
+  IN_CUPOLA_Z: -0.42,
+  IN_BULKHEAD_X: -0.78,
 };
 
 /** 仪表序号 → 表心世界坐标（布局与节点共用同一份派生，禁止两处各写一遍）。 */
@@ -205,6 +223,144 @@ export function makeInteriorLayouts(): Record<string, InstanceLayout> {
     return m;
   };
 
+  // ===================== L3 第三批：线束 / 战斗室 / 生活痕迹 =====================
+  // 这一批的坐标全部按「贴壁留 2mm 名义缝」的口径给，走线沿侧板内表面（z ±0.90）
+  // 高走 y 0.88，绕开潜望镜体（y 0.868~1.048 / z ±0.74）与座椅靠背（顶 0.57）。
+  const atList =
+    (
+      list: readonly (readonly [number, number, number])[],
+      rot: THREE.Matrix4 | null = null,
+    ): InstanceLayout =>
+    ({ index }) => {
+      const [x, y, z] = list[index % list.length]!;
+      return laid(rot, x, y, z);
+    };
+
+  // 线束卡箍：左右壁各 4 只（280mm 一只，末端让位给接线盒）
+  const clampSpots: (readonly [number, number, number])[] = [];
+  for (let i = 0; i < 3; i++) clampSpots.push([-4.05 + i * 0.28, 0.88, -0.898]);
+  layouts[INTERIOR_LAYOUTS.cableClamp] = atList(clampSpots);
+  layouts["interior.cableClampR"] = atList(
+    clampSpots.map(([x, y, z]) => [x, y, -z] as const),
+    new THREE.Matrix4().makeRotationY(Math.PI),
+  );
+  // 液压管左右两组（双管沿 Z 并排，贴地板走；转向机壳体宽到 z ±0.66，故走 z ±0.72）
+  layouts["interior.brakePipe"] = atList([
+    [0, 0, -0.72],
+    [0, 0, 0.72],
+  ]);
+
+  // 接线盒：左壁 / 右壁 / 后隔板，各自转朝向让背板贴壁
+  const boxSpots: [number, number, number][] = [
+    [-2.92, 0.88, -0.868],
+    [-2.92, 0.88, 0.868],
+    [-0.81, 0.86, -0.55],
+  ];
+  const boxRots = [0, Math.PI, -Math.PI / 2];
+  layouts[INTERIOR_LAYOUTS.junctionBox] = ({ index }) =>
+    new THREE.Matrix4()
+      .makeRotationY(boxRots[index % 3]!)
+      .setPosition(boxSpots[index % 3]![0], boxSpots[index % 3]![1], boxSpots[index % 3]![2]);
+  // 继电器盒 3 只 + 断路器 6 只：都在前装甲板内侧、仪表板上方（仪表顶 0.38）
+  layouts[INTERIOR_LAYOUTS.relayBox] = atList(
+    [-0.78, -0.66, -0.54].map((z) => [-4.36, 0.56, z] as const),
+  );
+  layouts[INTERIOR_LAYOUTS.breaker] = atList(
+    [0, 1, 2, 3, 4, 5].map((i) => [-4.368, 0.42, 0.33 + i * 0.042] as const),
+  );
+
+  // 待发弹：炮塔后壁前、吊篮内的横置弹架 2 层 ×2 列（弹体沿 Z 横放）
+  // 旋转必须写在 layout 里：layout 平移是叠在 mate 之上的，把旋转放 mate 会把
+  // 平移量一起转走（本批一开始就踩了这个坑，弹全部飞到车外）。
+  const RX90 = new THREE.Matrix4().makeRotationX(Math.PI / 2);
+  const RY90 = new THREE.Matrix4().makeRotationY(Math.PI / 2);
+  const RYm90 = new THREE.Matrix4().makeRotationY(-Math.PI / 2);
+  const RZ90 = new THREE.Matrix4().makeRotationZ(Math.PI / 2);
+  const readyXs = [-1.25, -1.13, -1.25, -1.13];
+  const readyZs = [0.22, 0.22, 0.36, 0.36];
+  layouts["interior.readyCase"] = ({ index }) =>
+    new THREE.Matrix4().makeTranslation(readyXs[index % 4]!, 1.4, readyZs[index % 4]!);
+  // 车长塔周向潜望镜 7 具：绕塔口 r 0.19（筒壁内表面 r 0.225、观察缝盒 r 0.234 之内）
+  layouts[INTERIOR_LAYOUTS.cupolaPeriscope] = ({ index }) => {
+    const deg = -55 + index * 50;
+    return new THREE.Matrix4().makeTranslation(
+      c.IN_CUPOLA_X! + 0.19 * Math.cos(THREE.MathUtils.degToRad(deg)),
+      1.92,
+      c.IN_CUPOLA_Z! + 0.19 * Math.sin(THREE.MathUtils.degToRad(deg)),
+    );
+  };
+  // 吊篮里的储物箱 / 弹鼓都只有地板上一个空位，坐标直接写进各自零件的 mate（见下）
+  // 后隔板（战斗室侧，面 x -0.780）：所有挂件按「离板面 2mm」给 x
+  layouts[INTERIOR_LAYOUTS.toolRow] = atList([
+    [-0.806, 0.3, -0.24],
+    [-0.806, 0.3, -0.14],
+    [-0.806, 0.3, -0.04],
+    [-0.806, 0.3, 0.16],
+    [-0.806, 0.3, 0.26],
+  ]);
+  layouts["interior.toolRowRot"] = atList(
+    [
+      [-0.818, 0.3, -0.24],
+      [-0.818, 0.3, -0.14],
+      [-0.818, 0.3, -0.04],
+      [-0.818, 0.3, 0.16],
+      [-0.818, 0.3, 0.26],
+    ],
+    RX90,
+  );
+  layouts[INTERIOR_LAYOUTS.personalKit] = atList([
+    [-0.825, 0.62, -0.68],
+    [-0.825, 0.62, 0.68],
+  ]);
+  layouts["interior.messTin"] = atList([
+    [-0.801, 0.46, -0.62],
+    [-0.801, 0.46, 0.62],
+  ]);
+  layouts["interior.hookRow"] = atList([
+    [-0.788, 0.76, -0.68],
+    [-0.788, 0.76, 0.68],
+    [-0.788, 0.76, -0.45],
+  ]);
+  layouts["interior.breadBag"] = atList([
+    [-0.812, 0.66, -0.3],
+    [-0.812, 0.66, 0.18],
+  ]);
+  // 扶手：两侧壁各一只（杆沿 Y、支座补到壁面）、后隔板两只（杆沿 Z、挂在个人物品上方）
+  layouts[INTERIOR_LAYOUTS.grabHandle] = ({ index }) => {
+    const list: [number, number, number, THREE.Matrix4][] = [
+      [-2.62, 0.62, -0.896, RY90],
+      [-0.782, 0.8, -0.38, RX90],
+      [-0.782, 0.8, 0.38, RX90],
+      [-2.62, 0.62, 0.896, RYm90],
+    ];
+    const [x, y, z, rot] = list[index % 4]!;
+    return laid(rot, x, y, z);
+  };
+  // 铭牌 / 警示标签：板面法线沿 X → 绕 Z 转 90°
+  const plateSpots: [number, number, number, THREE.Matrix4 | null][] = [
+    [-0.783, 0.86, -0.42, null],
+    [-0.783, 0.86, 0.42, null],
+    [-4.396, 0.72, -0.3, null],
+    [-3.198, 0.99, -0.896, RY90],
+    [-3.198, 0.99, 0.896, RYm90],
+    [-3.05, 0.414, 0.24, RZ90],
+  ];
+  layouts[INTERIOR_LAYOUTS.dataPlate] = ({ index }) => {
+    const [x, y, z, rot] = plateSpots[index % plateSpots.length]!;
+    return laid(rot, x, y, z);
+  };
+  layouts[INTERIOR_LAYOUTS.warningLabel] = atList(
+    [
+      [-4.3955, 0.66, -0.62],
+      [-0.783, 0.99, 0],
+      [-4.132, 0.2, -0.5],
+      [-2.87, 0.24, -0.868],
+    ] as const,
+  );
+  layouts[INTERIOR_LAYOUTS.floorMat] = atList([
+    [-3.9, -0.299, -0.67],
+    [-3.9, -0.299, 0.67],
+  ]);
   return layouts;
 }
 
@@ -215,6 +371,7 @@ export function makeInteriorLayouts(): Record<string, InstanceLayout> {
 function buildInteriorParts(): PartDefinition[] {
   const parts: PartDefinition[] = [];
   const add = (part: PartDefinition) => parts.push(part);
+  const c = IN_CONSTANTS;
 
   // ===================== 驾驶席：座椅（左右各一） =====================
   add({
@@ -518,20 +675,17 @@ function buildInteriorParts(): PartDefinition[] {
     build_layer: 3,
     build_order: 412,
     geometry: {
-      type: "merge",
-      parts: [
-        { type: "box", w: 0.1, h: 0.02, d: 0.06, at: [-4.24, 0.235, 0], bevel: 0.004 },
-        { type: "box", w: 0.03, h: 0.18, d: 0.03, at: [-4.19, 0.335, 0], bevel: 0.003 },
-        { type: "box", w: 0.225, h: 0.03, d: 0.03, at: [-4.2825, 0.42, 0], bevel: 0.003 },
-      ],
+      type: "kit",
+      kit: "perforatedPedal",
+      params: { d: 0.1, w: 0.06, t: 0.02, holes: 8, holeR: 0.0085, armH: 0.185 },
     },
     material: "steel_worn",
     instances: 3,
     indexed: true,
     instance_layout: INTERIOR_LAYOUTS.pedal,
-    mate: { type: "absolute" },
+    mate: { type: "absolute", position: [-4.24, 0.225, 0] },
     source:
-      "踏板（离合/制动/油门，踏板面 100×60）：踏板面顶 y 0.245，吊臂挂在 y 0.42 的横轴上；横轴前端离前装甲板内表面 5mm，整组在转向机前盖（x -4.122）之前 78mm。",
+      "踏板（离合/制动/油门，踏板面 100×60×20 铝板）：面顶 y 0.245，面上 8 个 ⌀17 防滑孔（真孔，不是贴花）；吊臂挂在踏板面后缘、套在 ⌀22 悬挂横轴（y 0.42 / x -4.28）上；横轴前端离前装甲板内表面 5mm，整组在转向机前盖（x -4.122）之前 78mm。",
   });
 
   add({
@@ -671,15 +825,15 @@ function buildInteriorParts(): PartDefinition[] {
     geometry: {
       type: "merge",
       parts: [
-        { type: "box", w: 0.04, h: 0.24, d: 0.016, at: [0.1, 0.42, 0.891], bevel: 0.003 },
-        { type: "box", w: 0.04, h: 0.24, d: 0.016, at: [-0.1, 0.42, 0.891], bevel: 0.003 },
-        { type: "box", w: 0.34, h: 0.02, d: 0.2, at: [0, 0.288, 0.78], bevel: 0.004 },
+        { type: "box", w: 0.04, h: 0.24, d: 0.006, at: [-3.7, 0.42, 0.895], bevel: 0.002 },
+        { type: "box", w: 0.04, h: 0.24, d: 0.006, at: [-3.9, 0.42, 0.895], bevel: 0.002 },
+        { type: "box", w: 0.34, h: 0.02, d: 0.2, at: [-3.8, 0.288, 0.78], bevel: 0.004 },
       ],
     },
     material: "steel_worn",
     mate: { type: "absolute" },
     source:
-      "电台支架（两条竖撑 + 托板）：竖撑后面离侧板内表面 2mm、离电台背面 2mm；托板顶面 0.298，离电台底面（0.30）2mm。",
+      "电台支架（两条竖撑 + 托板）：托板 340×20×200 顶面 0.298、离电台底面（0.30）2mm；两条竖撑 40×240×6 贴在电台背面与侧板内表面之间的 10mm 夹缝里（z 0.892~0.898，离电台背面 2mm、离侧板 2mm）。",
   });
 
   add({
@@ -1087,6 +1241,847 @@ function buildInteriorParts(): PartDefinition[] {
       "炮塔座席（Turmsitz）：立柱 ⌀110×300、座垫 360×60×360、靠背 60×340×360。三席：车长 (-1.32, -0.44) 在指挥塔正下方、炮手 (-1.95, -0.38) 朝前、装填手 (-1.95, +0.43) 朝后（转 180°）。座面 y 1.485、靠背顶 1.833，离顶盖内表面 1.811 留 22mm；立柱底离吊篮地板面 3mm。炮手/装填手席各外移 80mm——炮身 450mm 后坐终点（闩体后缘 x -1.77）要穿过两席之间，座背内缘留 ≥40mm 净空。",
   });
 
+  // ===================== L3 第三批 A：线束 / 管路（先布线，后装设备） =====================
+  // 走线口径：主束沿两侧板内表面高走（y 0.88 / z ±0.86，离壁 33mm），在前壁上方横穿连成
+  // 一路（绕驾驶舱三面一周），后隔板另走一趟 U 形；束子 3 股**竖向叠放**（spread = Y），
+  // 所以贴壁不鼓包、卡箍口只要 25mm 宽。炮塔内束绕吊篮外缘 r 0.755，遇到回转电机（r
+  // 0.56~0.77 / y 1.19 起）向内凹到 r 0.50 让位。
+  const bundle = (
+    points: readonly (readonly [number, number, number])[],
+    extra?: Record<string, number | number[]>,
+  ) => ({
+    type: "kit" as const,
+    kit: "cableRun",
+    params: { points: points.map((p) => [...p]), strands: 3, r: 0.0125, pitch: 0.028, spread: [0, 1, 0], ...extra },
+  });
+
+  add({
+    id: "tiger.interior.harness_trunk",
+    name_cn: "驾驶舱主电缆束",
+    name_en: "Kabelstrang (Haupt)",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 464,
+    geometry: bundle([
+      [-2.92, 0.915, -0.812],
+      [-3.4, 0.88, -0.86],
+      [-4.05, 0.88, -0.86],
+      [-4.24, 0.8, -0.855],
+      [-4.28, 0.72, -0.72],
+      [-4.28, 0.72, -0.3],
+      [-4.28, 0.72, 0.15],
+      [-4.28, 0.72, 0.6],
+      [-4.24, 0.8, 0.855],
+      [-4.05, 0.88, 0.86],
+      [-3.4, 0.88, 0.86],
+      [-2.92, 0.915, 0.812],
+    ]),
+    material: "cable_rubber",
+    mate: { type: "absolute" },
+    source:
+      "驾驶舱主电缆束：3 股 ⌀25 竖向叠成一束（束宽 25mm、高 84mm），从左侧接线盒上过线套前 8mm（x -2.92 / y 0.915 / z -0.812）起，沿左壁高位（y 0.88、离侧板内表面 33mm）向前，在仪表板上方 340mm 处横穿前壁（x -4.28，离继电器盒 42mm、离断路器 73mm），再沿右壁回到右侧接线盒。避开：潜望镜体（横向 120mm）、座椅靠背顶（竖向 310mm）、照明灯（62mm）。",
+  });
+
+  add({
+    id: "tiger.interior.harness_rear",
+    name_cn: "后隔板环形电缆束",
+    name_en: "Kabelstrang Schottwand",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 465,
+    geometry: bundle([
+      [-2.92, 0.805, -0.812],
+      [-2.6, 0.86, -0.86],
+      [-1.8, 0.86, -0.86],
+      [-1.05, 0.86, -0.86],
+      [-0.86, 0.86, -0.66],
+      [-0.86, 0.86, 0],
+      [-0.86, 0.86, 0.66],
+      [-1.05, 0.86, 0.86],
+      [-2.6, 0.86, 0.86],
+      [-2.92, 0.805, 0.812],
+    ]),
+    material: "cable_rubber",
+    mate: { type: "absolute" },
+    source:
+      "后隔板环形束：沿战斗室后壁（隔板面 x -0.78）前 66mm 绕 U 形，从同一只盒子的下过线套进出，把两侧主束在车尾侧连通，中途经过后隔板接线盒（盒面 x -0.83，束子外缘 -0.8475，净空 17mm）。与主束在两只壁盒处「各自 terminating 于盒面留 2mm」，不互相穿插。",
+  });
+
+  add({
+    id: "tiger.interior.harness_radio",
+    name_cn: "电台分支电缆",
+    name_en: "Kabelabzweig Funkgerät",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 466,
+    geometry: bundle(
+      [
+        [-3.7, 0.845, 0.828],
+        [-3.66, 0.72, 0.8],
+        [-3.62, 0.64, 0.76],
+      ],
+      { strands: 2, r: 0.01, pitch: 0.023 },
+    ),
+    material: "cable_rubber",
+    mate: { type: "absolute" },
+    source:
+      "电台分支（2 股 ⌀20）：从右壁主束 x -3.70 处内侧引下（起点 z 0.828，离主束外皮 20mm，不与主束穿插），落到 Fu 5 电台后上方（末端 x -3.62 / y 0.64 / z 0.76）——电台顶面 0.56（竖向净空 80mm）、电台后面 x -3.65（横向 30mm）。",
+  });
+
+  add({
+    id: "tiger.interior.harness_turret",
+    name_cn: "炮塔吊篮下电缆束",
+    name_en: "Turmkabelstrang",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 467,
+    geometry: bundle(
+      Array.from({ length: 16 }, (_, i) => {
+        const deg = 200 + i * 12;
+        // 遇到炮塔回转电机（r 0.56~0.77）向内凹到 r 0.50 让位
+        const dip = deg > 246 && deg < 296 ? 0.5 : 0.755;
+        const a = THREE.MathUtils.degToRad(deg);
+        return [c.IN_RING_X! + dip * Math.cos(a), 1.205, dip * Math.sin(a)] as [number, number, number];
+      }),
+      { r: 0.011, pitch: 0.025 },
+    ),
+    node: "Turret",
+    material: "cable_rubber",
+    mate: { type: "absolute" },
+    source:
+      "炮塔内电缆束（随炮塔转）：3 股 ⌀22，绕座圈中心 r 0.755、y 1.205 从 200° 走到 380°（正前方 180° 是炮闩与摇架，不走）。在 252°~288° 之间向内凹到 r 0.50 绕开炮塔回转电机（机体 x -1.78~-1.52 / z -0.76~-0.56 / y 1.19 起）；其余段卡在吊篮地板（面 y 1.16）之上、护栏带（r 0.79~0.82 / y 1.305~1.335）之下、座垫立柱（r ≤ 0.605）之外。",
+  });
+
+  add({
+    id: "tiger.interior.harness_sight",
+    name_cn: "瞄具与炮闩电缆",
+    name_en: "Kabel Zielgerät/Verschluss",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 468,
+    geometry: bundle(
+      [
+        [c.IN_RING_X! + 0.66 * Math.cos(THREE.MathUtils.degToRad(212)), 1.21, 0.66 * Math.sin(THREE.MathUtils.degToRad(212))],
+        [-2.32, 1.34, -0.44],
+        [-2.32, 1.46, -0.39],
+        [-2.3, 1.53, -0.36],
+      ],
+      { strands: 2, r: 0.01, pitch: 0.023 },
+    ),
+    node: "Turret",
+    material: "cable_rubber",
+    mate: { type: "absolute" },
+    source:
+      "瞄具/炮闩电缆（2 股 ⌀20）：从塔内束 212° 处**内侧**（r 0.66，离束子外皮 75mm，绕开样条弯角的过冲）引出抬到炮长瞄具目镜端（x -2.30 / y 1.53 / z -0.36）。离摇架侧颊（z -0.235）105mm、离闩体侧面 130mm。",
+  });
+
+  add({
+    id: "tiger.interior.vent_duct",
+    name_cn: "炮塔通风波纹软管",
+    name_en: "Belüftungsschlauch",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 469,
+    geometry: {
+      type: "kit",
+      kit: "cableRun",
+      params: {
+        points: [
+          [-0.98, 1.68, -0.1],
+          [-0.95, 1.56, -0.15],
+          [-0.98, 1.46, -0.2],
+          [-1.06, 1.36, -0.26],
+        ].map((p) => [...p]),
+        strands: 1,
+        r: 0.046,
+        corrugate: 0.026,
+      },
+    },
+    node: "Turret",
+    material: "cable_rubber",
+    mate: { type: "absolute" },
+    source:
+      "炮塔通风软管 ⌀92：从排烟风扇（底面 1.75）下方 11mm 起，沿塔体右后壁下到吊篮上方（末端 y 1.36）。整条走线到座圈中心的水平距离 ≤ 0.72，加上 ⌀118 波环仍在护栏带（r 0.79~0.82）以内 70mm。波纹环每 26mm 一道——就是内部照片里那根黑色可弯软管。",
+  });
+
+  add({
+    id: "tiger.interior.brake_pipe",
+    name_cn: "制动液压管",
+    name_en: "Bremsleitung",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 470,
+    geometry: {
+      type: "kit",
+      kit: "cableRun",
+      params: {
+        points: [
+          [-4.32, -0.28, 0],
+          [-4.05, -0.28, 0],
+          [-3.8, -0.28, 0],
+          [-3.55, -0.27, 0.03],
+        ].map((p) => [...p]),
+        strands: 2,
+        r: 0.0075,
+        pitch: 0.019,
+        spread: [0, 0, 1],
+      },
+    },
+    material: "brass_dull",
+    instances: 2,
+    indexed: true,
+    instance_layout: "interior.brakePipe",
+    mate: { type: "absolute" },
+    source:
+      "制动/转向液压钢管 2×2 路（⌀15 双管并排）：贴地板上方 17.5mm（管心 y -0.28、管底 -0.2875）从转向机前盖下方拉到变速箱壳体后方；左右两组走在 z ±0.72——转向机壳体宽到 z ±0.66（横向净空 45mm）、座椅骨架（x -3.49 起）之后 60mm 收尾、离脚垫外缘 12mm。铜色，与黑色电缆一眼分得开。",
+  });
+
+  add({
+    id: "tiger.interior.cable_clamp",
+    name_cn: "线束卡箍",
+    name_en: "Kabelschelle",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 471,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.036, h: 0.1, d: 0.006, at: [0, 0, 0.003], bevel: 0.0015 },
+        { type: "box", w: 0.024, h: 0.006, d: 0.036, at: [0, -0.047, 0.024], bevel: 0.0015 },
+        { type: "box", w: 0.024, h: 0.006, d: 0.036, at: [0, 0.047, 0.024], bevel: 0.0015 },
+        { type: "box", w: 0.024, h: 0.1, d: 0.006, at: [0, 0, 0.057], bevel: 0.0015 },
+        { type: "cylinder", r: 0.004, h: 0.012, at: [0.014, 0.03, 0.009], bevel: 0.001 },
+      ],
+    },
+    material: "steel_worn",
+    instances: 3,
+    indexed: true,
+    instance_layout: INTERIOR_LAYOUTS.cableClamp,
+    mate: { type: "absolute" },
+    source:
+      "线束卡箍（左壁 3 只，280mm 一只，只装在直线段上）：底板 36×100×6 贴侧板内表面（z -0.898，离壁 2mm）+ 上下两颊 + 压带（z 0.054~0.060，离束子外皮 6mm）；束子竖叠 84mm 高，正好卡在两颊之间。螺栓 ⌀8 打在底板上方。",
+  });
+
+  add({
+    id: "tiger.interior.cable_clamp_right",
+    name_cn: "线束卡箍（右）",
+    name_en: "Kabelschelle rechts",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 472,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.036, h: 0.1, d: 0.006, at: [0, 0, 0.003], bevel: 0.0015 },
+        { type: "box", w: 0.024, h: 0.006, d: 0.036, at: [0, -0.047, 0.024], bevel: 0.0015 },
+        { type: "box", w: 0.024, h: 0.006, d: 0.036, at: [0, 0.047, 0.024], bevel: 0.0015 },
+        { type: "box", w: 0.024, h: 0.1, d: 0.006, at: [0, 0, 0.057], bevel: 0.0015 },
+        { type: "cylinder", r: 0.004, h: 0.012, at: [0.014, 0.03, 0.009], bevel: 0.001 },
+      ],
+    },
+    material: "steel_worn",
+    instances: 3,
+    indexed: true,
+    instance_layout: "interior.cableClampR",
+    mate: { type: "absolute" },
+    source:
+      "线束卡箍（右壁 3 只）：与左壁同一几何，绕 Y 转 180° 让底板贴 z +0.898、压带朝车内。",
+  });
+
+  add({
+    id: "tiger.interior.junction_box",
+    name_cn: "电缆接线盒",
+    name_en: "Kabelverteilerdose",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 473,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.12, h: 0.1, d: 0.04, at: [0, 0, 0], bevel: 0.004 },
+        { type: "box", w: 0.128, h: 0.108, d: 0.008, at: [0, 0, -0.024], bevel: 0.002 },
+        { type: "box", w: 0.03, h: 0.012, d: 0.012, at: [0, -0.056, 0.026], bevel: 0.002 },
+        { type: "box", w: 0.026, h: 0.026, d: 0.012, at: [0, 0.04, 0.026], bevel: 0.003 },
+        { type: "box", w: 0.026, h: 0.026, d: 0.012, at: [0, -0.04, 0.026], bevel: 0.003 },
+      ],
+    },
+    material: "bakelite",
+    instances: 3,
+    indexed: true,
+    instance_layout: INTERIOR_LAYOUTS.junctionBox,
+    mate: { type: "absolute" },
+    source:
+      "电缆接线盒 ×3（胶木 120×100×40 + 安装背板 128×108×8 + 底部出线舌 + 盒面上下两只橡胶过线套 26×26×12）：左右壁各一只（y 0.86，主束进上套、环形束进下套）、后隔板左侧一只（x -0.81，背板贴隔板面 -0.782）。三只分别绕 Y 转 0°/180°/-90°，保证背板永远贴着墙。",
+  });
+
+  add({
+    id: "tiger.interior.relay_box",
+    name_cn: "继电器盒",
+    name_en: "Relaiskasten",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 474,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.05, h: 0.11, d: 0.09, at: [0, 0, 0], bevel: 0.004 },
+        { type: "box", w: 0.012, h: 0.02, d: 0.07, at: [-0.026, 0.03, 0], bevel: 0.002 },
+        { type: "box", w: 0.056, h: 0.008, d: 0.096, at: [0, 0.059, 0], bevel: 0.002 },
+      ],
+    },
+    material: "bakelite",
+    instances: 3,
+    indexed: true,
+    instance_layout: INTERIOR_LAYOUTS.relayBox,
+    mate: { type: "absolute" },
+    source:
+      "继电器盒 3 只并排（50×110×90 胶木盒 + 侧面标牌条 + 压盖）：装在前装甲板内侧、仪表板（顶 0.38）上方的空档，中心 x -4.36（离板面 35mm）、z -0.78/-0.66/-0.54；顶面 0.615 离主束（y 0.72 下缘 0.6725）57mm。",
+  });
+
+  add({
+    id: "tiger.interior.circuit_breaker",
+    name_cn: "断路器",
+    name_en: "Sicherungsschalter",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 475,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.03, h: 0.06, d: 0.026, at: [0, 0, 0], bevel: 0.003 },
+        { type: "box", w: 0.012, h: 0.02, d: 0.01, at: [-0.018, 0.012, 0], bevel: 0.0015 },
+      ],
+    },
+    material: "bakelite",
+    instances: 6,
+    indexed: true,
+    instance_layout: INTERIOR_LAYOUTS.breaker,
+    mate: { type: "absolute" },
+    source:
+      "断路器 6 只一排（30×60×26 黑胶木 + 侧面拨钮）：装在保险丝盒（顶 0.332）上方 58mm、前装甲板内侧，z 0.33 起每 42mm 一只——与保险丝盒、继电器盒一起构成「一排电门」的观感。",
+  });
+
+  add({
+    id: "tiger.interior.pedal_crossshaft",
+    name_cn: "踏板横轴",
+    name_en: "Pedalwellenlager",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 476,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.011, h: 0.62, at: [0, 0, 0], segments: 16, bevel: 0.002 },
+        { type: "box", w: 0.024, h: 0.03, d: 0.024, at: [0, -0.3, 0], bevel: 0.002 },
+        { type: "box", w: 0.024, h: 0.03, d: 0.024, at: [0, 0.3, 0], bevel: 0.002 },
+      ],
+    },
+    material: "steel_worn",
+    mate: { type: "absolute", position: [-4.28, 0.42, -0.42], rotation: [90, 0, 0] },
+    source:
+      "踏板悬挂横轴 ⌀22×620（两端轴承座 24×30×24）：三只踏板的吊臂都套在这根轴上（轴心 y 0.42、x -4.28），从离合（z -0.66）到油门（z -0.18）贯通；后端离前装甲板内表面 78mm。",
+  });
+
+  // ===================== L3 第三批 B：炮塔战斗室（瞄具 / 手轮 / 待发弹 / 塔口） =====================
+  add({
+    id: "tiger.interior.gunner_sight",
+    name_cn: "炮长瞄准镜 TZF 9b",
+    name_en: "Turmzielgerät TZF 9b",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 442,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.24, h: 0.075, d: 0.07, at: [0, 0, 0], bevel: 0.005 },
+        { type: "box", w: 0.06, h: 0.05, d: 0.055, at: [0.145, -0.008, 0], bevel: 0.003 },
+        { type: "box", w: 0.03, h: 0.09, d: 0.075, at: [-0.135, -0.01, 0], bevel: 0.003 },
+      ],
+    },
+    material: "steel_worn",
+    node: "Turret",
+    mate: { type: "absolute", position: [-2.5, 1.6, -0.325] },
+    source:
+      "炮长瞄准镜（TZF 9b）镜体 240×75×70 + 物镜端座 + 后支座：装在摇架左侧（镜体 z -0.36~-0.29，离摇架侧颊 -0.264 留 26mm），前端顶到炮塔左壁的瞄具开口（TR_SIGHT x -2.78 / y 1.58 / z -0.24）后方 80mm；顶面 1.6375 离复进机（底 1.592）横向错开 90mm，不与其重叠。",
+  });
+
+  add({
+    id: "tiger.interior.gunner_sight_tube",
+    name_cn: "瞄具目镜筒",
+    name_en: "Zielrohr (OK 15)",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 443,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.026, h: 0.1, at: [0, 0, 0], segments: 20, bevel: 0.003 },
+        { type: "cylinder", r: 0.031, h: 0.016, at: [0, -0.05, 0], segments: 20, bevel: 0.002 },
+        { type: "cylinder", r: 0.022, h: 0.02, at: [0, 0.058, 0], segments: 16, bevel: 0.002 },
+      ],
+    },
+    material: "steel_worn",
+    node: "Turret",
+    mate: { type: "absolute", position: [-2.25, 1.6, -0.33], rotation: [0, 0, 90] },
+    source:
+      "瞄具目镜筒 ⌀52×100（绕 Z 转 90° → 轴向沿 X）：接在镜体后端，出射端 x -2.2 正对炮长席（座面 x -1.95）方向，炮长低头即可贴目。离闩体后面（x -2.178）22mm。",
+  });
+
+  add({
+    id: "tiger.interior.gunner_sight_drum",
+    name_cn: "瞄具距离分划鼓",
+    name_en: "Entfernungstrommel",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 444,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.045, h: 0.03, at: [0, 0, 0], segments: 24, bevel: 0.003 },
+        { type: "cylinder", r: 0.048, h: 0.006, at: [0, 0.018, 0], segments: 24, bevel: 0.0015 },
+        { type: "box", w: 0.012, h: 0.014, d: 0.012, at: [0.044, 0, 0], bevel: 0.0015 },
+      ],
+    },
+    material: "aluminium",
+    node: "Turret",
+    mate: { type: "absolute", position: [-2.52, 1.535, -0.33] },
+    source:
+      "距离分划鼓 ⌀90×30（银白色，带 0~4000m 刻度环与拨钮）：挂在镜体下方 1.5mm，鼓面 y 1.528~1.562；离摇架侧颊 21mm、离吊篮护栏带 250mm，炮长左手正好够到。",
+  });
+
+  add({
+    id: "tiger.interior.traverse_handwheel",
+    name_cn: "炮塔手轮",
+    name_en: "Turmdrehkurbel",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 445,
+    geometry: { type: "kit", kit: "spokedWheel", params: { rimR: 0.09, barR: 0.008, spokes: 6, hubR: 0.02, pin: 0.034 } },
+    material: "steel_worn",
+    node: "Turret",
+    mate: { type: "absolute", position: [-2.36, 1.4, 0.33], rotation: [0, -90, 0] },
+    source:
+      "炮塔手动摇轮 ⌀180（6 辐条 + 木质握销）：绕 Y 转 -90° 让轮面竖直、轴沿 Z，装在炮手右侧（z 0.32~0.34），离摇架侧颊（z 0.264）56mm、离炮塔内壁（r 0.86）120mm；与回转电机（另一侧 z -0.66）分列炮身两侧。",
+  });
+
+  add({
+    id: "tiger.interior.ready_rack",
+    name_cn: "待发弹架",
+    name_en: "Schnellfeuerraum",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 446,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.3, h: 0.012, d: 0.3, at: [0, 0.006, 0], bevel: 0.003 },
+        { type: "box", w: 0.02, h: 0.44, d: 0.02, at: [-0.14, 0.23, -0.14], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.44, d: 0.02, at: [0.14, 0.23, -0.14], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.44, d: 0.02, at: [-0.14, 0.23, 0.14], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.44, d: 0.02, at: [0.14, 0.23, 0.14], bevel: 0.002 },
+        { type: "box", w: 0.3, h: 0.012, d: 0.02, at: [0, 0.42, -0.14], bevel: 0.002 },
+        { type: "box", w: 0.3, h: 0.012, d: 0.02, at: [0, 0.42, 0.14], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.012, d: 0.3, at: [-0.14, 0.42, 0], bevel: 0.002 },
+        { type: "box", w: 0.02, h: 0.012, d: 0.3, at: [0.14, 0.42, 0], bevel: 0.002 },
+      ],
+    },
+    material: "interior_paint",
+    mate: { type: "absolute", position: [-1.19, 1.162, 0.29] },
+    node: "Turret",
+    source:
+      "待发弹架（弹笼 300×440×300：底板 + 4 根立柱 + 上沿四道压条）：站在吊篮地板上（底板面 1.162，离地板 2mm），位于装填手一侧（x -1.19 / z +0.29，离座圈中心 r 0.56）——离塔内电缆束（r 0.744）134mm、离护栏带（r 0.79）180mm、离车长席靠背（x -1.19）60mm。",
+  });
+
+  add({
+    id: "tiger.interior.ready_round_case",
+    name_cn: "待发药筒",
+    name_en: "Patronenhülse (schußfertig)",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 447,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.051, h: 0.4, at: [0, 0, 0], segments: 20, bevel: 0.003 },
+        { type: "cylinder", r: 0.055, h: 0.022, at: [0, -0.19, 0], segments: 20, bevel: 0.002 },
+        { type: "tube", rOuter: 0.052, rInner: 0.044, h: 0.05, at: [0, 0.215, 0], segments: 20 },
+      ],
+    },
+    material: "case_brass",
+    instances: 4,
+    indexed: true,
+    instance_nodes: Array.from({ length: 4 }, () => "Turret"),
+    instance_layout: "interior.readyCase",
+    mate: { type: "absolute" },
+    source:
+      "待发药筒 ⌀102×400（黄铜，底缘 ⌀110、弹口收口环 ⌀104/⌀88）立放在待发弹架的 4 个格里（x -1.25/-1.13、z 0.22/0.36，筒身 y 1.20~1.60）；弹丸按实车由装填手从两侧弹架取来现装，故这里只放药筒。离弹架立柱最近 27mm。",
+  });
+
+  add({
+    id: "tiger.interior.cupola_periscope",
+    name_cn: "车长塔周向潜望镜",
+    name_en: "Rundumblick (Kuppel)",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 449,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.036, h: 0.05, d: 0.03, at: [0, 0, 0], bevel: 0.003 },
+        { type: "cylinder", r: 0.011, h: 0.022, at: [0, -0.032, 0], segments: 12, bevel: 0.0015 },
+        { type: "box", w: 0.02, h: 0.008, d: 0.034, at: [0, 0.028, 0], bevel: 0.0015 },
+      ],
+    },
+    material: "interior_paint",
+    instances: 7,
+    indexed: true,
+    instance_nodes: Array.from({ length: 7 }, () => "Turret"),
+    instance_layout: INTERIOR_LAYOUTS.cupolaPeriscope,
+    mate: { type: "absolute" },
+    source:
+      "车长塔周向潜望镜 7 具（镜箱 36×50×30 + 目镜 ⌀22 + 压条）：绕塔口 r 0.19 均布（-55°~245°，车尾侧留顶盖铰链缺口），目镜朝下对着车长眼睛高度（y 1.89）；筒壁内表面 r 0.225、观察缝盒 r 0.234，各留 21~34mm。",
+  });
+
+  add({
+    id: "tiger.interior.cupola_grip",
+    name_cn: "车长塔顶盖内把手",
+    name_en: "Kuppeldeckel-Griff (innen)",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 450,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.009, h: 0.05, at: [0, 0.025, 0], segments: 12, bevel: 0.0015 },
+        { type: "cylinder", r: 0.013, h: 0.07, at: [0, 0, 0], segments: 14, bevel: 0.002 },
+      ],
+    },
+    material: "steel_worn",
+    node: "Turret",
+    mate: { type: "absolute", position: [-1.42, 1.945, -0.42], rotation: [0, 0, 90] },
+    source:
+      "顶盖内开启把手（握杆 ⌀26×70 + 螺杆 ⌀18×50，绕 Z 转 90° 让杆轴沿 X）：挂在车长塔顶盖（内表面 1.969）下方，塔口前缘一侧（x -1.42），车长从塔口探出前先在车内顶盖；离周向潜望镜最近 86mm。",
+  });
+
+  add({
+    id: "tiger.interior.turret_bin",
+    name_cn: "吊篮储物箱",
+    name_en: "Turmgerätkasten",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 451,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.24, h: 0.13, d: 0.18, at: [0, 0.065, 0], bevel: 0.006 },
+        { type: "box", w: 0.248, h: 0.014, d: 0.188, at: [0, 0.137, 0], bevel: 0.003 },
+        { type: "box", w: 0.03, h: 0.02, d: 0.012, at: [0.135, 0.1, 0], bevel: 0.002 },
+      ],
+    },
+    material: "interior_paint",
+    mate: { type: "absolute", position: [-1.717, 1.162, 0.637] },
+    node: "Turret",
+    source:
+      "吊篮储物箱（240×130×180 + 翻盖 + 搭扣）：站在吊篮地板（面 1.16）上、装填手侧后方（r 0.64 / 96°），顶面 1.301 刚好压在护栏带（1.305）之下 4mm。",
+  });
+
+  add({
+    id: "tiger.interior.gearbox_bin",
+    name_cn: "变速箱盖储物箱",
+    name_en: "Getriebegerätkasten",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 477,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.24, h: 0.13, d: 0.18, at: [0, 0.065, 0], bevel: 0.006 },
+        { type: "box", w: 0.248, h: 0.014, d: 0.188, at: [0, 0.137, 0], bevel: 0.003 },
+        { type: "box", w: 0.03, h: 0.02, d: 0.012, at: [0.135, 0.1, 0], bevel: 0.002 },
+      ],
+    },
+    material: "interior_paint",
+    mate: { type: "absolute", position: [-3.15, 0.414, 0] },
+    source:
+      "变速箱检查盖（面 y 0.412）上的工具箱（同款 240×130×180）：驾驶室内传动件顶面就是唯一的置物台，左右离两侧壁 ≥ 500mm、后方离转向单元 30mm；随车工具与油料单据放这里。单独一个零件是因为它属车体、不随炮塔回转。",
+  });
+
+  add({
+    id: "tiger.interior.spare_drum",
+    name_cn: "备用弹鼓",
+    name_en: "Reserve-Trommelmagazin",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 452,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.11, h: 0.13, at: [0, 0, 0], segments: 24, bevel: 0.004 },
+        { type: "cylinder", r: 0.045, h: 0.016, at: [0, 0.07, 0], segments: 16, bevel: 0.002 },
+        { type: "box", w: 0.03, h: 0.018, d: 0.024, at: [0.108, 0.03, 0], bevel: 0.002 },
+      ],
+    },
+    material: "steel_worn",
+    mate: { type: "absolute", position: [-1.431, 1.23, 0.601] },
+    node: "Turret",
+    source:
+      "MG 34 弹鼓（⌀220×130 直弹鼓 + 上盖轴头 + 侧卡舌）1 只：吊篮地板上唯一的空位在读弹手席与待发弹架之间（r 0.64 / 70°），鼓底坐地板（1.165）、鼓顶 1.308 离护栏带（1.305）按半径让开 27mm，离弹架 39mm、离储物箱 42mm、离回转电机 590mm。",
+  });
+
+  add({
+    id: "tiger.interior.first_aid_kit",
+    name_cn: "急救箱",
+    name_en: "Verbandskasten",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 453,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.05, h: 0.16, d: 0.2, at: [0, 0, 0], bevel: 0.005 },
+        { type: "box", w: 0.008, h: 0.03, d: 0.06, at: [-0.028, 0.05, 0], bevel: 0.002 },
+      ],
+    },
+    material: "safety_red",
+    mate: { type: "absolute", position: [-0.805, 0.6, 0.5] },
+    source:
+      "急救箱（红 50×160×200 + 白色十字提手）：挂在战斗室后隔板（面 x -0.779）前 30mm、z +0.34、y 0.52~0.68——正好在后隔板环形束（y 0.86）下方 180mm，谁都能伸手拿到。",
+  });
+
+  // ===================== L3 第三批 C：标识 / 工具 / 生活痕迹 =====================
+  add({
+    id: "tiger.interior.grab_handle",
+    name_cn: "扶手",
+    name_en: "Haltegriff",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 454,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.011, h: 0.16, at: [-0.032, 0, 0], segments: 14, bevel: 0.002 },
+        { type: "box", w: 0.032, h: 0.02, d: 0.02, at: [-0.016, -0.086, 0], bevel: 0.002 },
+        { type: "box", w: 0.032, h: 0.02, d: 0.02, at: [-0.016, 0.086, 0], bevel: 0.002 },
+      ],
+    },
+    material: "steel_worn",
+    instances: 4,
+    indexed: true,
+    instance_layout: INTERIOR_LAYOUTS.grabHandle,
+    mate: { type: "absolute" },
+    source:
+      "扶手 ⌀22×160（杆离壁 32mm，两端支座 32×20×20 补到板面）4 只：后隔板两只（y 0.80、z ±0.38，杆沿 Z，正好在面包袋/个人物品上方 75mm、侧壁线束带（y 0.767~0.901）之外）；两侧壁各一只（x -2.62、y 0.62、z ±0.896，杆沿 Y，走线线束带下方 120mm、离顶甲板内表面（1.05）210mm）。朝向全部走 layout 旋转。",
+  });
+
+  add({
+    id: "tiger.interior.data_plate",
+    name_cn: "铭牌",
+    name_en: "Typenschild",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 455,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.002, h: 0.04, d: 0.06, at: [0, 0, 0], bevel: 0.0005 },
+        { type: "cylinder", r: 0.003, h: 0.004, at: [0, 0.014, -0.024], segments: 8, bevel: 0.0005 },
+        { type: "cylinder", r: 0.003, h: 0.004, at: [0, 0.014, 0.024], segments: 8, bevel: 0.0005 },
+        { type: "cylinder", r: 0.003, h: 0.004, at: [0, -0.014, -0.024], segments: 8, bevel: 0.0005 },
+        { type: "cylinder", r: 0.003, h: 0.004, at: [0, -0.014, 0.024], segments: 8, bevel: 0.0005 },
+      ],
+    },
+    material: "aluminium",
+    instances: 6,
+    indexed: true,
+    instance_layout: INTERIOR_LAYOUTS.dataPlate,
+    mate: { type: "absolute" },
+    source:
+      "铭牌 60×40×2 铝板 + 4 颗铆钉（朝向全部走 layout 旋转）：后隔板 2 块（法线沿 X）、前装甲板 1 块、两侧壁各 1 块（绕 Y 转 90°贴壁）、变速箱检查盖 1 块平铺（绕 Z 转 90°，法线朝上，坐盖面 y 0.412 上 2mm、x -3.05 / z 0.24，离箱体 250mm）。实车的工时/弹药/油料数据牌就钉在这些位置。",
+  });
+
+  add({
+    id: "tiger.interior.warning_label",
+    name_cn: "警示标签",
+    name_en: "Warntafel",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 456,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.0015, h: 0.022, d: 0.05, at: [0, 0, 0], bevel: 0.0004 },
+        { type: "box", w: 0.0015, h: 0.006, d: 0.05, at: [-0.0016, 0.008, 0], bevel: 0.0004 },
+      ],
+    },
+    material: "safety_red",
+    instances: 4,
+    indexed: true,
+    instance_layout: INTERIOR_LAYOUTS.warningLabel,
+    mate: { type: "absolute" },
+    source:
+      "警示标签 50×22（红底 + 上沿白条）4 张：前装甲板（灭火器/弹药提示）、后隔板（发动机启动前鸣笛）、变速箱盖（预选杆档位）、左壁（燃油）。",
+  });
+
+  add({
+    id: "tiger.interior.floor_mat",
+    name_cn: "驾驶席脚垫",
+    name_en: "Gummimatte",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 457,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.44, h: 0.012, d: 0.36, at: [0, 0, 0], bevel: 0.004 },
+        { type: "box", w: 0.4, h: 0.004, d: 0.32, at: [0, 0.008, 0], bevel: 0.002 },
+      ],
+    },
+    material: "canvas_black",
+    instances: 2,
+    indexed: true,
+    instance_layout: INTERIOR_LAYOUTS.floorMat,
+    mate: { type: "absolute" },
+    source:
+      "橡胶脚垫 2 块（440×12×360 + 上沿防滑台）：铺在驾驶/机电员席前（x -4.12~-3.68，z ±0.67），面顶 y -0.283；离踏板后缘 30mm、离座椅骨架前缘 60mm、离液压管（y -0.2875）竖向 12.5mm。",
+  });
+
+  add({
+    id: "tiger.interior.canteen",
+    name_cn: "水壶",
+    name_en: "Feldflasche",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 458,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "cylinder", r: 0.045, h: 0.19, at: [0, 0, 0], segments: 20, bevel: 0.004 },
+        { type: "cylinder", r: 0.014, h: 0.03, at: [0, 0.105, 0], segments: 12, bevel: 0.002 },
+      ],
+    },
+    material: "canvas_black",
+    instances: 2,
+    indexed: true,
+    instance_layout: INTERIOR_LAYOUTS.personalKit,
+    mate: { type: "absolute" },
+    source:
+      "帆布套水壶 ⌀90×190 + 铝盖：后隔板挂钩下沿吊挂 2 只（z ±0.68，壶身 y 0.525~0.715），离急救箱（z 0.34）240mm。",
+  });
+
+  add({
+    id: "tiger.interior.mess_tin",
+    name_cn: "饭盒",
+    name_en: "Essgeschirr",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 459,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.035, h: 0.09, d: 0.12, at: [0, 0, 0], bevel: 0.006 },
+        { type: "box", w: 0.041, h: 0.012, d: 0.126, at: [0, 0.05, 0], bevel: 0.003 },
+      ],
+    },
+    material: "aluminium",
+    instances: 2,
+    indexed: true,
+    instance_layout: "interior.messTin",
+    mate: { type: "absolute" },
+    source:
+      "铝制饭盒 35×90×120 + 盖：挂在后隔板下沿挂钩上（z ±0.62，y 0.415~0.505），在水壶内侧 60mm，不与水壶、急救箱重叠。",
+  });
+
+  add({
+    id: "tiger.interior.hook",
+    name_cn: "挂钩",
+    name_en: "Haken",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 460,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.012, h: 0.02, d: 0.02, at: [0, 0, 0], bevel: 0.0015 },
+        { type: "box", w: 0.03, h: 0.011, d: 0.011, at: [-0.02, -0.006, 0], bevel: 0.0015 },
+        { type: "box", w: 0.011, h: 0.02, d: 0.011, at: [-0.03, 0.006, 0], bevel: 0.0015 },
+      ],
+    },
+    material: "steel_worn",
+    instances: 3,
+    indexed: true,
+    instance_layout: "interior.hookRow",
+    mate: { type: "absolute" },
+    source:
+      "后隔板挂钩 3 只（底座 8×20×20 + ⌀10 钩杆前伸 30mm）：y 0.76，z -0.68 / 0.68（挂水壶）与 -0.3（挂面包袋）；钩杆前端 x -0.79，离后隔板环形束（y 0.86）竖向 100mm。",
+  });
+
+  add({
+    id: "tiger.interior.bread_bag",
+    name_cn: "面包袋",
+    name_en: "Brotbeutel",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 461,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.05, h: 0.17, d: 0.15, at: [0, -0.02, 0], bevel: 0.014 },
+        { type: "box", w: 0.056, h: 0.03, d: 0.156, at: [0, 0.075, 0], bevel: 0.006 },
+      ],
+    },
+    material: "canvas_black",
+    instances: 2,
+    indexed: true,
+    instance_layout: "interior.breadBag",
+    mate: { type: "absolute" },
+    source:
+      "帆布面包袋（⌀50×170 收口包 + 翻盖）2 只：一只挂后隔板中钩（z -0.3），一只挂在左壁灭火器旁的钉子上（x -2.74 / z -0.62）——车内「有人住」的痕迹。",
+  });
+
+  add({
+    id: "tiger.interior.tool_rack",
+    name_cn: "工具架",
+    name_en: "Werkzeugbrett",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 462,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.012, h: 0.06, d: 0.62, at: [0, 0, 0], bevel: 0.003 },
+        { type: "box", w: 0.016, h: 0.012, d: 0.62, at: [-0.01, -0.03, 0], bevel: 0.002 },
+      ],
+    },
+    material: "wood",
+    mate: { type: "absolute", position: [-0.792, 0.33, 0.06] },
+    source:
+      "工具挂板（12×60×620 木托条 + 下沿挡条）：钉在战斗室后隔板（面 x -0.779）前，z -0.25~0.37；扳手/螺丝刀插在其上的 5 个卡槽里。",
+  });
+
+  add({
+    id: "tiger.interior.hand_tool",
+    name_cn: "随机工具",
+    name_en: "Bordsatz",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 463,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.016, h: 0.02, d: 0.2, at: [0, 0, 0], bevel: 0.003 },
+        { type: "cylinder", r: 0.014, h: 0.024, at: [0, 0.012, -0.108], segments: 12, bevel: 0.002 },
+        { type: "box", w: 0.022, h: 0.022, d: 0.03, at: [0, 0.012, 0.112], bevel: 0.003 },
+      ],
+    },
+    material: "steel",
+    instances: 5,
+    indexed: true,
+    instance_layout: "interior.toolRowRot",
+    mate: { type: "absolute" },
+    source:
+      "随机工具 5 件（扳手/梅花扳手/螺丝刀等，长 240，朝向走 layout：绕 X 转 90° 让长度沿 Z 横插）：插在工具架的 5 个卡槽里（y 0.3，z -0.24~-0.04 与 0.16~0.26），杆面离挡条前缘 6mm、离后隔板 26mm。",
+  });
+
   return parts;
 }
 
@@ -1161,6 +2156,27 @@ export function makeInteriorRegistry(): ModelRegistry {
         envMapIntensity: 0.8,
         emissive: "#ffcf87",
         emissiveIntensity: 0.35,
+      },
+      cable_rubber: {
+        base: "#1c1e21",
+        metalness: 0.06,
+        roughness: 0.78,
+        preset: "rubber",
+        envMapIntensity: 0.5,
+      },
+      bakelite: {
+        base: "#2f2621",
+        metalness: 0.12,
+        roughness: 0.52,
+        preset: "none",
+        envMapIntensity: 0.7,
+      },
+      safety_red: {
+        base: "#9e2f24",
+        metalness: 0.15,
+        roughness: 0.55,
+        preset: "primer",
+        envMapIntensity: 0.8,
       },
     },
     parts: buildInteriorParts(),

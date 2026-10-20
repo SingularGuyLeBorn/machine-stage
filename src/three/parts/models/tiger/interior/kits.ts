@@ -173,8 +173,182 @@ const basketRail: GeometryBuilder = (spec) => {
   return merged;
 };
 
+// ---------------------------------------------------------------------------
+// 线束 / 软管（cableRun）：沿折线走线的多股圆管
+//
+// 点是**模型空间**坐标（装配位固定在原点），这样一根束子怎么绕壁、在哪里下弯
+// 一眼能看懂，不用再去推零件局部系。strands > 1 时按主法向平行铺开 = 一捆电缆。
+// corrugate > 0 时沿程套一圈圈波纹管环（通风软管那种），环面法线跟着切线转。
+// ---------------------------------------------------------------------------
+const cableRun: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const raw = params?.points;
+  if (!Array.isArray(raw) || raw.length < 2) {
+    throw new Error("interior kit：cableRun 需要 points=[[x,y,z], …]（至少 2 点）");
+  }
+  const pts = (raw as number[][]).map((p) => new THREE.Vector3(p[0]!, p[1]!, p[2]!));
+  const r = num(params, "r", 0.013);
+  const strands = Math.max(1, Math.round(num(params, "strands", 1)));
+  const pitch = num(params, "pitch", r * 2.2);
+  const corrugate = num(params, "corrugate", 0);
+  // 分股方向：贴壁走线的束子应当**竖着叠**（spread = Y），不是朝墙外鼓出来。
+  const spreadRaw = params?.spread;
+  const spread = new THREE.Vector3(
+    ...(Array.isArray(spreadRaw) ? (spreadRaw as number[]) : [0, 1, 0]),
+  ).normalize();
+  const parts: THREE.BufferGeometry[] = [];
+
+  const tangentAt = (list: THREE.Vector3[], i: number): THREE.Vector3 => {
+    const a = list[Math.max(i - 1, 0)]!;
+    const b = list[Math.min(i + 1, list.length - 1)]!;
+    return b.clone().sub(a).normalize();
+  };
+
+  for (let s = 0; s < strands; s++) {
+    const off = (s - (strands - 1) / 2) * pitch;
+    const path = pts.map((p, i) => {
+      if (strands === 1 || off === 0) return p.clone();
+      // 把 spread 正交化到切线的法平面内，弯角处不会把股挤到一起
+      const tan = tangentAt(pts, i);
+      const dir = spread.clone().addScaledVector(tan, -spread.dot(tan));
+      if (dir.lengthSq() < 1e-6) return p.clone();
+      return p.clone().addScaledVector(dir.normalize(), off);
+    });
+    const curve = new THREE.CatmullRomCurve3(path, false, "catmullrom", 0.25);
+    const length = curve.getLength();
+    const segments = Math.max(12, Math.min(240, Math.round(length / (r * 0.9))));
+    parts.push(new THREE.TubeGeometry(curve, segments, r, strands > 1 ? 6 : 8, false));
+
+    if (corrugate > 0) {
+      const ribs = Math.max(2, Math.round(length / corrugate));
+      const ring = new THREE.Quaternion();
+      for (let i = 0; i <= ribs; i++) {
+        const t = i / ribs;
+        const at = curve.getPointAt(t);
+        const tan = curve.getTangentAt(t);
+        const torus = new THREE.TorusGeometry(r * 1.28, r * 0.3, 5, 10);
+        ring.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tan);
+        torus.applyQuaternion(ring);
+        torus.translate(at.x, at.y, at.z);
+        parts.push(torus);
+      }
+    }
+  }
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
+// 防滑踏板（perforatedPedal）：踏板面 + 圆孔阵列 + 吊臂 + 横轴套
+// 孔是「真的没几何」而不是贴花——俯视/侧视都能读出防滑孔，且只减材料不会新增穿模。
+// 局部原点 = 踏板面前缘中心，面沿 -X 向后延伸。
+// ---------------------------------------------------------------------------
+const perforatedPedal: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const d = num(params, "d", 0.1); // 沿 X（踏板长，前后）
+  const w = num(params, "w", 0.06); // 沿 Z（踏板宽，左右）
+  const t = num(params, "t", 0.02);
+  const holes = Math.max(0, Math.round(num(params, "holes", 6)));
+  const holeR = num(params, "holeR", 0.008);
+  const armH = num(params, "armH", 0.18);
+
+  const parts: THREE.BufferGeometry[] = [];
+  // 面：Shape 在 XY 平面（x = 长、y = 宽），沿 +Z 挤出厚度后 rotateX(-90°) 放平
+  const shape = new THREE.Shape();
+  const hd = d / 2 - 0.002;
+  shape.moveTo(-hd, 0);
+  shape.lineTo(hd, 0);
+  shape.lineTo(hd, w - 0.004);
+  shape.lineTo(-hd, w - 0.004);
+  shape.closePath();
+  const cols = Math.max(1, Math.round(holes / 2));
+  for (let i = 0; i < cols; i++) {
+    for (let j = 0; j < 2; j++) {
+      if (i * 2 + j >= holes) break;
+      const hole = new THREE.Path();
+      hole.absarc(
+        -hd / 2 + j * hd,
+        ((w - 0.004) * (i + 0.6)) / (cols + 0.2),
+        Math.min(holeR, hd / 2, (w - 0.004) / 3),
+        0,
+        Math.PI * 2,
+        true,
+      );
+      shape.holes.push(hole);
+    }
+  }
+  const face = new THREE.ExtrudeGeometry(shape, {
+    depth: t - 0.003,
+    bevelEnabled: true,
+    bevelThickness: 0.0015,
+    bevelSize: 0.0015,
+    bevelSegments: 1,
+    steps: 1,
+    curveSegments: 10,
+  });
+  // (x, y, z) → (x, z, -y)：挤出轴变竖直向上，宽度轴落到 -Z
+  face.rotateX(-Math.PI / 2);
+  face.translate(0, 0, (w - 0.004) / 2);
+  parts.push(face);
+
+  // 吊臂（挂在踏板面后缘）+ 横轴套
+  const arm = bevelBoxGeometry(0.028, armH, 0.028, 0.003);
+  arm.translate(hd - 0.005, armH / 2, 0);
+  parts.push(arm);
+  const boss = cylinderGeometry(0.019, 0.05, 0.019, 16, 0.002);
+  boss.rotateZ(Math.PI / 2);
+  boss.translate(hd + 0.02, armH, 0);
+  parts.push(boss);
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
+// 手轮（spokedWheel）：轮缘 + N 根辐条 + 轮毂 + 手柄销，轴向 +X（轮面在 YZ 平面）
+// 炮塔手轮 / 风门手轮都用它，只是半径与辐条数不同。
+// ---------------------------------------------------------------------------
+const spokedWheel: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const rimR = num(params, "rimR", 0.09);
+  const barR = num(params, "barR", 0.008);
+  const spokes = Math.max(3, Math.round(num(params, "spokes", 6)));
+  const hubR = num(params, "hubR", 0.02);
+  const pin = num(params, "pin", 0.03);
+
+  const parts: THREE.BufferGeometry[] = [];
+  const rim = new THREE.TorusGeometry(rimR - barR, barR, 6, 28);
+  rim.rotateY(Math.PI / 2); // 环面法线 Z → X
+  parts.push(rim);
+  for (let i = 0; i < spokes; i++) {
+    const a = (i / spokes) * Math.PI * 2;
+    const spoke = cylinderGeometry(barR * 0.8, rimR - barR, barR * 0.8, 8, 0.001);
+    spoke.rotateX(Math.PI / 2); // 轴 Y → 轴 Z（轮面内）
+    spoke.rotateY(Math.PI / 2);
+    spoke.translate(0, Math.cos(a) * (rimR - barR) / 2, Math.sin(a) * (rimR - barR) / 2);
+    parts.push(spoke);
+  }
+  const hub = cylinderGeometry(hubR, hubR * 1.8, hubR, 14, 0.002);
+  hub.rotateZ(Math.PI / 2);
+  parts.push(hub);
+  const grip = cylinderGeometry(barR * 0.9, pin, barR * 0.9, 8, 0.001);
+  grip.rotateZ(Math.PI / 2);
+  grip.translate(-pin / 2 - barR, 0, rimR - barR * 2);
+  parts.push(grip);
+
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
 export const tigerInteriorKitBuilders: Record<string, GeometryBuilder> = {
   steeringWheel,
   bowMg,
   basketRail,
+  cableRun,
+  perforatedPedal,
+  spokedWheel,
 };
