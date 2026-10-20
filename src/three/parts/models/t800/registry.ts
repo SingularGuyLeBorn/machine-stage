@@ -31,7 +31,7 @@ import {
 /** 铬钢骨架材质库。 */
 const materials: ModelRegistry["materials"] = {
   chrome: { base: "#c9ced4", metalness: 0.95, roughness: 0.18, preset: "steel", envMapIntensity: 1.35 },
-  bone: { base: "#aab3bd", metalness: 0.93, roughness: 0.24, preset: "steel", envMapIntensity: 1.25 },
+  bone: { base: "#c2c8ce", metalness: 0.95, roughness: 0.2, preset: "steel", envMapIntensity: 1.35 },
   dark_chrome: { base: "#7c838c", metalness: 0.92, roughness: 0.3, preset: "steel" },
   gunmetal: { base: "#3f454d", metalness: 0.86, roughness: 0.42, preset: "steel_rough" },
   frame: { base: "#23272d", metalness: 0.72, roughness: 0.55, preset: "steel_rough" },
