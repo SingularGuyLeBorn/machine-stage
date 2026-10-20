@@ -15,6 +15,7 @@ import {
 } from "@/three/parts";
 import { findModel, type ViewKey } from "../catalog";
 import { setDamageSeed } from "@/three/parts/models/tiger/damage/plan";
+import { resetTigerLidPose } from "@/three/parts/models/tiger/lids";
 
 // ============================================================================
 // stageStore —— 展示台单一状态源
@@ -167,6 +168,8 @@ interface StageState {
   damage: DamageState;
   /** 随机破口种子：每次「随机破口」+1，重建时由 damage kit 读取。 */
   damageSeed: number;
+  /** 舱盖/加油口盖的用户开合覆盖（键 = partId#instance；缺省用 lids 注册表默认值）。 */
+  lidOverrides: Record<string, boolean>;
   /** 重掷破口时重建不重置相机（避免用户刚对准又被拉回默认视角）。 */
   preserveViewOnRebuild: boolean;
   focus: FocusRequest | null;
@@ -203,6 +206,8 @@ interface StageState {
   setDamage(state: DamageState): void;
   /** 换一组随机破口并切到破碎，触发重建。 */
   rerollDamage(): void;
+  setLidOpen(key: string, open: boolean): void;
+  setLidsOpen(keys: readonly string[], open: boolean): void;
   requestFocus(partId: string): void;
   focusPoint(center: [number, number, number], radius?: number, resetAngle?: boolean): void;
   setHome(center: [number, number, number], radius: number): void;
@@ -282,6 +287,7 @@ export const useStageStore = create<StageState>((set, get) => ({
   machineState: "idle",
   damage: "intact",
   damageSeed: 0,
+  lidOverrides: {},
   preserveViewOnRebuild: false,
   focus: null,
   home: null,
@@ -292,6 +298,7 @@ export const useStageStore = create<StageState>((set, get) => ({
     const model = findModel(modelId);
     if (model.status !== "ready" || model.id === get().modelId) return;
     setDamageSeed(0);
+    resetTigerLidPose();
     set({
       modelId,
       overrides: {},
@@ -313,6 +320,7 @@ export const useStageStore = create<StageState>((set, get) => ({
       machineState: model.states?.[0]?.id ?? "idle",
       damage: "intact",
       damageSeed: 0,
+      lidOverrides: {},
       preserveViewOnRebuild: false,
       views: { ...VIEWS_DEFAULT },
       focus: null,
@@ -454,6 +462,18 @@ export const useStageStore = create<StageState>((set, get) => ({
       rebuildToken: get().rebuildToken + 1,
     });
   },
+
+  setLidOpen: (key, open) =>
+    set((state) => ({
+      lidOverrides: { ...state.lidOverrides, [key]: open },
+    })),
+
+  setLidsOpen: (keys, open) =>
+    set((state) => {
+      const lidOverrides = { ...state.lidOverrides };
+      for (const key of keys) lidOverrides[key] = open;
+      return { lidOverrides };
+    }),
 
   requestFocus: (partId) => {
     const assembled = get().assembled;

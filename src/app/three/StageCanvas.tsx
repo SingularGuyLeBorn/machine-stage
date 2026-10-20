@@ -14,6 +14,7 @@ import { findModel, type StageModel } from "../catalog";
 import { faultFromError, useStageStore } from "../state/stageStore";
 import { applyDamage, applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
 import { TigerVfx } from "./vfx/TigerVfx";
+import { applyTigerLidPose, effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
 
 // ============================================================================
 // StageCanvas —— 中栏 3D 视口
@@ -265,6 +266,10 @@ function StageRuntime() {
     assembled.resetNodes();
     // 停机时传 0：悬挂回到装配态（否则会停在上一帧的抬起位）
     model.animate?.(assembled, running ? clockRef.current : 0, state);
+    // 舱盖/加油口盖是交互件：用真实帧时间平滑开合，不跟机器状态时钟走
+    if (store.modelId === "tiger") {
+      applyTigerLidPose(assembled, state, store.lidOverrides, delta);
+    }
     assembled.syncInstances();
     const motionParts = motionPartsOf(model);
     // 每帧都要给爆炸姿态一个目标值：关掉爆炸时必须回 0，否则模型会停在半爆炸态
@@ -326,8 +331,16 @@ function StageRuntime() {
     setLabelPoints(points);
   }, [assembled, views.labels, rebuildToken]);
 
-  const selectPart = useStageStore((state) => state.selectPart);
   const hoverPart = useStageStore((state) => state.hoverPart);
+
+  const pickPart = (partId: string, instance: number | null) => {
+    const store = useStageStore.getState();
+    store.selectPart(partId, instance);
+    const lid = lidAt(partId, instance);
+    if (!lid) return;
+    const open = effectiveLidOpen(lid, store.lidOverrides, store.machineState);
+    store.setLidOpen(lid.key, !open);
+  };
 
   // 开发期自检钩子（QA 截图 / 控制台调试；生产构建不写）
   const three = useThree();
@@ -366,8 +379,9 @@ function StageRuntime() {
         <AssembledObject
           key={`assembled:${scene?.seq ?? 0}`}
           assembled={assembled}
-          onSelect={selectPart}
+          onSelect={pickPart}
           onHover={hoverPart}
+          onFocus={(partId) => useStageStore.getState().requestFocus(partId)}
         />
       ) : null}
       {assembled && views.shadow ? (
@@ -405,22 +419,45 @@ function AssembledObject({
   assembled,
   onSelect,
   onHover,
+  onFocus,
 }: {
   assembled: AssembledModel;
-  onSelect: (partId: string | null, instance: number | null) => void;
+  onSelect: (partId: string, instance: number | null) => void;
   onHover: (partId: string | null, instance: number | null) => void;
+  onFocus: (partId: string) => void;
 }) {
+  useEffect(() => {
+    return () => {
+      document.body.style.cursor = "";
+    };
+  }, []);
+
   return (
     <primitive
       object={assembled.root}
       onPointerOver={(event: ThreeEvent<PointerEvent>) => {
         event.stopPropagation();
-        if (event.object.name) onHover(event.object.name, event.instanceId ?? null);
+        const partId = event.object.name;
+        if (!partId) return;
+        onHover(partId, event.instanceId ?? null);
+        document.body.style.cursor = lidAt(partId, event.instanceId) ? "pointer" : "";
       }}
-      onPointerOut={() => onHover(null, null)}
+      onPointerOut={() => {
+        onHover(null, null);
+        document.body.style.cursor = "";
+      }}
       onClick={(event: ThreeEvent<MouseEvent>) => {
         event.stopPropagation();
-        onSelect(event.object.name || null, event.instanceId ?? null);
+        if (event.delta > 6) return;
+        const partId = event.object.name;
+        if (partId) onSelect(partId, event.instanceId ?? null);
+      }}
+      onDoubleClick={(event: ThreeEvent<MouseEvent>) => {
+        event.stopPropagation();
+        if (event.delta > 6) return;
+        const partId = event.object.name;
+        if (!partId || lidAt(partId, event.instanceId)) return;
+        onFocus(partId);
       }}
     />
   );

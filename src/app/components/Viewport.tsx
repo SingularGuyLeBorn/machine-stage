@@ -1,5 +1,6 @@
-import { Boxes, Crosshair, Eye, Grid3x3, Layers, Tag } from "lucide-react";
+import { Boxes, Crosshair, DoorOpen, Eye, Grid3x3, Layers, MousePointerClick, Tag } from "lucide-react";
 import { instanceKey } from "@/three/parts";
+import { effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
 import { StageCanvas } from "../three/StageCanvas";
 import { findModel } from "../catalog";
 import { useStageStore } from "../state/stageStore";
@@ -26,6 +27,10 @@ export function Viewport() {
   const detached = useStageStore((state) => state.detached);
   const selectPart = useStageStore((state) => state.selectPart);
   const toggleDetach = useStageStore((state) => state.toggleDetach);
+  const hoveredPart = useStageStore((state) => state.hoveredPart);
+  const hoveredInstance = useStageStore((state) => state.hoveredInstance);
+  const lidOverrides = useStageStore((state) => state.lidOverrides);
+  const setLidsOpen = useStageStore((state) => state.setLidsOpen);
   const model = findModel(modelId);
   const stateLabel = model.states?.find((state) => state.id === machineState)?.label ?? machineState;
   const readouts = assembled && model.readouts ? model.readouts(assembled) : [];
@@ -47,6 +52,13 @@ export function Viewport() {
       ? model.detachOffset?.(selectedPart, selectedInstance, instanceCount) != null
       : false;
 
+  const crewLids = model.lids?.filter((lid) => lid.kind !== "fuel") ?? [];
+  const crewOpen =
+    crewLids.length > 0 &&
+    crewLids.every((lid) => effectiveLidOpen(lid, lidOverrides, machineState));
+  const hoverLid = lidAt(hoveredPart, hoveredInstance);
+  const hoverLidOpen = hoverLid ? effectiveLidOpen(hoverLid, lidOverrides, machineState) : false;
+
   return (
     <div className="viewport">
       <div className="viewport__canvas">
@@ -59,6 +71,15 @@ export function Viewport() {
       <ClippingDock />
       <IsolationView />
       <PartInfoCard />
+
+      {hoverLid ? (
+        <div className="lid-hint" role="status">
+          <MousePointerClick size={13} aria-hidden />
+          <span>
+            点击{hoverLidOpen ? "合上" : "开启"} · {hoverLid.name_cn}
+          </span>
+        </div>
+      ) : null}
 
       <div className="viewport__overlay viewport__overlay--tl">
         {inspectInstance ? (
@@ -128,6 +149,18 @@ export function Viewport() {
             <Eye size={13} aria-hidden />
             透视
           </button>
+          {crewLids.length > 0 ? (
+            <button
+              type="button"
+              className="btn btn--sm"
+              aria-pressed={crewOpen}
+              title="一键开/合全部乘员舱盖；也可以直接点单个盖板开合"
+              onClick={() => setLidsOpen(crewLids.map((lid) => lid.key), !crewOpen)}
+            >
+              <DoorOpen size={13} aria-hidden />
+              舱盖
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn--sm"

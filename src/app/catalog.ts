@@ -15,6 +15,7 @@ import {
   tigerDetachOffset,
   tigerInstanceLabel,
 } from "@/three/parts/models/tiger/motion";
+import { TIGER_LIDS, type TigerLidSpec } from "@/three/parts/models/tiger/lids";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -69,6 +70,8 @@ export interface StageModel {
   detachOffset?: (partId: string, index: number, count: number) => [number, number, number] | null;
   /** 实例检查器的人类可读标签（如「第 3 轴 · 第 2 排 · 右」）。 */
   instanceLabel?: (partId: string, index: number, count: number) => string | null;
+  /** 可交互盖板（点击开合 / 悬停提示 / 视口一键开合）。 */
+  lids?: readonly TigerLidSpec[];
   /** 主角数字（状态栏/参数面板展示，必须由求解器或常量算出）。 */
   readouts?: (assembled: AssembledModel) => Array<{ label: string; value: string }>;
   actions?: StageAction[];
@@ -144,6 +147,7 @@ export const CATALOG: StageModel[] = [
     detachKeys: tigerDetachKeys,
     detachOffset: tigerDetachOffset,
     instanceLabel: tigerInstanceLabel,
+    lids: TIGER_LIDS,
     states: [
       { id: "idle", label: "停机", hint: "悬挂静止，可拖构建滑杆看装配" },
       {
@@ -179,7 +183,7 @@ export const CATALOG: StageModel[] = [
       {
         id: "refuel",
         label: "加油",
-        hint: "左右燃油加注口盖绕外缘铰链掀起 72°，露出颈孔与下方加注管；再点一次合盖",
+        hint: "左右燃油加注口盖绕外缘铰链掀起 72°，露出颈孔与下方加注管；再点一次合盖。平时也可直接点击盖板/底座单独开合",
       },
       {
         id: "burning",
@@ -245,6 +249,7 @@ export const CATALOG: StageModel[] = [
       "主炮击发是节点驱动的机械演示（后坐 450mm + 开闩 + 击针 + 炮口焰）；机枪连射含枪管短后坐/枪口上跳/供弹链/弹壳。",
       "爆炸/燃烧用 vendored three.quarks 粒子（初焰闪→火球→冲击波→火花/破片→烟→焦痕）；轻击=穿甲穿孔，重击=榴弹全相，殉爆再叠加炮塔掀飞与火势蔓延。",
       "破碎形态由 damageSeed 随机：单穿孔 / 大口径爆裂 / 双孔，位置在安全区内抖动；战损组「随机破口」换一组并保持相机。",
+      "舱盖可交互：悬停盖板出现提示，单击开/合；前舱盖默认开启，视口右上「舱盖」可一键全开/全合。装填手舱口与车长塔顶盖在炮塔顶甲板上开了真孔，开盖能看进战斗室；加油口底座也可点击开盖。",
     ],
   },
   {

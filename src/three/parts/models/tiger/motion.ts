@@ -3,6 +3,7 @@ import { instanceKey, type AssembledModel } from "@/three/parts";
 import { pistonPinTravel, rodSwingRad, type CrankTrainGeometry } from "./engine/kinematics";
 import { makeTrackScroller, type TrackScroller } from "./running/registry";
 import { TIGER_MG_BELT_DIR, TIGER_MG_BELT_PITCH } from "./turret/kits";
+import { TIGER_LID_PART_IDS } from "./lids";
 
 // ============================================================================
 // tiger/motion —— 虎式行动装置动画（悬挂起伏 / 行进 / 单轮拆解）
@@ -27,9 +28,8 @@ export const TIGER_MOTION_PARTS = [
   "tiger.track.sprocket",
   "tiger.track.idler",
   "tiger.turret.aa_mg_case",
-  "tiger.hull.hatch_lid",
-  "tiger.hull.fuel_cap_lid",
   "tiger.effects.exhaust_smoke",
+  ...TIGER_LID_PART_IDS,
 ];
 
 /** 行进动画改写过的实例件；切换出 driving 时一次性复位，避免停在滚动中途。 */
