@@ -794,6 +794,28 @@ function buildHullParts(): PartDefinition[] {
   });
 
   add({
+    id: "tiger.hull.visor_wiper",
+    name_cn: "观察窗雨刷",
+    name_en: "Scheibenwischer",
+    assembly: "hull",
+    build_layer: 4,
+    build_order: 597,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.03, h: 0.036, d: 0.03, at: [0, 0, 0], bevel: 0.004 },
+        { type: "box", w: 0.012, h: 0.008, d: 0.3, at: [0, 0.002, 0.15], bevel: 0.002 },
+        { type: "box", w: 0.016, h: 0.026, d: 0.26, at: [0, 0.01, 0.17], bevel: 0.003 },
+      ],
+    },
+    material: "rubber_tyre",
+    mate: { type: "absolute" },
+    node: "VisorWiper",
+    source:
+      "观察窗雨刷（转轴 + 摆臂 300 + 胶条 260）：转轴在观察窗左下角外 17mm（x -4.57 / y 0.85 / z -0.83），刮臂在窗面外 10~16mm 扫过，绕 X 轴往复 5°~34°——正好盖住 360×160 窗面，不碰上部压条（窗顶 1.01）与首甲板。只在下雨时摆动。",
+  });
+
+  add({
     id: "tiger.hull.ring_bolts",
     name_cn: "座圈螺栓圈",
     name_en: "Turmdrehkranz-Schrauben",
@@ -1524,6 +1546,14 @@ export function makeHullRegistry(): ModelRegistry {
     constants: HULL_CONSTANTS,
     assemblies: [{ id: "hull", name_cn: "车体外壳", name_en: "hull shell", explode: [0, 1.5, 0] }],
     nodes: [
+      {
+        name: "VisorWiper",
+        parent: "root",
+        pivot: [-4.57, 0.85, -0.83],
+        motion: "rotate",
+        axis: "x",
+        note: "驾驶员观察窗雨刷：下雨时绕 X 轴 5°~34° 往复",
+      },
       {
         name: "BowMgBarrel",
         parent: "root",

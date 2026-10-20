@@ -1,4 +1,4 @@
-import { Boxes, Crosshair, DoorOpen, Eye, Grid3x3, Layers, MousePointerClick, Tag } from "lucide-react";
+import { Boxes, CloudRain, Crosshair, DoorOpen, Eye, Grid3x3, Layers, MousePointerClick, Tag } from "lucide-react";
 import { instanceKey } from "@/three/parts";
 import { effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
 import { StageCanvas } from "../three/StageCanvas";
@@ -198,6 +198,16 @@ export function Viewport() {
           >
             <Grid3x3 size={13} aria-hidden />
             网格
+          </button>
+          <button
+            type="button"
+            className="btn btn--sm"
+            aria-pressed={views.rain}
+            title="雨天：雨丝 + 驾驶员观察窗雨刷往复刮水"
+            onClick={() => toggleView("rain")}
+          >
+            <CloudRain size={13} aria-hidden />
+            雨天
           </button>
           <button
             type="button"

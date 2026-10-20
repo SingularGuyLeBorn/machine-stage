@@ -26,7 +26,7 @@ import type { CameraMode } from "./three/viewpoints";
 // planned 卡片是路线图占位（M-B…M-F），没有注册表时不可选中。
 // ============================================================================
 
-export type ViewKey = "explode" | "xray" | "labels" | "grid" | "shadow";
+export type ViewKey = "explode" | "xray" | "labels" | "grid" | "shadow" | "rain";
 
 export type StageAction =
   | { id: string; group: string; label: string; kind: "machine-state"; state: string }
@@ -114,6 +114,7 @@ export const CATALOG: StageModel[] = [
       { id: "rotor-run", group: "机构", label: "转子运转", kind: "machine-state", state: "running" },
       { id: "rotor-stop", group: "机构", label: "停机", kind: "machine-state", state: "idle" },
       { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "rain", group: "展示", label: "雨天", kind: "view-toggle", view: "rain" },
       { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
       { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
       {
@@ -248,6 +249,7 @@ export const CATALOG: StageModel[] = [
       { id: "detonation", group: "战损", label: "弹药殉爆", kind: "machine-state", state: "detonation" },
       { id: "suspension-stop", group: "机构", label: "停机", kind: "machine-state", state: "idle" },
       { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "rain", group: "展示", label: "雨天", kind: "view-toggle", view: "rain" },
       { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
       { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
       { id: "cam-driver", group: "视角", label: "驾驶席视角", kind: "camera", mode: "driver" },

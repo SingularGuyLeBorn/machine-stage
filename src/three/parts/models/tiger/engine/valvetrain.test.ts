@@ -74,7 +74,7 @@ describe("tiger/engine 气门组", () => {
     };
     expect(keeper.rOuter).toBeLessThan(retainer.rInner);
     const springParams = (
-      built.getPart("tiger.valvetrain.valve_spring")!.def.geometry as {
+      built.getPart("tiger.valvetrain.valve_spring")!.def.geometry as unknown as {
         params: { coilR: number; wireR: number };
       }
     ).params;
