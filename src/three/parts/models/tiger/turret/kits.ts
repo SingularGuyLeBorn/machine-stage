@@ -75,6 +75,12 @@ const turretShell: GeometryBuilder = (spec) => {
   const roofT = num(params, "roofT", 0.025);
   const gunPortR = num(params, "gunPortR", 0);
   const gunPortY = num(params, "gunPortY", 0);
+  const hatchX = num(params, "hatchX", Number.NaN);
+  const hatchZ = num(params, "hatchZ", 0);
+  const hatchR = num(params, "hatchR", 0);
+  const cupolaX = num(params, "cupolaX", Number.NaN);
+  const cupolaZ = num(params, "cupolaZ", 0);
+  const cupolaR = num(params, "cupolaR", 0);
   const bevel = num(params, "bevel", 0.003);
 
   if (rIn >= rOut || frontTh <= 0 || wallH <= 0) {
@@ -133,6 +139,16 @@ const turretShell: GeometryBuilder = (spec) => {
 
   // —— 顶盖：与外廓同平面形状，落在壁顶（局部 z ∈ [-roofT, 0]）——
   const roof = horseshoeShape(rOut - b, frontOut + b);
+  // 舱口真开口：开盖后能看进炮塔（否则盖板下面是实心顶甲板）
+  for (const [x, y, r] of [
+    [hatchX, hatchZ, hatchR],
+    [cupolaX, cupolaZ, cupolaR],
+  ] as const) {
+    if (!Number.isFinite(x) || r <= 0) continue;
+    const hole = new THREE.Path();
+    hole.absarc(x, y, r, 0, Math.PI * 2, true);
+    roof.holes.push(hole);
+  }
   const roofGeo = new THREE.ExtrudeGeometry(roof, {
     depth: Math.max(roofT - 2 * b, 0.001),
     bevelEnabled: true,
@@ -158,6 +174,7 @@ const turretCupola: GeometryBuilder = (spec) => {
   const h = num(params, "h", 0.13);
   const capR = num(params, "capR", r + 0.012);
   const capT = num(params, "capT", 0.03);
+  const hatchR = num(params, "hatchR", r * 0.6);
   const slits = Math.max(Math.round(num(params, "slits", 5)), 0);
   const slitW = num(params, "slitW", 0.1);
   const slitH = num(params, "slitH", 0.055);
@@ -165,11 +182,12 @@ const turretCupola: GeometryBuilder = (spec) => {
 
   const parts: THREE.BufferGeometry[] = [];
 
-  const drum = cylinderGeometry(r, h, r * 0.98, 36, 0.004);
+  // 筒体与顶盖做成环形：顶盖洞 + 中空筒身，开盖后直接看到炮塔内部
+  const drum = tubeGeometry(r, r - 0.035, h, 36);
   drum.translate(0, h / 2, 0);
   parts.push(drum);
 
-  const cap = cylinderGeometry(capR, capT, capR * 0.94, 36, 0.004);
+  const cap = tubeGeometry(capR, hatchR, capT, 36);
   cap.translate(0, h + capT / 2, 0);
   parts.push(cap);
 

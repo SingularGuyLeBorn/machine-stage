@@ -82,9 +82,13 @@ export function applyExplode(
       parent.getWorldQuaternion(scratchQuaternion).invert();
       const localOffset = offset.clone().applyQuaternion(scratchQuaternion);
       object.matrixAutoUpdate = false;
+      // 动画件（可动舱盖）用本帧位姿；静态件用静止局部矩阵，避免爆炸偏移逐帧叠加
+      const base = motionParts.has(handle.partId)
+        ? scratchMatrixB.copy(object.matrix)
+        : handle.instances[0].localMatrix;
       object.matrix
         .copy(scratchMatrixA.makeTranslation(localOffset.x, localOffset.y, localOffset.z))
-        .multiply(handle.instances[0].localMatrix);
+        .multiply(base);
       // 战损变体与完好件同父节点/同局部 TRS：爆炸偏移也要跟上
       for (const variant of Object.values(handle.damageObjects)) {
         if (!variant) continue;

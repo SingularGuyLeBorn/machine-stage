@@ -597,6 +597,9 @@
 
 .toolstrip {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: min(560px, calc(100vw - 360px));
   gap: 4px;
   padding: 4px;
 }
@@ -697,8 +700,42 @@
 
 .part-card__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: 2px;
+}
+
+/* 悬停可动盖板时的操作提示（不挡拾取） */
+.lid-hint {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow-2);
+  color: var(--accent-deep);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: lid-hint-in 140ms ease-out;
+}
+
+@keyframes lid-hint-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 @media (max-width: 1180px) {

@@ -1,5 +1,6 @@
-import { Crosshair, ScanSearch, X } from "lucide-react";
+import { Crosshair, DoorOpen, ScanSearch, X } from "lucide-react";
 import { BUILD_LAYER_LABELS } from "@/three/parts";
+import { effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
 import { findModel } from "../catalog";
 import { useStageStore } from "../state/stageStore";
 
@@ -18,6 +19,9 @@ export function PartInfoCard() {
   const selectPart = useStageStore((state) => state.selectPart);
   const requestFocus = useStageStore((state) => state.requestFocus);
   const openPartIsolation = useStageStore((state) => state.openPartIsolation);
+  const lidOverrides = useStageStore((state) => state.lidOverrides);
+  const setLidOpen = useStageStore((state) => state.setLidOpen);
+  const machineState = useStageStore((state) => state.machineState);
 
   if (!selectedPart) return null;
   const registry = findModel(modelId).registry;
@@ -32,6 +36,8 @@ export function PartInfoCard() {
       : part.dual
         ? "左右件"
         : "单件";
+  const lid = lidAt(part.id, selectedInstance);
+  const lidOpen = lid ? effectiveLidOpen(lid, lidOverrides, machineState) : false;
 
   return (
     <aside className="part-card float-card" aria-label="当前零件信息">
@@ -64,6 +70,19 @@ export function PartInfoCard() {
         </span>
       </div>
       <div className="part-card__actions">
+        {lid ? (
+          <button
+            type="button"
+            className="btn btn--sm"
+            aria-pressed={lidOpen}
+            title={`${lid.name_cn}：铰链可动件，点击${lidOpen ? "合上" : "开启"}`}
+            onClick={() => setLidOpen(lid.key, !lidOpen)}
+          >
+            <DoorOpen size={12} aria-hidden />
+            {lidOpen ? "合上" : "开启"}
+            {lid.kind === "fuel" ? "加油口盖" : "舱盖"}
+          </button>
+        ) : null}
         <button type="button" className="btn btn--sm" onClick={() => requestFocus(part.id)}>
           <Crosshair size={12} aria-hidden />
           聚焦
