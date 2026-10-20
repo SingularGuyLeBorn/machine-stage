@@ -7,6 +7,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // 本 worktree 内 vendored（MIT）——共享 node_modules 是主线的 junction，不能往里装包
+      "three.quarks": fileURLToPath(new URL("./vendor/three.quarks/three.quarks.esm.js", import.meta.url)),
+      "quarks.core": fileURLToPath(new URL("./vendor/quarks.core/quarks.core.esm.js", import.meta.url)),
     },
   },
   server: {

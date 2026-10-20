@@ -1,0 +1,25 @@
+import { Quaternion, Vector3 } from 'quarks.core';
+import { BufferGeometry } from 'three';
+import { VFXBatch } from './VFXBatch';
+import { VFXBatchSettings } from './BatchedRenderer';
+export declare class TrailBatch extends VFXBatch {
+    geometry: BufferGeometry;
+    private positionBuffer;
+    private previousBuffer;
+    private nextBuffer;
+    private uvBuffer;
+    private sideBuffer;
+    private widthBuffer;
+    private colorBuffer;
+    private indexBuffer;
+    constructor(settings: VFXBatchSettings);
+    setupBuffers(): void;
+    expandBuffers(target: number): void;
+    rebuildMaterial(): void;
+    vector_: Vector3;
+    vector2_: Vector3;
+    vector3_: Vector3;
+    quaternion_: Quaternion;
+    update(): void;
+    dispose(): void;
+}

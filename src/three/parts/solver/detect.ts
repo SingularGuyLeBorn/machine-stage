@@ -78,6 +78,8 @@ function collectInstances(
 ): BodyInstance[] {
   const out: BodyInstance[] = [];
   for (const handle of assembled.parts) {
+    // fx 是视觉特效（烟团/火球/火星），本来就会互相重叠并埋进模型；不参与结构检测。
+    if (handle.def.tags?.includes("fx")) continue;
     if (filter && !filter(handle)) continue;
     if (!handle.geometry.boundingBox) handle.geometry.computeBoundingBox();
     if (!handle.instanced) {

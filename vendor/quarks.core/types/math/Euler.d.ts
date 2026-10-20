@@ -1,0 +1,35 @@
+import { Quaternion } from './Quaternion';
+import { Matrix4 } from './Matrix4';
+import { Vector3 } from './Vector3';
+export type EulerOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY' | 'XYX' | 'YZY' | 'ZXZ' | 'XZX' | 'YXY' | 'ZYZ';
+declare class Euler {
+    _x: number;
+    _y: number;
+    _z: number;
+    _order: EulerOrder;
+    isEuler: boolean;
+    static DEFAULT_ORDER: EulerOrder;
+    constructor(x?: number, y?: number, z?: number, order?: EulerOrder);
+    get x(): number;
+    set x(value: number);
+    get y(): number;
+    set y(value: number);
+    get z(): number;
+    set z(value: number);
+    get order(): EulerOrder;
+    set order(value: EulerOrder);
+    set(x: number, y: number, z: number, order?: EulerOrder): this;
+    clone(): Euler;
+    copy(euler: Euler): this;
+    setFromRotationMatrix(m: Matrix4, order?: EulerOrder, update?: boolean): this;
+    setFromQuaternion(q: Quaternion, order: EulerOrder, update?: boolean): this;
+    setFromVector3(v: Vector3, order?: EulerOrder): this;
+    reorder(newOrder: EulerOrder): this;
+    equals(euler: Euler): boolean;
+    fromArray(array: any[]): this;
+    toArray(array?: any[], offset?: number): any[];
+    _onChange(callback: (euler?: Euler) => void): this;
+    _onChangeCallback(euler?: Euler): void;
+    [Symbol.iterator](): Generator<number | EulerOrder, void, unknown>;
+}
+export { Euler };

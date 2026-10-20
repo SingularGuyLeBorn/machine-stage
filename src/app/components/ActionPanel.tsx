@@ -12,6 +12,7 @@ import { useStageStore } from "../state/stageStore";
 export function ActionPanel() {
   const modelId = useStageStore((state) => state.modelId);
   const machineState = useStageStore((state) => state.machineState);
+  const damage = useStageStore((state) => state.damage);
   const views = useStageStore((state) => state.views);
   const scanPhase = useStageStore((state) => state.scanPhase);
 
@@ -35,6 +36,9 @@ export function ActionPanel() {
           store.machineState === action.state ? (model.states?.[0]?.id ?? "idle") : action.state,
         );
         break;
+      case "damage":
+        store.setDamage(action.level);
+        break;
       case "view-toggle":
         store.toggleView(action.view);
         break;
@@ -56,6 +60,7 @@ export function ActionPanel() {
 
   const pressedOf = (action: StageAction): boolean => {
     if (action.kind === "machine-state") return machineState === action.state;
+    if (action.kind === "damage") return damage === action.level;
     if (action.kind === "view-toggle") return views[action.view];
     return false;
   };

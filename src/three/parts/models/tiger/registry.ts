@@ -13,6 +13,7 @@ import { makeHullLayouts, makeHullRegistry } from "./hull/registry";
 import { tigerHullKitBuilders } from "./hull/kits";
 import { makeTurretLayouts, makeTurretRegistry } from "./turret/registry";
 import { tigerTurretKitBuilders } from "./turret/kits";
+import { tigerDamageKitBuilders } from "./damage/kits";
 
 // ============================================================================
 // models/tiger —— 虎式 I 整机注册表（分层合并）
@@ -114,4 +115,5 @@ export const tigerBuilders: Record<string, GeometryBuilder> = {
   ...tigerInteriorKitBuilders,
   ...tigerHullKitBuilders,
   ...tigerTurretKitBuilders,
+  ...tigerDamageKitBuilders,
 };

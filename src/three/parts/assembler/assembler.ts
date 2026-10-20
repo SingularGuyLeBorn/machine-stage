@@ -1,7 +1,14 @@
 import * as THREE from "three";
 import { mirrorGeometry } from "../kernel/geometry";
 import { resolveConstants } from "../registry/expression";
-import type { BuildLayer, MateSpec, ModelRegistry, NodeDef, PartDefinition } from "../registry/types";
+import type {
+  BuildLayer,
+  DamageState,
+  MateSpec,
+  ModelRegistry,
+  NodeDef,
+  PartDefinition,
+} from "../registry/types";
 import { buildGeometry, resolveSpec, type GeometryBuilder } from "./geometry";
 
 // ============================================================================
@@ -63,6 +70,11 @@ export interface PartHandle {
   instances: AssembledInstance[];
   /** 写入实例矩阵（模型空间）。 */
   setInstanceMatrix(index: number, matrix: THREE.Matrix4): void;
+  /** 预制战损变体（隐藏的替换/叠加网格，单实例零件才有）。 */
+  damageObjects: Partial<Record<Exclude<DamageState, "intact">, THREE.Mesh>>;
+  damageState: DamageState;
+  /** 切换战损形态（只改可见性；碰撞/支撑仍按完好几何）。 */
+  setDamageState(state: DamageState): void;
 }
 
 export interface AssembledModel {
@@ -357,6 +369,14 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
   for (const [name, matrix] of nodeRest) {
     nodeRestInverse.set(name, new THREE.Matrix4().copy(matrix).invert());
   }
+  let buildThreshold: number | null = null;
+  const refreshDamageVisibility = (target: PartHandle): void => {
+    const inBuild = buildThreshold === null || target.buildOrder <= buildThreshold;
+    target.object.visible = inBuild && target.damageState === "intact";
+    for (const [state, object] of Object.entries(target.damageObjects)) {
+      if (object) object.visible = inBuild && target.damageState === state;
+    }
+  };
 
   for (const item of expanded) {
     const matrix = modelMatrixOf(item.id);
@@ -375,6 +395,11 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
 
     const instances: AssembledInstance[] = [];
     let handle: PartHandle;
+    if (item.def.damage && count > 1) {
+      throw new Error(
+        `assembler：零件 "${item.id}" 是实例件（${count}），战损变体需要拆成单实例零件`,
+      );
+    }
 
     if (count > 1) {
       const instanced = new THREE.InstancedMesh(geometry, material, count);
@@ -416,6 +441,9 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
           instanced.setMatrixAt(index, value);
           instanced.instanceMatrix.needsUpdate = true;
         },
+        damageObjects: {},
+        damageState: "intact",
+        setDamageState: () => {},
       };
     } else {
       const mesh = new THREE.Mesh(geometry, material);
@@ -432,6 +460,29 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
       mesh.updateMatrix();
       mesh.matrixWorldNeedsUpdate = true;
       (parentNode ?? root).add(mesh);
+
+      // 战损变体：同父节点、同局部 TRS，默认隐藏；几何用独立缓存键避免与完好件串用。
+      const damageObjects: Partial<Record<Exclude<DamageState, "intact">, THREE.Mesh>> = {};
+      for (const state of ["damaged", "broken"] as const) {
+        const spec = item.def.damage?.[state];
+        if (!spec) continue;
+        const variantGeometry = getGeometry(
+          spec,
+          item.mirrored,
+          JSON.stringify({ part: item.id, state, spec }),
+          item.id,
+        );
+        const variant = new THREE.Mesh(variantGeometry, material);
+        variant.name = `${item.id}@${state}`;
+        variant.position.copy(mesh.position);
+        variant.quaternion.copy(mesh.quaternion);
+        variant.scale.copy(mesh.scale);
+        variant.updateMatrix();
+        variant.visible = false;
+        (parentNode ?? root).add(variant);
+        damageObjects[state] = variant;
+      }
+
       instances.push({
         index: 0,
         node: item.def.node ?? null,
@@ -455,6 +506,12 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
           value.decompose(mesh.position, mesh.quaternion, mesh.scale);
           mesh.updateMatrix();
           mesh.matrixWorldNeedsUpdate = true;
+        },
+        damageObjects,
+        damageState: "intact",
+        setDamageState: (state) => {
+          handle.damageState = state;
+          refreshDamageVisibility(handle);
         },
       };
     }
@@ -517,8 +574,13 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
     },
     instanceMatrix,
     setBuildThreshold: (threshold) => {
+      buildThreshold = threshold;
       for (const handle of parts) {
-        handle.object.visible = threshold === null || handle.buildOrder <= threshold;
+        if (Object.keys(handle.damageObjects).length > 0) {
+          refreshDamageVisibility(handle);
+        } else {
+          handle.object.visible = threshold === null || handle.buildOrder <= threshold;
+        }
       }
     },
     partBounds: (handle, target) => {

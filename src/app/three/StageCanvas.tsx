@@ -1,6 +1,6 @@
 import { ContactShadows, Environment, Grid, Html, Lightformer, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { EffectComposer, N8AO, Vignette } from "@react-three/postprocessing";
+import { Bloom, EffectComposer, N8AO, Vignette } from "@react-three/postprocessing";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import {
@@ -12,7 +12,8 @@ import {
 } from "@/three/parts";
 import { findModel, type StageModel } from "../catalog";
 import { faultFromError, useStageStore } from "../state/stageStore";
-import { applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
+import { applyDamage, applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
+import { TigerVfx } from "./vfx/TigerVfx";
 
 // ============================================================================
 // StageCanvas —— 中栏 3D 视口
@@ -49,6 +50,7 @@ export function StageCanvas() {
       <color attach="background" args={["#e9ecf0"]} />
       <Studio />
       <StageRuntime />
+      <TigerVfx />
       <CameraRig />
       <StageEffects />
     </Canvas>
@@ -124,6 +126,7 @@ function StageEffects() {
   return (
     <EffectComposer multisampling={4}>
       <N8AO halfRes quality="medium" aoRadius={0.45} intensity={1.15} distanceFalloff={0.9} color="#26303c" />
+      <Bloom luminanceThreshold={0.88} luminanceSmoothing={0.22} intensity={0.55} mipmapBlur />
       <Vignette offset={0.32} darkness={0.28} />
     </EffectComposer>
   );
@@ -239,6 +242,9 @@ function StageRuntime() {
       state === "firing" ||
       state === "mg_firing" ||
       state === "aiming" ||
+      state === "engine_start" ||
+      state === "burning" ||
+      state === "detonation" ||
       state === "hit_light" ||
       state === "hit_heavy";
     // 切换机器状态时重置动画时钟：击发必须从 0s 开始，悬挂演示也应从头起步。
@@ -264,11 +270,17 @@ function StageRuntime() {
     }
     assembled.root.updateMatrixWorld(true);
   });
-  // ---- 透视 / 高亮 ----
+  // ---- 透视 / 战损 / 高亮 ----
   useEffect(() => {
     if (!assembled) return;
     applyXray(assembled, views.xray);
   }, [assembled, views.xray]);
+
+  const damage = useStageStore((state) => state.damage);
+  useEffect(() => {
+    if (!assembled) return;
+    applyDamage(assembled, damage);
+  }, [assembled, damage]);
 
   const selectedPart = useStageStore((state) => state.selectedPart);
   const selectedInstance = useStageStore((state) => state.selectedInstance);

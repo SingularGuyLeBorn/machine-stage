@@ -80,6 +80,20 @@ export interface AssemblyDef {
   explode?: ExprVec3;
 }
 
+/** 战损三态：完好 / 破损（凹陷+裂痕）/ 破碎（缺块+断面露内部结构）。 */
+export type DamageState = "intact" | "damaged" | "broken";
+
+/**
+ * 预制战损变体（只对单实例零件生效）：
+ *   damaged = 完好几何之上叠加的凹陷/裂痕层；
+ *   broken  = 替换几何：缺块 + 撕裂断面 + 内部骨架/管路（不是黑窟窿）。
+ * 碰撞/支撑检测始终按完好几何算——变体是展示层。
+ */
+export interface DamageVariants {
+  damaged?: GeometrySpec;
+  broken?: GeometrySpec;
+}
+
 /** 零件声明。instances > 1 时必须 indexed；双侧件用 dual 展开为 <id>_l / <id>_r。 */
 export interface PartDefinition {
   id: string;
@@ -107,6 +121,8 @@ export interface PartDefinition {
    * 这两类本来就不该有支撑邻居；其余标签供模型/检测扩展使用。
    */
   tags?: string[];
+  /** 预制战损变体（damaged / broken）；需要“破碎件三态”的零件才登记。 */
+  damage?: DamageVariants;
   /** 尺寸/资料的出处注记。 */
   source?: string;
 }

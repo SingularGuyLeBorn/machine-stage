@@ -6,6 +6,7 @@ import {
   type ModelRegistry,
 } from "@/three/parts";
 import type { GeometryBuilder } from "@/three/parts/assembler/geometry";
+import type { DamageState } from "@/three/parts";
 import { makeTigerLayouts, makeTigerRegistry, tigerBuilders } from "@/three/parts/models/tiger/registry";
 import {
   animateTiger,
@@ -27,6 +28,7 @@ export type ViewKey = "explode" | "xray" | "labels" | "grid" | "shadow";
 
 export type StageAction =
   | { id: string; group: string; label: string; kind: "machine-state"; state: string }
+  | { id: string; group: string; label: string; kind: "damage"; level: DamageState }
   | { id: string; group: string; label: string; kind: "view-toggle"; view: ViewKey }
   | { id: string; group: string; label: string; kind: "param"; param: string; value: number | null }
   | { id: string; group: string; label: string; kind: "scan"; scanKind: "static" | "sweep" }
@@ -169,25 +171,46 @@ export const CATALOG: StageModel[] = [
         hint: "炮塔 ±36° 回转 + 炮管 ±3.4° 俯仰（8s 循环；瞄准时自动盖上驾驶员/无线电员舱盖）",
       },
       {
+        id: "engine_start",
+        label: "发动机启动",
+        hint: "起动机拖动 → 逐缸点火 → 650rpm 怠速：曲轴/凸轮/风扇/活塞连杆运动 + 排气白烟 + 车体一扭（开透视看内部）",
+      },
+      {
+        id: "burning",
+        label: "发动机起火",
+        hint: "发动机舱持续燃烧：quarks 火焰 + 烟柱 + 点光闪烁，车体轻微震颤",
+      },
+      {
+        id: "detonation",
+        label: "弹药殉爆",
+        hint: "炮塔内闪光 → 炮塔掀飞 0.85m → 火球/冲击波/破片/烟柱 → 焦痕，火势蔓延到发动机舱",
+      },
+      {
         id: "hit_light",
         label: "轻击（小口径）",
-        hint: "小口径命中：车体高频轻颤，悬挂不沉",
+        hint: "穿甲弹命中：初焰闪 + 窄束火花 + 穿孔焦痕；车体高频轻颤",
       },
       {
         id: "hit_heavy",
         label: "重击（大口径）",
-        hint: "大口径正中：车体重挫 + 悬挂压缩 + 阻尼回弹",
+        hint: "榴弹命中：初焰闪 → 火球 → 冲击波 → 火花/破片 → 烟 → 焦痕；车体重挫 + 悬挂回弹",
       },
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
     ],
     actions: [
       { id: "suspension-run", group: "机构", label: "悬挂演示", kind: "machine-state", state: "running" },
       { id: "drive-run", group: "机构", label: "行进演示", kind: "machine-state", state: "driving" },
+      { id: "engine-start", group: "机构", label: "发动机启动", kind: "machine-state", state: "engine_start" },
       { id: "cannon-fire", group: "火力", label: "主炮击发", kind: "machine-state", state: "firing" },
       { id: "mg-fire", group: "火力", label: "机枪连射", kind: "machine-state", state: "mg_firing" },
       { id: "aim", group: "火炮", label: "炮塔瞄准", kind: "machine-state", state: "aiming" },
       { id: "hit-light", group: "受击", label: "轻击（小口径）", kind: "machine-state", state: "hit_light" },
       { id: "hit-heavy", group: "受击", label: "重击（大口径）", kind: "machine-state", state: "hit_heavy" },
+      { id: "damage-intact", group: "战损", label: "完好", kind: "damage", level: "intact" },
+      { id: "damage-dented", group: "战损", label: "破损（凹陷/裂痕）", kind: "damage", level: "damaged" },
+      { id: "damage-broken", group: "战损", label: "破碎（断面露内构）", kind: "damage", level: "broken" },
+      { id: "burning", group: "战损", label: "发动机起火", kind: "machine-state", state: "burning" },
+      { id: "detonation", group: "战损", label: "弹药殉爆", kind: "machine-state", state: "detonation" },
       { id: "suspension-stop", group: "机构", label: "停机", kind: "machine-state", state: "idle" },
       { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
       { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
@@ -197,8 +220,9 @@ export const CATALOG: StageModel[] = [
       { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
     ],
     notes: [
-      "L1–L5 已装配到 223 件 / 1998 实例；主炮闩 / 中空炮管 / 车长塔枪座 / 战术编号已落地。",
-      "主炮击发是节点驱动的机械演示（后坐 450mm + 开闩 + 击针 + 炮口焰）；机枪连射含枪管短后坐/枪口上跳/供弹链/弹壳；受击按口径分级。",
+      "L1–L5 已装配到 236 件 / 2038 实例；主炮闩 / 中空炮管 / 双油箱 / 战损三态 / 多相爆炸已落地。",
+      "主炮击发是节点驱动的机械演示（后坐 450mm + 开闩 + 击针 + 炮口焰）；机枪连射含枪管短后坐/枪口上跳/供弹链/弹壳。",
+      "爆炸/燃烧用 vendored three.quarks 粒子（初焰闪→火球→冲击波→火花/破片→烟→焦痕）；轻击=穿甲穿孔，重击=榴弹全相，殉爆再叠加炮塔掀飞与火势蔓延。",
     ],
   },
   {

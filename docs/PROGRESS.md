@@ -1466,3 +1466,56 @@ tsc / build ✓。零件/实例仍为 223 / 1998，227 报告 / 未豁免 0，�
 `m-p3-mg-fire.png` / `m-p3-mg-fire-front.png`（连射中弹壳/弹链可见）、`m-p3-mg-front.png`
 （枪管/弹鼓/弹链俯视）。录屏：交互状态已可现场播放；GIF/视频存 `docs/screenshots/` 由
 演示录屏工具补（本轮代码与静态截图已落盘）。
+
+### P3 综合包：行进 / 炮塔瞄准 / 补油箱 / 战损三态 / quarks 多相爆炸（2026-10-20）
+
+本轮把「能开、能打、能被打坏」补齐，并按要求改用成熟 VFX 资源。
+
+**1. 行进演示（`driving`）**
+- 前进 1.54m → 倒退回位 → 原地右转 24° → 左转 48° → 回正，18.4s 闭环；
+- 履带板/销/锁环沿同一条闭合轨迹滚动（`makeTrackScroller`），主动轮/诱导轮/负重轮按节圆差速；
+- **关键修复**：姿态层 `clearExplode` 每帧把非节点实例复位，导致根节点在动、履带和轮子不动。
+  现在 `motionParts` 被排除，并加回归测试 `running/driving.test.ts`（含 explode=0 不抹行进姿态）。
+- 代价：`applyExplode` 还要同步战损变体矩阵，已在 pose 层处理。
+
+**2. 炮塔瞄准 + 前机枪**
+- 炮塔 ±36° 绕座圈中心回转、炮管 ±3.4°；瞄准时自动盖驾驶员/无线电员舱盖（长身管扫过前甲板）。
+- 同轴 + 航向 MG34 同步短后坐/枪口焰；枪口焰 30ms→60ms、前机枪放大 2.4×，正面可见。
+- 两者 8–9 个时间点零干涉。
+
+**3. 虎式补全：发动机 / 油箱**
+- 左右燃油箱（520×680×280）落在发动机舱两侧：前缘离电台支架 30mm、后缘离尾板 110mm、
+  内壁离风扇叶尖 76mm、外壁离侧板 20mm；含固定箍/加油颈/油位传感器/出油管；
+  发动机舱盖新增两个加油口，与箱体加油颈同轴。
+- 发动机启动 `engine_start`：起动机拖动 → 点火 → 650rpm 怠速；曲轴/凸轮/风扇/12 组活塞连杆
+  直接调用 `engine/kinematics`；排气白烟（最重的时刻 1.35×）+ 启动瞬间车体一扭。
+
+**4. 破碎件三态（框架 + 6 件）**
+- `PartDefinition.damage = { damaged?, broken? }`：装配器为单实例件生成隐藏变体；
+  `damaged` 是原几何 + 凹陷/裂痕覆盖层，`broken` 是替换几何（缺块 + 撕裂翻边 + 内部肋/管/线束）。
+- 已落地 6 件：首上装甲、战斗室顶甲板、发动机舱盖、炮盾、左右燃油箱。
+- UI「战损」组：完好 / 破损 / 破碎；构建进度优先（没装到的件不显示变体）；爆炸视图同步移动变体。
+- 碰撞/支撑仍按完好几何算——变体是展示层。
+
+**5. 弹药爆炸 / 燃烧殉爆（vendored three.quarks 0.16，MIT）**
+- 共享 `node_modules` 是指向主线的 junction，禁止往里装包；因此把
+  `three.quarks@0.16.0` + `quarks.core@0.16.0` vendored 到 `vendor/`（含 LICENSE 与说明），
+  Vite/Vitest alias + tsconfig paths 解析，**没动 package.json 依赖**。
+- 新 `app/three/vfx/TigerVfx.tsx`：quarks 粒子（火球/烟/火花/网格破片）+ 加色闪光盘 +
+  扩散冲击波 + 焦痕/穿孔贴花 + 瞬态点光 + Bloom。
+- 分相：初焰闪 → 火球（两段膨胀）→ 冲击波 → 火花/破片 → 烟 → 焦痕。
+  轻击 = 穿甲（窄束火花 + 穿孔焦痕，无火球）；重击 = 榴弹（全相）；
+  殉爆 = 座圈处更大全相 + 炮塔掀飞 0.85m + 火势蔓延到发动机舱；发动机起火为持续循环火/烟。
+- 旧手搓火球/火星件已删除（只保留排气烟），避免双份特效；`fx` 默认不参与穿模检测。
+- 性能实测（headless Chrome，1400×900）：空闲 60.5fps / 重击 60.1fps / 连续 5 发榴弹叠加 60.1fps。
+- 录屏：canvas `captureStream(60)` + MediaRecorder → 60fps MP4（1280 宽，H.264）：
+  `docs/recordings/m-p3-cannon.mp4`、`mg-front`、`hit-ap`、`hit-he`、`detonation`、`burning`、
+  `drive`、`pivot`、`multi-blast`。
+
+| 口径        | 结果 |
+| ----------- | ---- |
+| 零件 / 实例 | 236 件 / 2038 实例（+双油箱+加油口，-7 个手搓 fx 件） |
+| 静态报告    | 227 / 未豁免 0（fx 不再进检测）；悬空 20mm 0 / 0 |
+| 测试        | **133 tests**（新增行进 5、战损/发动机/特效 6）；tsc / build ✓ |
+| 性能        | 60fps 级（实测 60.1–60.5）；多爆炸叠加仍 60.1 |
+| 截图        | `m-final-hit-ap-*` / `m-final-hit-he-*` / `m-final-detonation-*` / `m-final-burning` / `m-final-multi-blast`；`m-dmg-broken-*`（首上/顶甲板/炮盾破口）、`m-engine-start-xray`（油箱/发动机透视）、`m-mg-front`、`m-aim-front` |

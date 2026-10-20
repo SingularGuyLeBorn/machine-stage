@@ -689,6 +689,7 @@ const MATERIALS: ModelRegistry["materials"] = {
   rubber_belt: { base: "#26292d", metalness: 0.02, roughness: 0.9, preset: "rubber", envMapIntensity: 0.5 },
   bakelite: { base: "#2f2b26", metalness: 0.1, roughness: 0.6, preset: "none", envMapIntensity: 0.6 },
   brass: { base: "#b3893c", metalness: 0.92, roughness: 0.32, preset: "steel", envMapIntensity: 1.3 },
+  fuel_tank: { base: "#5c6152", metalness: 0.24, roughness: 0.58, preset: "primer", envMapIntensity: 0.8 },
 };
 
 // ---------------------------------------------------------------------------
@@ -2945,6 +2946,44 @@ function buildParts(): PartDefinition[] {
     instance_layout: ENGINE_LAYOUTS.airFilterClamp,
     source: "**[新增]** 四只空滤罐各 1 只：盖体接口处的夹紧带（盖口下沿 12mm），收紧块朝列外上方",
   });
+
+  // ================= 燃油箱（虎式补全） =================
+  // 实车 534L 燃油分装于发动机舱两侧；这里放在风扇外侧 z ±0.72（内壁离风扇叶尖 46mm、
+  // 外壁离车体侧板内表面 30mm），箱体 760 × 720 × 300，底部离地板 170mm。
+  const fuelDamage = (side: 1 | -1): NonNullable<PartDefinition["damage"]> => ({
+    damaged: {
+      type: "merge",
+      parts: [
+        { type: "kit", kit: "fuelTank", params: { w: 0.52, h: 0.68, d: 0.28, side } },
+        {
+          type: "kit",
+          kit: "damageScarV",
+          params: { t: 0.28, at: [0.08, 0.05], r: 0.09, plane: side > 0 ? "z+" : "z-" },
+        },
+      ],
+    },
+    broken: {
+      type: "kit",
+      kit: "fuelTankBroken",
+      params: { w: 0.52, h: 0.68, d: 0.28, side },
+    },
+  });
+  for (const side of [1, -1] as const) {
+    add({
+      id: `tiger.engine.fuel_tank_${side > 0 ? "r" : "l"}`,
+      name_cn: `${side > 0 ? "右" : "左"}燃油箱`,
+      name_en: `Kraftstoffbehälter ${side > 0 ? "rechts" : "links"}`,
+      assembly: "accessory",
+      build_layer: 1,
+      build_order: side > 0 ? 180 : 181,
+      geometry: { type: "kit", kit: "fuelTank", params: { w: 0.52, h: 0.68, d: 0.28, side } },
+      material: "fuel_tank",
+      mate: { type: "absolute", position: [0.46, 0.22, side * 0.74] },
+      damage: fuelDamage(side),
+      source:
+        "虎式 I 燃油箱（实车 534L 分两侧布置；本模型按可用空间 520 × 680 × 280 建模）：三道固定箍 + 外侧加油颈/盖 + 油位传感器 + 内侧出油管 + 放油塞。箱体 x 0.20 ~ 0.72、z ±0.60 ~ ±0.88：前缘离电台支架 30mm、后缘离尾板 110mm、内壁离风扇叶尖 76mm、外壁离侧板 20mm。三态战损：破损 = 凹陷裂痕，破碎 = 外侧撕开露出防晃隔板/吸油管/残油。",
+    });
+  }
 
   return parts;
 }

@@ -5,6 +5,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "three.quarks": fileURLToPath(new URL("./vendor/three.quarks/three.quarks.esm.js", import.meta.url)),
+      "quarks.core": fileURLToPath(new URL("./vendor/quarks.core/quarks.core.esm.js", import.meta.url)),
     },
   },
   test: {

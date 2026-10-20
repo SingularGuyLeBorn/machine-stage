@@ -336,8 +336,44 @@ function buildTurretParts(): PartDefinition[] {
     },
     material: "armor_steel",
     mate: { type: "absolute", position: [mantletCX, c.TR_GUN_Y!, 0] },
+    damage: {
+      damaged: {
+        type: "merge",
+        parts: [
+          {
+            type: "kit",
+            kit: "turretMantlet",
+            params: {
+              w: c.TR_MANTLET_W!,
+              h: c.TR_MANTLET_H!,
+              d: c.TR_MANTLET_D!,
+              collarR: c.TR_COLLAR_R!,
+              collarRi: c.TR_COLLAR_RI!,
+              collarL: c.TR_COLLAR_L!,
+            },
+          },
+          {
+            type: "kit",
+            kit: "damageScarV",
+            params: { t: c.TR_MANTLET_W!, at: [0.18, 0.14], r: 0.09, plane: "x-" },
+          },
+        ],
+      },
+      broken: {
+        type: "kit",
+        kit: "mantletBroken",
+        params: {
+          w: c.TR_MANTLET_W!,
+          h: c.TR_MANTLET_H!,
+          d: c.TR_MANTLET_D!,
+          collarR: c.TR_COLLAR_R!,
+          collarRi: c.TR_COLLAR_RI!,
+          collarL: c.TR_COLLAR_L!,
+        },
+      },
+    },
     source:
-      "炮盾（Blende，120mm 铸造装甲）：860 宽 × 560 高 × 240 厚，盖住炮塔前壁中央（z ±0.43，两侧到壳体外面各剩 510mm 前壁直段）；内面离炮塔前壁外面 3mm（x -2.783 ~ -3.023）。**中央炮口是通孔**：炮盾板挖 ⌀320 孔 + ⌀320/⌀256 × 100 空心套环，炮管 ⌀210 基段从套环内穿过（环缝 45mm；为 ±3.5° 俯仰留量），后坐 450mm 全程不接触。竖直方向盖住壳体高度（1.111 ~ 1.811）的 1.17 ~ 1.73 段，下留 59mm、上留 81mm 板边。",
+      "炮盾（Blende，120mm 铸造装甲）：860 宽 × 560 高 × 240 厚，盖住炮塔前壁中央（z ±0.43，两侧到壳体外面各剩 510mm 前壁直段）；内面离炮塔前壁外面 3mm（x -2.783 ~ -3.023）。**中央炮口是通孔**：炮盾板挖 ⌀320 孔 + ⌀320/⌀256 × 100 空心套环，炮管 ⌀210 基段从套环内穿过（环缝 45mm；为 ±3.5° 俯仰留量），后坐 450mm 全程不接触。竖直方向盖住壳体高度（1.111 ~ 1.811）的 1.17 ~ 1.73 段，下留 59mm、上留 81mm 板边。战损变体：破损 = 铸造面凹陷 + 裂痕；破碎 = 右上角撕裂缺块，露出耳轴座、后坐机筒与线束。",
   });
 
   // ===================== 8,8 cm KwK 36 炮管（中空） =====================
