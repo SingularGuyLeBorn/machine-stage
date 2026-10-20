@@ -503,7 +503,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "servo",
     layer: 5,
     node: NODES.knee,
-    at: [-0.038, 0.24, 0.0465],
+    at: [0.01, 0.24, 0.0465],
     rot: [90, 0, 0],
     hint: "读取踝关节转角（与髋/膝传感器同一总线）",
   });

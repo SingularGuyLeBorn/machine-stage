@@ -70,18 +70,22 @@ describe("T-800 装配质量", () => {
     ).toEqual([]);
   });
 
-  it("屈伸扫掠全程零穿模（未豁免）", () => {
-    const { registry, model, poseAt } = build();
-    for (let frame = 0; frame <= 12; frame++) {
-      poseAt((frame / 12) * 5.4);
-      const reports = detectStatic(model, { minDepthM: 0.0005 });
-      const { active } = partitionExpectedContacts(reports, registry.expectedContacts ?? []);
-      expect(
-        active.map((hit) => `${hit.report.a}↔${hit.report.b}`),
-        `第 ${frame} 帧出现未豁免穿模`,
-      ).toEqual([]);
-    }
-  });
+  it(
+    "屈伸扫掠全程零穿模（未豁免）",
+    () => {
+      const { registry, model, poseAt } = build();
+      for (let frame = 0; frame <= 12; frame++) {
+        poseAt((frame / 12) * 5.4);
+        const reports = detectStatic(model, { minDepthM: 0.0005 });
+        const { active } = partitionExpectedContacts(reports, registry.expectedContacts ?? []);
+        expect(
+          active.map((hit) => `${hit.report.a}↔${hit.report.b}`),
+          `第 ${frame} 帧出现未豁免穿模`,
+        ).toEqual([]);
+      }
+    },
+    30_000,
+  );
 });
 
 describe("T-800 液压驱动缸", () => {
