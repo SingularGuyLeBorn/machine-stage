@@ -130,8 +130,14 @@ export function applyArmourSurface(
         /* glsl */ `#include <color_fragment>
         {
           ${verticalMask}
-          // 淋雨：竖直面压暗 10%，低洼处更深（雨水聚在凹处）
+          // 淋雨：竖直面压暗 10%，再叠「沿壁流下的水痕」——Y 向拉长的噪声成股
           diffuseColor.rgb *= mix(1.0, 0.90, uWet * armourVertical);
+          float wetRun = smoothstep(0.52, 0.86,
+            armourFbm(vec3(vArmourWorld.x * 15.0, vArmourWorld.y * 0.55, vArmourWorld.z * 15.0) + vec3(2.3)));
+          float wetRun2 = smoothstep(0.62, 0.92,
+            armourFbm(vec3(vArmourWorld.x * 31.0, vArmourWorld.y * 1.1, vArmourWorld.z * 31.0) + vec3(7.1)));
+          float wetStreak = max(wetRun, wetRun2 * 0.7) * uWet * armourVertical;
+          diffuseColor.rgb *= mix(1.0, 0.80, wetStreak);
           ${
             zimmerit
               ? `// 防磁棱的高度场同时压暗谷底，让凹凸在平光下也可读
@@ -211,17 +217,23 @@ export function applyArmourSurface(
         float low = (1.0 - smoothstep(-0.35, 0.58, vArmourWorld.y)) * armourVertical;
         float mudN = smoothstep(0.22, 0.72, armourFbm(vArmourWorld * 4.1));
         float chipR = smoothstep(0.855, 0.945, armourFbm(vArmourWorld * 27.0 + vec3(3.2, 8.1, 1.4)));
+        float wetStreakR = max(
+          smoothstep(0.52, 0.86, armourFbm(vec3(vArmourWorld.x * 15.0, vArmourWorld.y * 0.55, vArmourWorld.z * 15.0) + vec3(2.3))),
+          smoothstep(0.62, 0.92, armourFbm(vec3(vArmourWorld.x * 31.0, vArmourWorld.y * 1.1, vArmourWorld.z * 31.0) + vec3(7.1))) * 0.7
+        ) * uWet * armourVertical;
         roughnessFactor = clamp(
           roughnessFactor + 0.15 * grain + 0.10 * low * mudN + 0.05 * armourVertical + 0.07 * chipR,
           0.40,
           1.0
         );
         roughnessFactor = mix(roughnessFactor, max(0.28, roughnessFactor - 0.22), uWet);
+        // 水痕处更亮更滑（成股的水膜）
+        roughnessFactor = mix(roughnessFactor, 0.24, wetStreakR);
       }`,
     );
 
     shader.fragmentShader = fragment;
   };
   material.customProgramCacheKey = () =>
-    `armour-surface-v4-${zimmerit ? 1 : 0}${camo ? 1 : 0}${grime ? 1 : 0}`;
+    `armour-surface-v5-${zimmerit ? 1 : 0}${camo ? 1 : 0}${grime ? 1 : 0}`;
 }
