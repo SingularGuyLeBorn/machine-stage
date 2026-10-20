@@ -10,3 +10,4 @@ export * from "./solver/whitelist";
 export * from "./solver/detect";
 export * from "./kernel/geometry";
 export * from "./kernel/textures";
+export * from "./instanceKey";

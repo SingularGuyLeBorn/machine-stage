@@ -1,5 +1,11 @@
 import * as THREE from "three";
-import { resolveSpec, type AssembledModel, type PartHandle } from "@/three/parts";
+import {
+  instanceKey,
+  parseInstanceKey,
+  resolveSpec,
+  type AssembledModel,
+  type PartHandle,
+} from "@/three/parts";
 
 // ============================================================================
 // app/three/pose —— 视口姿态层（爆炸图 / 透视 / 选中高亮）
@@ -33,6 +39,8 @@ const scratchVector = new THREE.Vector3();
 const scratchQuaternion = new THREE.Quaternion();
 const scratchMatrixA = new THREE.Matrix4();
 const scratchMatrixB = new THREE.Matrix4();
+const scratchMatrixC = new THREE.Matrix4();
+const EMPTY_PARTS: ReadonlySet<string> = new Set();
 
 /** 零件层的爆炸偏移（模型空间）。 */
 export function explodeOffsetOf(
@@ -46,9 +54,18 @@ export function explodeOffsetOf(
 
 /**
  * 爆炸图：非实例件改矩阵（父节点局部），实例件改实例矩阵（模型空间）。
- * 幂等：每帧调用安全（动画循环里先 syncInstances 再调它）。
+ * 幂等：每帧调用安全。
+ *
+ * 实例件分三种基准：
+ *   · 挂节点的 → 本帧 syncInstances 刚写入的绝对位姿；
+ *   · 动画件（motionParts，如负重轮）→ animate 本帧刚写入的位姿；
+ *   · 静态件 → restMatrix（不能读当前矩阵，否则每帧叠加会飞走）。
  */
-export function applyExplode(assembled: AssembledModel, factor: number): void {
+export function applyExplode(
+  assembled: AssembledModel,
+  factor: number,
+  motionParts: ReadonlySet<string> = EMPTY_PARTS,
+): void {
   if (factor === 0) {
     clearExplode(assembled);
     return;
@@ -68,10 +85,14 @@ export function applyExplode(assembled: AssembledModel, factor: number): void {
         .copy(scratchMatrixA.makeTranslation(localOffset.x, localOffset.y, localOffset.z))
         .multiply(handle.instances[0].localMatrix);
     } else {
+      const animated = motionParts.has(handle.partId);
       for (const instance of handle.instances) {
-        const target = assembled.instanceMatrix(handle, instance.index, scratchMatrixB);
-        target.premultiply(scratchMatrixA.makeTranslation(offset.x, offset.y, offset.z));
-        handle.setInstanceMatrix(instance.index, target);
+        const base =
+          instance.node || animated
+            ? assembled.instanceMatrix(handle, instance.index, scratchMatrixB)
+            : instance.restMatrix;
+        scratchMatrixB.copy(base).premultiply(scratchMatrixA.makeTranslation(offset.x, offset.y, offset.z));
+        handle.setInstanceMatrix(instance.index, scratchMatrixB);
       }
     }
   }
@@ -154,15 +175,60 @@ export function applyXray(assembled: AssembledModel, enabled: boolean): void {
   }
 }
 
-/** 选中/悬停高亮：只给目标零件换一份自发光材质克隆，其余还原。 */
+/** 选中/悬停高亮：part 级换材质克隆；给了实例序号时只染那一个实例（instanceColor）。 */
+const highlightTints = new WeakMap<AssembledModel, Array<{ handle: PartHandle; index: number }>>();
+const SELECT_TINT = new THREE.Color(1.8, 3.4, 6.0);
+const HOVER_TINT = new THREE.Color(1.3, 1.6, 2.0);
+const NO_TINT = new THREE.Color(1, 1, 1);
+
+function instanceColorsOf(handle: PartHandle): THREE.InstancedBufferAttribute | null {
+  const mesh = handle.object;
+  if (!(mesh as THREE.InstancedMesh).isInstancedMesh) return null;
+  const instanced = mesh as THREE.InstancedMesh;
+  if (!instanced.instanceColor) {
+    const colors = new Float32Array(handle.instances.length * 3).fill(1);
+    instanced.instanceColor = new THREE.InstancedBufferAttribute(colors, 3);
+  }
+  return instanced.instanceColor;
+}
+
+function tintInstance(handle: PartHandle, index: number, color: THREE.Color): void {
+  const attribute = instanceColorsOf(handle);
+  if (!attribute || index < 0 || index >= handle.instances.length) return;
+  color.toArray(attribute.array as Float32Array, index * 3);
+  attribute.needsUpdate = true;
+}
+
 export function applyHighlight(
   assembled: AssembledModel,
   selectedPartId: string | null,
   hoveredPartId: string | null,
+  selectedInstance: number | null = null,
+  hoveredInstance: number | null = null,
 ): void {
+  // 先清掉上一帧染过的实例
+  for (const entry of highlightTints.get(assembled) ?? []) {
+    tintInstance(entry.handle, entry.index, NO_TINT);
+  }
+  highlightTints.set(assembled, []);
+
   const accent = new THREE.Color("#2f6ea8");
+  const selectedHandle = selectedPartId ? assembled.getPart(selectedPartId) : undefined;
+  const hoveredHandle = hoveredPartId ? assembled.getPart(hoveredPartId) : undefined;
+  const instanceSelected =
+    selectedHandle?.instanced && selectedInstance !== null && selectedHandle.instances[selectedInstance]
+      ? selectedHandle
+      : null;
+
   for (const handle of assembled.parts) {
-    const wanted = handle.partId === selectedPartId ? 0.34 : handle.partId === hoveredPartId ? 0.16 : 0;
+    const wanted =
+      handle === instanceSelected
+        ? 0
+        : handle.partId === selectedPartId
+          ? 0.34
+          : handle.partId === hoveredPartId
+            ? 0.16
+            : 0;
     const object = handle.object;
     const current = object.material as THREE.Material;
     const isClone = object.userData.__highlight === true;
@@ -189,6 +255,79 @@ export function applyHighlight(
     material.emissive = accent;
     material.emissiveIntensity = wanted;
   }
+
+  // 实例级染色：悬停淡、选中亮；同一实例时选中优先
+  const tinted: Array<{ handle: PartHandle; index: number }> = [];
+  const hoverInstanceTarget =
+    hoveredHandle?.instanced && hoveredInstance !== null && hoveredHandle.instances[hoveredInstance]
+      ? hoveredHandle
+      : null;
+  if (hoverInstanceTarget && hoveredInstance !== null) {
+    tintInstance(hoverInstanceTarget, hoveredInstance, HOVER_TINT);
+    tinted.push({ handle: hoverInstanceTarget, index: hoveredInstance });
+  }
+  if (instanceSelected && selectedInstance !== null) {
+    tintInstance(instanceSelected, selectedInstance, SELECT_TINT);
+    tinted.push({ handle: instanceSelected, index: selectedInstance });
+  }
+  highlightTints.set(assembled, tinted);
+}
+
+/** 单实例拆解：按 key 把实例沿模型空间平移（选中轮子 →「拆下」）。幂等：每帧可调。 */
+const appliedDetach = new WeakMap<AssembledModel, Set<string>>();
+
+export function applyDetach(
+  assembled: AssembledModel,
+  detached: readonly string[],
+  options: {
+    motionParts?: ReadonlySet<string>;
+    offsetOf: (partId: string, index: number, count: number) => [number, number, number] | null;
+  },
+): void {
+  const previous = appliedDetach.get(assembled) ?? new Set<string>();
+  const next = new Set(detached);
+  appliedDetach.set(assembled, next);
+
+  // 装回：动画件每帧由 animate 重写，这里只还原静态件
+  for (const key of previous) {
+    if (next.has(key)) continue;
+    const parsed = parseInstanceKey(key);
+    if (!parsed) continue;
+    const handle = assembled.getPart(parsed.partId);
+    const instance = handle?.instances[parsed.index];
+    if (!handle || !instance) continue;
+    if (options.motionParts?.has(handle.partId)) continue;
+    handle.setInstanceMatrix(parsed.index, instance.restMatrix);
+  }
+
+  if (next.size === 0) return;
+  for (const handle of assembled.parts) {
+    if (!handle.instanced) continue;
+    let carriesKey = false;
+    for (const key of next) {
+      if (key.startsWith(`${handle.partId}#`)) {
+        carriesKey = true;
+        break;
+      }
+    }
+    if (!carriesKey) continue;
+    const animated = options.motionParts?.has(handle.partId) ?? false;
+    for (const instance of handle.instances) {
+      if (!next.has(instanceKey(handle.partId, instance.index))) continue;
+      const offset = options.offsetOf(handle.partId, instance.index, handle.instances.length);
+      if (!offset) continue;
+      const base =
+        instance.node || animated
+          ? assembled.instanceMatrix(handle, instance.index, scratchMatrixB)
+          : instance.restMatrix;
+      handle.setInstanceMatrix(
+        instance.index,
+        scratchMatrixC
+          .copy(base)
+          .premultiply(scratchMatrixA.makeTranslation(offset[0], offset[1], offset[2])),
+      );
+    }
+  }
 }
 
 /** 还原全部姿态层（切模型 / 重建 / 卸载时调用）。 */
@@ -196,4 +335,5 @@ export function clearPose(assembled: AssembledModel): void {
   clearExplode(assembled);
   applyXray(assembled, false);
   applyHighlight(assembled, null, null);
+  appliedDetach.delete(assembled);
 }

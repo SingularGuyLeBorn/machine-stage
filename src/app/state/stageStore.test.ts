@@ -451,3 +451,29 @@ describe("stageStore 运行故障（白屏防御）", () => {
     expect(useStageStore.getState().modelId).toBe("tiger");
   });
 });
+
+describe("stageStore 实例检查器（负重轮单拆）", () => {
+  it("selectPart 记住实例序号；toggleDetach 连带 6 颗轮毂螺栓，再点一次装回", () => {
+    const model = findModel("tiger");
+    const assembled = buildModel(model.registry!, {
+      builders: model.builders,
+      instanceLayouts: model.layouts,
+      warnMissingLayout: false,
+    });
+    useStageStore.setState({ modelId: "tiger", assembled, detached: [] });
+
+    useStageStore.getState().selectPart("tiger.suspension.wheel", 20);
+    expect(useStageStore.getState().selectedPart).toBe("tiger.suspension.wheel");
+    expect(useStageStore.getState().selectedInstance).toBe(20);
+    expect(useStageStore.getState().hoveredInstance).toBeNull();
+
+    useStageStore.getState().toggleDetach("tiger.suspension.wheel", 20);
+    const keys = useStageStore.getState().detached;
+    expect(keys).toContain("tiger.suspension.wheel#20");
+    expect(keys.filter((key) => key.startsWith("tiger.suspension.hub_bolt#"))).toHaveLength(6);
+
+    useStageStore.getState().toggleDetach("tiger.suspension.wheel", 20);
+    expect(useStageStore.getState().detached).toHaveLength(0);
+    assembled.dispose();
+  });
+});
