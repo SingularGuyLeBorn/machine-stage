@@ -381,7 +381,7 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
       instanced.name = item.id;
       instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       for (let i = 0; i < count; i++) {
-        const node = instanceNodes ? instanceNodes[i] : null;
+        const node = instanceNodes ? instanceNodes[i]! : (item.def.node ?? null);
         const nodeMatrix = node ? new THREE.Matrix4().copy(nodeRestMatrix(node)) : new THREE.Matrix4();
         const delta = layout
           ? layout({ part: item.def, partId: item.id, index: i, count, constants, node })
@@ -397,7 +397,7 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
       }
       instanced.instanceMatrix.needsUpdate = true;
       instanced.computeBoundingSphere();
-      instanced.frustumCulled = !instanceNodes;
+      instanced.frustumCulled = !instanceNodes && !item.def.node;
       instanced.matrixAutoUpdate = true;
       root.add(instanced);
       handle = {
@@ -409,7 +409,7 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
         buildOrder: item.def.build_order,
         object: instanced,
         instanced: true,
-        node: instanceNodes ? null : (item.def.node ?? null),
+        node: item.def.node ?? (instanceNodes ? null : null),
         geometry,
         instances,
         setInstanceMatrix: (index, value) => {
