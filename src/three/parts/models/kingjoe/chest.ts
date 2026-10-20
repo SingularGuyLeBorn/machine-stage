@@ -430,7 +430,7 @@ function addChestShell(builder: KingJoeParts): void {
     name_en: "shoulder cowl",
     assembly: A,
     layer: 4,
-    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.6, h: 0.5, t: 0.035, corner: 0.09 } },
+    geometry: { type: "kit", kit: "kjChamferPlate", params: { w: 0.5, h: 0.5, t: 0.035, corner: 0.09 } },
     material: "silver",
     node: A,
     mate: mateAt(A, [0, KJ.CHEST_Y + 1.86, 0.51]),

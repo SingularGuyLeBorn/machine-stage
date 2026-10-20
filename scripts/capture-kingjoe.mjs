@@ -117,8 +117,8 @@ async function evaluate(expression, awaitPromise = false) {
 }
 
 async function shot(name) {
-  const { data } = await send("Page.captureScreenshot", { format: "png", fromSurface: true });
-  const file = path.join(SHOTS, name);
+  const { data } = await send("Page.captureScreenshot", { format: "jpeg", quality: 88, fromSurface: true });
+  const file = path.join(SHOTS, name.replace(/\.png$/, ".jpg"));
   fs.writeFileSync(file, Buffer.from(data, "base64"));
   console.log(
     `screenshot ${path.relative(ROOT, file)} (${(Buffer.from(data, "base64").length / 1024).toFixed(0)} KB)`,

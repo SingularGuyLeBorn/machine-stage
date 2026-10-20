@@ -10,6 +10,7 @@ import { addShipParts } from "./ship";
 import { addChestParts } from "./chest";
 import { addStomachParts } from "./stomach";
 import { addLegsParts } from "./legs";
+import { addKingJoeDetails } from "./details";
 import { KINGJOE_LAYOUTS } from "./layouts";
 import { kingjoeBuilders } from "./kits";
 
@@ -28,6 +29,7 @@ export function makeKingJoeRegistry(): ModelRegistry {
   addStomachParts(builder);
   addChestParts(builder);
   addShipParts(builder);
+  addKingJoeDetails(builder);
   for (const dock of DOCKS) addAxialDock(builder, dock);
   const parts = builder.finalize();
 

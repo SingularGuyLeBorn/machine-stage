@@ -1,24 +1,24 @@
 {
   "stats": {
-    "parts": 469,
-    "instances": 663,
+    "parts": 570,
+    "instances": 764,
     "reports": 0,
     "state": "idle",
     "stats": {
-      "parts": 469,
-      "triangles": 265722
+      "parts": 570,
+      "triangles": 305710
     }
   },
-  "fps": 57.1,
+  "fps": 57.2,
   "recording": {
-    "bytes": 4477445,
-    "frames": 613
+    "bytes": 4579625,
+    "frames": 611
   },
   "final": {
     "reports": 0,
     "modelId": "kingjoe",
     "machineState": "idle",
-    "buildIndex": 469
+    "buildIndex": 570
   },
   "pageErrors": [],
   "consoleErrors": []
