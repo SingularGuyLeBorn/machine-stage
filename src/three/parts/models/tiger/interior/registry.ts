@@ -766,6 +766,29 @@ function buildInteriorParts(): PartDefinition[] {
   // ===================== L3 第二批：战斗舱（弹药 / 吊篮 / 座席） =====================
 
   add({
+    id: "tiger.interior.fuse_box",
+    name_cn: "保险丝盒",
+    name_en: "Sicherungskasten",
+    assembly: "interior",
+    build_layer: 3,
+    build_order: 439,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.1, h: 0.16, d: 0.18, at: [0, 0, 0], bevel: 0.004 },
+        { type: "box", w: 0.012, h: 0.13, d: 0.15, at: [-0.058, 0, 0], bevel: 0.002 },
+        { type: "cylinder", r: 0.012, h: 0.03, at: [0.06, 0.03, 0.055], segments: 12, bevel: 0.002 },
+        { type: "cylinder", r: 0.012, h: 0.03, at: [0.06, 0.03, -0.055], segments: 12, bevel: 0.002 },
+        { type: "box", w: 0.008, h: 0.12, d: 0.12, at: [-0.095, 0, 0], bevel: 0.001 },
+        { type: "box", w: 0.03, h: 0.03, d: 0.04, at: [-0.075, 0.05, 0], bevel: 0.001 },
+      ],
+    },
+    material: "bakelite",
+    mate: { type: "absolute", position: [-4.30, 0.25, 0.45] },
+    source:
+      "保险丝盒（Sicherungskasten）：100×160×180 胶木盒 + 前盖 + 2 个接线柱 + 下支架，装在首上装甲内表面驾驶员右侧（x -4.32 / y 0.25 / z +0.45），背面挂架离装甲板 1mm，避开转向柱与航向机枪。",
+  });
+  add({
     id: "tiger.interior.ammo_case",
     name_cn: "8,8 cm 药筒",
     name_en: "8,8 cm Treibladungshülse",

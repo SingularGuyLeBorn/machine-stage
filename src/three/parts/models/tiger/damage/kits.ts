@@ -222,6 +222,156 @@ function exitPetals(
   return petals;
 }
 
+/** 三角网细分（非索引三角形逐级 4 分；位移函数按位置连续，共享边不会裂）。 */
+function subdivide(geometry: THREE.BufferGeometry, iterations: number): THREE.BufferGeometry {
+  let current = geometry.index ? geometry.toNonIndexed() : geometry;
+  for (let iteration = 0; iteration < iterations; iteration++) {
+    const position = current.getAttribute("position");
+    const next: number[] = [];
+    for (let i = 0; i < position.count; i += 3) {
+      const ax = position.getX(i);
+      const ay = position.getY(i);
+      const az = position.getZ(i);
+      const bx = position.getX(i + 1);
+      const by = position.getY(i + 1);
+      const bz = position.getZ(i + 1);
+      const cx = position.getX(i + 2);
+      const cy = position.getY(i + 2);
+      const cz = position.getZ(i + 2);
+      const abx = (ax + bx) / 2;
+      const aby = (ay + by) / 2;
+      const abz = (az + bz) / 2;
+      const bcx = (bx + cx) / 2;
+      const bcy = (by + cy) / 2;
+      const bcz = (bz + cz) / 2;
+      const cax = (cx + ax) / 2;
+      const cay = (cy + ay) / 2;
+      const caz = (cz + az) / 2;
+      next.push(
+        ax, ay, az, abx, aby, abz, cax, cay, caz,
+        abx, aby, abz, bx, by, bz, bcx, bcy, bcz,
+        cax, cay, caz, bcx, bcy, bcz, cx, cy, cz,
+        abx, aby, abz, bcx, bcy, bcz, cax, cay, caz,
+      );
+    }
+    const nextGeometry = new THREE.BufferGeometry();
+    nextGeometry.setAttribute("position", new THREE.Float32BufferAttribute(next, 3));
+    if (current !== geometry) current.dispose();
+    current = nextGeometry;
+  }
+  current.computeVertexNormals();
+  return current;
+}
+
+/**
+ * 只在坑范围内平滑法线：非索引三角形细分后逐面法线是硬的，
+ * 按「同位置顶点」在坑区（椭圆 1.35×）内平均面法线，坑外保持硬边。
+ */
+function smoothNormalsNear(
+  geometry: THREE.BufferGeometry,
+  hit: [number, number],
+  rx: number,
+  ry: number,
+): void {
+  geometry.computeVertexNormals();
+  const position = geometry.getAttribute("position");
+  const normal = geometry.getAttribute("normal");
+  const region = 1.35;
+  const keys: Array<string | null> = new Array(position.count);
+  const sums = new Map<string, { x: number; y: number; z: number; count: number }>();
+  for (let i = 0; i < position.count; i++) {
+    const dx = (position.getX(i) - hit[0]) / (rx * region);
+    const dy = (position.getY(i) - hit[1]) / (ry * region);
+    if (dx * dx + dy * dy > 1) {
+      keys[i] = null;
+      continue;
+    }
+    const key = `${position.getX(i).toFixed(5)}|${position.getY(i).toFixed(5)}|${position.getZ(i).toFixed(5)}`;
+    keys[i] = key;
+    if (!sums.has(key)) sums.set(key, { x: 0, y: 0, z: 0, count: 0 });
+  }
+  for (let i = 0; i < position.count; i += 3) {
+    const nx = normal.getX(i);
+    const ny = normal.getY(i);
+    const nz = normal.getZ(i);
+    for (let k = 0; k < 3; k++) {
+      const key = keys[i + k];
+      if (!key) continue;
+      const sum = sums.get(key)!;
+      sum.x += nx;
+      sum.y += ny;
+      sum.z += nz;
+      sum.count++;
+    }
+  }
+  for (let i = 0; i < position.count; i++) {
+    const key = keys[i];
+    if (!key) continue;
+    const sum = sums.get(key)!;
+    const length = Math.hypot(sum.x, sum.y, sum.z) || 1;
+    normal.setXYZ(i, sum.x / length, sum.y / length, sum.z / length);
+  }
+  normal.needsUpdate = true;
+}
+
+/**
+ * 参数化凹陷：命中点 + 口径 + 板厚 + 入射角 → 坑深/椭圆半径，
+ * 对局部顶点做平滑内推（不是预制凹陷模型）。厚板/小口径只凹不穿。
+ */
+const dentPlate: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const w = num(params, "w");
+  const h = num(params, "h");
+  const t = num(params, "t", 0.03);
+  const hit = pair(params, "hit", [0, 0]);
+  const caliber = num(params, "caliber", 0.05);
+  const angle = THREE.MathUtils.degToRad(num(params, "angleDeg", 15));
+  const push: 1 | -1 = num(params, "push", -1) >= 0 ? 1 : -1;
+  const iterations = Math.max(1, Math.min(3, Math.round(num(params, "subdivide", 2))));
+  const seed = Math.round(num(params, "seed", 1));
+
+  const base = breachedPlate(w, h, t, holesOf(params), rectsOf(params), null, undefined);
+  const geometry = subdivide(base, iterations);
+  base.dispose();
+
+  const radius = caliber * 2.6 + t * 0.6;
+  const rx = radius * (1 + 0.9 * Math.sin(angle));
+  const ry = radius * (1 - 0.25 * Math.sin(angle));
+  const depth = Math.min(
+    t * 0.45,
+    Math.max(0.003, caliber * 0.35 * Math.cos(angle) * Math.sqrt(0.1 / Math.max(t, 0.05))),
+  );
+  const position = geometry.getAttribute("position");
+  for (let i = 0; i < position.count; i++) {
+    const dx = (position.getX(i) - hit[0]) / rx;
+    const dy = (position.getY(i) - hit[1]) / ry;
+    const r2 = dx * dx + dy * dy;
+    if (r2 >= 1) continue;
+    const falloff = (1 - r2) ** 2;
+    position.setZ(i, position.getZ(i) + push * depth * falloff);
+  }
+  position.needsUpdate = true;
+  smoothNormalsNear(geometry, hit, rx, ry);
+
+  // 坑缘放射裂纹（贴在未变形的外表面，坑缘处 falloff≈0）
+  const outerZ = -push * (t / 2);
+  const cracks: THREE.BufferGeometry[] = [];
+  const rand = mulberry32(seed);
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2 + (rand() - 0.5) * 0.3;
+    const length = rx * (0.2 + rand() * 0.35);
+    const crack = bevelBoxGeometry(0.004 + rand() * 0.003, length, 0.003, 0.0007);
+    crack.translate(0, rx * 0.92 + length * 0.35, 0);
+    crack.rotateZ(a - Math.PI / 2);
+    crack.translate(hit[0], hit[1], outerZ - push * 0.0018);
+    cracks.push(crack);
+  }
+  const merged = mergeGeometries([geometry, ...cracks]);
+  geometry.dispose();
+  for (const crack of cracks) crack.dispose();
+  return merged;
+};
+
 /** 入口边缘的小卷边（比出口花瓣小，主要破掉「平切口」的感觉）。 */
 function entryRolls(
   entry: BreachPoint[],
@@ -778,6 +928,7 @@ const smokePuff: GeometryBuilder = (spec) => {
 
 export const tigerDamageKitBuilders: Record<string, GeometryBuilder> = {
   damagePlate,
+  dentPlate,
   damageScarV,
   damageScarH,
   mantletBroken,

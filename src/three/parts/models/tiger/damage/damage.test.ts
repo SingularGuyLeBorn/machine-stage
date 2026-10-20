@@ -92,6 +92,24 @@ describe("tiger/P3 战损三态", () => {
     built.dispose();
   });
 
+  it("凹陷是参数化顶点位移：首上装甲命中点被压入 >8mm", () => {
+    const built = build();
+    const front = built.getPart("tiger.hull.front_plate")!;
+    const geometry = front.damageObjects.damaged!.geometry;
+    const position = geometry.getAttribute("position");
+    let maxZ = -Infinity;
+    for (let i = 0; i < position.count; i++) {
+      const x = position.getX(i);
+      const y = position.getY(i);
+      const z = position.getZ(i);
+      if (Math.hypot(x - 0.42, y - 0.12) < 0.06 && z > 0) maxZ = Math.max(maxZ, z);
+    }
+    // 完好板外表面 z=+0.05；50mm 弹砸 100mm 首上应压入十几毫米
+    expect(maxZ).toBeGreaterThan(0);
+    expect(maxZ).toBeLessThan(0.05 - 0.008);
+    built.dispose();
+  });
+
   it("变体与完好件同位置，破碎几何非空（断面内构在同一网格里）", () => {
     const built = build();
     built.root.updateMatrixWorld(true);
@@ -214,10 +232,11 @@ describe("tiger/P3 发动机 / 事故特效", () => {
   it("弹药殉爆：炮塔掀飞 + 车体冲击；持续燃烧只保留车体震颤", () => {
     const built = build();
     built.resetNodes();
-    animateTigerDetonation(built, 1.3);
+    animateTigerDetonation(built, 2.5);
+    expect(Math.abs(built.root.position.y)).toBeGreaterThan(0.001);
+    animateTigerDetonation(built, 3.2);
     const turret = built.getNode("Turret")!;
     expect(turret.position.y).toBeGreaterThan(0.2);
-    expect(Math.abs(built.root.position.y)).toBeGreaterThan(0.001);
 
     built.resetNodes();
     animateTigerBurning(built, 1.0);

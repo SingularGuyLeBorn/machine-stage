@@ -19,7 +19,7 @@ import {
   Vector3 as QVec3,
   Vector4 as QVec4,
 } from "three.quarks";
-import { TIGER_PREHEAT_END } from "@/three/parts/models/tiger/motion";
+import { TIGER_DETONATION_IMPACT, TIGER_PREHEAT_END } from "@/three/parts/models/tiger/motion";
 import { useStageStore } from "@/app/state/stageStore";
 
 // ============================================================================
@@ -43,6 +43,10 @@ const OBLIQUE = new THREE.Vector3(-1.75, 1.45, 0.955);
 const RICOCHET = new THREE.Vector3(-1.3, 1.36, 0.955);
 const IMPACT_NORMAL = new THREE.Vector3(0, 0, 1);
 const RING = new THREE.Vector3(-1.65, 1.16, 0);
+/** 炮塔顶部排烟风扇罩（泄压阀喷火位置）。 */
+const VENT = new THREE.Vector3(-0.92, 1.9, -0.2);
+/** 车长塔舱口（弹药架升温时冒烟）。 */
+const CUPOLA = new THREE.Vector3(-1.3, 1.95, -0.42);
 const ENGINE_DECK = new THREE.Vector3(0.52, 1.16, 0.34);
 
 /** 确定性伪随机（贴图生成用，避免每次刷新纹理不同）。 */
@@ -77,6 +81,8 @@ interface VfxAssets {
   ricochetTexture: THREE.Texture;
   /** 静态破碎板的热影响/掉漆环（中心透明，叠在几何破口周围）。 */
   heatRingTexture: THREE.Texture;
+  /** 凹陷坑缘的掉漆/磨损环（中心透明，叠在参数化凹陷周围）。 */
+  dentRingTexture: THREE.Texture;
   debrisGeometry: THREE.BufferGeometry;
   debrisMaterial: THREE.MeshStandardMaterial;
   dispose(): void;
@@ -338,6 +344,56 @@ function makeAssets(): VfxAssets {
     }
   });
 
+  // 凹陷坑缘：掉漆/磨损环 + 细裂纹（中心透明，不遮凹坑）
+  const dentRingTexture = canvasTexture(256, (ctx) => {
+    const rand = seeded(97);
+    const cx = 128;
+    const cy = 128;
+    const ring = ctx.createRadialGradient(cx, cy, 26, cx, cy, 120);
+    ring.addColorStop(0, "rgba(0,0,0,0)");
+    ring.addColorStop(0.28, "rgba(0,0,0,0)");
+    ring.addColorStop(0.4, "rgba(36,30,24,0.2)");
+    ring.addColorStop(0.58, "rgba(80,68,52,0.16)");
+    ring.addColorStop(0.8, "rgba(24,20,16,0.1)");
+    ring.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = ring;
+    ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 120; i++) {
+      const angle = rand() * Math.PI * 2;
+      const distance = 38 + rand() * 76;
+      const x = cx + Math.cos(angle) * distance;
+      const y = cy + Math.sin(angle) * distance;
+      const r = 1 + rand() * 5.5;
+      const kind = rand();
+      ctx.fillStyle =
+        kind < 0.55
+          ? `rgba(${145 + Math.round(rand() * 45)},${132 + Math.round(rand() * 40)},${108 + Math.round(rand() * 32)},${0.16 + rand() * 0.32})`
+          : `rgba(24,20,16,${0.14 + rand() * 0.26})`;
+      ctx.beginPath();
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2;
+        const rr = r * (0.55 + rand() * 0.65);
+        const px = x + Math.cos(a) * rr;
+        const py = y + Math.sin(a) * rr;
+        if (k === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2 + (rand() - 0.5) * 0.4;
+      const start = 38 + rand() * 6;
+      const length = 16 + rand() * 42;
+      ctx.strokeStyle = `rgba(10,8,7,${0.3 + rand() * 0.4})`;
+      ctx.lineWidth = 0.7 + rand() * 1.8;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(angle) * start, cy + Math.sin(angle) * start);
+      ctx.lineTo(cx + Math.cos(angle + 0.05) * (start + length), cy + Math.sin(angle + 0.05) * (start + length));
+      ctx.stroke();
+    }
+  });
+
   // 跳弹：长条犁沟 + 亮金属擦痕 + 端部掉漆；没有穿透孔
   const ricochetTexture = canvasTexture(256, (ctx) => {
     const rand = seeded(71);
@@ -421,6 +477,7 @@ function makeAssets(): VfxAssets {
     holeTexture,
     ricochetTexture,
     heatRingTexture,
+    dentRingTexture,
     debrisGeometry,
     debrisMaterial,
     dispose() {
@@ -433,6 +490,7 @@ function makeAssets(): VfxAssets {
       holeTexture.dispose();
       ricochetTexture.dispose();
       heatRingTexture.dispose();
+      dentRingTexture.dispose();
       fireMaterial.dispose();
       smokeMaterial.dispose();
       sparkMaterial.dispose();
@@ -747,7 +805,7 @@ export function TigerVfx() {
   };
   const stateRef = useRef<string>("");
   const elapsed = useRef(0);
-  const phase = useRef({ charge: false, main: false, spread: false, preheat: false });
+  const phase = useRef({ charge: false, vent: false, main: false, spread: false, preheat: false });
 
   useEffect(() => {
     batch.name = "tiger-vfx";
@@ -773,28 +831,31 @@ export function TigerVfx() {
   // 静态破碎板的热影响/掉漆环：只在 damage=broken 时贴在三个几何破口周围
   useEffect(() => {
     clearHeatDecals();
-    if (modelId !== TIGER_ID || damage !== "broken") return;
+    if (modelId !== TIGER_ID || (damage !== "broken" && damage !== "damaged")) return;
+    const texture = damage === "broken" ? assets.heatRingTexture : assets.dentRingTexture;
+    const opacity = damage === "broken" ? 0.62 : 0.8;
+    const scale = damage === "broken" ? 1 : 0.75;
     const decals = [
       makeDecal(
         new THREE.Vector3(-4.506, 0.47, 0.42),
         new THREE.Vector3(-1, 0, 0),
-        [0.82, 0.82],
-        assets.heatRingTexture,
-        0.62,
+        [0.82 * scale, 0.82 * scale],
+        texture,
+        opacity,
       ),
       makeDecal(
         new THREE.Vector3(-3.99, 1.077, 0.15),
         new THREE.Vector3(0, 1, 0),
-        [0.9, 0.9],
-        assets.heatRingTexture,
-        0.6,
+        [0.9 * scale, 0.9 * scale],
+        texture,
+        opacity,
       ),
       makeDecal(
         new THREE.Vector3(0.66, 1.106, 0.35),
         new THREE.Vector3(0, 1, 0),
-        [0.8, 0.8],
-        assets.heatRingTexture,
-        0.58,
+        [0.8 * scale, 0.8 * scale],
+        texture,
+        opacity,
       ),
     ];
     for (const decal of decals) {
@@ -823,7 +884,7 @@ export function TigerVfx() {
     if (stateRef.current !== machineState) {
       stateRef.current = machineState;
       elapsed.current = 0;
-      phase.current = { charge: false, main: false, spread: false, preheat: false };
+      phase.current = { charge: false, vent: false, main: false, spread: false, preheat: false };
       // 一次性爆炸允许播完（连续触发时可同屏叠加）；只有持续燃烧（maxAge=∞）随状态切走
       for (let i = bursts.current.length - 1; i >= 0; i--) {
         const effect = bursts.current[i]!;
@@ -1000,26 +1061,54 @@ export function TigerVfx() {
       impactBurst("he");
     }
     if (machineState === "detonation") {
-      if (!phase.current.charge && t >= 0.12) {
+      if (!phase.current.charge && t >= 0.15) {
         phase.current.charge = true;
-        // 殉爆前奏：炮塔座圈内小股闪光与烟（弹药架升温）
-        const effect = new Burst(1.2);
-        const flash = makeFlash(assets, RING, 1.8);
-        effect.addBillboard(flash.mesh);
-        effect.addTween(0.35, (u) => {
-          flash.material.opacity = 0.7 * (1 - u);
-          flash.mesh.scale.setScalar(1.8 * (1 + u));
+        // 阶段 1：弹药架升温——座圈缝/车长塔口持续冒烟，内部橙色热光脉动
+        const effect = new Burst(TIGER_DETONATION_IMPACT + 0.35);
+        const smokeRing = smokeSystem(assets, 0.5, 2.3);
+        smokeRing.emissionOverTime = new ConstantValue(6);
+        effect.addSystem(batch, smokeRing, RING);
+        const smokeCupola = smokeSystem(assets, 0.35, 2.3);
+        smokeCupola.emissionOverTime = new ConstantValue(4);
+        effect.addSystem(batch, smokeCupola, CUPOLA);
+        const heatLight = new THREE.PointLight(0xff7a33, 0, 8, 2);
+        heatLight.position.copy(RING).add(new THREE.Vector3(0, 0.22, 0));
+        effect.group.add(heatLight);
+        effect.setTick((age) => {
+          heatLight.intensity =
+            age < TIGER_DETONATION_IMPACT ? 2.4 + 1.5 * Math.sin(age * 9) : 0;
         });
-        effect.addSystem(batch, smokeSystem(assets, 0.4, 0.7), RING);
         addBurst(effect);
       }
-      if (!phase.current.main && t >= 0.65) {
+      if (!phase.current.vent && t >= 1.2) {
+        phase.current.vent = true;
+        // 阶段 2：泄压阀喷火——排烟风扇罩向上喷出火舌/火星/烟
+        const effect = new Burst(1.8);
+        const fire = fireSystem(assets, 0.55);
+        fire.startLife = new IntervalValue(0.35, 0.7);
+        fire.startSpeed = new IntervalValue(1.5, 4.5);
+        fire.duration = 1.1;
+        fire.looping = false;
+        fire.emissionOverTime = new ConstantValue(36);
+        fire.emissionBursts = [];
+        effect.addSystem(batch, fire, VENT);
+        effect.addSystem(batch, sparkSystem(assets, 22, 5.5), VENT);
+        effect.addSystem(batch, smokeSystem(assets, 0.3, 1.2), VENT);
+        const ventLight = new THREE.PointLight(0xff8a3a, 0, 7, 2);
+        ventLight.position.copy(VENT).add(new THREE.Vector3(0, 0.25, 0));
+        effect.group.add(ventLight);
+        effect.addTween(1.1, (u) => {
+          ventLight.intensity = 18 * (1 - u) ** 1.2;
+        });
+        addBurst(effect);
+      }
+      if (!phase.current.main && t >= TIGER_DETONATION_IMPACT) {
         phase.current.main = true;
         impactBurst("ammo");
       }
-      if (!phase.current.spread && t >= 1.6) {
+      if (!phase.current.spread && t >= TIGER_DETONATION_IMPACT + 1.2) {
         phase.current.spread = true;
-        // 火势蔓延到发动机舱：一小段持续火 + 烟
+        // 阶段 4：火势蔓延到发动机舱：一小段持续火 + 烟
         const effect = new Burst(5);
         const fire = fireSystem(assets, 0.4);
         fire.duration = 1.4;

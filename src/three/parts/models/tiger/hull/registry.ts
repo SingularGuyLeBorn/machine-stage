@@ -362,24 +362,20 @@ function buildHullParts(): PartDefinition[] {
     },
     damage: {
       damaged: {
-        type: "merge",
-        parts: [
-          {
-            type: "kit",
-            kit: "hullPlate",
-            params: {
-              w: sideOuter * 2,
-              h: shellH,
-              t: c.HULL_FRONT_T!,
-              holes: [[c.HULL_MG_HOLE_Z!, c.HULL_MG_HOLE_Y! - shellCY, c.HULL_MG_HOLE_R!]],
-            },
-          },
-          {
-            type: "kit",
-            kit: "damageScarV",
-            params: { t: c.HULL_FRONT_T!, at: [0.42, 0.12], r: 0.14, plane: "z+" },
-          },
-        ],
+        type: "kit",
+        kit: "dentPlate",
+        params: {
+          w: sideOuter * 2,
+          h: shellH,
+          t: c.HULL_FRONT_T!,
+          holes: [[c.HULL_MG_HOLE_Z!, c.HULL_MG_HOLE_Y! - shellCY, c.HULL_MG_HOLE_R!]],
+          hit: [0.42, 0.12],
+          caliber: 0.075,
+          angleDeg: 20,
+          push: -1,
+          seed: 11,
+          subdivide: 3,
+        },
       },
       broken: {
         type: "kit",
@@ -505,32 +501,28 @@ function buildHullParts(): PartDefinition[] {
     mate: { type: "absolute", position: [roofCX, (roofUnder + roofTop) / 2, 0], rotation: [90, 0, 0] },
     damage: {
       damaged: {
-        type: "merge",
-        parts: [
-          {
-            type: "kit",
-            kit: "hullPlate",
-            params: {
-              w: roofW,
-              h: sideOuter * 2,
-              t: c.HULL_ROOF_T!,
-              holes: [
-                [roofLocalX(c.HULL_TURRET_X!), 0, c.HULL_TURRET_R!],
-                [roofLocalX(c.HULL_HATCH_X!), c.HULL_HATCH_Z!, c.HULL_HATCH_R!],
-                [roofLocalX(c.HULL_HATCH_X!), -c.HULL_HATCH_Z!, c.HULL_HATCH_R!],
-              ],
-              rects: [
-                [roofLocalX(c.HULL_PERI_X!), c.HULL_PERI_Z!, c.HULL_PERI_W!, c.HULL_PERI_H!],
-                [roofLocalX(c.HULL_PERI_X!), -c.HULL_PERI_Z!, c.HULL_PERI_W!, c.HULL_PERI_H!],
-              ],
-            },
-          },
-          {
-            type: "kit",
-            kit: "damageScarV",
-            params: { t: c.HULL_ROOF_T!, at: [-1.35, 0.15], r: 0.12, plane: "z-" },
-          },
-        ],
+        type: "kit",
+        kit: "dentPlate",
+        params: {
+          w: roofW,
+          h: sideOuter * 2,
+          t: c.HULL_ROOF_T!,
+          holes: [
+            [roofLocalX(c.HULL_TURRET_X!), 0, c.HULL_TURRET_R!],
+            [roofLocalX(c.HULL_HATCH_X!), c.HULL_HATCH_Z!, c.HULL_HATCH_R!],
+            [roofLocalX(c.HULL_HATCH_X!), -c.HULL_HATCH_Z!, c.HULL_HATCH_R!],
+          ],
+          rects: [
+            [roofLocalX(c.HULL_PERI_X!), c.HULL_PERI_Z!, c.HULL_PERI_W!, c.HULL_PERI_H!],
+            [roofLocalX(c.HULL_PERI_X!), -c.HULL_PERI_Z!, c.HULL_PERI_W!, c.HULL_PERI_H!],
+          ],
+          hit: [-1.35, 0.15],
+          caliber: 0.03,
+          angleDeg: 15,
+          push: 1,
+          seed: 23,
+          subdivide: 3,
+        },
       },
       broken: {
         type: "kit",
@@ -592,27 +584,23 @@ function buildHullParts(): PartDefinition[] {
     },
     damage: {
       damaged: {
-        type: "merge",
-        parts: [
-          {
-            type: "kit",
-            kit: "hullPlate",
-            params: {
-              w: deckW,
-              h: sideOuter * 2,
-              t: c.HULL_DECK_T!,
-              holes: [
-                [0.616 - deckCX, 0.802, 0.07],
-                [0.616 - deckCX, -0.802, 0.07],
-              ],
-            },
-          },
-          {
-            type: "kit",
-            kit: "damageScarV",
-            params: { t: c.HULL_DECK_T!, at: [0.545, 0.35], r: 0.13, plane: "z-" },
-          },
-        ],
+        type: "kit",
+        kit: "dentPlate",
+        params: {
+          w: deckW,
+          h: sideOuter * 2,
+          t: c.HULL_DECK_T!,
+          holes: [
+            [0.616 - deckCX, 0.802, 0.07],
+            [0.616 - deckCX, -0.802, 0.07],
+          ],
+          hit: [0.545, 0.35],
+          caliber: 0.03,
+          angleDeg: 15,
+          push: 1,
+          seed: 37,
+          subdivide: 3,
+        },
       },
       broken: {
         type: "kit",
@@ -1512,9 +1500,9 @@ export function makeHullRegistry(): ModelRegistry {
     ],
     materials: {
       armor_steel: {
-        base: "#79683f",
+        base: "#6b5a32",
         metalness: 0.12,
-        roughness: 0.74,
+        roughness: 0.77,
         preset: "steel",
         envMapIntensity: 1.0,
       },
