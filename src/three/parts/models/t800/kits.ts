@@ -1,6 +1,12 @@
 import * as THREE from "three";
 import type { GeometryBuilder } from "../../assembler/geometry";
-import { cylinderGeometry, latheGeometry, mergeGeometries, tubeGeometry } from "../../kernel/geometry";
+import {
+  bevelBoxGeometry,
+  cylinderGeometry,
+  latheGeometry,
+  mergeGeometries,
+  tubeGeometry,
+} from "../../kernel/geometry";
 
 // ============================================================================
 // t800/kits —— T-800 腿的专用几何构造器
@@ -35,36 +41,26 @@ function roundedRectShape(width: number, height: number, radius: number): THREE.
   return shape;
 }
 
-/**
- * 方管梁：圆角矩形截面 + 圆形管腔，沿 Y 拉伸。
- * 管腔贯穿全骨（液压线从关节中心穿过），两端口正好是关节盘插销的插入口。
- */
-function beamGeometry(
-  w: number,
-  d: number,
-  h: number,
-  cornerR: number,
-  boreR: number,
-): THREE.BufferGeometry {
-  const shape = roundedRectShape(w - 2 * BEVEL, d - 2 * BEVEL, Math.max(cornerR - BEVEL, 0.002));
-  if (boreR > 0) {
-    const hole = new THREE.Path();
-    hole.absarc(0, 0, boreR, 0, Math.PI * 2, true);
-    shape.holes.push(hole);
-  }
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth: h - 2 * BEVEL,
-    bevelEnabled: true,
-    bevelThickness: BEVEL,
-    bevelSize: BEVEL,
-    bevelSegments: 1,
-    steps: 1,
-    curveSegments: 8,
-  });
-  geometry.translate(0, 0, -(h - 2 * BEVEL) / 2);
-  geometry.rotateX(-Math.PI / 2);
-  return geometry;
+/** 圆角矩形孔（挖空用）。 */
+function roundedRectPath(width: number, height: number, radius: number): THREE.Path {
+  const path = new THREE.Path();
+  const w = Math.max(width, 0.002);
+  const h = Math.max(height, 0.002);
+  const r = Math.max(Math.min(radius, w / 2 - 0.001, h / 2 - 0.001), 0.001);
+  path.moveTo(-w / 2 + r, -h / 2);
+  path.lineTo(w / 2 - r, -h / 2);
+  path.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + r);
+  path.lineTo(w / 2, h / 2 - r);
+  path.quadraticCurveTo(w / 2, h / 2, w / 2 - r, h / 2);
+  path.lineTo(-w / 2 + r, h / 2);
+  path.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - r);
+  path.lineTo(-w / 2, -h / 2 + r);
+  path.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + r, -h / 2);
+  path.closePath();
+  return path;
 }
+
+
 
 /** 叉耳：圆头舌片（XY 轮廓，沿 Z 挤出），中心带轴承孔。 */
 function cheekGeometry(
@@ -95,6 +91,10 @@ function cheekGeometry(
   geometry.translate(0, 0, -(thickness - 2 * BEVEL) / 2);
   return geometry;
 }
+
+
+
+
 
 /**
  * 安装凸台：绕 Y 回转的带盲孔凸台。
@@ -178,6 +178,11 @@ interface BoneKitParams {
   h: number;
   corner: number;
   bore: number;
+  /** 桁架参数：角柱截面 / 横撑环厚 / 环数 / 端板厚 / 端板孔半径 */
+  rail?: number;
+  ringT?: number;
+  ringCount?: number;
+  endT?: number;
   /** 端部叉耳：{ y, z } —— 圆头中心 y、所在 z */
   cheeks?: Array<{ y: number; z: number }>;
   cheekR: number;
@@ -195,11 +200,27 @@ interface BoneKitParams {
     boreDepth: number;
     embed: number;
   }>;
+  /** 安装座垫块（把凸台接到骨架上，替代"贴在光板面上"） */
+  padW?: number;
+  padH?: number;
+  padT?: number;
 }
 
 function boneKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeometry {
   const p = spec.params as unknown as BoneKitParams;
-  const pieces: THREE.BufferGeometry[] = [beamGeometry(p.w, p.d, p.h, p.corner, p.bore)];
+  const pieces: THREE.BufferGeometry[] = [
+    trussBeam(
+      p.w,
+      p.d,
+      p.h,
+      p.rail ?? 0.013,
+      p.ringT ?? 0.009,
+      p.ringCount ?? 4,
+      p.endT ?? 0.014,
+      p.bore > 0 ? p.bore : 0,
+      p.corner,
+    ),
+  ];
   for (const cheek of p.cheeks ?? []) {
     const geometry = cheekGeometry(
       p.cheekR,
@@ -212,6 +233,15 @@ function boneKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeomet
     pieces.push(geometry);
   }
   for (const mount of p.mounts ?? []) {
+    // 安装座垫块：把凸台接到骨架上（不再"贴在光板面上"）
+    const padW = p.padW ?? 0.034;
+    const padH = p.padH ?? 0.034;
+    const padT = p.padT ?? 0.016;
+    if (padT > 0) {
+      const pad = bevelBoxGeometry(padW, padH, padT, BEVEL);
+      pad.translate(mount.x, mount.y, mount.side * (p.d / 2 - padT / 2));
+      pieces.push(pad);
+    }
     const geometry = bossGeometry(
       mount.faceR,
       mount.out + mount.embed,
@@ -225,13 +255,163 @@ function boneKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeomet
   return mergeGeometries(pieces);
 }
 
+/**
+ * 桁架骨段：4 根纵向角柱 + N 道横撑环 + 两端带孔端板。
+ * 骨段不再是"实心光板"，而是能看穿的空间框架 —— 内部管腔与连杆从环与环之间露出来。
+ */
+function trussBeam(
+  w: number,
+  d: number,
+  h: number,
+  rail: number,
+  ringT: number,
+  ringCount: number,
+  endT: number,
+  holeR: number,
+  cornerR: number,
+): THREE.BufferGeometry {
+  const pieces: THREE.BufferGeometry[] = [];
+  const halfH = h / 2;
+  // 纵向角柱
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const post = bevelBoxGeometry(rail, h - endT * 2, rail, BEVEL);
+      post.translate(sx * (w / 2 - rail / 2), 0, sz * (d / 2 - rail / 2));
+      pieces.push(post);
+    }
+  }
+  // 横撑环（外廓贴住截面，内孔挖空）
+  const ringOuter = roundedRectShape(w, d, cornerR);
+  const ringInner = roundedRectPath(w - ringT * 2, d - ringT * 2, Math.max(cornerR - ringT, 0.002));
+  ringOuter.holes.push(ringInner);
+  for (let i = 0; i < ringCount; i++) {
+    const y = -halfH + endT + ((i + 1) * (h - endT * 2)) / (ringCount + 1);
+    const ring = new THREE.ExtrudeGeometry(ringOuter, {
+      depth: ringT - 2 * BEVEL,
+      bevelEnabled: true,
+      bevelThickness: BEVEL,
+      bevelSize: BEVEL,
+      bevelSegments: 1,
+      steps: 1,
+      curveSegments: 6,
+    });
+    ring.translate(0, 0, -(ringT - 2 * BEVEL) / 2);
+    ring.rotateX(-Math.PI / 2);
+    ring.translate(0, y, 0);
+    pieces.push(ring);
+  }
+  // 端板：带圆孔，给关节盘插销当插座
+  for (const sy of [-1, 1]) {
+    const plate = roundedRectShape(w, d, cornerR);
+    if (holeR > 0) {
+      const hole = new THREE.Path();
+      hole.absarc(0, 0, holeR, 0, Math.PI * 2, true);
+      plate.holes.push(hole);
+    }
+    const geometry = new THREE.ExtrudeGeometry(plate, {
+      depth: endT - 2 * BEVEL,
+      bevelEnabled: true,
+      bevelThickness: BEVEL,
+      bevelSize: BEVEL,
+      bevelSegments: 1,
+      steps: 1,
+      curveSegments: 6,
+    });
+    geometry.translate(0, 0, -(endT - 2 * BEVEL) / 2);
+    geometry.rotateX(-Math.PI / 2);
+    geometry.translate(0, sy * (halfH - endT / 2), 0);
+    pieces.push(geometry);
+  }
+  return mergeGeometries(pieces);
+}
+
+/**
+ * 开放框板：矩形外廓挖一个大孔（局部 +Y = 板厚方向）。
+ * 用来做「局部护板 / 骨盆框板」——不是整块壳，是能看穿内部的框。
+ */
+interface FrameKitParams {
+  w: number;
+  d: number;
+  t: number;
+  holeW: number;
+  holeD: number;
+  corner: number;
+  /** 孔心偏移（X / Z），让框板一侧留出实心安装区 */
+  holeX?: number;
+  holeZ?: number;
+}
+
+function frameKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeometry {
+  const p = spec.params as unknown as FrameKitParams;
+  const outer = roundedRectShape(p.w, p.d, p.corner);
+  const band = Math.max((p.w - p.holeW) / 2, 0.002);
+  const hole = roundedRectPath(p.holeW, p.holeD, Math.max(p.corner - band, 0.002));
+  const holeX = p.holeX ?? 0;
+  const holeZ = p.holeZ ?? 0;
+  if (holeX !== 0 || holeZ !== 0) {
+    // 偏移孔：把孔轮廓平移后再挖（Path 的曲线要重新描一遍）
+    const moved = new THREE.Path();
+    const w = p.holeW;
+    const h = p.holeD;
+    const r = Math.max(p.corner - band, 0.002);
+    const cx = holeX;
+    const cz = holeZ;
+    moved.moveTo(cx - w / 2 + r, cz - h / 2);
+    moved.lineTo(cx + w / 2 - r, cz - h / 2);
+    moved.quadraticCurveTo(cx + w / 2, cz - h / 2, cx + w / 2, cz - h / 2 + r);
+    moved.lineTo(cx + w / 2, cz + h / 2 - r);
+    moved.quadraticCurveTo(cx + w / 2, cz + h / 2, cx + w / 2 - r, cz + h / 2);
+    moved.lineTo(cx - w / 2 + r, cz + h / 2);
+    moved.quadraticCurveTo(cx - w / 2, cz + h / 2, cx - w / 2, cz + h / 2 - r);
+    moved.lineTo(cx - w / 2, cz - h / 2 + r);
+    moved.quadraticCurveTo(cx - w / 2, cz - h / 2, cx - w / 2 + r, cz - h / 2);
+    moved.closePath();
+    outer.holes.push(moved);
+  } else {
+    outer.holes.push(hole);
+  }
+  const geometry = new THREE.ExtrudeGeometry(outer, {
+    depth: p.t - 2 * BEVEL,
+    bevelEnabled: true,
+    bevelThickness: BEVEL,
+    bevelSize: BEVEL,
+    bevelSegments: 1,
+    steps: 1,
+    curveSegments: 8,
+  });
+  geometry.translate(0, 0, -(p.t - 2 * BEVEL) / 2);
+  geometry.rotateX(-Math.PI / 2);
+  return geometry;
+}
+
+/**
+ * 单个安装凸台：盲孔沿 +Z，凸出面在 z=0（基座伸向 -Z）。
+ * 骨段本体做成开放骨架后，凸台没法再"长"在光板面上，改为独立件挂上去。
+ */
+interface BossKitParams {
+  faceR: number;
+  len: number;
+  boreR: number;
+  boreDepth: number;
+  /** 凸台轴向：+1 = 凸出面朝 +Z，-1 = 朝 -Z */
+  dir?: number;
+}
+
+function bossKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeometry {
+  const p = spec.params as unknown as BossKitParams;
+  const geometry = bossGeometry(p.faceR, p.len, p.boreR, p.boreDepth);
+  // 凸出面在 z=0，基座伸向 -Z（与骨段 kit 里的凸台同一朝向）
+  geometry.rotateX(Math.PI / 2);
+  if ((p.dir ?? 1) < 0) geometry.rotateY(Math.PI);
+  return geometry;
+}
+
 interface CheekKitParams {
   r: number;
   boreR: number;
   thickness: number;
   top: number;
 }
-
 /** 单片叉耳：圆头舌片，圆心（销孔）在局部原点。 */
 function cheekKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeometry {
   const p = spec.params as unknown as CheekKitParams;
@@ -279,7 +459,9 @@ function eyeKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeometr
 /** T-800 全部 kit 构造器。 */
 export const t800Builders: Record<string, GeometryBuilder> = {
   t800Bone: boneKit as GeometryBuilder,
+  t800Boss: bossKit as GeometryBuilder,
   t800Cheek: cheekKit as GeometryBuilder,
+  t800Frame: frameKit as GeometryBuilder,
   t800JointDisc: jointDiscKit as GeometryBuilder,
   t800Eye: eyeKit as GeometryBuilder,
 };

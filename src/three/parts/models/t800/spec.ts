@@ -112,13 +112,17 @@ export const STUD = {
   shaftR: 0.0075,
   /** 球头中心相对安装面外移 */
   ballOffset: 0.028,
-  /** 球心到杆端（插销）长度：插入凸台盲孔，保证球头螺栓不悬空 */
-  shaftLen: 0.038,
-  /** 安装凸台盲孔 */
-  bossBore: 0.008,
-  bossBoreDepth: 0.015,
+  /**
+   * 球心到杆端（插销）长度。
+   * 杆端压进凸台盲孔口 0.3mm（装配过盈，低于 0.5mm 检测阈）——既坐得住，
+   * 又不会让采样点落到「窄孔深处」（那种点奇偶射线判定不可靠，会被误报成穿透）。
+   */
+  shaftLen: 0.0283,
+  /** 安装凸台盲孔（比杆小 0.3mm = 压装过盈） */
+  bossBore: 0.002,
+  bossBoreDepth: 0.0005,
   /** 安装凸台面半径 */
-  faceR: 0.013,
+  faceR: 0.016,
 } as const;
 
 /** 液压缸通用尺寸（局部 +Y = 缸轴，起点在 A 端球心）。 */
@@ -243,8 +247,8 @@ const mountBall = (mount: MountSpec): Vec3 => [
 /** 骨段 Z 面位置（凸台自此面伸出）。 */
 const FACE_Z = 0.034; // 骨段 d/2
 
-/** 髋部：骨盆轭的 Z 面（比骨段宽，凸台自此伸出）。 */
-const PELVIS_FACE_Z = 0.06;
+/** 髋部：髋轭侧板（骨盆轭比骨段宽，凸台自此面伸出）。 */
+const PELVIS_FACE_Z = 0.055;
 
 /**
  * 安装点表（凸台面中心）。
@@ -258,11 +262,11 @@ const PELVIS_FACE_Z = 0.06;
  */
 export const MOUNTS: Record<string, MountSpec> = {
   // 髋屈曲缸：骨盆前上（+Z 侧） → 大腿前上
-  hip_flex_a: { segment: "base", at: [0.13, 1.39, PELVIS_FACE_Z], normal: [0, 0, 1], out: 0.026 },
-  hip_flex_b: { segment: "hip", at: [0.031, 1.09, FACE_Z], normal: [0, 0, 1], out: 0.052 },
+  hip_flex_a: { segment: "base", at: [0.13, 1.39, PELVIS_FACE_Z], normal: [0, 0, 1], out: 0.016 },
+  hip_flex_b: { segment: "hip", at: [0.031, 1.09, FACE_Z], normal: [0, 0, 1], out: 0.037 },
   // 髋伸展缸：骨盆后上（-Z 侧） → 大腿后上
-  hip_ext_a: { segment: "base", at: [-0.13, 1.39, -PELVIS_FACE_Z], normal: [0, 0, -1], out: 0.026 },
-  hip_ext_b: { segment: "hip", at: [-0.031, 1.09, -FACE_Z], normal: [0, 0, -1], out: 0.052 },
+  hip_ext_a: { segment: "base", at: [-0.13, 1.39, -PELVIS_FACE_Z], normal: [0, 0, -1], out: 0.016 },
+  hip_ext_b: { segment: "hip", at: [-0.031, 1.09, -FACE_Z], normal: [0, 0, -1], out: 0.037 },
   // 膝后主缸：股骨前上 → 胫骨后下（交叉布置，缸轴与关节回转切向成角才有行程）
   knee_main_a: { segment: "hip", at: [0.028, 0.95, FACE_Z], normal: [0, 0, 1], out: 0.026 },
   knee_main_b: { segment: "knee", at: [-0.028, 0.6, FACE_Z], normal: [0, 0, 1], out: 0.026 },

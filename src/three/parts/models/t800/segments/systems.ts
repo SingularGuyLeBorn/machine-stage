@@ -10,33 +10,6 @@ import { NODE_PIVOT, NODES, STUD, T800_STUDS } from "../spec";
 // 球头螺栓 12 件实例化，跟着各自骨段节点走，是缸体/杆端耳环与骨面之间的唯一连接件。
 // ============================================================================
 
-/** 护甲螺栓位置（模型坐标；螺栓轴沿 X 拧在护甲面上）。 */
-const BOLT_POSITIONS: ReadonlyArray<readonly [number, number, number]> = [
-  [0.0585, 1.13, 0.035],
-  [0.0585, 0.87, 0.035],
-  [0.0585, 1.13, -0.035],
-  [0.0585, 0.87, -0.035],
-  [0.0585, 1.01, 0.035],
-  [0.0585, 1.01, -0.035],
-];
-
-/** 安装面密封圈的位置（模型坐标）与所属节点。 */
-const MOUNT_SEAL_POSITIONS: ReadonlyArray<readonly [number, number, number]> = [
-  [0.031, 1.09, 0.087],
-  [-0.031, 1.09, -0.087],
-  [-0.028, 0.975, 0.061],
-  [0.028, 0.955, -0.061],
-  [0.028, 0.3, 0.061],
-  [-0.028, 0.3, -0.061],
-];
-const MOUNT_SEAL_NODES: string[] = [
-  NODES.hip,
-  NODES.hip,
-  NODES.hip,
-  NODES.hip,
-  NODES.knee,
-  NODES.knee,
-];
 
 export function buildSystems(builder: PartBuilder, layouts: Record<string, InstanceLayout>): void {
   // ===================== 液压站（装在骨盆顶板上方）=====================
@@ -49,7 +22,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "frame",
     layer: 1,
     node: NODES.base,
-    at: [0, 1.585, -0.04],
+    at: [0, 1.562, -0.04],
     hint: "三关节伺服阀的共用油路块，坐在骨盆顶板上",
   });
   builder.add({
@@ -61,16 +34,16 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "servo",
     layer: 2,
     node: NODES.base,
-    at: [0, 1.585, 0],
+    at: [0, 1.562, 0],
     inst: 3,
     layout: "t800.hydraulics.servos",
     instNodes: repeatNode(NODES.base, 3),
     hint: "髋 / 膝 / 踝各一只伺服阀，闭环控制缸的伸缩量",
   });
   layouts["t800.hydraulics.servos"] = instanceLayout(NODES.base, [
-    [0, 1.585, -0.032],
-    [0, 1.585, 0],
-    [0, 1.585, 0.032],
+    [-0.03, 1.562, 0.032],
+    [0, 1.562, 0.032],
+    [0.03, 1.562, 0.032],
   ]);
   builder.add({
     id: "t800.hydraulics.accumulator",
@@ -81,7 +54,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "dark_chrome",
     layer: 2,
     node: NODES.base,
-    at: [-0.02, 1.67, -0.04],
+    at: [-0.02, 1.647, -0.04],
     hint: "吸收屈伸冲击，保证活塞行程平顺（不出现瞬动）；立在阀块顶面",
   });
   builder.add({
@@ -99,20 +72,9 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     instNodes: repeatNode(NODES.base, 2),
   });
   layouts["t800.hydraulics.clamps"] = instanceLayout(NODES.base, [
-    [-0.02, 1.705, -0.04],
-    [-0.02, 1.635, -0.04],
+    [-0.02, 1.682, -0.04],
+    [-0.02, 1.612, -0.04],
   ]);
-  builder.add({
-    id: "t800.hydraulics.filter",
-    cn: "回油滤清器",
-    en: "Return line filter",
-    asm: "hydraulics",
-    geom: { type: "cylinder", r: 0.02, h: 0.055, segments: 20, bevel: 0.003 },
-    mat: "gunmetal",
-    layer: 2,
-    node: NODES.base,
-    at: [0.14, 1.588, -0.04],
-  });
   builder.add({
     id: "t800.hydraulics.gauge",
     cn: "压力表",
@@ -122,9 +84,9 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "brass",
     layer: 5,
     node: NODES.base,
-    at: [0.03, 1.6285, -0.04],
+    at: [0.03, 1.605, 0],
     rot: [90, 0, 0],
-    hint: "读缸压（0.5mm 垫圈座在阀块顶面）",
+    hint: "读缸压（表盘坐在阀块顶面）",
   });
   builder.add({
     id: "t800.hydraulics.supply",
@@ -135,7 +97,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "brass",
     layer: 3,
     node: NODES.base,
-    at: [-0.03, 1.64, -0.085],
+    at: [-0.03, 1.567, -0.111],
     hint: "供油管向下接骨盆轭，再经大腿/小腿硬管到各缸",
   });
   builder.add({
@@ -147,29 +109,8 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "brass",
     layer: 3,
     node: NODES.base,
-    at: [0.03, 1.64, -0.085],
+    at: [0.03, 1.567, -0.111],
   });
-  builder.add({
-    id: "t800.hydraulics.fittings",
-    cn: "液压站管接头",
-    en: "Station fitting",
-    asm: "hydraulics",
-    geom: { type: "tube", rOuter: 0.012, rInner: 0.0085, h: 0.014, segments: 16 },
-    mat: "brass",
-    layer: 4,
-    node: NODES.base,
-    at: [-0.03, 1.625, -0.085],
-    inst: 4,
-    layout: "t800.hydraulics.fittings",
-    instNodes: repeatNode(NODES.base, 4),
-    hint: "阀块与供回油管之间的卡套接头（内孔 0.5mm 间隙包住油管）",
-  });
-  layouts["t800.hydraulics.fittings"] = instanceLayout(NODES.base, [
-    [-0.03, 1.625, -0.085],
-    [0.03, 1.625, -0.085],
-    [-0.03, 1.66, -0.085],
-    [0.03, 1.66, -0.085],
-  ]);
   builder.add({
     id: "t800.hydraulics.harness",
     cn: "传感线束",
@@ -179,9 +120,9 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "rubber",
     layer: 5,
     node: NODES.base,
-    at: [0.05, 1.566, -0.112],
+    at: [0.05, 1.5435, 0.1],
     rot: [0, 0, 90],
-    hint: "沿骨盆顶板走的信号束，接角度传感器与伺服阀",
+    hint: "沿骨盆框板前缘走的信号束（外露可见），接角度传感器与伺服阀",
   });
 
   builder.add({
@@ -189,11 +130,11 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     cn: "液压泵",
     en: "Hydraulic pump",
     asm: "hydraulics",
-    geom: { type: "cylinder", r: 0.026, h: 0.07, segments: 24, bevel: 0.003 },
+    geom: { type: "cylinder", r: 0.026, h: 0.052, segments: 24, bevel: 0.003 },
     mat: "gunmetal",
     layer: 2,
     node: NODES.base,
-    at: [0.11, 1.595, 0.03],
+    at: [0.09, 1.563, 0.04],
     hint: "腿段液压泵（躯干主泵的分支），驱动六根缸",
   });
   builder.add({
@@ -201,11 +142,11 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     cn: "油箱",
     en: "Reservoir tank",
     asm: "hydraulics",
-    geom: { type: "box", w: 0.08, h: 0.06, d: 0.05, bevel: 0.005 },
+    geom: { type: "cylinder", r: 0.028, h: 0.05, segments: 24, bevel: 0.003 },
     mat: "frame",
     layer: 2,
     node: NODES.base,
-    at: [-0.12, 1.593, 0.04],
+    at: [0.02, 1.612, 0.04],
     hint: "腿段油箱，给六根缸供油",
   });
   builder.add({
@@ -217,8 +158,20 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "servo",
     layer: 5,
     node: NODES.base,
-    at: [0.072, 1.573, -0.02],
+    at: [0, 1.5997, 0],
     hint: "监测主缸缸压，配合蓄能器做冲击吸收",
+  });
+  builder.add({
+    id: "t800.hydraulics.filter",
+    cn: "回油滤清器",
+    en: "Return line filter",
+    asm: "hydraulics",
+    geom: { type: "cylinder", r: 0.02, h: 0.055, segments: 20, bevel: 0.003 },
+    mat: "gunmetal",
+    layer: 2,
+    node: NODES.base,
+    at: [0.145, 1.5642, 0.04],
+    hint: "回油路上的滤清器（装在骨盆框板上）",
   });
   builder.add({
     id: "t800.hydraulics.relief",
@@ -229,21 +182,8 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "brass",
     layer: 2,
     node: NODES.base,
-    at: [-0.075, 1.575, -0.04],
+    at: [-0.03, 1.602, 0],
     hint: "系统限压，防止屈伸末端憋压",
-  });
-  builder.add({
-    id: "t800.hydraulics.cooler_line",
-    cn: "回油冷却管",
-    en: "Cooler return line",
-    asm: "hydraulics",
-    geom: { type: "cylinder", r: 0.006, h: 0.16, segments: 14 },
-    mat: "dark_chrome",
-    layer: 4,
-    node: NODES.base,
-    at: [0.0, 1.6, 0.05],
-    rot: [0, 0, 90],
-    hint: "泵与油箱之间的冷却回油管",
   });
 
   // ===================== 紧固件族 =====================
@@ -256,7 +196,13 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
       type: "merge",
       parts: [
         { type: "sphere", r: STUD.ballR, segments: 24 },
-        { type: "cylinder", r: STUD.shaftR, h: STUD.shaftLen, segments: 14, at: [0, -0.019, 0] },
+        {
+          type: "cylinder",
+          r: STUD.shaftR,
+          h: STUD.shaftLen,
+          segments: 14,
+          at: [0, -STUD.shaftLen / 2, 0],
+        },
       ],
     },
     mat: "chrome",
@@ -277,37 +223,11 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     return new THREE.Matrix4().compose(position, q, new THREE.Vector3(1, 1, 1));
   };
   builder.add({
-    id: "t800.fasteners.bolts",
-    cn: "护甲螺栓",
-    en: "Armor bolt",
-    asm: "fasteners",
-    geom: { type: "cylinder", r: 0.0055, h: 0.009, segments: 12, bevel: 0.0008 },
-    mat: "dark_chrome",
-    layer: 4,
-    node: NODES.hip,
-    at: [0, 1.0, 0],
-    inst: 6,
-    layout: "t800.fasteners.bolts",
-    instNodes: repeatNode(NODES.hip, 6),
-    hint: "护甲固定螺栓（实例族，螺栓轴沿 X 拧在护甲面上）",
-  });
-  // 实例矩阵里自带旋转：bolt 的轴要转到 +X。
-  layouts["t800.fasteners.bolts"] = ({ index }: { index: number }) => {
-    const p = BOLT_POSITIONS[index] ?? BOLT_POSITIONS[0];
-    const pivot = NODE_PIVOT[NODES.hip];
-    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
-    return new THREE.Matrix4().compose(
-      new THREE.Vector3(p[0] - pivot[0], p[1] - pivot[1], p[2] - pivot[2]),
-      q,
-      new THREE.Vector3(1, 1, 1),
-    );
-  };
-  builder.add({
     id: "t800.fasteners.washers",
     cn: "密封垫圈族",
     en: "Seal washer",
     asm: "fasteners",
-    geom: { type: "tube", rOuter: 0.009, rInner: 0.0058, h: 0.0015, segments: 14 },
+    geom: { type: "tube", rOuter: 0.008, rInner: 0.0062, h: 0.002, segments: 14 },
     mat: "rubber",
     layer: 4,
     node: NODES.knee,
@@ -315,39 +235,14 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     inst: 4,
     layout: "t800.fasteners.washers",
     instNodes: repeatNode(NODES.knee, 4),
-    hint: "硬管接头的密封垫圈（实例族）",
+    hint: "硬管接头处的密封垫圈（实例族）",
   });
   layouts["t800.fasteners.washers"] = instanceLayout(NODES.knee, [
-    [0.064, 0.2515, 0.02],
-    [0.064, 0.4915, 0.02],
-    [0.064, 0.2515, -0.02],
-    [0.064, 0.4915, -0.02],
+    [0.055, 0.2515, 0.02],
+    [0.055, 0.4915, 0.02],
+    [0.055, 0.2515, -0.02],
+    [0.055, 0.4915, -0.02],
   ]);
-  builder.add({
-    id: "t800.fasteners.mount_seals",
-    cn: "安装面密封圈族",
-    en: "Mount face seal",
-    asm: "fasteners",
-    geom: { type: "tube", rOuter: 0.0155, rInner: 0.0135, h: 0.002, segments: 20 },
-    mat: "rubber",
-    layer: 4,
-    node: NODES.hip,
-    at: [0, 1.0, 0],
-    inst: 6,
-    layout: "t800.fasteners.mount_seals",
-    instNodes: [NODES.hip, NODES.hip, NODES.hip, NODES.hip, NODES.knee, NODES.knee],
-    hint: "每个安装凸台面上的 O 型密封圈（实例族，密封面垂直于销轴）",
-  });
-  layouts["t800.fasteners.mount_seals"] = ({ index }: { index: number }) => {
-    const p = MOUNT_SEAL_POSITIONS[index] ?? MOUNT_SEAL_POSITIONS[0];
-    const pivot = NODE_PIVOT[MOUNT_SEAL_NODES[index]] ?? [0, 0, 0];
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0, "XYZ"));
-    return new THREE.Matrix4().compose(
-      new THREE.Vector3(p[0] - pivot[0], p[1] - pivot[1], p[2] - pivot[2]),
-      q,
-      new THREE.Vector3(1, 1, 1),
-    );
-  };
   builder.add({
     id: "t800.hip.tie_rod",
     cn: "骨盆拉杆",
@@ -357,7 +252,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "chrome",
     layer: 2,
     node: NODES.base,
-    at: [-0.14, 1.5655, 0.09],
+    at: [-0.14, 1.542, 0.06],
     rot: [0, 0, 90],
     hint: "骨盆顶板上的横向拉杆（与躯干接口的抗扭件）",
   });
