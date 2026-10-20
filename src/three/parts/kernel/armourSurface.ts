@@ -91,9 +91,10 @@ export function applyArmourSurface(
           vec3 armourHorizontal = abs(vArmourNormal.x) > 0.55 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
           float armourCoord = dot(vArmourWorld.xz, normalize(armourHorizontal.xz));
           float ridge = armourCoord * 72.0
-            + 1.15 * sin(vArmourWorld.y * 5.0)
-            + 0.85 * sin(armourCoord * 3.1 + vArmourWorld.y * 1.7)
-            + 2.6 * armourFbm(vArmourWorld * 2.4);
+            + 1.35 * sin(vArmourWorld.y * 5.0 + armourFbm(vArmourWorld * 1.3) * 2.2)
+            + 1.05 * sin(armourCoord * 3.1 + vArmourWorld.y * 1.7)
+            + 2.9 * armourFbm(vArmourWorld * 2.4)
+            + 1.1 * armourFbm(vArmourWorld * 0.9 + vec3(3.3));
           float dh = cos(ridge);
           // 顶面法线≈+Y 时 cross(up,normal) 长度为 0，必须给退化面一个确定切线，
           // 否则 normalize(0) = NaN，整块顶盖/壳体会变黑或直接不可见。
@@ -104,7 +105,7 @@ export function applyArmourSurface(
             : vec3(1.0, 0.0, 0.0);
           vec3 perturbWorld = tangent * dh + vec3(0.0, 1.0, 0.0) * 0.35 * cos(ridge * 0.7 + 1.7);
           vec3 perturbView = (viewMatrix * vec4(perturbWorld * armourVertical, 0.0)).xyz;
-          normal = normalize(normal + perturbView * 0.52);
+          normal = normalize(normal + perturbView * 0.62);
 
           // 手抹涂层的细小表面粗糙（顶面也有，只弱一些）
           float micro = armourFbm(vArmourWorld * 19.0) - 0.5;
@@ -127,26 +128,30 @@ export function applyArmourSurface(
             vec3 hAxis = abs(vArmourNormal.x) > 0.55 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
             float coord = dot(vArmourWorld.xz, normalize(hAxis.xz));
             float ridgeH = cos(coord * 72.0
-              + 1.15 * sin(vArmourWorld.y * 5.0)
-              + 0.85 * sin(coord * 3.1 + vArmourWorld.y * 1.7)
-              + 2.6 * armourFbm(vArmourWorld * 2.4));
+              + 1.35 * sin(vArmourWorld.y * 5.0 + armourFbm(vArmourWorld * 1.3) * 2.2)
+              + 1.05 * sin(coord * 3.1 + vArmourWorld.y * 1.7)
+              + 2.9 * armourFbm(vArmourWorld * 2.4)
+              + 1.1 * armourFbm(vArmourWorld * 0.9 + vec3(3.3)));
             float relief = clamp(ridgeH * 0.5 + 0.5, 0.0, 1.0);
-            diffuseColor.rgb *= mix(1.0, 0.84 + 0.20 * relief, armourVertical);
-            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.026, 0.022, 0.016), (1.0 - relief) * armourVertical * 0.20);
+            diffuseColor.rgb *= mix(1.0, 0.80 + 0.26 * relief, armourVertical);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.024, 0.020, 0.014), (1.0 - relief) * armourVertical * 0.30);
           }`
               : ""
           }
           ${
             camo
               ? `// 迷彩：三组高频噪声 + 细碎条纹/喷绘软边；不再是大块硬边贴纸
-          float camoWarp = (armourFbm(vArmourWorld * vec3(6.5, 2.0, 6.0) + vec3(1.7)) - 0.5) * 0.16;
-          float camoA = armourFbm(vArmourWorld * vec3(3.4, 1.1, 3.2) + vec3(3.1) + camoWarp);
-          float camoB = armourFbm(vArmourWorld * vec3(2.7, 0.9, 3.8) + vec3(11.7, 5.3, 2.1) - camoWarp);
-          float camoBreak = (armourFbm(vArmourWorld * 22.0) - 0.5) * 0.075;
-          float camoFine = (armourFbm(vArmourWorld * 41.0 + vec3(4.0, 1.3, 8.0)) - 0.5) * 0.06;
-          float green = smoothstep(0.50, 0.62, camoA + camoBreak + camoFine) * 0.80;
-          float brown = smoothstep(0.535, 0.655, camoB + camoBreak - camoFine) * (1.0 - green) * 0.70;
-          float olive = smoothstep(0.55, 0.67, camoA * 0.68 + camoB * 0.32 + camoBreak * 0.5) * (1.0 - green) * (1.0 - brown) * 0.34;
+          float camoWarp = (armourFbm(vArmourWorld * vec3(8.5, 2.6, 8.0) + vec3(1.7)) - 0.5) * 0.20;
+          float camoA = armourFbm(vArmourWorld * vec3(4.6, 1.5, 4.4) + vec3(3.1) + camoWarp);
+          float camoB = armourFbm(vArmourWorld * vec3(3.6, 1.2, 5.1) + vec3(11.7, 5.3, 2.1) - camoWarp);
+          float camoBreak = (armourFbm(vArmourWorld * 29.0) - 0.5) * 0.095;
+          float camoFine = (armourFbm(vArmourWorld * 54.0 + vec3(4.0, 1.3, 8.0)) - 0.5) * 0.075;
+          // 喷绘软边：阈值区间拉宽（0.15~0.18），边界上再叠一层细噪声做雾化
+          float greenEdge = smoothstep(0.47, 0.65, camoA + camoBreak + camoFine);
+          float green = greenEdge * (0.94 - 0.10 * (armourFbm(vArmourWorld * 85.0) - 0.5));
+          float brownEdge = smoothstep(0.50, 0.70, camoB + camoBreak - camoFine);
+          float brown = brownEdge * (1.0 - green) * 0.92;
+          float olive = smoothstep(0.52, 0.72, camoA * 0.68 + camoB * 0.32 + camoBreak * 0.5) * (1.0 - green) * (1.0 - brown) * 0.55;
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.034, 0.050, 0.018), green);
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.066, 0.028, 0.012), brown);
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.042, 0.040, 0.018), olive);`
@@ -196,7 +201,7 @@ export function applyArmourSurface(
         float mudN = smoothstep(0.22, 0.72, armourFbm(vArmourWorld * 4.1));
         float chipR = smoothstep(0.855, 0.945, armourFbm(vArmourWorld * 27.0 + vec3(3.2, 8.1, 1.4)));
         roughnessFactor = clamp(
-          roughnessFactor + 0.13 * grain + 0.10 * low * mudN + 0.04 * armourVertical + 0.07 * chipR,
+          roughnessFactor + 0.15 * grain + 0.10 * low * mudN + 0.05 * armourVertical + 0.07 * chipR,
           0.40,
           1.0
         );
@@ -206,5 +211,5 @@ export function applyArmourSurface(
     shader.fragmentShader = fragment;
   };
   material.customProgramCacheKey = () =>
-    `armour-surface-v3-${zimmerit ? 1 : 0}${camo ? 1 : 0}${grime ? 1 : 0}`;
+    `armour-surface-v4-${zimmerit ? 1 : 0}${camo ? 1 : 0}${grime ? 1 : 0}`;
 }
