@@ -13,6 +13,7 @@ import {
 import { findModel, type StageModel } from "../catalog";
 import { faultFromError, useStageStore } from "../state/stageStore";
 import { applyDamage, applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
+import { Weather } from "./Weather";
 import { TigerVfx } from "./vfx/TigerVfx";
 import { applyTigerLidPose, effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
 import { firstPersonView, type CameraMode } from "./viewpoints";
@@ -149,6 +150,7 @@ function StageRuntime() {
   // 阴影板切在机体中间、网格从模型腰部穿出）。
   const [stageFloor, setStageFloor] = useState<{ y: number; footprint: number } | null>(null);
   const clockRef = useRef(0);
+  const realTimeRef = useRef(0);
   const lastStateRef = useRef<string | null>(null);
   const assembled = scene?.assembled ?? null;
 
@@ -238,6 +240,7 @@ function StageRuntime() {
 
   // ---- 每帧纪律 ----
   useFrame((_state, delta) => {
+    realTimeRef.current += Math.min(delta, 0.05);
     if (!assembled) return;
     const store = useStageStore.getState();
     const model = findModel(store.modelId);
@@ -271,6 +274,8 @@ function StageRuntime() {
     // 舱盖/加油口盖是交互件：用真实帧时间平滑开合，不跟机器状态时钟走
     if (store.modelId === "tiger") {
       applyTigerLidPose(assembled, state, store.lidOverrides, delta);
+      const wiper = store.views.rain ? assembled.getNode("VisorWiper") : null;
+      if (wiper) wiper.rotation.x = 0.05 + 0.5 * (0.5 - 0.5 * Math.cos(realTimeRef.current * 2.6));
     }
     assembled.syncInstances();
     const motionParts = motionPartsOf(model);
@@ -377,6 +382,7 @@ function StageRuntime() {
           raycast={() => null}
         />
       ) : null}
+      <Weather assembled={assembled} />
       {assembled ? (
         <AssembledObject
           key={`assembled:${scene?.seq ?? 0}`}

@@ -38,7 +38,7 @@ const resetStore = () => {
     scanPhase: "idle",
     scanKind: null,
     scanMs: null,
-    views: { explode: false, xray: false, labels: false, grid: false, shadow: true },
+    views: { explode: false, xray: false, labels: false, grid: false, shadow: true, rain: false },
     layout: {
       left: { width: 272, open: true },
       right: { width: 324, open: true },
