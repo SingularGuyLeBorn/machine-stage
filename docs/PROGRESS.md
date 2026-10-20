@@ -1375,8 +1375,8 @@ y 1.078~1.105（顶面与舱盖齐平，下表面离赞助板顶板 1.075 留 3m
 
 - 静态/悬空：`npx vite-node scripts/diag-kingjoe.ts` → `static clipping=0 / unsupported=0`。
 - 全程扫掠：`npx vite-node scripts/diag-sweep-kj.ts` —— combining 10s@30fps / separation 4s / robot 6s / firing 3s / formation 3s / crippled 3s，均为 **0 reports**，悬空 0。
-- 浏览器：生产构建 + `?qa=1`，`node scripts/capture-kingjoe.mjs`；headless Chrome rAF **57.2 fps**，录屏 611 帧/10.7s。
-- 截图：`docs/screenshots/kingjoe-idle.jpg`、`kingjoe-formation.jpg`、`kingjoe-docking-closeup.jpg`、`kingjoe-lock-closeup.jpg`、`kingjoe-docking-wide.jpg`、`kingjoe-combined.jpg`、`kingjoe-firing.jpg`、`kingjoe-separation.jpg`、`kingjoe-crippled.jpg`。
+- 浏览器：生产构建 + `?qa=1`，`node scripts/capture-kingjoe.mjs`；headless Chrome rAF **57.3 fps**，录屏 610 帧 / 10.7s，转码为 60fps H.264。
+- 截图：`docs/screenshots/kingjoe-idle.jpg`、`kingjoe-formation.jpg`、`kingjoe-docking-closeup.jpg`、`kingjoe-lock-closeup.jpg`、`kingjoe-docking-wide.jpg`、`kingjoe-combined.jpg`、`kingjoe-robot.jpg`、`kingjoe-firing.jpg`、`kingjoe-separation.jpg`、`kingjoe-crippled.jpg`。
 - 录屏：`docs/recordings/kingjoe-combine-60fps.mp4`（60fps / 10.7s / 938×734，四体编队 → 合体全程）；缩略拼图 `docs/qa/kingjoe-combine-contact.jpg`。
 
 ### 关键口径 / 设计取舍
@@ -1386,13 +1386,13 @@ y 1.078~1.105（顶面与舱盖齐平，下表面离赞助板顶板 1.075 留 3m
 - **液压杆求解**：杆节点每帧按「缸筒出口 E' → 耳环 C'」的真实距离平移 + 转向；回缩部分滑进缸筒内孔，不对缸体做伸缩缩放。膝/髋/踝/肩/肘均接入。
 - **状态驱动时钟**：框架原来只有 `machineState === "running"` 推进时钟；`catalog.animatedStates` + `animate(…, state)` 让一个模型可以有多个可动形态（这是本里程碑唯一需要动 app 层的框架改动）。
 - **装配器修复**：`instances` 未显式声明 `instance_nodes` 时也应继承 `def.node`；否则腹/胸/头的实例件（瓷片、肩荚短筒、对接销）会掉在模型原点，四体错位。这个修复对虎式无影响（虎式实例件均无 node）。
-- **合体期刚性躯干**：轴向锁死后的胸/腹/腿接口是刚性连接；若在腰/胸节点上加旋转，接口环/锁爪会互穿。因此机器人步行只做髋/膝/踝与手臂摆动、脊柱不扭；腰部转轴机构仍有完整零件（轴承/齿圈/减速器/编码器/密封），但当前不是独立动画节点。
+- **腰部是唯一相对运动节点**：腰鼓/齿圈/下轴承固定在 stomach；上腹/胸/头作为 `waist` 节点的子树绕腰枢轴旋转（转身 ±4°、弯腰 ±1.2°），胸↔腹接口两侧同步旋转，腿↔腹锁死接口保持不动。合体/分离时腰节点归零，接口仍刚性对齐。
 - **残缺合体**：隐藏腿部飞船（腿零件仍在树里，节点下移出场）；躯干降下、前倾、双臂下垂，并启用临时地面承影盘；不是行走 IK。
 
 ### 已知边界（下一轮优先）
 
 1. **定义件 570 vs 计划 ~580（差 10）**：四体为 **Ship 100 / Chest 198（含双臂）/ Stomach 100 / Legs 172**。所有机构件（液压 7–8 件/缸、对接销/座/锁/钩、喷口 4 件、三指三节、对接环座/锁环/导轨）逐件；Ship/Stomach 已补到 100 件（背部接缝、紧固件圈、耳荚端盖、腰部制动块、腹部角撑、徽章/能量缝）。差额不再是「总成级糊弄」，而是胸体因双臂略超 180、其余体没有为凑满 580 继续加无支撑小件。
-2. **腰部未做成独立动画节点**：齿圈/轴承/电机都是零件，但躯干作为整体移动；要做真实弯腰需把腹部上段拆成 waist 节点并重排对接接口。
+2. **腰部转角受包络限制**：`waist` 节点只做 ±4° 转身 / ±1.2° 侧倾 / 射击 ±1.6° 俯仰；腰鼓与上腹之间仅留约 4cm 轴向间隙，液压与线缆包络不允许更大弯腰，且暂无重心转移 / 根位移。
 3. **步行/爬行无地面 IK**：脚底随关节角度抬落，站立脚有轻微滑动；残缺形态是低姿态撑地，不是位移爬行。
 4. **音频缺失**：锁死「咔哒」目前是视觉闪光 + 锁环过冲，没有声音资产。
 5. **视觉**：铬钢在灰棚里仍偏灰，头部/小腿比例与参考图还有差距；下一轮做头冠/小腿鼓包与更强的高光对比。

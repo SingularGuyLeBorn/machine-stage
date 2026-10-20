@@ -278,8 +278,10 @@ export function addHydraulic(builder: KingJoeParts, spec: HydraulicSpec): void {
 // ---------------------------------------------------------------------------
 
 export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
+  // 胸↔腹接口的下半部分随腰部上段旋转；腿↔腹接口仍在腹部底端（不动）。
+  const dockLowerNode = dock.id === "chest_stomach" ? "waist" : dock.lowerNode;
   const upperOrigin = nodeOrigin(dock.upperNode);
-  const lowerOrigin = nodeOrigin(dock.lowerNode);
+  const lowerOrigin = nodeOrigin(dockLowerNode);
   const upperPrefix = pid(dock.upper, `dock_${dock.id}`);
   const lowerPrefix = pid(dock.lower, `dock_${dock.id}`);
   const upperYLocal = dock.upperY - upperOrigin[1];
@@ -443,7 +445,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     layer: 1,
     geometry: { type: "cylinder", r: 0.55, h: 0.03, segments: 40, bevel: 0.004 },
     material: "joint_steel",
-    node: dock.lowerNode,
+    node: dockLowerNode,
     mate: absMate([0, lowerTopLocal + 0.015, 0]),
   });
   builder.add({
@@ -454,7 +456,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     layer: 1,
     geometry: { type: "tube", rOuter: 0.52, rInner: 0.44, h: collarH - 0.03, segments: 40 },
     material: "silver_dark",
-    node: dock.lowerNode,
+    node: dockLowerNode,
     mate: absMate([0, lowerTopLocal + 0.03 + (collarH - 0.03) / 2, 0]),
     source: "环座高 220mm，锥销完全落在环座高度内，销尖不触及下模块顶板",
   });
@@ -466,7 +468,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     layer: 2,
     geometry: { type: "tube", rOuter: KJ.SOCKET_RO, rInner: KJ.SOCKET_RI, h: collarH - 0.06, segments: 16 },
     material: "gold_dark",
-    node: dock.lowerNode,
+    node: dockLowerNode,
     mate: absMate([0, lowerTopLocal + 0.03 + (collarH - 0.06) / 2, 0]),
     instances: 4,
     indexed: true,
@@ -480,7 +482,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     layer: 2,
     geometry: { type: "tube", rOuter: KJ.BORE_RO, rInner: KJ.BORE_RI, h: collarH - 0.06, segments: 16 },
     material: "joint_steel",
-    node: dock.lowerNode,
+    node: dockLowerNode,
     mate: absMate([0, lowerTopLocal + 0.03 + (collarH - 0.06) / 2, 0]),
     instances: 2,
     indexed: true,
@@ -494,7 +496,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     layer: 2,
     geometry: { type: "box", w: 0.06, h: 0.04, d: 0.12, bevel: 0.006 },
     material: "gold",
-    node: dock.lowerNode,
+    node: dockLowerNode,
     mate: absMate([0, lowerTopLocal + 0.09, 0]),
     instances: 4,
     indexed: true,
@@ -508,7 +510,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     layer: 2,
     geometry: { type: "box", w: 0.09, h: 0.18, d: 0.08, bevel: 0.008 },
     material: "silver_dark",
-    node: dock.lowerNode,
+    node: dockLowerNode,
     mate: absMate([0, lowerTopLocal + 0.09, -0.1]),
     instances: 2,
     indexed: true,
@@ -520,9 +522,15 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
 // 反重力发生器（外壳框 + 6 悬浮线圈 + 能量核心 + 稳定环 + 冷却套 + 管路）
 // ---------------------------------------------------------------------------
 
-export function addAntigravity(builder: KingJoeParts, module: string, center: Vec3, scale = 1): void {
+export function addAntigravity(
+  builder: KingJoeParts,
+  module: string,
+  center: Vec3,
+  scale = 1,
+  nodeName = module,
+): void {
   const prefix = pid(module, "ag");
-  const node = module;
+  const node = nodeName;
   const H = KJ.AG_H * scale;
   const top = add(center, [0, H / 2, 0]);
   const bottom = add(center, [0, -H / 2, 0]);
@@ -608,7 +616,13 @@ export function addAntigravity(builder: KingJoeParts, module: string, center: Ve
   });
 }
 
-export function addNozzles(builder: KingJoeParts, module: string): void {
+export function addNozzles(
+  builder: KingJoeParts,
+  module: string,
+  options: { parentNode?: string; yOffset?: number } = {},
+): void {
+  const parentNode = options.parentNode ?? module;
+  const yOffset = options.yOffset ?? 0;
   NOZZLE_LOCAL[module].forEach((position, index) => {
     const node = `${module}Nozzle${index}`;
     const prefix = pid(module, `nozzle_${index}`);
@@ -660,7 +674,11 @@ export function addNozzles(builder: KingJoeParts, module: string): void {
       mate: absMate([0, 0, -0.04], [-90, 0, 0]),
     });
     const outSign = position[0] < 0 ? -1 : 1;
-    const actuatorLocal: Vec3 = [position[0] + outSign * 0.19, position[1] + 0.15, position[2] - 0.1];
+    const actuatorLocal: Vec3 = [
+      position[0] + outSign * 0.19,
+      position[1] + 0.15 + yOffset,
+      position[2] - 0.1,
+    ];
     builder.add({
       id: `${prefix}_actuator`,
       name_cn: `第 ${index + 1} 喷口作动器`,
@@ -669,7 +687,7 @@ export function addNozzles(builder: KingJoeParts, module: string): void {
       layer: 2,
       geometry: { type: "cylinder", r: 0.034, h: 0.13, segments: 14, bevel: 0.003 },
       material: "silver",
-      node: module,
+      node: parentNode,
       mate: absMate(actuatorLocal),
     });
   });

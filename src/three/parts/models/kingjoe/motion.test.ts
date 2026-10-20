@@ -28,6 +28,15 @@ describe("kingjoe motion", () => {
       model.root.updateMatrixWorld(true);
       expect(detectStatic(model, { minDepthM: 0.0005 }), `state ${state}`).toEqual([]);
     }
+    // 腰部关节关键帧：上腹/胸/头绕 waist 转，腿↔腹接口不动
+    model.resetNodes();
+    animateKingJoe(model, 0, "robot");
+    for (const t of [1.5, 3, 4.5]) {
+      model.resetNodes();
+      animateKingJoe(model, t, "robot");
+      model.root.updateMatrixWorld(true);
+      expect(detectStatic(model, { minDepthM: 0.0005 }), `robot waist t=${t}`).toEqual([]);
+    }
     // 合体关键帧（含三段对接、锁环、展开）
     model.resetNodes();
     animateKingJoe(model, 0, "combining");

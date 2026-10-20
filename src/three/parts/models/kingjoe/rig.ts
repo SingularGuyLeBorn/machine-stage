@@ -167,6 +167,7 @@ export function nodeOrigin(name: string): Vec3 {
   if (name === "root") return [0, 0, 0];
   if (name === "legs") return ROOT_ORIGIN.legs;
   if (name === "stomach") return ROOT_ORIGIN.stomach;
+  if (name === "waist") return [0, KJ.STOMACH_Y + 0.49, 0];
   if (name === "chest") return ROOT_ORIGIN.chest;
   if (name === "ship") return ROOT_ORIGIN.ship;
   if (name.startsWith("rod")) {
