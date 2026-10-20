@@ -27,6 +27,13 @@ describe("kingjoe registry", () => {
     expect(counts.get("ship")).toBeGreaterThan(40);
   });
 
+  it("双肩第 4 对接口零件存在", () => {
+    const ids = new Set(registry.parts.map((part) => part.id));
+    expect(ids.has("kingjoe.chest.arm_dock_guide")).toBe(true);
+    expect(ids.has("kingjoe.chest.arm_dock_face_seal")).toBe(true);
+    expect(ids.has("kingjoe.chest.arm_dock_sensor")).toBe(true);
+  });
+
   it("战损外挂装甲板逐件存在", () => {
     const ids = new Set(registry.parts.map((part) => part.id));
     expect(ids.has("kingjoe.legs.thigh_applique")).toBe(true);

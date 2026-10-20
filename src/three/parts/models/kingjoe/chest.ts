@@ -480,6 +480,54 @@ function addChestShell(builder: KingJoeParts): void {
     indexed: true,
     instance_layout: "kjShoulderAxles",
   });
+  // 双臂↔胸的第 4 对接口：肩关节必须连续绕 X 转动，离散锥销会锁死自由度，
+  // 因此用环形导引面 + 端面密封 + 双接近传感器，锁环仍绕 X 咬合 18°。
+  builder.add({
+    id: pid(A, "arm_dock_guide"),
+    name_cn: "肩对接导引环",
+    name_en: "shoulder dock guide ring",
+    assembly: A,
+    layer: 2,
+    geometry: { type: "tube", rOuter: 0.33, rInner: 0.245, h: 0.025, segments: 36 },
+    material: "gold_dark",
+    node: A,
+    mate: mateAt(A, [0, KJ.CHEST_Y + KJ.SHOULDER_Y, 0]),
+    instances: 2,
+    indexed: true,
+    instance_layout: "kjShoulderDockRings",
+    hint: "导引环与锁环轴向留 12.5mm；环面通过锥度先把肩毂导入，再让锁环咬合",
+  });
+  builder.add({
+    id: pid(A, "arm_dock_face_seal"),
+    name_cn: "肩对接端面密封",
+    name_en: "shoulder dock face seal",
+    assembly: A,
+    layer: 4,
+    geometry: { type: "tube", rOuter: 0.27, rInner: 0.215, h: 0.01, segments: 36 },
+    material: "rubber",
+    node: A,
+    mate: mateAt(A, [0, KJ.CHEST_Y + KJ.SHOULDER_Y, 0]),
+    instances: 2,
+    indexed: true,
+    instance_layout: "kjShoulderFaceSeals",
+    hint: "端面密封贴肩座外端 1.5mm；与锁环内孔/肩轴均留径向间隙",
+  });
+  builder.add({
+    id: pid(A, "arm_dock_sensor"),
+    name_cn: "肩对接到位传感器",
+    name_en: "shoulder dock proximity sensor",
+    assembly: A,
+    layer: 4,
+    geometry: { type: "cylinder", r: 0.02, h: 0.012, segments: 12, bevel: 0.002 },
+    material: "sensor_red",
+    node: A,
+    mate: mateAt(A, [0, KJ.CHEST_Y + KJ.SHOULDER_Y, 0]),
+    instances: 4,
+    indexed: true,
+    instance_layout: "kjShoulderDockSensors",
+    hint: "每肩两只，位于端面外缘对角；锁环到位后两路同时接通",
+  });
+
   builder.add({
     id: pid(A, "shoulder_stack"),
     name_cn: "肩荚四联短筒",
