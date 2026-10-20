@@ -35,12 +35,11 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     asm: "knee",
     geom: {
       type: "kit",
-      kit: "t800Cheek",
+      kit: "t800RoundCheek",
       params: {
-        r: JOINT_STD.cheekR,
+        outerR: 0.044,
         boreR: JOINT_STD.cheekBore,
         thickness: JOINT_STD.cheekT,
-        top: JOINT_STD.cheekTop,
       },
     },
     mat: "gunmetal",
@@ -158,7 +157,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "chrome",
     layer: 3,
     node: NODES.knee,
-    at: [0.0245, 0.6, 0],
+    at: [0.0335, 0.575, 0],
     rot: [0, 90, 0],
     hint: "盖住胫骨上端，把前侧补偿缸的冲击面保护起来",
   });
@@ -190,8 +189,8 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "把前后护罩固定在胫骨上的支架（实例族）",
   });
   layouts["t800.knee.guard_bracket"] = instanceLayout(NODES.knee, [
-    [0.0245, 0.51, 0],
-    [-0.0945, 0.51, 0],
+    [0.0335, 0.47, 0],
+    [-0.0945, 0.52, 0],
   ]);
   builder.add({
     id: "t800.knee.boot",
@@ -237,6 +236,19 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
         bodyX: tibia.bodyX,
         endScale: tibia.endScale,
         endBottomX: tibia.endBottomX,
+        // 外侧曲面装甲板：膝细 → 腓肠肌中段鼓 → 踝细（轮廓起伏由真实渐变造型给出）
+        shell: {
+          z0: 0.0355,
+          thickness: 0.005,
+          xOffset: 0.03,
+          levels: [
+            { y: 0.2255, halfW: 0.05, bow: 0.014 },
+            { y: 0.13, halfW: 0.06, bow: 0.022 },
+            { y: 0.0, halfW: 0.066, bow: 0.024 },
+            { y: -0.13, halfW: 0.06, bow: 0.02 },
+            { y: -0.2355, halfW: 0.048, bow: 0.012 },
+          ],
+        },
         endTopScale: tibia.endTopScale,
         padW: 0.05,
         padH: 0.05,
@@ -282,7 +294,6 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
   });
   layouts["t800.shin.armor_side"] = instanceLayout(NODES.knee, [
     [0, 0.375, -0.0395],
-    [0, 0.375, 0.0395],
   ]);
   builder.add({
     id: "t800.shin.lines",
@@ -400,8 +411,6 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     hint: "小腿后缘 6 根后置活塞杆成束排布：腓肠肌的弧度由真实机构排列形成",
   });
   layouts["t800.shin.piston_rods"] = instanceLayout(NODES.knee, [
-    [-0.098, 0.34, 0.042],
-    [-0.098, 0.34, 0.058],
     [-0.098, 0.34, -0.042],
     [-0.098, 0.34, -0.058],
   ]);
@@ -415,18 +424,14 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     layer: 5,
     node: NODES.knee,
     at: [0, 0.34, 0],
-    inst: 6,
+    inst: 2,
     layout: "t800.shin.hose_bank",
-    instNodes: repeatNode(NODES.knee, 6),
+    instNodes: repeatNode(NODES.knee, 2),
     hint: "沿小腿走的软管束（参考图：大量波纹软管）",
   });
   layouts["t800.shin.hose_bank"] = instanceLayout(NODES.knee, [
-    [-0.02, 0.28, 0.06],
-    [-0.05, 0.28, 0.06],
-    [-0.08, 0.28, 0.06],
-    [-0.02, 0.28, -0.06],
-    [-0.05, 0.28, -0.06],
-    [-0.08, 0.28, -0.06],
+    [-0.015, 0.28, -0.06],
+    [-0.075, 0.28, -0.06],
   ]);
 
   // ===================== 踝关节 =====================
@@ -557,7 +562,7 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "servo",
     layer: 5,
     node: NODES.knee,
-    at: [0.01, 0.24, 0.0465],
+    at: [0.01, 0.24, -0.0465],
     rot: [90, 0, 0],
     hint: "读取踝关节转角（与髋/膝传感器同一总线）",
   });

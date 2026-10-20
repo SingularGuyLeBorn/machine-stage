@@ -69,7 +69,7 @@ export const JOINT_STD = {
   /** 上骨本体下沿相对关节中心（叉耳顶端 yJ+cheekTop 再留 4mm 缝，容纳挤出倒角） */
   upperDrop: 0.055,
   /** 下骨本体上沿相对关节中心（叉耳底端 yJ-cheekR 再留 2.5mm 缝） */
-  lowerRise: 0.034,
+  lowerRise: 0.046,
 } as const;
 
 /** 骨段（中空方管梁 + 端部叉耳/骨腔）。d = Z 向厚度，全腿统一。 */

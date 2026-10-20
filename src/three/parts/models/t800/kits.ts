@@ -191,6 +191,13 @@ interface BoneKitParams {
   endTopScale?: number;
   /** 下端端板的 X 偏移（局部坐标，对准下关节中心） */
   endBottomX?: number;
+  /** 外侧曲面装甲板：随本体一起的"腿形体量"（层：y / 半宽 / 外鼓） */
+  shell?: {
+    levels: Array<{ y: number; halfW: number; bow: number }>;
+    z0: number;
+    thickness: number;
+    xOffset?: number;
+  };
   /** 端部叉耳：{ y, z } —— 圆头中心 y、所在 z */
   cheeks?: Array<{ y: number; z: number }>;
   cheekR: number;
@@ -216,7 +223,13 @@ interface BoneKitParams {
 
 function boneKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeometry {
   const p = spec.params as unknown as BoneKitParams;
-  const pieces: THREE.BufferGeometry[] = [
+  const pieces: THREE.BufferGeometry[] = [];
+  if (p.shell) {
+    pieces.push(
+      armorShell(p.shell.levels, p.shell.z0, p.shell.thickness, p.shell.xOffset ?? 0),
+    );
+  }
+  pieces.push(
     trussBeam(
       p.w,
       p.d,
@@ -232,7 +245,7 @@ function boneKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeomet
       p.endBottomX ?? 0,
       p.endTopScale ?? p.endScale ?? 1,
     ),
-  ];
+  );
   for (const cheek of p.cheeks ?? []) {
     const geometry = cheekGeometry(
       p.cheekR,
@@ -265,6 +278,129 @@ function boneKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeomet
     pieces.push(geometry);
   }
   return mergeGeometries(pieces);
+}
+
+/**
+ * 外侧曲面装甲板（大腿/小腿的"体量"来源）。
+ *
+ * 参考图里腿的轮廓不是靠内部骨架，而是靠**外侧一整片光滑曲面装甲板**：
+ * 上宽下窄（股骨）、膝细→中段鼓→踝细（胫骨）。这里按若干层轮廓放样出
+ * 一条带厚度的曲面壳（flat 侧贴在骨面上，outer 侧外鼓）。
+ *
+ * 每层轮廓 = [x0, z0] … [x1, z0] + 一段二次贝塞尔外弧；
+ * 各层的 (半宽, 外鼓量) 沿 Y 变化，就得到"上宽下窄 / 中段鼓"的渐变外形。
+ */
+function armorShell(
+  levels: Array<{ y: number; halfW: number; bow: number }>,
+  z0: number,
+  thickness: number,
+  xOffset = 0,
+  segments = 9,
+): THREE.BufferGeometry {
+  const profileOf = (halfW: number, bow: number): Array<[number, number]> => {
+    const pts: Array<[number, number]> = [
+      [-halfW, 0],
+      [halfW, 0],
+    ];
+    for (let i = 1; i < segments; i++) {
+      const t = i / segments;
+      // 二次贝塞尔：P0=(halfW,0) P1=(0,bow) P2=(-halfW,0)
+      const mt = 1 - t;
+      const x = mt * mt * halfW + 2 * mt * t * 0 + t * t * -halfW;
+      const z = mt * mt * 0 + 2 * mt * t * bow + t * t * 0;
+      pts.push([x, z]);
+    }
+    return pts;
+  };
+
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const ringSize = segments + 1; // 每层轮廓点数（首尾不重复）
+  const profiles = levels.map((lvl) => profileOf(lvl.halfW, lvl.bow));
+
+  for (let li = 0; li < levels.length; li++) {
+    for (const [x, z] of profiles[li]) {
+      positions.push(x + xOffset, levels[li].y, z + z0); // 外表面
+    }
+  }
+  for (let li = 0; li < levels.length; li++) {
+    for (const [x, z] of profiles[li]) {
+      positions.push(x + xOffset, levels[li].y, z + z0 - thickness); // 内表面
+    }
+  }
+  const outerBase = 0;
+  const innerBase = levels.length * ringSize;
+
+  for (let li = 0; li < levels.length - 1; li++) {
+    const a = outerBase + li * ringSize;
+    const b = outerBase + (li + 1) * ringSize;
+    for (let i = 0; i < ringSize - 1; i++) {
+      indices.push(a + i, b + i, b + i + 1, a + i, b + i + 1, a + i + 1);
+    }
+    const c = innerBase + li * ringSize;
+    const d = innerBase + (li + 1) * ringSize;
+    for (let i = 0; i < ringSize - 1; i++) {
+      indices.push(c + i, c + i + 1, d + i + 1, c + i, d + i + 1, d + i);
+    }
+  }
+  // 两侧封边（flat 侧）
+  for (let li = 0; li < levels.length - 1; li++) {
+    const o0 = outerBase + li * ringSize;
+    const o1 = outerBase + (li + 1) * ringSize;
+    const i0 = innerBase + li * ringSize;
+    const i1 = innerBase + (li + 1) * ringSize;
+    indices.push(o0, o1, i1, o0, i1, i0);
+    const o2 = o0 + ringSize - 1;
+    const o3 = o1 + ringSize - 1;
+    const i2 = i0 + ringSize - 1;
+    const i3 = i1 + ringSize - 1;
+    indices.push(o2, i2, i3, o2, i3, o3);
+  }
+  // 上下端盖
+  for (const [li, flip] of [
+    [0, true],
+    [levels.length - 1, false],
+  ] as Array<[number, boolean]>) {
+    const o = outerBase + li * ringSize;
+    const i = innerBase + li * ringSize;
+    for (let k = 1; k < ringSize - 1; k++) {
+      if (flip) indices.push(o, o + k + 1, o + k);
+      else indices.push(o, o + k, o + k + 1);
+      if (flip) indices.push(i, i + k, i + k + 1);
+      else indices.push(i, i + k + 1, i + k);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/** 圆盘式叉耳（膝/踝的紧凑盘组）：圆盘 + 轴承孔，不是长舌片。 */
+function roundCheekGeometry(
+  outerR: number,
+  boreR: number,
+  thickness: number,
+  segments = 40,
+): THREE.BufferGeometry {
+  const shape = new THREE.Shape();
+  shape.absarc(0, 0, outerR, 0, Math.PI * 2, false);
+  const hole = new THREE.Path();
+  hole.absarc(0, 0, boreR, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: thickness - 2 * BEVEL,
+    bevelEnabled: true,
+    bevelThickness: BEVEL,
+    bevelSize: BEVEL,
+    bevelSegments: 2,
+    steps: 1,
+    curveSegments: segments / 4,
+  });
+  geometry.translate(0, 0, -(thickness - 2 * BEVEL) / 2);
+  return geometry;
 }
 
 /**
@@ -501,11 +637,53 @@ function eyeKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeometr
 }
 
 /** T-800 全部 kit 构造器。 */
+interface ArmorShellParams {
+  /** 每层：y 高度 / 半宽 / 外鼓量 */
+  levels: Array<{ y: number; halfW: number; bow: number }>;
+  /** flat 侧所在的 Z（贴在骨面外侧） */
+  z0: number;
+  /** 板厚 */
+  thickness: number;
+  /** 轮廓沿 X 的偏移（让开安装凸台） */
+  xOffset?: number;
+  /** 支撑柱：把装甲板撑在骨面外（避开安装凸台） */
+  posts?: Array<{ x: number; y: number; r: number; from: number; to: number }>;
+}
+
+function armorShellKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeometry {
+  const p = spec.params as unknown as ArmorShellParams;
+  const pieces: THREE.BufferGeometry[] = [
+    armorShell(p.levels, p.z0, p.thickness, p.xOffset ?? 0),
+  ];
+  for (const post of p.posts ?? []) {
+    const length = post.to - post.from;
+    if (length <= 0) continue;
+    const geometry = cylinderGeometry(post.r, length, 12);
+    geometry.rotateX(Math.PI / 2);
+    geometry.translate(post.x, post.y, post.from + length / 2);
+    pieces.push(geometry);
+  }
+  return mergeGeometries(pieces);
+}
+
+interface RoundCheekParams {
+  outerR: number;
+  boreR: number;
+  thickness: number;
+}
+
+function roundCheekKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeometry {
+  const p = spec.params as unknown as RoundCheekParams;
+  return roundCheekGeometry(p.outerR, p.boreR, p.thickness);
+}
+
 export const t800Builders: Record<string, GeometryBuilder> = {
+  t800ArmorShell: armorShellKit as GeometryBuilder,
   t800Bone: boneKit as GeometryBuilder,
   t800Boss: bossKit as GeometryBuilder,
   t800Cheek: cheekKit as GeometryBuilder,
   t800Frame: frameKit as GeometryBuilder,
   t800JointDisc: jointDiscKit as GeometryBuilder,
   t800Eye: eyeKit as GeometryBuilder,
+  t800RoundCheek: roundCheekKit as GeometryBuilder,
 };
