@@ -385,6 +385,60 @@ function addChestShell(builder: KingJoeParts): void {
     node: A,
     mate: mateAt(A, [0, KJ.CHEST_Y + 1.28, 0.69], [90, 0, 0]),
   });
+  builder.add({
+    id: pid(A, "emitter_cooling"),
+    name_cn: "胸口发射口冷却套",
+    name_en: "chest emitter cooling jacket",
+    assembly: A,
+    layer: 2,
+    geometry: { type: "tube", rOuter: 0.18, rInner: 0.164, h: 0.04, segments: 36 },
+    material: "copper",
+    node: A,
+    mate: mateAt(A, [0, KJ.CHEST_Y + 1.28, 0.69], [90, 0, 0]),
+    hint: "冷却套与充能环同轴，径向留 5mm；套内走冷却液",
+  });
+  builder.add({
+    id: pid(A, "emitter_mount"),
+    name_cn: "发射口安装环",
+    name_en: "chest emitter mount ring",
+    assembly: A,
+    layer: 2,
+    geometry: { type: "tube", rOuter: 0.2, rInner: 0.184, h: 0.02, segments: 36 },
+    material: "gold_dark",
+    node: A,
+    mate: mateAt(A, [0, KJ.CHEST_Y + 1.28, 0.7], [90, 0, 0]),
+    hint: "安装环把冷却套/透镜组压在前隔板上，轴向留 5mm 给充能环",
+  });
+  for (const [suffix, sx] of [
+    ["a", -1],
+    ["b", 1],
+  ] as const) {
+    builder.add({
+      id: pid(A, `emitter_capacitor_${suffix}`),
+      name_cn: "胸口发射口电容",
+      name_en: "chest emitter capacitor",
+      assembly: A,
+      layer: 2,
+      geometry: { type: "cylinder", r: 0.04, h: 0.12, segments: 18, bevel: 0.004 },
+      material: "copper",
+      node: A,
+      mate: mateAt(A, [sx * 0.23, KJ.CHEST_Y + 1.45, 0.72]),
+      hint: "两只电容分列发射口上缘，避开彩色镶嵌框；为充能环提供脉冲电流",
+    });
+    builder.add({
+      id: pid(A, `emitter_capacitor_bracket_${suffix}`),
+      name_cn: "电容支架",
+      name_en: "capacitor standoff bracket",
+      assembly: A,
+      layer: 2,
+      geometry: { type: "box", w: 0.07, h: 0.05, d: 0.006, bevel: 0.002 },
+      material: "joint_steel",
+      node: A,
+      mate: mateAt(A, [sx * 0.23, KJ.CHEST_Y + 1.45, 0.6725]),
+      hint: "支架贴前隔板，向外托住电容；电容与冷却套径向留 20mm",
+    });
+  }
+
   for (const [suffix, sx] of [
     ["l", -1],
     ["r", 1],

@@ -27,6 +27,18 @@ describe("kingjoe registry", () => {
     expect(counts.get("ship")).toBeGreaterThan(40);
   });
 
+  it("胸口发射口内构零件存在", () => {
+    const ids = new Set(registry.parts.map((part) => part.id));
+    for (const id of [
+      "kingjoe.chest.emitter_cooling",
+      "kingjoe.chest.emitter_mount",
+      "kingjoe.chest.emitter_capacitor_a",
+      "kingjoe.chest.emitter_capacitor_b",
+    ]) {
+      expect(ids.has(id)).toBe(true);
+    }
+  });
+
   it("Ship 舵面 / 控制板 / 线束零件存在", () => {
     const ids = new Set(registry.parts.map((part) => part.id));
     for (const id of [
