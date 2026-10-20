@@ -310,6 +310,22 @@ function buildRegistry(parts: ModelRegistry["parts"]): ModelRegistry {
         reason: "踝叉耳舌片插入胫骨端板（装配配合面）",
         maxDepthMm: 3,
       },
+      ...(
+        [
+          ["t800.hip.cyl_hip_flex_*", "髋屈曲缸"],
+          ["t800.hip.cyl_hip_ext_*", "髋伸展缸"],
+          ["t800.thigh.cyl_knee_main_*", "膝后主缸"],
+          ["t800.thigh.cyl_knee_comp_*", "膝前补偿缸"],
+          ["t800.shin.cyl_ankle_l_*", "踝左驱动缸"],
+          ["t800.shin.cyl_ankle_r_*", "踝右驱动缸"],
+        ] as Array<[string, string]>
+      ).map(([prefix, label]) => ({
+        family: "t800-cylinder-fit",
+        a: prefix,
+        b: prefix,
+        reason: `${label}缸内零件之间的装配配合（活塞/密封/导向套/卡箍/防尘圈）`,
+        maxDepthMm: 1.5,
+      })),
     ],
   };
 }

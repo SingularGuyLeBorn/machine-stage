@@ -308,15 +308,15 @@ export const MOUNTS: Record<string, MountSpec> = {
   hip_ext_a: { segment: "base", at: [-0.13, 1.39, -PELVIS_FACE_Z], normal: [0, 0, -1], out: 0.016 },
   hip_ext_b: { segment: "hip", at: [0.024, 1.09, -FACE_Z], normal: [0, 0, -1], out: 0.037 },
   // 膝后主缸：股骨前上 → 胫骨后下（交叉布置，缸轴与关节回转切向成角才有行程）
-  knee_main_a: { segment: "hip", at: [0.083, 0.95, FACE_Z], normal: [0, 0, 1], out: 0.026 },
+  knee_main_a: { segment: "hip", at: [0.083, 1.03, FACE_Z], normal: [0, 0, 1], out: 0.026 },
   knee_main_b: { segment: "knee", at: [-0.063, 0.6, FACE_Z], normal: [0, 0, 1], out: 0.026 },
   // 膝前补偿缸：股骨后上 → 胫骨前下（与主缸反向交叉，一伸一缩对置）
   knee_comp_a: { segment: "hip", at: [0.027, 0.93, -FACE_Z], normal: [0, 0, -1], out: 0.026 },
   knee_comp_b: { segment: "knee", at: [-0.007, 0.58, -FACE_Z], normal: [0, 0, -1], out: 0.026 },
   // 踝驱动缸（左右各一）：胫骨后 → 足后（后置，形成小腿肚的实体量）
-  ankle_l_a: { segment: "knee", at: [-0.063, 0.3, FACE_Z], normal: [0, 0, 1], out: 0.026 },
+  ankle_l_a: { segment: "knee", at: [-0.063, 0.46, FACE_Z], normal: [0, 0, 1], out: 0.026 },
   ankle_l_b: { segment: "ankle", at: [-0.055, 0.07, FACE_Z], normal: [0, 0, 1], out: 0.026 },
-  ankle_r_a: { segment: "knee", at: [-0.063, 0.3, -FACE_Z], normal: [0, 0, -1], out: 0.026 },
+  ankle_r_a: { segment: "knee", at: [-0.063, 0.46, -FACE_Z], normal: [0, 0, -1], out: 0.026 },
   ankle_r_b: { segment: "ankle", at: [-0.055, 0.07, -FACE_Z], normal: [0, 0, -1], out: 0.026 },
 };
 
@@ -344,7 +344,7 @@ const CYLINDER_SEEDS: CylinderSeed[] = [
     child: "hip",
     a: "hip_flex_a",
     b: "hip_flex_b",
-    rBody: 0.024,
+    rBody: 0.044,
     lc: 0.45,
     // 杆端余量要留足（缩回极限时杆端不能顶到缸底）：lr 偏小
     lr: 0.47,
@@ -357,7 +357,7 @@ const CYLINDER_SEEDS: CylinderSeed[] = [
     child: "hip",
     a: "hip_ext_a",
     b: "hip_ext_b",
-    rBody: 0.024,
+    rBody: 0.044,
     lc: 0.45,
     lr: 0.5,
   },
@@ -369,7 +369,7 @@ const CYLINDER_SEEDS: CylinderSeed[] = [
     child: "knee",
     a: "knee_main_a",
     b: "knee_main_b",
-    rBody: 0.026,
+    rBody: 0.046,
     lc: 0.45,
     lr: 0.52,
   },
@@ -381,7 +381,7 @@ const CYLINDER_SEEDS: CylinderSeed[] = [
     child: "knee",
     a: "knee_comp_a",
     b: "knee_comp_b",
-    rBody: 0.021,
+    rBody: 0.04,
     lc: 0.42,
     lr: 0.48,
   },
@@ -393,9 +393,10 @@ const CYLINDER_SEEDS: CylinderSeed[] = [
     child: "ankle",
     a: "ankle_l_a",
     b: "ankle_l_b",
-    rBody: 0.021,
+    rBody: 0.044,
     lc: 0.4,
-    lr: 0.42,
+    // 杆长比例要保证：活塞全程不出缸口（>5mm 余量）且杆端不脱缸
+    lr: 0.55,
   },
   {
     key: "ankle_r",
@@ -405,9 +406,10 @@ const CYLINDER_SEEDS: CylinderSeed[] = [
     child: "ankle",
     a: "ankle_r_a",
     b: "ankle_r_b",
-    rBody: 0.021,
+    rBody: 0.044,
     lc: 0.4,
-    lr: 0.42,
+    // 杆长比例要保证：活塞全程不出缸口（>5mm 余量）且杆端不脱缸
+    lr: 0.55,
   },
 ];
 
@@ -528,9 +530,10 @@ export interface CylinderDims {
 export function cylinderDims(spec: HydraulicSpec): CylinderDims {
   return {
     L: length(spec),
-    bore: spec.rBody - 0.0035,
+    /** 缸膛：肌肉壳厚 ~52% 缸径 */
+    bore: spec.rBody * 0.48,
     rodR: spec.rBody * 0.42,
-    pistonR: spec.rBody - 0.0045,
+    pistonR: spec.rBody * 0.48 - 0.001,
   };
 }
 

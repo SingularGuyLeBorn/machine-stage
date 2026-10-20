@@ -99,8 +99,29 @@ const MATERIAL_COLOR: Record<string, [number, number, number]> = {
 const LIGHT = new THREE.Vector3(0.35, 0.75, 0.56).normalize();
 
 // ---------------------------------------------------------------- 投影
-function project(p: THREE.Vector3): [number, number] {
-  return [W / 2 + (p.x + X_SHIFT) * SCALE, H - 40 - p.y * SCALE];
+type View = "side" | "front" | "iso";
+
+const VIEWS: Record<View, { dir: THREE.Vector3; up: THREE.Vector3; label: string }> = {
+  // 侧视：+Z 看过去（腿的左右厚度被压掉，看到前后起伏）
+  side: { dir: new THREE.Vector3(0, 0, 1), up: new THREE.Vector3(0, 1, 0), label: "侧视" },
+  // 正视：+X 看过去（看到腿的左右厚度 / 肌肉块宽度）
+  front: { dir: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 1, 0), label: "正视" },
+  // 斜 45°：同时看到厚度与起伏
+  iso: {
+    dir: new THREE.Vector3(0.7071, 0, 0.7071),
+    up: new THREE.Vector3(0, 1, 0),
+    label: "斜 45°",
+  },
+};
+
+function makeProjector(view: View): (p: THREE.Vector3) => [number, number] {
+  const { dir, up } = VIEWS[view];
+  const right = new THREE.Vector3().crossVectors(up, dir).normalize();
+  const camUp = new THREE.Vector3().crossVectors(dir, right).normalize();
+  return (p: THREE.Vector3) => [
+    W / 2 + (p.dot(right) + X_SHIFT) * SCALE,
+    H - 40 - p.dot(camUp) * SCALE,
+  ];
 }
 
 interface Tri {
@@ -130,11 +151,12 @@ function fillTriangle(canvas: Canvas, t: Tri): void {
   }
 }
 
-function renderAt(seconds: number): { png: Buffer; caption: string } {
+function renderAt(seconds: number, view: View): { png: Buffer; caption: string } {
   model.resetNodes();
   animateT800(model, seconds);
   model.syncInstances();
   model.root.updateMatrixWorld(true);
+  const project = makeProjector(view);
 
   const tris: Tri[] = [];
   const matrix = new THREE.Matrix4();
@@ -199,7 +221,7 @@ function renderAt(seconds: number): { png: Buffer; caption: string } {
 
   const pose = t800Pose();
   const knee = pose.extensions.find((e) => e.key === "knee_main");
-  const caption = `T-800 right leg - side view - t=${seconds.toFixed(2)}s - hip/knee/ankle ${pose.hipDeg.toFixed(1)}/${pose.kneeDeg.toFixed(1)}/${pose.ankleDeg.toFixed(1)} deg - knee_main exposed rod ${knee?.exposedMm.toFixed(1)} mm - ${registry.parts.length} part definitions`;
+  const caption = `T-800 right leg - ${VIEWS[view].label} - t=${seconds.toFixed(2)}s - hip/knee/ankle ${pose.hipDeg.toFixed(1)}/${pose.kneeDeg.toFixed(1)}/${pose.ankleDeg.toFixed(1)} deg - knee_main exposed rod ${knee?.exposedMm.toFixed(1)} mm - ${registry.parts.length} part definitions`;
   return { png: canvas.toPng(), caption };
 }
 
@@ -216,9 +238,23 @@ const frames: Array<[number, string]> = [
 ];
 
 for (const [seconds, name] of frames) {
-  const { png, caption } = renderAt(seconds);
+  const { png, caption } = renderAt(seconds, "side");
   writeFileSync(`${OUT}/${name}.png`, png);
   writeFileSync(`${OUT}/${name}.txt`, `${caption}\n`, "utf8");
   console.log("wrote", name, "t=", seconds);
+}
+
+// 正视 / 斜 45°：站姿 + 屈膝峰值
+for (const view of ["front", "iso"] as View[]) {
+  for (const [seconds, tag] of [
+    [0, "stand"],
+    [2.2, "peak"],
+  ] as Array<[number, string]>) {
+    const { png, caption } = renderAt(seconds, view);
+    const name = `${view}-${tag}`;
+    writeFileSync(`${OUT}/${name}.png`, png);
+    writeFileSync(`${OUT}/${name}.txt`, `${caption}\n`, "utf8");
+    console.log("wrote", name, "t=", seconds);
+  }
 }
 console.log("done");

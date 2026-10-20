@@ -19,6 +19,39 @@ export interface CylinderOptions {
   label: string;
 }
 
+/**
+ * 缸体的"肌肉"外形：两端收细、中间鼓起的纺锤回转体。
+ *
+ * 这是终结者腿的关键形体感来源 —— 缸体本身就是肌肉（股四头肌 / 小腿肚），
+ * 骨架在肌肉之间连接。直筒缸只会让整条腿读成"细杆 + 零散件"。
+ *
+ * 内膛保持等径（活塞导向面），外形按正弦鼓胀：
+ *   r(t) = rEnd + (rMax - rEnd) · sin(πt)
+ */
+function muscleProfile(
+  bore: number,
+  rEnd: number,
+  rMax: number,
+  length: number,
+): Array<[number, number]> {
+  const profile: Array<[number, number]> = [];
+  const rim = Math.min(0.01, length * 0.12);
+  const body = Math.max(length - 2 * rim, 0.001);
+  profile.push([bore, 0]);
+  profile.push([rEnd, 0]);
+  profile.push([rEnd, rim]);
+  const steps = 12;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const r = rEnd + (rMax - rEnd) * Math.sin(Math.PI * t);
+    profile.push([r, rim + t * body]);
+  }
+  profile.push([rEnd, length]);
+  profile.push([bore, length]);
+  profile.push([bore, 0]);
+  return profile;
+}
+
 export function addCylinder(builder: PartBuilder, spec: HydraulicSpec, options: CylinderOptions): void {
   const dims = cylinderDims(spec);
   const layout = cylinderLayout(spec);
@@ -26,6 +59,8 @@ export function addCylinder(builder: PartBuilder, spec: HydraulicSpec, options: 
   const rodNode = HYDRAULIC_NODE(spec, "rod");
   const { asm, prefix, label } = options;
   const id = `t800.${asm}.${prefix}_${spec.key}`;
+  const barrelLength = layout.glandStart - layout.barrelStart - 0.001;
+  const rEnd = spec.rBody * 0.72;
 
   // ---- 缸体侧（挂父段节点，局部 +Y = A→B）----
   builder.add({
@@ -59,7 +94,7 @@ export function addCylinder(builder: PartBuilder, spec: HydraulicSpec, options: 
     cn: `${label}缸底盖`,
     en: `${spec.name_en} end cap`,
     asm,
-    geom: { type: "cylinder", r: spec.rBody, h: CYL.capH, segments: 28, bevel: 0.0012 },
+    geom: { type: "cylinder", r: rEnd, h: CYL.capH, segments: 28, bevel: 0.0012 },
     mat: "gunmetal",
     layer: 2,
     node: cylNode,
@@ -73,18 +108,16 @@ export function addCylinder(builder: PartBuilder, spec: HydraulicSpec, options: 
     en: `${spec.name_en} barrel`,
     asm,
     geom: {
-      type: "tube",
-      rOuter: spec.rBody,
-      rInner: dims.bore,
-      h: layout.glandStart - layout.barrelStart - 0.001,
-      segments: 32,
+      type: "lathe",
+      profile: muscleProfile(dims.bore, rEnd, spec.rBody, barrelLength),
+      segments: 36,
     },
     mat: "dark_chrome",
     layer: 2,
     node: cylNode,
     local: true,
-    at: [0, (layout.barrelStart + layout.glandStart - 0.001) / 2, 0],
-    hint: "缸长 = lc × |AB|；关节转动时缸体不缩放，缩放的是活塞杆",
+    at: [0, layout.barrelStart, 0],
+    hint: "缸体是纺锤形「肌肉块」：两端收细、中间鼓起，缸长 = lc × |AB|，关节转动时缸体不缩放，缩放的是活塞杆",
   });
   builder.add({
     id: `${id}_clamp`,
@@ -93,8 +126,8 @@ export function addCylinder(builder: PartBuilder, spec: HydraulicSpec, options: 
     asm,
     geom: {
       type: "tube",
-      rOuter: spec.rBody + 0.004,
-      rInner: spec.rBody + 0.0006,
+      rOuter: rEnd + 0.005,
+      rInner: rEnd + 0.0006,
       h: 0.012,
       segments: 28,
     },
@@ -102,8 +135,8 @@ export function addCylinder(builder: PartBuilder, spec: HydraulicSpec, options: 
     layer: 2,
     node: cylNode,
     local: true,
-    at: [0, layout.capStart + 0.03, 0],
-    hint: "把缸体固定在骨段上的卡箍（内孔 0.6mm 间隙）",
+    at: [0, layout.barrelStart + 0.006, 0],
+    hint: "把缸体固定在骨段上的卡箍（卡在收细的根部，内孔 0.6mm 间隙）",
   });
   builder.add({
     id: `${id}_gland`,
@@ -112,7 +145,7 @@ export function addCylinder(builder: PartBuilder, spec: HydraulicSpec, options: 
     asm,
     geom: {
       type: "tube",
-      rOuter: spec.rBody + CYL.glandBulge,
+      rOuter: rEnd - 0.002,
       rInner: dims.bore + 0.0006,
       h: CYL.glandH,
       segments: 32,
@@ -208,7 +241,7 @@ export function addCylinder(builder: PartBuilder, spec: HydraulicSpec, options: 
         },
         {
           type: "tube",
-          rOuter: 0.019,
+          rOuter: spec.rBody * 0.5,
           rInner: dims.rodR + 0.0006,
           h: CYL.rodCollarH,
           segments: 28,
