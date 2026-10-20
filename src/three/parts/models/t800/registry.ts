@@ -275,6 +275,41 @@ function buildRegistry(parts: ModelRegistry["parts"]): ModelRegistry {
         reason: "衬套压入叉耳轴承孔（同心配合面）",
         maxDepthMm: 3,
       },
+      {
+        family: "t800-joint-socket",
+        a: "t800.thigh.femur",
+        b: "t800.hip.ballhead",
+        reason: "髋球头座插销插入股骨端板插座（装配配合面）",
+        maxDepthMm: 3,
+      },
+      {
+        family: "t800-joint-socket",
+        a: "t800.shin.tibia",
+        b: "t800.knee.disc",
+        reason: "膝关节盘插销插入胫骨端板插座（装配配合面）",
+        maxDepthMm: 3,
+      },
+      {
+        family: "t800-joint-socket",
+        a: "t800.foot.housing",
+        b: "t800.ankle.disc",
+        reason: "踝关节盘插销插入踝连接座插座（装配配合面）",
+        maxDepthMm: 3,
+      },
+      {
+        family: "t800-joint-socket",
+        a: "t800.thigh.femur",
+        b: "t800.knee.socket",
+        reason: "膝叉耳舌片插入股骨端板（装配配合面）",
+        maxDepthMm: 3,
+      },
+      {
+        family: "t800-joint-socket",
+        a: "t800.shin.tibia",
+        b: "t800.ankle.socket",
+        reason: "踝叉耳舌片插入胫骨端板（装配配合面）",
+        maxDepthMm: 3,
+      },
     ],
   };
 }

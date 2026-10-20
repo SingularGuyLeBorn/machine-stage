@@ -183,6 +183,14 @@ interface BoneKitParams {
   ringT?: number;
   ringCount?: number;
   endT?: number;
+  /** 本体相对关节连线的 X 偏移（+X 前）：股四头肌前凸 / 小腿肚后凸 */
+  bodyX?: number;
+  /** 端板缩放（<1 = 关节处收细，膝盖比大腿小腿都窄） */
+  endScale?: number;
+  /** 上端端板缩放（髋端保持全宽，腿才连得上） */
+  endTopScale?: number;
+  /** 下端端板的 X 偏移（局部坐标，对准下关节中心） */
+  endBottomX?: number;
   /** 端部叉耳：{ y, z } —— 圆头中心 y、所在 z */
   cheeks?: Array<{ y: number; z: number }>;
   cheekR: number;
@@ -219,6 +227,10 @@ function boneKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeomet
       p.endT ?? 0.014,
       p.bore > 0 ? p.bore : 0,
       p.corner,
+      p.bodyX ?? 0,
+      p.endScale ?? 1,
+      p.endBottomX ?? 0,
+      p.endTopScale ?? p.endScale ?? 1,
     ),
   ];
   for (const cheek of p.cheeks ?? []) {
@@ -258,6 +270,11 @@ function boneKit(spec: { params?: Record<string, unknown> }): THREE.BufferGeomet
 /**
  * 桁架骨段：4 根纵向角柱 + N 道横撑环 + 两端带孔端板。
  * 骨段不再是"实心光板"，而是能看穿的空间框架 —— 内部管腔与连杆从环与环之间露出来。
+ *
+ * bodyX：本体相对关节连线的 X 偏移（+X 前）。股四头肌前凸 / 小腿肚后凸都靠它：
+ *   端板留在关节连线上（x=0，保证插销对准关节中心），本体整体前移/后移，
+ *   两者之间由两根连接臂搭起来 —— 于是腿的"中心线"呈 S 形而不是一根直柱。
+ * endScale：端板相对截面的缩放（<1 即关节处收细，膝盖比大腿小腿都窄）。
  */
 function trussBeam(
   w: number,
@@ -269,6 +286,10 @@ function trussBeam(
   endT: number,
   holeR: number,
   cornerR: number,
+  bodyX: number,
+  endScale: number,
+  endBottomX: number,
+  endTopScale: number,
 ): THREE.BufferGeometry {
   const pieces: THREE.BufferGeometry[] = [];
   const halfH = h / 2;
@@ -276,7 +297,11 @@ function trussBeam(
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
       const post = bevelBoxGeometry(rail, h - endT * 2, rail, BEVEL);
-      post.translate(sx * (w / 2 - rail / 2), 0, sz * (d / 2 - rail / 2));
+      post.translate(
+        bodyX + sx * (w / 2 - rail / 2),
+        0,
+        sz * (d / 2 - rail / 2),
+      );
       pieces.push(post);
     }
   }
@@ -297,12 +322,17 @@ function trussBeam(
     });
     ring.translate(0, 0, -(ringT - 2 * BEVEL) / 2);
     ring.rotateX(-Math.PI / 2);
-    ring.translate(0, y, 0);
+    ring.translate(bodyX, y, 0);
     pieces.push(ring);
   }
-  // 端板：带圆孔，给关节盘插销当插座
+  // 端板：带圆孔，给关节盘插销当插座（留在关节连线上）
   for (const sy of [-1, 1]) {
-    const plate = roundedRectShape(w, d, cornerR);
+    const scale = sy < 0 ? endScale : endTopScale;
+    const plate = roundedRectShape(
+      w * scale,
+      d * scale,
+      Math.max(cornerR * scale, 0.004),
+    );
     if (holeR > 0) {
       const hole = new THREE.Path();
       hole.absarc(0, 0, holeR, 0, Math.PI * 2, true);
@@ -319,8 +349,22 @@ function trussBeam(
     });
     geometry.translate(0, 0, -(endT - 2 * BEVEL) / 2);
     geometry.rotateX(-Math.PI / 2);
-    geometry.translate(0, sy * (halfH - endT / 2), 0);
+    // 下端端板跟着下关节中心走（关节中心可以不在 x=0）
+    const endX = sy < 0 ? endBottomX : 0;
+    geometry.translate(endX, sy * (halfH - endT / 2), 0);
     pieces.push(geometry);
+  }
+  // 端板 ↔ 本体 的连接臂（本体偏移时才有）——双耳板，厚度与端板齐平（不侵入关节盘空间）
+  if (Math.abs(bodyX) > 0.005) {
+    for (const sy of [-1, 1]) {
+      const endX = sy < 0 ? endBottomX : 0;
+      const span = Math.abs(bodyX - endX);
+      for (const sz of [-1, 1]) {
+        const arm = bevelBoxGeometry(span + 0.02, endT * 0.8, 0.024, BEVEL);
+        arm.translate((bodyX + endX) / 2, sy * (halfH - endT / 2), sz * (d / 2 - 0.012));
+        pieces.push(arm);
+      }
+    }
   }
   return mergeGeometries(pieces);
 }

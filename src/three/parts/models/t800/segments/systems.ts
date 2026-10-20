@@ -227,7 +227,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     cn: "密封垫圈族",
     en: "Seal washer",
     asm: "fasteners",
-    geom: { type: "tube", rOuter: 0.008, rInner: 0.0062, h: 0.002, segments: 14 },
+    geom: { type: "tube", rOuter: 0.0055, rInner: 0.0052, h: 0.002, segments: 14 },
     mat: "rubber",
     layer: 4,
     node: NODES.knee,
@@ -238,10 +238,10 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     hint: "硬管接头处的密封垫圈（实例族）",
   });
   layouts["t800.fasteners.washers"] = instanceLayout(NODES.knee, [
-    [0.055, 0.2515, 0.02],
-    [0.055, 0.4915, 0.02],
-    [0.055, 0.2515, -0.02],
-    [0.055, 0.4915, -0.02],
+    [0.02, 0.2515, 0.02],
+    [0.02, 0.4915, 0.02],
+    [0.02, 0.2515, -0.02],
+    [0.02, 0.4915, -0.02],
   ]);
   builder.add({
     id: "t800.hip.tie_rod",

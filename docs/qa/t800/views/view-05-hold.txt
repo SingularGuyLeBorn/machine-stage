@@ -1,1 +1,1 @@
-T-800 right leg - side view - t=2.60s - hip/knee/ankle 20.1/-60.2/21.8 deg - knee_main exposed rod 85.9 mm - 136 part definitions
+T-800 right leg - side view - t=2.60s - hip/knee/ankle 20.1/-60.2/21.8 deg - knee_main exposed rod 92.7 mm - 136 part definitions

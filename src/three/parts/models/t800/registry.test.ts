@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildModel } from "../../assembler/assembler";
 import { validateRegistry } from "../../registry/validate";
 import { detectStatic } from "../../solver/detect";
+import { partitionExpectedContacts } from "../../solver/whitelist";
 import { makeT800Layouts, makeT800Registry, t800Builders } from "./registry";
 import { animateT800, t800Pose } from "./motion";
 import { T800_HYDRAULICS, cylinderDims, cylinderLayout } from "./spec";
@@ -55,21 +56,30 @@ describe("T-800 右腿注册表", () => {
 });
 
 describe("T-800 装配质量", () => {
-  it("静态装配零穿模", () => {
-    const { model } = build();
+  // 判定口径：未豁免报告 = 0（构造性接触如球头销/耳环配合走 expectedContacts 豁免族）
+  it("静态装配零穿模（未豁免）", () => {
+    const { registry, model } = build();
     model.resetNodes();
     animateT800(model, 0);
     model.syncInstances();
     model.root.updateMatrixWorld(true);
-    expect(detectStatic(model, { minDepthM: 0.0005 })).toEqual([]);
+    const reports = detectStatic(model, { minDepthM: 0.0005 });
+    const { active } = partitionExpectedContacts(reports, registry.expectedContacts ?? []);
+    expect(
+      active.map((hit) => `${hit.report.a}↔${hit.report.b} ${hit.report.depth_mm?.toFixed(2)}mm`),
+    ).toEqual([]);
   });
 
-  it("屈伸扫掠全程零穿模", () => {
-    const { model, poseAt } = build();
+  it("屈伸扫掠全程零穿模（未豁免）", () => {
+    const { registry, model, poseAt } = build();
     for (let frame = 0; frame <= 12; frame++) {
       poseAt((frame / 12) * 5.4);
       const reports = detectStatic(model, { minDepthM: 0.0005 });
-      expect(reports, `第 ${frame} 帧出现穿模`).toEqual([]);
+      const { active } = partitionExpectedContacts(reports, registry.expectedContacts ?? []);
+      expect(
+        active.map((hit) => `${hit.report.a}↔${hit.report.b}`),
+        `第 ${frame} 帧出现未豁免穿模`,
+      ).toEqual([]);
     }
   });
 });
