@@ -14,6 +14,12 @@ import {
   tigerDetachOffset,
   tigerInstanceLabel,
 } from "@/three/parts/models/tiger/motion";
+import {
+  makeT800Layouts,
+  makeT800Registry,
+  t800Builders,
+} from "@/three/parts/models/t800/registry";
+import { animateT800, t800Readouts } from "@/three/parts/models/t800/motion";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -80,6 +86,43 @@ export const TEST_ROTOR_OMEGA = 1.2;
 const testKit = makeTestRegistry();
 
 export const CATALOG: StageModel[] = [
+  {
+    id: "t800",
+    title: "T-800 内骨骼 · 右腿",
+    subtitle: "M-G：髋 / 膝 / 踝液压关节链（零件级）",
+    milestone: "M-G",
+    status: "ready",
+    registry: makeT800Registry(),
+    layouts: makeT800Layouts(),
+    builders: t800Builders,
+    animate: animateT800,
+    readouts: t800Readouts,
+    states: [
+      { id: "idle", label: "待机", hint: "液压腿静止，可拖构建滑杆逐层装配" },
+      {
+        id: "running",
+        label: "屈伸演示",
+        hint: "髋/膝/踝欠阻尼屈伸，6 根液压缸随角度真实伸缩；点零件看实例检查器",
+      },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 屈伸扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "t800-flex", group: "机构", label: "屈伸演示", kind: "machine-state", state: "running" },
+      { id: "t800-stop", group: "机构", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "扫掠检测", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "零件级：一条腿 141 个定义件 / 221 个实例；每根驱动缸 11 件（缸体/缸底盖/卡箍/导向套/杆密封/防尘圈/耳环A/耳环B/活塞杆/活塞/活塞密封），6 根共 66 件。",
+      "活塞杆露出长度 = |AB| - 缸口位置，由关节角几何决定，动画不写死位移；膝主缸全行程 58.7mm。",
+      "球头螺栓 12 件实例化（球心在安装面外 28mm，插入凸台盲孔）；耳环孔轴与销轴同轴。",
+      "验收脚本：npx tsx scripts/diag-t800.ts --write（静态 + 24 帧扫掠穿模、悬空、液压行程核算）。",
+    ],
+  },
   {
     id: "test",
     title: "框架自检台",
