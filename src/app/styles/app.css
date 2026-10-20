@@ -1507,8 +1507,9 @@
 
 .sm {
   display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
-  gap: 4px;
+  gap: 4px 2px;
   padding: var(--sp-2) var(--sp-2) var(--sp-3);
   overflow-x: auto;
 }

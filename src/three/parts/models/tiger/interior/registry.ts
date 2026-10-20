@@ -881,6 +881,7 @@ function buildInteriorParts(): PartDefinition[] {
     build_layer: 3,
     build_order: 434,
     geometry: { type: "tube", rOuter: 0.8, rInner: 0.34, h: 0.02, segments: 40 },
+    node: "Turret",
     material: "armor_steel",
     mate: { type: "absolute", position: [-1.65, 1.15, 0] },
     source:
@@ -899,6 +900,7 @@ function buildInteriorParts(): PartDefinition[] {
       kit: "basketRail",
       params: { rOuter: 0.82, rInner: 0.79, h: 0.03, gapDeg: 90, gapCenterDeg: 180 },
     },
+    node: "Turret",
     material: "steel",
     mate: { type: "absolute", position: [-1.65, 0, 0] },
     source:
@@ -920,6 +922,7 @@ function buildInteriorParts(): PartDefinition[] {
         { type: "cylinder", r: 0.03, h: 0.12, at: [0, 0.33, 0], bevel: 0.003 },
       ],
     },
+    node: "Turret",
     material: "steel",
     mate: { type: "absolute", position: [-1.65, 1.3, -0.66] },
     source:
@@ -941,6 +944,7 @@ function buildInteriorParts(): PartDefinition[] {
         { type: "cylinder", r: 0.03, h: 0.04, at: [0, 0.005, 0], bevel: 0.004 },
       ],
     },
+    node: "Turret",
     material: "armor_steel",
     mate: { type: "absolute", position: [-0.98, 1.78, -0.1] },
     source:
@@ -965,6 +969,7 @@ function buildInteriorParts(): PartDefinition[] {
     material: "canvas_black",
     instances: 3,
     indexed: true,
+    instance_nodes: ["Turret", "Turret", "Turret"],
     instance_layout: "interior.turretSeat",
     mate: { type: "absolute" },
     source:

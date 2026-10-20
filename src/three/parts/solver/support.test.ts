@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ModelRegistry } from "@/three/parts";
+import * as THREE from "three";
+import type { InstanceLayout, ModelRegistry } from "@/three/parts";
 import { buildModel, detectUnsupportedParts } from "@/three/parts";
 import { findModel } from "@/app/catalog";
 
@@ -14,12 +15,25 @@ import { findModel } from "@/app/catalog";
 
 const model = findModel("tiger");
 
-const build = (registry: ModelRegistry = model.registry!) =>
+const build = (
+  registry: ModelRegistry = model.registry!,
+  instanceLayouts: Record<string, InstanceLayout> = model.layouts!,
+) =>
   buildModel(registry, {
     builders: model.builders,
-    instanceLayouts: model.layouts,
+    instanceLayouts,
     warnMissingLayout: false,
   });
+
+/** 吊环挂在 Turret 节点上、走实例布局（忽略 mate），抬高必须改布局而不是 mate。 */
+const raisedEyeLayouts = (): Record<string, InstanceLayout> => {
+  const base = model.layouts!["turret.roofEyes"]!;
+  return {
+    ...model.layouts,
+    "turret.roofEyes": (args) =>
+      base(args).premultiply(new THREE.Matrix4().makeTranslation(0, 0.25, 0)),
+  };
+};
 
 describe("solver/support 悬空检测", () => {
   it("虎式整机在 20mm 阈值下没有疑似悬空件", () => {
@@ -31,24 +45,7 @@ describe("solver/support 悬空检测", () => {
   });
 
   it("炮塔吊环抬高 250mm → 恰好报两个实例（实例级定位）", () => {
-    const registry = model.registry!;
-    const eye = registry.parts.find((part) => part.id === "tiger.turret.lifting_eye")!;
-    const mate = eye.mate as { type: "absolute"; position: [number, number, number] };
-    const patched: ModelRegistry = {
-      ...registry,
-      parts: registry.parts.map((part) =>
-        part.id === eye.id
-          ? {
-              ...part,
-              mate: {
-                type: "absolute" as const,
-                position: [mate.position[0], mate.position[1] + 0.25, mate.position[2]],
-              },
-            }
-          : part,
-      ),
-    };
-    const built = build(patched);
+    const built = build(model.registry!, raisedEyeLayouts());
     built.resetNodes();
     const reports = detectUnsupportedParts(built);
     expect(reports.map((report) => report.ref).sort()).toEqual([
@@ -95,23 +92,13 @@ describe("solver/support 悬空检测", () => {
   it('抬高件打 tags: ["fx"] → 支撑检测豁免', () => {
     const registry = model.registry!;
     const eye = registry.parts.find((part) => part.id === "tiger.turret.lifting_eye")!;
-    const mate = eye.mate as { type: "absolute"; position: [number, number, number] };
     const patched: ModelRegistry = {
       ...registry,
       parts: registry.parts.map((part) =>
-        part.id === eye.id
-          ? {
-              ...part,
-              tags: ["fx"],
-              mate: {
-                type: "absolute" as const,
-                position: [mate.position[0], mate.position[1] + 0.25, mate.position[2]],
-              },
-            }
-          : part,
+        part.id === eye.id ? { ...part, tags: ["fx"] } : part,
       ),
     };
-    const built = build(patched);
+    const built = build(patched, raisedEyeLayouts());
     built.resetNodes();
     expect(detectUnsupportedParts(built)).toEqual([]);
     built.dispose();

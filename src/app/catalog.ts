@@ -149,6 +149,11 @@ export const CATALOG: StageModel[] = [
         hint: "车体在扭杆上轻微浮沉，48 只负重轮各自转动；点单轮可拆下检查",
       },
       {
+        id: "driving",
+        label: "行进演示",
+        hint: "前进 1.5m → 倒退回位 → 原地右转 24° → 左转 48° → 回正；履带板/销/锁环滚动，轮系差速",
+      },
+      {
         id: "firing",
         label: "主炮击发",
         hint: "开闩 → 关闩 → 击针 → 后坐 450mm → 复进 → 开闩抛壳，6s 循环；看车体后坐与炮口焰",
@@ -157,6 +162,11 @@ export const CATALOG: StageModel[] = [
         id: "mg_firing",
         label: "机枪连射",
         hint: "MG34 10 发连射：枪管短后坐、枪口上跳、供弹链步进、弹壳抛出/弹跳；3.2s 循环",
+      },
+      {
+        id: "aiming",
+        label: "炮塔瞄准",
+        hint: "炮塔 ±36° 回转 + 炮管 ±3.4° 俯仰（8s 循环；瞄准时自动盖上驾驶员/无线电员舱盖）",
       },
       {
         id: "hit_light",
@@ -172,8 +182,10 @@ export const CATALOG: StageModel[] = [
     ],
     actions: [
       { id: "suspension-run", group: "机构", label: "悬挂演示", kind: "machine-state", state: "running" },
+      { id: "drive-run", group: "机构", label: "行进演示", kind: "machine-state", state: "driving" },
       { id: "cannon-fire", group: "火力", label: "主炮击发", kind: "machine-state", state: "firing" },
       { id: "mg-fire", group: "火力", label: "机枪连射", kind: "machine-state", state: "mg_firing" },
+      { id: "aim", group: "火炮", label: "炮塔瞄准", kind: "machine-state", state: "aiming" },
       { id: "hit-light", group: "受击", label: "轻击（小口径）", kind: "machine-state", state: "hit_light" },
       { id: "hit-heavy", group: "受击", label: "重击（大口径）", kind: "machine-state", state: "hit_heavy" },
       { id: "suspension-stop", group: "机构", label: "停机", kind: "machine-state", state: "idle" },

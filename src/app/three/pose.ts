@@ -67,7 +67,7 @@ export function applyExplode(
   motionParts: ReadonlySet<string> = EMPTY_PARTS,
 ): void {
   if (factor === 0) {
-    clearExplode(assembled);
+    clearExplode(assembled, motionParts);
     return;
   }
   assembled.root.updateMatrixWorld(true);
@@ -99,8 +99,15 @@ export function applyExplode(
   assembled.root.updateMatrixWorld(true);
 }
 
-/** 还原爆炸位移（非实例件恢复 TRS 驱动，实例件回到静止装配位）。 */
-export function clearExplode(assembled: AssembledModel): void {
+/**
+ * 还原爆炸位移（非实例件恢复 TRS 驱动，实例件回到静止装配位）。
+ * motionParts 是动画每帧写入的实例（履带/负重轮/舱盖…），绝不能在这里复位——
+ * 否则爆炸关闭时每帧都会把行进/悬挂姿态抹回静止位，看起来就是「履带和轮子不动」。
+ */
+export function clearExplode(
+  assembled: AssembledModel,
+  motionParts: ReadonlySet<string> = EMPTY_PARTS,
+): void {
   let touched = false;
   for (const handle of assembled.parts) {
     if (!handle.instanced) {
@@ -110,6 +117,7 @@ export function clearExplode(assembled: AssembledModel): void {
         touched = true;
       }
     } else {
+      if (motionParts.has(handle.partId)) continue;
       for (const instance of handle.instances) {
         if (!instance.node) {
           handle.setInstanceMatrix(instance.index, instance.restMatrix);

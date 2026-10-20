@@ -769,7 +769,7 @@ const gunCradle: GeometryBuilder = (spec) => {
     parts.push(ear);
   }
   const bottom = bevelBoxGeometry(0.1, 0.02, zMid * 2 - 0.02, 0.003);
-  bottom.translate(frontX + 0.09, -halfH + 0.03, 0);
+  bottom.translate(frontX + 0.09, -halfH - 0.005, 0);
   parts.push(bottom);
 
   const merged = mergeGeometries(parts);
