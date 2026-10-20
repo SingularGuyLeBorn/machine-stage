@@ -330,6 +330,10 @@ export const useStageStore = create<StageState>((set, get) => ({
       if (clamped <= 0) assembled.setBuildThreshold(-1);
       else if (clamped >= orders.length) assembled.setBuildThreshold(null);
       else assembled.setBuildThreshold(orders[clamped - 1]);
+      // 特效件（tags: fx）不跟构建滑杆显示，只由动画在击发窗口内点亮
+      for (const handle of assembled.parts) {
+        if (handle.def.tags?.includes("fx")) handle.object.visible = false;
+      }
     }
     set((state) => {
       // 显示值立刻按新进度重算（单调不增），选中项越界则清空。

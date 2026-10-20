@@ -1004,6 +1004,34 @@ const aaShield: GeometryBuilder = (spec) => {
 };
 
 // ---------------------------------------------------------------------------
+// 炮口焰（特效）：核心球 + 前向锥 + 6 片径向星芒，整体在炮口前方 35mm 之外。
+// 世界向，原点 = 炮口前 5mm 的名义中心；-X 朝车头。动画只切 visible / scale。
+// ---------------------------------------------------------------------------
+const muzzleFlash: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: Params }).params;
+  const coreR = num(params, "coreR", 0.1);
+  const parts: THREE.BufferGeometry[] = [];
+  const core = sphereGeometry(coreR, 14, 10);
+  core.scale(1.5, 1, 1);
+  core.translate(-0.18, 0, 0);
+  parts.push(core);
+  const cone = cylinderGeometry(0.12, 0.42, 0.008, 12, 0);
+  cone.rotateZ(Math.PI / 2);
+  cone.translate(-0.3, 0, 0);
+  parts.push(cone);
+  for (let i = 0; i < 6; i++) {
+    const lobe = sphereGeometry(0.05, 8, 6);
+    lobe.scale(1.2, 3.2, 1);
+    lobe.rotateX((i * Math.PI) / 3);
+    lobe.translate(-0.16, 0, 0);
+    parts.push(lobe);
+  }
+  const merged = mergeGeometries(parts);
+  for (const item of parts) item.dispose();
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
 // 顶盖排烟风扇罩：⌀300 罩圈 + 蘑菇顶盖 + 4 根支撑爪
 // 世界向，原点 = 罩圈底面中心（落在顶盖上 3mm）。
 // ---------------------------------------------------------------------------
@@ -1048,6 +1076,7 @@ export const tigerTurretKitBuilders: Record<string, GeometryBuilder> = {
   closeDefense,
   loaderPeriscope,
   ventCowl,
+  muzzleFlash,
   gunBreechRing,
   breechBlock,
   firingPin,

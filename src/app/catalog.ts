@@ -8,7 +8,7 @@ import {
 import type { GeometryBuilder } from "@/three/parts/assembler/geometry";
 import { makeTigerLayouts, makeTigerRegistry, tigerBuilders } from "@/three/parts/models/tiger/registry";
 import {
-  animateTigerSuspension,
+  animateTiger,
   TIGER_MOTION_PARTS,
   tigerDetachKeys,
   tigerDetachOffset,
@@ -56,8 +56,8 @@ export interface StageModel {
   layouts?: Record<string, InstanceLayout>;
   /** 模型自定义几何 kit 构造器（如发动机 borePlate/siameseBlock 等）。 */
   builders?: Record<string, GeometryBuilder>;
-  /** 动画：只驱动节点，每帧调用前框架已 resetNodes。t 为秒。 */
-  animate?: (assembled: AssembledModel, seconds: number) => void;
+  /** 动画：只驱动节点，每帧调用前框架已 resetNodes。t 为秒；state 为当前机器状态。 */
+  animate?: (assembled: AssembledModel, seconds: number, state?: string) => void;
   /** 由 animate 直接改写实例矩阵的零件（pose 层的爆炸/拆解据此取本帧位姿）。 */
   motionParts?: string[];
   /** 单实例拆解要一起移动的实例键（如负重轮 + 它的轮毂螺栓）。 */
@@ -136,7 +136,7 @@ export const CATALOG: StageModel[] = [
     registry: makeTigerRegistry(),
     layouts: makeTigerLayouts(),
     builders: tigerBuilders,
-    animate: animateTigerSuspension,
+    animate: animateTiger,
     motionParts: TIGER_MOTION_PARTS,
     detachKeys: tigerDetachKeys,
     detachOffset: tigerDetachOffset,
@@ -148,10 +148,16 @@ export const CATALOG: StageModel[] = [
         label: "悬挂演示",
         hint: "车体在扭杆上轻微浮沉，48 只负重轮各自转动；点单轮可拆下检查",
       },
+      {
+        id: "firing",
+        label: "主炮击发",
+        hint: "开闩 → 关闩 → 击针 → 后坐 450mm → 复进 → 开闩抛壳，6s 循环；看车体后坐与炮口焰",
+      },
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
     ],
     actions: [
       { id: "suspension-run", group: "机构", label: "悬挂演示", kind: "machine-state", state: "running" },
+      { id: "cannon-fire", group: "火力", label: "主炮击发", kind: "machine-state", state: "firing" },
       { id: "suspension-stop", group: "机构", label: "停机", kind: "machine-state", state: "idle" },
       { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
       { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
@@ -161,8 +167,8 @@ export const CATALOG: StageModel[] = [
       { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
     ],
     notes: [
-      "M-B 进行中：当前可见 L1 已写零件（曲轴箱为主）；后续零件随注册表补全自动出现，无需等待全部完成。",
-      "机构动画（曲轴/活塞联动）由实现者接入后，此处追加 running 状态与启动/停机动作。",
+      "L1–L5 已装配到 223 件 / 1998 实例；主炮闩 / 中空炮管 / 车长塔枪座 / 战术编号已落地。",
+      "主炮击发是节点驱动的机械演示（后坐 450mm + 开闩 + 击针 + 炮口焰）；弹壳抛壳与供弹链是下一步。",
     ],
   },
   {
