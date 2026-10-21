@@ -74,7 +74,7 @@ interface Angles {
 const HIP_MAX = 17;
 const KNEE_MAX = 68;
 const TOE_MAX = 20;
-const SHOULDER_MAX = 15;
+const SHOULDER_MAX = 22;
 const ELBOW_MAX = 48;
 /** 手指卷曲角（度，每节）。 */
 const FINGER_CURL = 30;
@@ -108,9 +108,9 @@ function jointAngles(seconds: number): Angles {
   // 髋：大腿绕髋关节前后摆（绕 Z，正 = 前摆）
   z.set("LeftUpLegRoll_084", HIP_MAX * hipR);
   z.set("RightUpLegRoll_092", HIP_MAX * hipL);
-  // 膝：屈曲（负 = 小腿向后收）
-  z.set("LeftKnee_helper_086", -KNEE_MAX * kneeR);
-  z.set("RightKnee_helper_094", -KNEE_MAX * kneeL);
+  // 膝：屈曲（负 = 小腿向后收）+ 常屈 6 度（机械腿站姿是"蹲"着的，更沉）
+  z.set("LeftKnee_helper_086", -(KNEE_MAX * kneeR + 6));
+  z.set("RightKnee_helper_094", -(KNEE_MAX * kneeL + 6));
   // 踝/腕/趾：留到链式求解时按"父级累计角"补偿（脚掌贴地、手掌不歪）
   // 趾：蹬地
   z.set("bip_toe_R_085", -TOE_MAX * pulse(right + 0.45));
