@@ -444,7 +444,7 @@ const boltCarrierKit: GeometryBuilder = (spec) => {
   const boreR = num(p, "boreR", 0.0078);
   const springR = num(p, "springR", 0.0102); // 尾段簧腔内径
   const parts: THREE.BufferGeometry[] = [];
-  const frontLen = len * 0.62; // 前段（枪机通道）长 106.6mm
+  const frontLen = len * 0.55; // 前段（枪机通道）长 94.6mm（底部让位窗从这里开始）
   // 前段外筒（整圆）
   const outer = new THREE.CylinderGeometry(r, r, frontLen, 20);
   outer.rotateX(Math.PI / 2);
@@ -522,7 +522,7 @@ const boltCarrierKit: GeometryBuilder = (spec) => {
   // 活塞结合座（顶部杯形座：活塞杆尾插入其中，0.1mm 滑动间隙）
   const cup = tubeGeometry(0.0085, 0.0046, 0.02, 14);
   cup.rotateX(Math.PI / 2);
-  cup.translate(0, 0.019, len - 0.016);
+  cup.translate(0, 0.0175, len - 0.016);
   parts.push(cup);
   const merged = mergeGeometries(parts);
   for (const part of parts) part.dispose();
