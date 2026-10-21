@@ -81,15 +81,22 @@ function buildNodes(): NodeDef[] {
       const bones = FINGER_BONES[`${finger}_${side}`];
       const prox = bones && JOINT_BY_NAME.get(bones.proximal);
       if (!prox) continue;
+      const anchor: [number, number, number] = [
+        hand.center[0] + (prox.center[0] - hand.center[0]) * 0.18,
+        hand.center[1] + 0.012,
+        hand.center[2] + (prox.center[2] - hand.center[2]) * 0.18,
+      ];
       nodes.push({
-        name: tendonNodeName(`${finger}_${side}`),
+        name: tendonNodeName(`${finger}_${side}_s1`),
         parent: "root",
-        pivot: [
-          hand.center[0] + (prox.center[0] - hand.center[0]) * 0.18,
-          hand.center[1] + 0.012,
-          hand.center[2] + (prox.center[2] - hand.center[2]) * 0.18,
-        ],
-        note: `${finger} 屈肌腱（随抓握伸缩）`,
+        pivot: anchor,
+        note: `${finger} 屈肌腱 近节段（随抓握伸缩）`,
+      });
+      nodes.push({
+        name: tendonNodeName(`${finger}_${side}_s2`),
+        parent: "root",
+        pivot: prox.center,
+        note: `${finger} 屈肌腱 中节段（随抓握伸缩）`,
       });
     }
   }
@@ -204,11 +211,12 @@ export function makeT800(options: { decompose?: boolean } = {}): T800Bundle {
       const bones = FINGER_BONES[`${finger}_${side}`];
       const prox = bones && JOINT_BY_NAME.get(bones.proximal);
       if (!prox) continue;
-      pivots[tendonNodeName(`${finger}_${side}`)] = [
+      pivots[tendonNodeName(`${finger}_${side}_s1`)] = [
         hand.center[0] + (prox.center[0] - hand.center[0]) * 0.18,
         hand.center[1] + 0.012,
         hand.center[2] + (prox.center[2] - hand.center[2]) * 0.18,
       ];
+      pivots[tendonNodeName(`${finger}_${side}_s2`)] = prox.center;
     }
   }
   const builder = new PartBuilder(pivots);
@@ -336,6 +344,7 @@ export function makeT800(options: { decompose?: boolean } = {}): T800Bundle {
         hand.center[1] + 0.012,
         hand.center[2] + (prox.center[2] - hand.center[2]) * 0.18,
       ];
+      // 腱索：**两段**（掌面锚点 → 近节滑轮 → 中节滑轮），机械上绕过关节才真实
       const fingerCn: Record<string, string> = {
         thumb: "拇指",
         index: "食指",
@@ -343,18 +352,22 @@ export function makeT800(options: { decompose?: boolean } = {}): T800Bundle {
         ring: "无名指",
         pinky: "小指",
       };
-      builder.add({
-        id: `${prefix}.tendon.${finger}_${side.toLowerCase()}`,
-        cn: `${side === "R" ? "右" : "左"}${fingerCn[finger]}屈肌腱`,
-        en: `${side === "R" ? "Right" : "Left"} ${finger} Flexor Tendon`,
-        asm: "hand",
-        geom: { type: "kit", kit: "t800Tendon", params: { finger, side } },
-        mat: "dark_chrome",
-        layer: 2,
-        node: tendonNodeName(`${finger}_${side}`),
-        at: anchor,
-        hint: "屈肌腱：近节卷 → 腱索被拉长 → 中节被动跟卷",
-      });
+      const segNames = ["近节段", "中节段"];
+      for (let seg = 0; seg < 2; seg++) {
+        const from = seg === 0 ? anchor : prox.center;
+        builder.add({
+          id: `${prefix}.tendon.${finger}_${side.toLowerCase()}_s${seg + 1}`,
+          cn: `${side === "R" ? "右" : "左"}${fingerCn[finger]}屈肌腱${segNames[seg]}`,
+          en: `${side === "R" ? "Right" : "Left"} ${finger} Flexor Tendon ${seg + 1}`,
+          asm: "hand",
+          geom: { type: "kit", kit: "t800Tendon", params: { finger, side } },
+          mat: "dark_chrome",
+          layer: 2,
+          node: tendonNodeName(`${finger}_${side}_s${seg + 1}`),
+          at: from,
+          hint: "屈肌腱：绕过指节滑轮，握拳时被拉长",
+        });
+      }
       for (const [i, j] of [prox, mid].entries()) {
         builder.add({
           id: `${prefix}.tendon.pulley_${finger}_${side.toLowerCase()}_${i + 1}`,
