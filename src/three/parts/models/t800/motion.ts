@@ -41,6 +41,16 @@ function pulse(u: number): number {
   return 1 - dampedStep((w - half) / (half * 0.86));
 }
 
+/**
+ * 落地冲击响应：u=0 是脚跟触地那一下，之后是快速衰减的振荡。
+ * 机械腿落地应该"咚"一下沉到位再回弹，而不是平滑过渡。
+ */
+function impact(u: number): number {
+  const w = ((u % 1) + 1) % 1;
+  if (w < 0) return 0;
+  return Math.exp(-7 * w) * Math.sin(19 * w);
+}
+
 /** 步态相位（0..1）。 */
 export function gaitPhase(seconds: number): number {
   return (((seconds % CYCLE) + CYCLE) % CYCLE) / CYCLE;
@@ -50,6 +60,8 @@ export function gaitPhase(seconds: number): number {
 interface Angles {
   z: Map<string, number>;
   y: Map<string, number>;
+  /** 落地冲击强度（左右各一），脚跟触地那一下最大 */
+  land: { r: number; l: number };
 }
 
 /** 屈伸幅度（度）。 */
@@ -146,7 +158,8 @@ function jointAngles(seconds: number): Angles {
     if (!z.has(joint.name)) z.set(joint.name, 0);
     if (!y.has(joint.name)) y.set(joint.name, 0);
   }
-  return { z, y };
+  // 落地冲击：脚跟触地（膝屈到位的瞬间）
+  return { z, y, land: { r: impact(right + 0.25), l: impact(left + 0.25) } };
 }
 
 /**
@@ -163,8 +176,9 @@ function refineAngles(angles: Angles): void {
     const parentAccum = joint.parent ? (accum.get(joint.parent) ?? 0) : 0;
     let local = angles.z.get(joint.name) ?? 0;
     if (joint.name.startsWith("bip_foot_")) {
-      // 踝：抵掉整条腿链的累计角
-      local = -parentAccum + 4;
+      // 踝：抵掉整条腿链的累计角 + 落地冲击（顶一下再回弹）
+      const land = joint.name.endsWith("_R_081") ? angles.land.r : angles.land.l;
+      local = -parentAccum + 4 + 9 * land;
     } else if (joint.name.startsWith("bip_hand_")) {
       // 腕：只抵掉肩的摆角（沿父链往上找 upperArm）
       const shoulder = jointChain(joint.name).find((n) => /upperArm/i.test(n));
@@ -208,6 +222,8 @@ function solveWorld(angles: Angles): Map<string, Pose> {
     const pos = parent
       ? parent.pos.clone().add(offset.clone().applyQuaternion(parent.quat))
       : rest.clone();
+    // 骨盆：落地时下沉一下（机械腿的重量感）
+    if (!joint.parent) pos.y -= 0.009 * (angles.land.r + angles.land.l);
     world.set(joint.name, { pos, quat });
   }
   return world;
@@ -265,7 +281,7 @@ export function animateT800(
   model.resetNodes();
   // 待机：站姿（不迈步）—— 步态循环里总有一条腿屈着，静止展示用站姿更干净
   const angles: Angles = options.idle
-    ? { z: new Map(), y: new Map() }
+    ? { z: new Map(), y: new Map(), land: { r: 0, l: 0 } }
     : jointAngles(seconds);
   if (options.idle) {
     for (const [name, deg] of Object.entries(SPINE_BEND)) angles.z.set(name, deg);
