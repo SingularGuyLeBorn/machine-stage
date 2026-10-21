@@ -4,6 +4,7 @@ import type { KitParam } from "../../registry/types";
 import type { ModelRegistry, NodeDef } from "../../registry/types";
 import { PartBuilder } from "./build";
 import { JOINTS, MISSING_PARENTS, NODE_PIVOTS, nodeNameOf } from "./spec";
+import { MECH_NAMES, boneName } from "./names";
 import { meshPartGeometryByIndex } from "./mesh/geometry";
 import {
   HYDRAULICS,
@@ -39,10 +40,10 @@ const ASM_LABEL: Record<string, { cn: string; en: string }> = {
   head: { cn: "头部", en: "Head" },
   shoulder: { cn: "肩带", en: "Shoulder girdle" },
   arm: { cn: "手臂", en: "Arm" },
-  hand: { cn: "手", en: "Hand" },
-  leg: { cn: "腿", en: "Leg" },
-  foot: { cn: "足", en: "Foot" },
-  hydraulics: { cn: "液压", en: "Hydraulics" },
+  hand: { cn: "手部", en: "Hand" },
+  leg: { cn: "下肢", en: "Leg" },
+  foot: { cn: "足部", en: "Foot" },
+  hydraulics: { cn: "液压系统", en: "Hydraulic System" },
 };
 
 const assemblies: ModelRegistry["assemblies"] = Object.entries(ASM_LABEL).map(([id, v]) => ({
@@ -89,13 +90,14 @@ export function makeT800(): T800Bundle {
   const builder = new PartBuilder(pivots);
   const layouts: Record<string, InstanceLayout> = {};
 
-  // ---- 真实网格切出的骨骼零件 ----
+  // ---- 真实网格切出的骨骼零件（标准机械/解剖命名）----
   for (let index = 0; index < JOINTS.length; index++) {
     const joint = JOINTS[index];
+    const name = boneName(joint.name);
     builder.add({
-      id: joint.partId,
-      cn: `${joint.name}（真实网格切分）`,
-      en: joint.name,
+      id: `t800.${name.system}.${name.slug}`,
+      cn: name.cn,
+      en: name.en,
       asm: joint.asm,
       geom: {
         type: "kit",
@@ -106,7 +108,7 @@ export function makeT800(): T800Bundle {
       layer: joint.asm === "hand" ? 2 : 1,
       node: nodeNameOf(joint.name),
       at: joint.center,
-      hint: `真实内骨骼网格按蒙皮切分：${joint.size.map((v) => (v * 1000).toFixed(0)).join("×")} mm`,
+      hint: `${name.en} · ${joint.size.map((v) => (v * 1000).toFixed(0)).join("×")} mm`,
     });
   }
 
@@ -121,10 +123,12 @@ export function makeT800(): T800Bundle {
           : plan.attach === "child"
             ? nodeNameOf(def.child)
             : rodNodeName(def.key);
+      const mech = MECH_NAMES[plan.name] ?? { cn: plan.name, en: plan.name };
+      const jointCn = boneName(def.child).cn;
       builder.add({
         id: `t800.hydraulics.${def.key}_${plan.name}`,
-        cn: `液压缸 ${def.key} · ${plan.name}`,
-        en: `Hydraulic ${def.key} ${plan.name}`,
+        cn: `${jointCn}液压${mech.cn}`,
+        en: `${boneName(def.child).en} ${mech.en}`,
         asm: "hydraulics",
         geom: {
           type: "kit",
@@ -142,8 +146,8 @@ export function makeT800(): T800Bundle {
 
   bundle = {
     registry: {      model: "t800",
-      title: "T-800 内骨骼 · 真实网格切分",
-      subtitle: "76 个蒙皮部位逐件成零件 + 14 根关节液压缸",
+      title: "T-800 内骨骼 · 整机",
+      subtitle: "76 个解剖部位 + 17 根关节液压缸（195 个标准化零件）",
       source_notes:
         "几何来自 t800-mesh.obj（120854 顶点 / 130884 面）按 t800-verts-joints.csv 的 76 个蒙皮部位切分；" +
         "坐标已换算为站立姿态（+X 前 / +Y 上 / +Z 右），身高 1.90m，脚底 y=0。" +
@@ -161,17 +165,6 @@ export function makeT800(): T800Bundle {
       parts: builder.parts,
       expectedContacts: [
         {
-          family: "t800-mesh-seam",
-          a: "t800.mesh.*",
-          b: "t800.mesh.*",
-          reason:
-            "同一真实网格按蒙皮切分的相邻部位：源网格里各骨本来就在同一原物体上互相穿插" +
-            "（躯干壳体与锁骨重叠 60mm 量级），切开后接缝处的重叠是构造性的，不是错位穿透",
-          maxDepthMm: 70,
-          allowDisplaced: true,
-          allowSuspect: true,
-        },
-        {
           family: "t800-hydraulic-fit",
           a: "t800.hydraulics.*",
           b: "t800.*",
@@ -181,13 +174,24 @@ export function makeT800(): T800Bundle {
           allowSuspect: true,
         },
         {
+          family: "t800-mesh-seam",
+          a: "t800.*",
+          b: "t800.*",
+          reason:
+            "同一真实网格按蒙皮切分的相邻部位：源网格里各骨本来就在同一原物体上互相穿插" +
+            "（躯干壳体与锁骨重叠 60mm 量级），切开后接缝处的重叠是构造性的，不是错位穿透",
+          maxDepthMm: 70,
+          allowDisplaced: true,
+          allowSuspect: true,
+        },
+        {
           // 源网格里这两对骨本来就互相埋进去（同一个原物体被拆成两骨）：
-          //   · 躯干壳体 ↔ 左上臂段（上臂根就长在胸廓里）
+          //   · 胸廓壳体 ↔ 左上臂段（上臂根就长在胸廓里）
           //   · 骨盆 ↔ 左髋（髋球座就在骨盆内部）
           // 深度超出上面"接缝族"的常规量级，单独立条写明，避免整族放水。
           family: "t800-source-overlap",
-          a: "t800.mesh.bip_spine_3_06",
-          b: "t800.mesh.rightarmroll_helper_049",
+          a: "t800.spine.vertebra_t3",
+          b: "t800.arm.humerus_distal_l",
           reason: "源网格自身的骨间穿插：上臂根长在胸廓壳体内部（非装配错位）",
           maxDepthMm: 95,
           allowDisplaced: true,
@@ -195,8 +199,8 @@ export function makeT800(): T800Bundle {
         },
         {
           family: "t800-source-overlap",
-          a: "t800.mesh.bip_pelvis_02",
-          b: "t800.mesh.bip_hip_l_082",
+          a: "t800.pelvis.pelvis",
+          b: "t800.leg.hip_joint_l",
           reason: "源网格自身的骨间穿插：髋球座嵌在骨盆内部（非装配错位）",
           maxDepthMm: 95,
           allowDisplaced: true,

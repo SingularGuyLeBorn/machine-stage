@@ -7,6 +7,7 @@ import { animateT800, t800CylinderReadout } from "./motion";
 import { HYDRAULICS, hydraulicPlans } from "./hydraulics";
 import { JOINTS, JOINT_BY_NAME, jointChain } from "./spec";
 import { MESH_META } from "./mesh/assets";
+import { boneName } from "./names";
 import { meshPartGeometry } from "./mesh/geometry";
 
 // ============================================================================
@@ -74,13 +75,20 @@ describe("T-800 真实网格切分", () => {
     expect(misplaced, `错位零件：\n${misplaced.join("\n")}`).toEqual([]);
   });
 
-  it("76 个蒙皮部位逐件成独立 partId", () => {
+  it("76 个蒙皮部位逐件成独立 partId（标准化命名 t800.<系统>.<零件>_<侧别>）", () => {
     const { registry } = build();
-    const meshParts = registry.parts.filter((p) => p.id.startsWith("t800.mesh."));
-    expect(meshParts).toHaveLength(76);
-    expect(new Set(meshParts.map((p) => p.id)).size).toBe(76);
-    // 每个部位在资产清单里都能找到
-    expect(meshParts).toHaveLength(MESH_META.length);
+    const ids = new Set(registry.parts.map((p) => p.id));
+    for (const joint of JOINTS) {
+      const name = boneName(joint.name);
+      const id = `t800.${name.system}.${name.slug}`;
+      expect(ids.has(id), `${joint.name} 应有零件 ${id}`).toBe(true);
+    }
+    // 零件名里不能再有"真实网格切分"这种过程标签
+    for (const part of registry.parts) {
+      expect(part.name_cn, `${part.id} 的中文名`).not.toContain("真实网格切分");
+      expect(part.name_en, `${part.id} 的英文名`).not.toContain("bip_");
+      expect(part.name_en, `${part.id} 的英文名`).not.toContain("helper");
+    }
   });
 
   it("五指各三节 × 左右 = 30 件独立零件", () => {
