@@ -4,7 +4,7 @@
 // 退出码：0 = 全部通过；1 = 有未豁免穿模 / 悬空 / 校验错误。
 import { buildModel } from "../src/three/parts/assembler/assembler";
 import { validateRegistry } from "../src/three/parts/registry/validate";
-import { detectUnsupportedParts } from "../src/three/parts/solver/support";
+import { detectFloatingIslands, detectUnsupportedParts } from "../src/three/parts/solver/support";
 import { detectStatic } from "../src/three/parts/solver/detect";
 import { partitionExpectedContacts } from "../src/three/parts/solver/whitelist";
 import { makeMbtRegistry, makeMbtLayouts, mbtBuilders } from "../src/three/parts/models/mbt/registry";
@@ -42,6 +42,15 @@ for (const row of support.slice(0, 10)) {
   console.log(`    ${row.ref} 距最近 ${row.nearest} ${row.gap_mm.toFixed(1)}mm`);
 }
 
+// 成对支撑会把「互相靠近的一团悬空件」当成有支撑；连通性检查补这个洞。
+const islands = detectFloatingIslands(built, { maxGapM: 0.02 });
+console.log(
+  `  悬空孤岛：${islands.islands.length} 组 / ${islands.islandInstances} 件（最大连通分量 ${islands.rootedSize}/${islands.total}）`,
+);
+for (const island of islands.islands.slice(0, 10)) {
+  console.log(`    ${island.size} 件：${island.refs.join(", ")}`);
+}
+
 let unexcused = 0;
 if (!skipStatic) {
   const started = performance.now();
@@ -51,12 +60,22 @@ if (!skipStatic) {
   console.log(
     `  静态穿模：${clips.length} 报告 / 未豁免 ${unexcused} / 已豁免 ${split.expected.length}（${((performance.now() - started) / 1000).toFixed(1)}s）`,
   );
-  for (const row of split.active.slice(0, 10)) {
-    console.log(
-      `    ${row.report.a} ↔ ${row.report.b} ${row.report.depth_mm === null ? "—" : row.report.depth_mm.toFixed(2)}mm [${row.report.form}]`,
-    );
+  const grouped = new Map<string, { a: string; b: string; count: number; depth: number; forms: Set<string> }>();
+  for (const row of split.active) {
+    const key = `${row.report.a} ↔ ${row.report.b}`;
+    const entry = grouped.get(key) ?? { a: row.report.a, b: row.report.b, count: 0, depth: 0, forms: new Set<string>() };
+    entry.count += 1;
+    entry.depth = Math.max(entry.depth, row.report.depth_mm ?? 0);
+    entry.forms.add(row.report.form);
+    grouped.set(key, entry);
+  }
+  const topGroups = [...grouped.values()].sort((x, y) => y.depth - x.depth || y.count - x.count);
+  for (const row of topGroups.slice(0, 30)) {
+    console.log(`    ${row.a} ↔ ${row.b} ×${row.count} 最深 ${row.depth.toFixed(2)}mm [${[...row.forms].join(",")}]`);
   }
 }
 
 built.dispose();
-process.exit(errors.length > 0 || support.length > 0 || unexcused > 0 ? 1 : 0);
+process.exit(
+  errors.length > 0 || support.length > 0 || islands.islands.length > 0 || unexcused > 0 ? 1 : 0,
+);
