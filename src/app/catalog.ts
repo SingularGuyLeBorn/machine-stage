@@ -27,6 +27,12 @@ import {
 } from "@/three/parts/models/kingjoe-lower/registry";
 import { kingjoeLowerBuilders } from "@/three/parts/models/kingjoe-lower/kits";
 import { animateKingJoeLower, type KingJoeLowerState } from "@/three/parts/models/kingjoe-lower/motion";
+import {
+  makeKingJoeThreeLayouts,
+  makeKingJoeThreeRegistry,
+} from "@/three/parts/models/kingjoe-three/registry";
+import { kingjoeThreeBuilders } from "@/three/parts/models/kingjoe-three/kits";
+import { animateKingJoeThree, type KingJoeThreeState } from "@/three/parts/models/kingjoe-three/motion";
 import { animateKingJoeSkin, type KingJoeSkinState } from "@/three/parts/models/kingjoe-skin/motion";
 import {
   animateTigerSuspension,
@@ -374,6 +380,69 @@ export const CATALOG: StageModel[] = [
       "皮肤：下半身 1,510 三角 / 3 材质组，上半身 13,738 三角 / 12 材质组，合计 15,248 三角；内部不焊接/不布尔/不重拓扑。",
       "自检：合体态、分离终态、分离/合体全程未豁免穿模为 0、悬空为 0；只有藏在髋腔/骨盆壳内的榫件与源髋部互锁按带原因的深度白名单豁免。",
       "整机单件外观在「整体实心（单件）」卡；四体编队/分离/怪光线在主卡「金古桥 King Joe」。",
+      "版权：奥特曼 IP；本工程仅个人参考，不做商用。",
+    ],
+  },
+  {
+    id: "kingjoethree",
+    title: "金古桥 King Joe · 三体拆分",
+    subtitle: "腿部+髋部 ↔ 腹部+胸部 ↔ 脑袋+双手 · 腰缝楔榫 · 三体分离/合体电弧",
+    milestone: "M-G·R3.3",
+    status: "ready",
+    registry: makeKingJoeThreeRegistry(),
+    layouts: makeKingJoeThreeLayouts(),
+    builders: kingjoeThreeBuilders,
+    animatedStates: ["separating", "combining"],
+    animate: (assembled, seconds, state) =>
+      animateKingJoeThree(assembled, seconds, (state as KingJoeThreeState) ?? "idle"),
+    states: [
+      {
+        id: "idle",
+        label: "合体待机",
+        hint: "三组贴合：腿+髋 / 腹+胸 / 头+双手；腰缝楔榫藏于腹甲腔，外观与整机单件一致",
+      },
+      {
+        id: "separating",
+        label: "三体分离",
+        hint: "躯干提起 0.6m；头+双手先沿 +Z 0.7m 离开肩颈/手腕，再沿 +Y 提起 1.6m",
+      },
+      {
+        id: "separated",
+        label: "分离停放",
+        hint: "三组各自悬停：腰缝楔榫、颈根、双腕接口全部露出",
+      },
+      {
+        id: "combining",
+        label: "三体合体",
+        hint: "头手先下降回到腕位，躯干再落座；腰缝/颈根/双腕电弧接通并锁死闪光",
+      },
+    ],
+    actions: [
+      { id: "kjt-separate", group: "三体", label: "三体分离", kind: "machine-state", state: "separating" },
+      { id: "kjt-park", group: "三体", label: "分离停放", kind: "machine-state", state: "separated" },
+      { id: "kjt-combine", group: "三体", label: "三体合体 + 电弧", kind: "machine-state", state: "combining" },
+      { id: "kjt-idle", group: "三体", label: "合体待机", kind: "machine-state", state: "idle" },
+      { id: "kjt-xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "kjt-labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "kjt-grid", group: "展示", label: "网格", kind: "view-toggle", view: "grid" },
+      { id: "kjt-reset", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "kjt-scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "kjt-scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    readouts: (assembled) => [
+      { label: "零件", value: `${assembled.parts.length} 件` },
+      { label: "皮肤三角", value: "15,248 个" },
+      { label: "三组", value: "腿髋 / 腹胸 / 头手" },
+      { label: "腰缝榫卯", value: "4 楔榫 + 4 榫槽" },
+    ],
+    notes: [
+      "三组按源网格自然归属合并：下半身 = legs 总成 + pelvis（腿部+髋部）；躯干 = abdomen + chest 非手部件（腹部+胸部+肩臂/锁骨/肘腕护甲）；头手 = ship.head + chest.hand/finger（脑袋+两只手）。",
+      "接缝沿用源边界：腰缝（骨盆/腹甲）、颈根（头/肩荚）、双腕（手/腕护甲）；不切三角形、不焊接、不布尔、不重拓扑。",
+      "腰缝保留 4 组楔榫/榫槽，躯干提起 0.6m 退出；头手组因为手在腕部，先沿 +Z 0.7m 脱离肩颈/手腕，再沿 +Y 提起 1.6m，避免手从手腕里直接向上穿进小臂。",
+      "三处电弧：腰缝、颈根、双腕；分离时拉断，合体末段接通并锁死闪光。FX 不参与零件树/穿模/悬空检测。",
+      "皮肤三角：下半身 1,855 / 躯干 8,143 / 头手 5,250，合计 15,248；材质组 4 / 10 / 6。",
+      "自检：合体态、分离终态、三体分离/合体全程未豁免穿模为 0、悬空为 0；源关节/腰缝隐藏件按带原因的深度白名单豁免。",
+      "髋缝两体版本在「髋缝两体拆分」卡；四体编队/怪光线在主卡「金古桥 King Joe」。",
       "版权：奥特曼 IP；本工程仅个人参考，不做商用。",
     ],
   },

@@ -1555,3 +1555,32 @@ npm test && npm run build
 PREVIEW_URL='http://localhost:5176/?qa=1' PREVIEW_MODEL=kingjoelower node scripts/capture-preview.mjs
 ```
 
+
+### 追加：三体拆分（腿部+髋部 / 腹部+胸部 / 脑袋+双手，2026-10-21）
+
+按用户指定的三组重做：**腿部+髋部**、**腹部+胸部**、**脑袋+两只手**。源网格 578 件 + 21 个叠加细节（615 个 handle）按源归属合并成三组，不切三角形、不焊接、不布尔、不体素重拓扑。
+
+| 组     | 组成                                                                                                                                  | 三角 / 材质组 | 包围盒（m）                          |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------------ |
+| 下半身 | legs 总成 + stomach.pelvis（腿、髋鼓、骨盆中柱）                                                                                       | **1,855 / 4** | x ±1.343，y −0.004…4.222，z −0.812…1.032 |
+| 躯干   | stomach.abdomen + chest 非手部件（胸甲、肩荚、锁骨、上臂、小臂、肘/腕护甲、胸口彩虹栅）                                                  | **8,143 / 10** | x ±1.842，y 3.220…6.104，z −1.054…0.907 |
+| 头手   | ship.head + 头部细节（visor/眼/口）+ chest.hand/finger（头、双手、三指）                                                                | **5,250 / 6** | x ±1.818，y 2.428…6.615，z −0.937…0.907 |
+| 合计   | 615 handles / 15,248 三角                                                                                                             |               | 合体包围盒 3.683 × 6.618 × 2.086     |
+
+- **接缝**：腰缝（骨盆/腹甲，约 3.986–4.222m）、颈根（头/肩荚）、双腕（手/腕护甲）全部沿用源网格边界；腰缝保留 4 组楔榫/榫槽（躯干提起 0.6m 退出）。
+- **头手组路径**：手在腕部，若直接沿 +Y 提起会从小臂里穿出；因此头手组先沿 **+Z 0.7m** 脱离肩颈/双腕，再沿 **+Y 1.6m** 提起。躯干先提起 **0.6m**，下半身站在地面不动。
+- **三处电弧**：腰缝 6 条、颈根 4 条、双腕各 2 条；分离时拉断，合体末段重新接通并锁死闪光；FX 不参与零件树/穿模/悬空检测。
+- **门禁**：`vitest` **146 passed（18 文件）**；`tsc` / `build` ✓；合体态 **active 0 / expected 3 / unsupported 0**；分离终态 **active 0**；三体分离/合体 30fps 扫掠 **active 0**；浏览器加载 active 0 / expected 3，page errors 0。
+- **外观**：合体态与「整机单件」同相机正视图 SSIM **0.9992 / PSNR 49.0 dB**（900×620，裁状态栏）。
+- **白名单**（只覆盖源关节与隐藏腰缝件）：`lower.body ↔ torso.body` 40mm（骨盆中柱/腹甲源互锁）；`waist_seat ↔ torso.body` 240mm；`waist_tenon ↔ torso.body` 280mm；`waist_socket ↔ torso.body` 280mm；`headhands.body ↔ torso.body` 800mm（颈根/双腕源关节壳互嵌）。榫头/榫槽本体 5mm 侧隙，不进白名单。
+- **证据**：`docs/qa/kingjoe-three-card.jpg`（前端卡片）、`-separated-front`、`-separated`、`-seam-separated`、`-views`（三视对照）、`-separating-arc`、`-combining-arc`、`-combining-lock`、`-arcs`（三态电弧）、`-vs-whole`（整机对比）、`-xray-idle` / `-xray-separated`（隐藏腰缝件/源关节）。
+- **已知边界**：源网格仍是互嵌薄壳，头/肩荚与手/腕护甲分离后能看到源壳开口（未加端盖，避免再造“假拼接”）；头手组是按用户要求的人为分组，不是四体飞船里的真实舱段；未做强度/摩擦分析。
+
+**复现**
+
+```bash
+npx vite-node scripts/build-kingjoe-three.ts    # 生成三组皮
+npx vite-node scripts/diag-kingjoe-three.ts     # 静态/分离/合体扫掠
+npm test && npm run build
+PREVIEW_URL='http://localhost:5176/?qa=1' PREVIEW_MODEL=kingjoethree node scripts/capture-preview.mjs
+```
