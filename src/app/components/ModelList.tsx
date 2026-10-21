@@ -9,7 +9,6 @@ import { useStageStore } from "../state/stageStore";
 export function ModelList() {
   const modelId = useStageStore((state) => state.modelId);
   const setModel = useStageStore((state) => state.setModel);
-  const models = CATALOG.filter((model) => !model.hidden);
 
   return (
     <section className="panel">
@@ -17,12 +16,12 @@ export function ModelList() {
         <Boxes size={14} className="muted" aria-hidden />
         <h2 className="panel__title">模型库</h2>
         <span className="panel__count">
-          {models.filter((model) => model.status === "ready").length}/{models.length} 已交付
+          {CATALOG.filter((model) => model.status === "ready").length}/{CATALOG.length} 已交付
         </span>
       </header>
       <div className="panel__body">
         <div className="model-list">
-          {models.map((model) => {
+          {CATALOG.map((model) => {
             const ready = model.status === "ready";
             return (
               <button
