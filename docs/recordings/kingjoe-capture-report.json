@@ -1,20 +1,20 @@
 {
   "stats": {
-    "parts": 601,
-    "instances": 800,
+    "parts": 599,
+    "instances": 818,
     "reports": 0,
     "state": "idle",
     "stats": {
-      "parts": 601,
-      "triangles": 319610
+      "parts": 599,
+      "triangles": 326498
     }
   },
-  "fps": 57.3,
+  "fps": 60,
   "recording": {
-    "bytes": 4774124,
-    "frames": 606,
+    "bytes": 4318799,
+    "frames": 642,
     "audioTracks": 1,
-    "chunks": 45,
+    "chunks": 42,
     "mimeType": "video/webm;codecs=vp9,opus",
     "audioState": "running",
     "errors": []
@@ -23,8 +23,10 @@
     "reports": 0,
     "modelId": "kingjoe",
     "machineState": "idle",
-    "buildIndex": 601
+    "buildIndex": 599
   },
   "pageErrors": [],
-  "consoleErrors": []
+  "consoleErrors": [
+    "warning: THREE.WebGLProgram: Program Info Log: (85,12-86): warning X3595: gradient instruction used in a loop with varying iteration; partial derivatives may have undefined value\n(85,12-86): warning X3595: gradient instruction used in a loop with varying iteration; partial derivatives may have undefined value"
+  ]
 }

@@ -336,7 +336,7 @@ function applyMaterialDefaults(assembled: AssembledModel): void {
     const target = part.object.material as THREE.MeshStandardMaterial;
     if (material === "eye_glow") target.emissiveIntensity = 2.2;
     else if (material === "forehead_glow") target.emissiveIntensity = 2.4;
-    else if (material.startsWith("chest_glow")) target.emissiveIntensity = 1.3;
+    else if (material.startsWith("chest_glow")) target.emissiveIntensity = 2.4;
     else if (material === "sensor_red") target.emissiveIntensity = 1.1;
     else target.emissiveIntensity = 0.9;
   }
