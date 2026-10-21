@@ -112,10 +112,21 @@ const LIGHT = new THREE.Vector3(0.35, 0.75, 0.56).normalize();
 // ---------------------------------------------------------------- 投影
 type View = "side" | "front" | "iso";
 
-const VIEWS: Record<View, { dir: THREE.Vector3; up: THREE.Vector3; label: string }> = {
-  // 侧视：+Z 看过去（腿的左右厚度被压掉，看到前后起伏）
+/** 一个视角：视线方向 + 目标点 + 缩放（像素/米）。 */
+interface ViewDef {
+  dir: THREE.Vector3;
+  up: THREE.Vector3;
+  label: string;
+  /** 视线中心（模型坐标） */
+  target?: [number, number, number];
+  /** 缩放（像素/米），默认 SCALE */
+  scale?: number;
+}
+
+const VIEWS: Record<View, ViewDef> = {
+  // 侧视：+Z 看过去（左右厚度被压掉，看到前后起伏）
   side: { dir: new THREE.Vector3(0, 0, 1), up: new THREE.Vector3(0, 1, 0), label: "侧视" },
-  // 正视：+X 看过去（看到腿的左右厚度 / 肌肉块宽度）
+  // 正视：+X 看过去（看到左右厚度 / 机构宽度）
   front: { dir: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 1, 0), label: "正视" },
   // 斜 45°：同时看到厚度与起伏
   iso: {
@@ -125,13 +136,51 @@ const VIEWS: Record<View, { dir: THREE.Vector3; up: THREE.Vector3; label: string
   },
 };
 
-function makeProjector(view: View): (p: THREE.Vector3) => [number, number] {
+/** 特写视角（不进主视图表，单独渲染）。 */
+const CLOSEUPS: Record<string, ViewDef & { view: View; tag: string; seconds: number }> = {
+  head: {
+    view: "front",
+    dir: new THREE.Vector3(1, 0, 0),
+    up: new THREE.Vector3(0, 1, 0),
+    label: "头部特写",
+    target: [0.03, 1.76, -0.01],
+    scale: 1700,
+    tag: "closeup-head",
+    seconds: 0,
+  },
+  leg: {
+    view: "iso",
+    dir: new THREE.Vector3(0.7071, 0, 0.7071),
+    up: new THREE.Vector3(0, 1, 0),
+    label: "右腿特写",
+    target: [0.0, 0.45, 0.14],
+    scale: 1100,
+    tag: "closeup-leg",
+    seconds: 1.6,
+  },
+  hand: {
+    view: "iso",
+    dir: new THREE.Vector3(0.7071, 0, 0.7071),
+    up: new THREE.Vector3(0, 1, 0),
+    label: "右手特写",
+    target: [0.19, 1.02, 0.28],
+    scale: 2600,
+    tag: "closeup-hand",
+    seconds: 1.2,
+  },
+};
+
+function makeProjector(view: View, target?: [number, number, number], scale?: number): (p: THREE.Vector3) => [number, number] {
   const { dir, up } = VIEWS[view];
+  const s = scale ?? SCALE;
   const right = new THREE.Vector3().crossVectors(up, dir).normalize();
   const camUp = new THREE.Vector3().crossVectors(dir, right).normalize();
+  const t = target ? new THREE.Vector3(...target) : new THREE.Vector3();
+  // 有目标点 = 特写：目标落在画面中心；没有目标 = 全身：地面线在画布底部
+  const baseY = target ? H / 2 : H - 40;
   return (p: THREE.Vector3) => [
-    W / 2 + (p.dot(right) + X_SHIFT) * SCALE,
-    H - 40 - p.dot(camUp) * SCALE,
+    W / 2 + (p.dot(right) - t.dot(right) + X_SHIFT) * s,
+    baseY - (p.dot(camUp) - t.dot(camUp)) * s,
   ];
 }
 
@@ -164,12 +213,16 @@ function fillTriangle(canvas: Canvas, t: Tri): void {
   }
 }
 
-function renderAt(seconds: number, view: View): { png: Buffer; caption: string } {
+function renderAt(
+  seconds: number,
+  view: View,
+  override?: { dir: THREE.Vector3; up: THREE.Vector3; target?: [number, number, number]; scale?: number },
+): { png: Buffer; caption: string } {
   model.resetNodes();
   animateT800(model, seconds);
   model.syncInstances();
   model.root.updateMatrixWorld(true);
-  const project = makeProjector(view);
+  const project = makeProjector(view, override?.target, override?.scale);
 
   const tris: Tri[] = [];
   const matrix = new THREE.Matrix4();
@@ -208,7 +261,7 @@ function renderAt(seconds: number, view: View): { png: Buffer; caption: string }
         const [ax, ay] = project(a);
         const [bx, by] = project(b);
         const [cx, cy] = project(c);
-        const dir = VIEWS[view].dir;
+        const dir = override?.dir ?? VIEWS[view].dir;
         tris.push({
           pts: [
             [ax, ay],
@@ -267,5 +320,17 @@ for (const view of ["front", "iso"] as View[]) {
     writeFileSync(`${OUT}/${name}.txt`, `${caption}\n`, "utf8");
     console.log("wrote", name, "t=", seconds);
   }
+}
+// 特写：头 / 右腿 / 右手
+for (const def of Object.values(CLOSEUPS)) {
+  const { png, caption } = renderAt(def.seconds, def.view, {
+    dir: def.dir,
+    up: def.up,
+    target: def.target,
+    scale: def.scale,
+  });
+  writeFileSync(`${OUT}/${def.tag}.png`, png);
+  writeFileSync(`${OUT}/${def.tag}.txt`, `${caption}\n`, "utf8");
+  console.log("wrote", def.tag, "t=", def.seconds);
 }
 console.log("done");
