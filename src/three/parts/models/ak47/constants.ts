@@ -76,22 +76,22 @@ export const AK47_CONSTANTS = {
 
   // ---- 击发机构（机匣下部尾段：击锤/扳机/快慢机 + 三销）----
   HAMMER_Y: -0.04,
-  HAMMER_PIVOT_Z: -0.068,
+  HAMMER_PIVOT_Z: -0.085,
   HAMMER_SWING_DEG: 50,
   HAMMER_LEN: 0.055,
   HAMMER_R: 0.007,
   TRIGGER_Y: -0.042,
-  TRIGGER_PIVOT_Z: -0.075,
+  TRIGGER_PIVOT_Z: -0.095,
   TRIGGER_BLADE_Y: -0.085,
   TRIGGER_PULL_DEG: 10,
   TRIGGER_LEN: 0.045,
   SELECTOR_PIVOT_Y: -0.020,
-  SELECTOR_PIVOT_Z: -0.072,
+  SELECTOR_PIVOT_Z: -0.105,
   SELECTOR_LEN: 0.055,
   SELECTOR_SWING_DEG: 40,
 
   // ---- 弹匣（弧形双列交错，30 发）----
-  MAG_FEED_Y: -0.010, // 供弹位弹心高（枪膛轴下 10mm：抱弹口与膛线近似对中）
+  MAG_FEED_Y: -0.018, // 供弹位弹心高（枪膛轴下 10mm：抱弹口与膛线近似对中）
   MAG_FEED_Z: -0.0304, // 供弹位弹底 z（弹头尖距枪膛 5mm）
   MAG_PITCH: 0.0102, // 相邻两弹沿弧的间距（半槽）
   MAG_ROWS: 30, // 弹数（双列交错，每列 15）
@@ -153,7 +153,7 @@ export const AK47_CONSTANTS = {
 
   // ---- 台面 ----
   STAGE_Y: 0.3, // 枪膛轴离地高度（展示台基准：实例布局为 root 空间，需加此偏移对齐零件）
-  FOLLOWER_Y: -0.198, // 托弹板静止位（末发下方 10mm）
+  FOLLOWER_Y: -0.206, // 托弹板静止位（末发下方 10mm）
   FOLLOWER_Z: -0.058,
 } as const;
 
@@ -214,7 +214,7 @@ export function magRoundTransform(i: number): { pos: [number, number, number]; a
   const u = magRoundArc(i);
   const uTotal = magRoundArc(29);
   // 沿堆叠方向积分（固定步数 → 确定性）
-  let y = -0.010;
+  let y = -0.018;
   let z = -0.0304;
   const step = u / MAG_INTEGRATE_STEPS;
   for (let k = 0; k < MAG_INTEGRATE_STEPS; k++) {
@@ -235,7 +235,7 @@ export function magRoundAngle(i: number): number {
 export function magSlotTransform(u: number, _opts?: { R?: number; half?: number }) {
   const uTotal = magRoundArc(29);
   const seg = Math.max(0, Math.min(u, uTotal + 0.035)); // 允许托弹板/托弹簧越过末发弧位
-  let y = -0.010;
+  let y = -0.018;
   let z = -0.0304;
   const steps = MAG_INTEGRATE_STEPS;
   const step = seg / steps;
