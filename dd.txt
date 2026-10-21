@@ -3,9 +3,9 @@ npm warn Unknown user config "python". This will stop working in the next major 
 npm warn Unknown user config "canvas_binary_host_mirror". This will stop working in the next major version of npm.
 npm warn Unknown user config "electron_mirror". This will stop working in the next major version of npm.
 注册表校验：0 错 / 0 警
-零件定义 225 / 实例 225
-静态穿模报告 378（未豁免 0 / 已豁免 378）
-扫掠 16 帧穿模报告 6123（未豁免 0 / 已豁免 6123）
+零件定义 235 / 实例 235
+静态穿模报告 420（未豁免 0 / 已豁免 420）
+扫掠 16 帧穿模报告 6784（未豁免 0 / 已豁免 6784）
   （唯一对 0 个）
 悬空候选（未挂到骨架的部位）：0
 父子骨骼几何间隙 > 120mm 的部位：0
@@ -22,11 +22,11 @@ npm warn Unknown user config "electron_mirror". This will stop working in the ne
   shoulder_l  |AB|=80.6mm  露出杆长=41.1mm
   elbow_l  |AB|=97.3mm  露出杆长=38.4mm
   wrist_l  |AB|=59.6mm  露出杆长=30.6mm
-  spine_column  |AB|=536.5mm  露出杆长=266.0mm
+  spine_column  |AB|=546.1mm  露出杆长=269.7mm
   lumbar  |AB|=120.0mm  露出杆长=59.4mm
   neck  |AB|=45.4mm  露出杆长=22.9mm
   erector_r  |AB|=183.8mm  露出杆长=92.7mm
   erector_l  |AB|=184.2mm  露出杆长=93.1mm
 液压行程判定：PASS
 
-未豁免穿模 0（静态 0 + 扫掠 0）  悬空 0  液压行程 PASS  零件 225 PASS
+未豁免穿模 0（静态 0 + 扫掠 0）  悬空 0  液压行程 PASS  零件 235 PASS

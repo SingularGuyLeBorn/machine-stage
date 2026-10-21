@@ -75,7 +75,7 @@ export function splitBoneIntoPlates(geometry: THREE.BufferGeometry): Plate[] {
     // 这样外形仍与源网格吻合（外表面完整），但不是"整面糊死"。
     const cellR = faces.map((f) => faceRadius(f));
     const rMax = Math.max(...cellR);
-    const keep = faces.filter((_, k) => cellR[k] >= rMax * 0.62);
+    const keep = faces.filter((_, k) => cellR[k] >= rMax * 0.68);
     if (keep.length < 2) continue;
 
     const pos: number[] = [];

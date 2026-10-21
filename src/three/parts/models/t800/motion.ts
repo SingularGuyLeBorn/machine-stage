@@ -341,8 +341,8 @@ export function animateT800(
 }
 
 /**
- * 屈肌腱：每根手指一根索，从掌面锚点拉到中节滑轮。
- * 长度 = |锚点 - 滑轮|，抓握卷曲时这个距离变大 → 索被拉长（按实际距离缩放）。
+ * 屈肌腱：每根手指**两段**（掌面锚点 → 近节滑轮 → 中节滑轮），
+ * 绕过关节才符合机械。每帧按实际距离重算方向与长度（握拳时索被拉长）。
  */
 function updateTendons(model: AssembledModel, world: Map<string, Pose>): void {
   const up = new THREE.Vector3(0, 1, 0);
@@ -361,8 +361,9 @@ function updateTendons(model: AssembledModel, world: Map<string, Pose>): void {
       const prox = JOINT_BY_NAME.get(bones.proximal);
       const mid = JOINT_BY_NAME.get(bones.middle);
       if (!prox || !mid) continue;
-      const node = model.getNode(tendonNodeName(`${finger}_${side}`));
-      if (!node) continue;
+      const proxPose = world.get(prox.name);
+      const midPose = world.get(mid.name);
+      if (!proxPose || !midPose) continue;
       // 掌面锚点（跟手掌一起动）
       const anchorRest = new THREE.Vector3(
         hand.center[0] + (prox.center[0] - hand.center[0]) * 0.18,
@@ -374,27 +375,34 @@ function updateTendons(model: AssembledModel, world: Map<string, Pose>): void {
         .sub(new THREE.Vector3(...hand.pivot))
         .applyQuaternion(handPose.quat)
         .add(handPose.pos);
-      // 中节滑轮的世界位置
-      const midPose = world.get(mid.name);
-      if (!midPose) continue;
-      const pulley = midPose.pos;
-      dir.copy(pulley).sub(anchor);
-      const length = Math.max(dir.length(), 1e-4);
-      dir.divideScalar(length);
-      quat.setFromUnitVectors(up, dir);
-      node.position.copy(anchor);
-      node.quaternion.copy(quat);
-      // 索按实际长度缩放（抓握时可见被拉长）
-      const handle =
-        model.getPart(`t800.tendon.${finger}_${side.toLowerCase()}`) ??
-        model.getPart(`t800_mech.tendon.${finger}_${side.toLowerCase()}`);
-      if (handle) {
-        scale.set(1, length, 1);
-        matrix.compose(new THREE.Vector3(), new THREE.Quaternion(), scale);
-        handle.setInstanceMatrix(0, matrix);
+      // 两段：锚点→近节、近节→中节
+      const chain = [anchor, proxPose.pos, midPose.pos];
+      for (let seg = 0; seg < 2; seg++) {
+        const node = model.getNode(tendonNodeName(`${finger}_${side}_s${seg + 1}`));
+        if (!node) continue;
+        const a = chain[seg];
+        const b = chain[seg + 1];
+        dir.copy(b).sub(a);
+        const length = Math.max(dir.length(), 1e-4);
+        dir.divideScalar(length);
+        quat.setFromUnitVectors(up, dir);
+        node.position.copy(a);
+        node.quaternion.copy(quat);
+        const handle =
+          model.getPart(`${prefixOf(model)}.tendon.${finger}_${side.toLowerCase()}_s${seg + 1}`);
+        if (handle) {
+          scale.set(1, length, 1);
+          matrix.compose(new THREE.Vector3(), new THREE.Quaternion(), scale);
+          handle.setInstanceMatrix(0, matrix);
+        }
       }
     }
   }
+}
+
+/** 从模型 id 推出零件 id 前缀（GLB 原型 / 机械拆解版）。 */
+function prefixOf(model: AssembledModel): string {
+  return model.registry.model === "t800_mech" ? "t800_mech" : "t800";
 }
 
 let lastSeconds = 0;
