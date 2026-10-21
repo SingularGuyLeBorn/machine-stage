@@ -1,14 +1,54 @@
 # T-800 右腿 · 装配 / 悬空 / 液压行程审计
 
-- 零件定义：140，实例：215
-- 静态穿模：8；扫掠 24 帧：223
-- 悬空候选（无 ≤3mm AABB 支撑邻居）：0
+- 零件定义：410，实例：687
+- 静态穿模：185；扫掠 24 帧：4502
+- 悬空候选（真实表面间距 > 3mm，无支撑邻居）：41
 
 ## 悬空清单（人工审）
 
 | 零件 | 最近邻居 | 间隙 |
 |---|---|---|
-| （无） | — | — |
+| `t800.hydraulics.relief` | `t800.hydraulics.accumulator` | 3.6mm |
+| `t800.torso.ribs_0[0]` | `t800.torso.ribs_0[1]` | 4.3mm |
+| `t800.torso.ribs_0[1]` | `t800.torso.ribs_0[2]` | 4.0mm |
+| `t800.torso.ribs_0[2]` | `t800.torso.ribs_1[0]` | 3.2mm |
+| `t800.torso.ribs_1[0]` | `t800.torso.ribs_0[2]` | 3.2mm |
+| `t800.torso.ribs_1[1]` | `t800.spine.vert_thoracic[10]` | 4.1mm |
+| `t800.torso.ribs_1[2]` | `t800.spine.vert_thoracic[9]` | 4.5mm |
+| `t800.torso.ribs_left_0[0]` | `t800.torso.ribs_left_0[1]` | 4.2mm |
+| `t800.torso.ribs_left_0[1]` | `t800.torso.ribs_left_0[2]` | 3.8mm |
+| `t800.torso.ribs_left_0[2]` | `t800.torso.ribs_left_1[0]` | 3.2mm |
+| `t800.torso.ribs_left_1[0]` | `t800.torso.ribs_left_0[2]` | 3.2mm |
+| `t800.torso.ribs_left_1[1]` | `t800.spine.vert_thoracic[10]` | 3.9mm |
+| `t800.torso.ribs_left_1[2]` | `t800.spine.vert_thoracic[8]` | 4.6mm |
+| `t800.torso.sternum` | `t800.torso.ribs_left_1[2]` | 13.8mm |
+| `t800.arm_right.metacarpal[0]` | `t800.arm_right.metacarpal[1]` | 7.1mm |
+| `t800.arm_right.metacarpal[3]` | `t800.arm_right.metacarpal[4]` | 3.1mm |
+| `t800.arm_right.metacarpal[4]` | `t800.arm_right.metacarpal[3]` | 3.1mm |
+| `t800.arm_left.metacarpal[0]` | `t800.arm_left.metacarpal[1]` | 7.1mm |
+| `t800.arm_left.metacarpal[3]` | `t800.arm_left.metacarpal[4]` | 3.1mm |
+| `t800.arm_left.metacarpal[4]` | `t800.arm_left.metacarpal[3]` | 3.1mm |
+| `t800.head.jaw` | `t800.head.jaw_hinge[0]` | 13.5mm |
+| `t800.arm_left.bracket_shoulder_flex` | `t800.arm_left.shoulder_socket` | 6.1mm |
+| `t800.arm_left.bracket_shoulder_ext` | `t800.arm_left.shoulder_socket` | 9.4mm |
+| `t800.arm_left.bracket_elbow` | `t800.arm_left.humerus_line` | 13.0mm |
+| `t800.head.jaw_hinge[0]` | `t800.head.jaw` | 13.5mm |
+| `t800.head.jaw_hinge[1]` | `t800.head.cranium` | 27.5mm |
+| `t800.knee.guard_bracket_left[0]` | `t800.shin.tibia_left` | 3.3mm |
+| `t800.torso.chest_lines[0]` | `t800.torso.chest_lines[1]` | 10.0mm |
+| `t800.torso.chest_lines[1]` | `t800.torso.chest_lines[2]` | 10.0mm |
+| `t800.torso.chest_lines[2]` | `t800.torso.chest_lines[3]` | 10.0mm |
+| `t800.torso.chest_lines[3]` | `t800.torso.chest_lines[2]` | 10.0mm |
+| `t800.torso.chest_lines[4]` | `t800.torso.chest_lines[3]` | 10.0mm |
+| `t800.torso.chest_lines[5]` | `t800.torso.chest_lines[4]` | 10.0mm |
+| `t800.arm_right.tendons[0]` | `t800.arm_right.tendons[1]` | 14.8mm |
+| `t800.arm_right.tendons[3]` | `t800.arm_right.tendons[4]` | 10.8mm |
+| `t800.arm_right.tendons[4]` | `t800.arm_right.tendons[3]` | 10.8mm |
+| `t800.arm_left.tendons[0]` | `t800.arm_left.tendons[1]` | 14.8mm |
+| `t800.arm_left.tendons[3]` | `t800.arm_left.tendons[4]` | 10.8mm |
+| `t800.arm_left.tendons[4]` | `t800.arm_left.tendons[3]` | 10.8mm |
+| `t800.hip.sensor` | `` | Infinitymm |
+| `t800.hip.sensor_left` | `` | Infinitymm |
 
 ## 液压缸行程（几何解，非动画写死）
 
