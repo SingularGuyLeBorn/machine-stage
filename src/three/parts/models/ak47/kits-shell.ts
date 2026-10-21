@@ -478,7 +478,7 @@ const boltCarrierKit: GeometryBuilder = (spec) => {
   parts.push(step);
   // 尾段外壁 / 内腔：底部 120° 让位窗（弹匣供弹位 + 击锤伸入打击针）
   const rearLen = len - frontLen - 0.0104;
-  const slot = (120 * Math.PI) / 180;
+  const slot = (140 * Math.PI) / 180; // 让位窗：击锤鼻从弹匣下方伸入打击针（鼻角约 63°）
   const rearOuter = new THREE.CylinderGeometry(r, r, rearLen, 20, 1, true, slot / 2, Math.PI * 2 - slot);
   rearOuter.rotateX(Math.PI / 2);
   rearOuter.translate(0, 0, frontLen + 0.0104 + rearLen / 2);
