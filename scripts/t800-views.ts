@@ -61,17 +61,28 @@ const X_SHIFT = 0.0;
 
 class Canvas {
   data: Uint8Array;
+  /** 深度缓冲（沿视线方向的米，越小越近） */
+  zbuf: Float32Array;
   constructor(
     public w: number,
     public h: number,
     bg: [number, number, number] = [232, 236, 241],
   ) {
     this.data = new Uint8Array(w * h * 3);
+    this.zbuf = new Float32Array(w * h).fill(Infinity);
     for (let i = 0; i < w * h; i++) {
       this.data[i * 3] = bg[0];
       this.data[i * 3 + 1] = bg[1];
       this.data[i * 3 + 2] = bg[2];
     }
+  }
+  /** 写入深度：若比缓冲里更近则返回 true（可以着色）。 */
+  putDepth(x: number, y: number, depth: number): boolean {
+    if (x < 0 || y < 0 || x >= this.w || y >= this.h) return false;
+    const i = y * this.w + x;
+    if (depth >= this.zbuf[i]) return false;
+    this.zbuf[i] = depth;
+    return true;
   }
   set(x: number, y: number, c: [number, number, number]): void {
     if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
@@ -126,7 +137,7 @@ function makeProjector(view: View): (p: THREE.Vector3) => [number, number] {
 
 interface Tri {
   pts: [number, number][];
-  depth: number;
+  depth: [number, number, number];
   color: [number, number, number];
 }
 
@@ -146,6 +157,8 @@ function fillTriangle(canvas: Canvas, t: Tri): void {
       const w1 = ((p2[0] - px) * (p0[1] - py) - (p0[0] - px) * (p2[1] - py)) / area;
       const w2 = 1 - w0 - w1;
       if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+      const depth = w0 * t.depth[0] + w1 * t.depth[1] + w2 * t.depth[2];
+      if (!canvas.putDepth(x, y, depth)) continue;
       canvas.set(x, y, t.color);
     }
   }
@@ -195,21 +208,20 @@ function renderAt(seconds: number, view: View): { png: Buffer; caption: string }
         const [ax, ay] = project(a);
         const [bx, by] = project(b);
         const [cx, cy] = project(c);
+        const dir = VIEWS[view].dir;
         tris.push({
           pts: [
             [ax, ay],
             [bx, by],
             [cx, cy],
           ],
-          depth: (a.z + b.z + c.z) / 3,
+          depth: [a.dot(dir), b.dot(dir), c.dot(dir)],
           color,
         });
       }
     }
   }
 
-  // 画家算法：远的先画
-  tris.sort((p, q) => p.depth - q.depth);
   const canvas = new Canvas(W, H);
   for (const t of tris) fillTriangle(canvas, t);
 
@@ -220,8 +232,7 @@ function renderAt(seconds: number, view: View): { png: Buffer; caption: string }
   }
 
   const pose = t800Pose();
-  const knee = pose.extensions.find((e) => e.key === "knee_main");
-  const caption = `T-800 right leg - ${VIEWS[view].label} - t=${seconds.toFixed(2)}s - hip/knee/ankle ${pose.hipDeg.toFixed(1)}/${pose.kneeDeg.toFixed(1)}/${pose.ankleDeg.toFixed(1)} deg - knee_main exposed rod ${knee?.exposedMm.toFixed(1)} mm - ${registry.parts.length} part definitions`;
+  const caption = `T-800 endoskeleton (real mesh) - ${VIEWS[view].label} - t=${seconds.toFixed(2)}s - phase ${(pose.stroke * 100).toFixed(0)}% - ${registry.parts.length} parts / 120854 verts`;
   return { png: canvas.toPng(), caption };
 }
 

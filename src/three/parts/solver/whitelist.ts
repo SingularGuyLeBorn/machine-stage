@@ -54,7 +54,8 @@ export function matchExpectedContact(
     const formOk =
       report.form === "face_mate" ||
       report.form === "bearing_overlap" ||
-      (report.form === "displaced" && rule.allowDisplaced === true);
+      (report.form === "displaced" && rule.allowDisplaced === true) ||
+      (report.form === "suspect" && rule.allowSuspect === true);
     if (!formOk) continue;
     const forward = matchesPartId(rule.a, report.a) && matchesPartId(rule.b, report.b);
     const backward = matchesPartId(rule.a, report.b) && matchesPartId(rule.b, report.a);

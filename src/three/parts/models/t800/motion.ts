@@ -1,206 +1,279 @@
 import * as THREE from "three";
 import type { AssembledModel } from "../../assembler/assembler";
-import {
-  CYLINDER_PART_SUFFIXES,
-  HYDRAULIC_NODE,
-  JOINT_Y,
-  LEG_Z,
-  T800_HYDRAULICS,
-  aimQuaternion,
-  cylinderDims,
-  cylinderLayout,
-  legHydraulics,
-  legNodes,
-  type HydraulicSpec,
-  type LegSide,
-  type Segment,
-  type Vec3,
-} from "./spec";
+import { JOINT_BY_NAME, JOINTS, jointChain, nodeNameOf } from "./spec";
+import { HYDRAULICS, cylinderAxis, rodNodeName, type HydraulicDef } from "./hydraulics";
 
 // ============================================================================
-// t800/motion —— 屈伸循环 + 液压缸真实行程
+// t800/motion —— 整机运动学
 //
-// 关节角只驱动三段刚体（髋 / 膝 / 踝），缸的两端锚点 A、B 各自跟着父/子段走；
-// 每帧把缸体节点放到 A、活塞杆节点放到 B，并把各自 +Y 指向对方。
-// 因此「露出杆长 = |AB| - 缸长」是几何结果，不是写死的位移——关节转多少度，
-// 活塞就伸缩多少毫米（scripts/diag-t800.ts 会逐帧核算）。
+// 每个蒙皮部位一个节点（根级），按"父链"逐级摆：
+//   关节角 → 绕自身转轴旋转 → 子节点跟随（世界位姿直接算，避免父子二次变换）。
 //
-// 阻尼：每段用零初速的二阶欠阻尼阶跃响应（慢启动→加速→减速→过冲回弹），
-// 不是匀速插值。
+// 轴向约定（模型坐标 +X 前 / +Y 上 / +Z 右）：
+//   · 矢状面内的屈伸（髋/膝/踝/肩/肘/腕/脊椎/下颌/手指）→ 绕 **Z** 轴；
+//   · 水平面内的扭转（头颈转头、眼珠扫视、脊椎拧转）→ 绕 **Y** 轴。
+//
+// 液压缸的活塞杆节点每帧重算：杆端永远指住缸口方向，露出长度 = |AB| - 缸长。
+// 阻尼：欠阻尼二阶阶跃（慢启动 → 加速 → 减速 → 过冲 → 回稳）。
 // ============================================================================
 
-export const T800_MOTION_PARTS: string[] = [];
+/** 步态周期（秒）：左右各一步。 */
+const CYCLE = 6.4;
 
-const CYCLE = 5.4;
-const STROKE = 2.3;
-const HOLD = 0.4;
-
-/** 关节角上限（rad）：髋屈伸 / 膝屈伸 / 踝屈伸。 */
-export const JOINT_RANGE = {
-  hip: 0.35,
-  knee: -1.05,
-  ankle: 0.38,
+const AXIS_VEC: Record<string, THREE.Vector3> = {
+  x: new THREE.Vector3(1, 0, 0),
+  y: new THREE.Vector3(0, 1, 0),
+  z: new THREE.Vector3(0, 0, 1),
 };
 
-/** 0..1 的欠阻尼阶跃响应：t=0 初速 0，约 t=0.55 过冲 ~3%，t=1 基本收敛。 */
+/** 欠阻尼阶跃：t=0 初速 0，约 t=0.55 过冲 ~3%，t=1 收敛。 */
 function dampedStep(u: number): number {
   if (u <= 0) return 0;
   if (u >= 1) return 1;
   return 1 - Math.exp(-5 * u) * (Math.cos(6 * u) + (5 / 6) * Math.sin(6 * u));
 }
 
-export function t800Stroke(seconds: number): number {
-  const p = ((seconds % CYCLE) + CYCLE) % CYCLE;
-  if (p < STROKE) return dampedStep(p / STROKE);
-  if (p < STROKE + HOLD) return 1;
-  if (p < STROKE * 2 + HOLD) return 1 - dampedStep((p - STROKE - HOLD) / STROKE);
-  return 0;
+/** 0→1→0 的钟形（带阻尼过冲）：u=0/1 处为 0，中段接近 1。 */
+function pulse(u: number): number {
+  const w = ((u % 1) + 1) % 1;
+  const half = 0.5;
+  if (w < half) return dampedStep(w / (half * 0.86));
+  return 1 - dampedStep((w - half) / (half * 0.86));
 }
 
-export interface T800Pose {
-  hipDeg: number;
-  kneeDeg: number;
-  ankleDeg: number;
-  /** 膝主缸当前露出杆长（mm） */
-  kneeExposedMm: number;
-  /** 每根缸的实时行程审计 */
-  extensions: Array<{ key: string; name: string; exposedMm: number; lengthMm: number }>;
+/** 步态相位（0..1）。 */
+export function gaitPhase(seconds: number): number {
+  return (((seconds % CYCLE) + CYCLE) % CYCLE) / CYCLE;
 }
 
-let lastPose: T800Pose = {
-  hipDeg: 0,
-  kneeDeg: 0,
-  ankleDeg: 0,
-  kneeExposedMm: 0,
-  extensions: [],
+/** 关节角（度）。z = 矢状面屈伸，y = 水平面扭转。 */
+interface Angles {
+  z: Map<string, number>;
+  y: Map<string, number>;
+}
+
+/** 屈伸幅度（度）。 */
+const HIP_MAX = 17;
+const KNEE_MAX = 68;
+const ANKLE_MAX = 22;
+const TOE_MAX = 20;
+const SHOULDER_MAX = 15;
+const ELBOW_MAX = 48;
+const WRIST_MAX = 16;
+/** 手指卷曲角（度，每节）。 */
+const FINGER_CURL = 30;
+/** 脊椎静态前倾（度）。 */
+const SPINE_BEND: Record<string, number> = {
+  bip_spine_1_04: -3,
+  bip_spine_2_05: 2,
+  bip_spine_3_06: 3,
+  bip_neck_039: 2,
 };
 
-const Z = new THREE.Vector3(0, 0, 1);
+/** 关节链深度（用于拓扑排序）。 */
+const DEPTH = new Map<string, number>(JOINTS.map((j) => [j.name, jointChain(j.name).length]));
 
-export function animateT800(model: AssembledModel, seconds: number): void {
-  const s = t800Stroke(seconds);
-  const hip = JOINT_RANGE.hip * s;
-  const knee = JOINT_RANGE.knee * s;
-  const ankle = JOINT_RANGE.ankle * s;
-  const extensions: T800Pose["extensions"] = [];
+/** 按链深排序的部位（父先子后）。 */
+const ORDERED = [...JOINTS].sort((a, b) => (DEPTH.get(a.name) ?? 0) - (DEPTH.get(b.name) ?? 0));
 
-  const setJoint = (name: string, pos: THREE.Vector3, quat: THREE.Quaternion) => {
-    const node = model.getNode(name);
-    if (!node) return;
-    node.position.copy(pos);
-    node.quaternion.copy(quat);
-  };
+/** 计算所有关节的目标角度（度）。 */
+function jointAngles(seconds: number): Angles {
+  const p = gaitPhase(seconds);
+  const right = p;
+  const left = (p + 0.5) % 1;
+  const z = new Map<string, number>();
+  const y = new Map<string, number>();
 
-  for (const side of [1, -1] as LegSide[]) {
-    const nodes = legNodes(side);
-    const z = side * LEG_Z;
-    const H = new THREE.Vector3(0, JOINT_Y.hip, z);
-    const K = new THREE.Vector3(0, JOINT_Y.knee, z);
-    const A = new THREE.Vector3(0, JOINT_Y.ankle, z);
+  const hipR = Math.sin(2 * Math.PI * right);
+  const hipL = Math.sin(2 * Math.PI * left);
+  const kneeR = pulse(right + 0.25);
+  const kneeL = pulse(left + 0.25);
 
-    const qHip = new THREE.Quaternion().setFromAxisAngle(Z, hip);
-    const qKnee = new THREE.Quaternion().setFromAxisAngle(Z, hip + knee);
-    const qAnkle = new THREE.Quaternion().setFromAxisAngle(Z, hip + knee + ankle);
+  // 髋：大腿绕髋关节前后摆（绕 Z，正 = 前摆）
+  z.set("LeftUpLegRoll_084", HIP_MAX * hipR);
+  z.set("RightUpLegRoll_092", HIP_MAX * hipL);
+  // 膝：屈曲（负 = 小腿向后收）
+  z.set("LeftKnee_helper_086", -KNEE_MAX * kneeR);
+  z.set("RightKnee_helper_094", -KNEE_MAX * kneeL);
+  // 踝：踩平 + 蹬地
+  z.set("bip_foot_R_081", 8 * kneeR - ANKLE_MAX * 0.25 * hipR);
+  z.set("bip_foot_L_089", 8 * kneeL - ANKLE_MAX * 0.25 * hipL);
+  // 趾：蹬地
+  z.set("bip_toe_R_085", -TOE_MAX * pulse(right + 0.45));
+  z.set("bip_toe_L_093", -TOE_MAX * pulse(left + 0.45));
 
-    const K2 = K.clone().sub(H).applyQuaternion(qHip).add(H);
-    const A2 = A.clone().sub(K).applyQuaternion(qKnee).add(K2);
+  // 肩/肘/腕：与同侧腿反相
+  z.set("bip_upperArm_R_08", -SHOULDER_MAX * hipR);
+  z.set("bip_upperArm_L_047", -SHOULDER_MAX * hipL);
+  z.set("LeftElbow_helper_035", ELBOW_MAX * (0.22 + 0.78 * pulse(right + 0.1)));
+  z.set("RightElbow_helper_075", ELBOW_MAX * (0.22 + 0.78 * pulse(left + 0.1)));
+  z.set("bip_hand_R_016", -WRIST_MAX * pulse(right + 0.1));
+  z.set("bip_hand_L_055", -WRIST_MAX * pulse(left + 0.1));
 
-    setJoint(nodes.hip, H, qHip);
-    setJoint(nodes.knee, K2, qKnee);
-    setJoint(nodes.ankle, A2, qAnkle);
+  // 脊椎：前倾 + 水平拧转
+  const twist = 5 * Math.sin(2 * Math.PI * p);
+  z.set("bip_spine_1_04", SPINE_BEND.bip_spine_1_04);
+  z.set("bip_spine_2_05", SPINE_BEND.bip_spine_2_05);
+  z.set("bip_spine_3_06", SPINE_BEND.bip_spine_3_06);
+  z.set("bip_neck_039", SPINE_BEND.bip_neck_039);
+  y.set("bip_spine_2_05", twist * 0.5);
+  y.set("bip_spine_3_06", -twist * 0.5);
+  y.set("bip_neck_039", -twist * 0.6);
+  y.set("bip_head_040", twist * 0.5);
 
-    const pointAt = (seg: Segment, p: Vec3): THREE.Vector3 => {
-      const v = new THREE.Vector3(...p);
-      if (seg === "base") return v;
-      if (seg === "hip") return v.sub(H).applyQuaternion(qHip).add(H);
-      if (seg === "knee") return v.sub(K).applyQuaternion(qKnee).add(K2);
-      return v.sub(A).applyQuaternion(qAnkle).add(A2);
-    };
-    const rotateNormal = (seg: Segment, n: Vec3): THREE.Vector3 => {
-      const v = new THREE.Vector3(...n);
-      if (seg === "hip") v.applyQuaternion(qHip);
-      else if (seg === "knee") v.applyQuaternion(qKnee);
-      else if (seg === "ankle") v.applyQuaternion(qAnkle);
-      return v;
-    };
+  // 下颌：随步态微张
+  z.set("Bip_jaw_041", 13 * pulse(right + 0.25));
 
-    for (const spec of legHydraulics(side)) {
-      const Aw = pointAt(spec.parent, spec.A);
-      const Bw = pointAt(spec.child, spec.B);
-      const span = Aw.distanceTo(Bw);
-      const layout = cylinderLayout(spec);
-      const exposedMm = (span - layout.mouth) * 1000;
-      if (side > 0) {
-        extensions.push({
-          key: spec.key,
-          name: spec.name_cn,
-          exposedMm,
-          lengthMm: span * 1000,
-        });
-      }
+  // 眼珠：缓慢扫视（水平面 = 绕 Y）
+  const gaze = 14 * Math.sin(2 * Math.PI * p * 0.5);
+  y.set("Bip_Eyeball_R_045", gaze);
+  y.set("Bip_Eyeball_L_043", gaze);
 
-      const cyl = model.getNode(side > 0 ? HYDRAULIC_NODE(spec, "cyl") : `${HYDRAULIC_NODE(spec, "cyl")}L`);
-      if (cyl) {
-        cyl.position.copy(Aw);
-        cyl.quaternion.copy(
-          aimQuaternion(vec(Aw), vec(Bw), vec(rotateNormal(spec.parent, normalOf(spec, "A")))),
-        );
-      }
-      const rod = model.getNode(side > 0 ? HYDRAULIC_NODE(spec, "rod") : `${HYDRAULIC_NODE(spec, "rod")}L`);
-      if (rod) {
-        rod.position.copy(Bw);
-        rod.quaternion.copy(
-          aimQuaternion(vec(Bw), vec(Aw), vec(rotateNormal(spec.child, normalOf(spec, "B")))),
-        );
-      }
-    }
+  // 五指：抓握（握拳相位与摆动相关）
+  const gripR = pulse(right + 0.35);
+  const gripL = pulse(left + 0.35);
+  for (const joint of JOINTS) {
+    const m = /^bip_(thumb|index|middle|ring|pinky)_([0-2])_(R|L)_/.exec(joint.name);
+    if (!m) continue;
+    const seg = Number(m[2]);
+    const grip = m[3] === "R" ? gripR : gripL;
+    z.set(joint.name, FINGER_CURL * (0.3 + 0.32 * seg) * grip);
   }
 
-  lastPose = {
-    hipDeg: THREE.MathUtils.radToDeg(hip),
-    kneeDeg: THREE.MathUtils.radToDeg(knee),
-    ankleDeg: THREE.MathUtils.radToDeg(ankle),
-    kneeExposedMm: extensions.find((item) => item.key === "knee_main")?.exposedMm ?? 0,
-    extensions,
+  for (const joint of JOINTS) {
+    if (!z.has(joint.name)) z.set(joint.name, 0);
+    if (!y.has(joint.name)) y.set(joint.name, 0);
+  }
+  return { z, y };
+}
+
+/** 关节姿态（世界位姿）。 */
+interface Pose {
+  pos: THREE.Vector3;
+  quat: THREE.Quaternion;
+}
+
+/** 求解所有关节的世界位姿。 */
+function solveWorld(angles: Angles): Map<string, Pose> {
+  const world = new Map<string, Pose>();
+  const zero = new THREE.Vector3();
+  for (const joint of ORDERED) {
+    const parentJoint = joint.parent ? JOINT_BY_NAME.get(joint.parent) : undefined;
+    const parent = joint.parent ? world.get(joint.parent) : undefined;
+    const rest = new THREE.Vector3(...joint.pivot);
+    const parentRest = parentJoint ? new THREE.Vector3(...parentJoint.pivot) : zero;
+    const offset = rest.clone().sub(parentRest);
+    // 局部旋转 = 矢状面屈伸（绕 Z）× 水平面扭转（绕 Y）
+    const local = new THREE.Quaternion()
+      .setFromAxisAngle(
+        AXIS_VEC.z,
+        THREE.MathUtils.degToRad(angles.z.get(joint.name) ?? 0),
+      )
+      .multiply(
+        new THREE.Quaternion().setFromAxisAngle(
+          AXIS_VEC.y,
+          THREE.MathUtils.degToRad(angles.y.get(joint.name) ?? 0),
+        ),
+      );
+    const quat = parent ? parent.quat.clone().multiply(local) : local;
+    const pos = parent
+      ? parent.pos.clone().add(offset.clone().applyQuaternion(parent.quat))
+      : rest.clone();
+    world.set(joint.name, { pos, quat });
+  }
+  return world;
+}
+
+/** 缸的实时几何解：两端世界坐标、轴向、长度、露出杆长。 */
+export interface CylinderState {
+  key: string;
+  /** 两端距离（mm） */
+  lengthMm: number;
+  /** 露出的活塞杆长度（mm） = |AB| - 缸长 */
+  exposedMm: number;
+  /** 当前轴向（单位向量） */
+  axis: [number, number, number];
+}
+
+/** 计算缸两端的世界坐标。 */
+function cylinderEnds(def: HydraulicDef, world: Map<string, Pose>): {
+  a: THREE.Vector3;
+  b: THREE.Vector3;
+} {
+  const parentPose = world.get(def.parent)!;
+  const childPose = world.get(def.child)!;
+  const parentRest = new THREE.Vector3(...JOINT_BY_NAME.get(def.parent)!.pivot);
+  const childRest = new THREE.Vector3(...JOINT_BY_NAME.get(def.child)!.pivot);
+  const a = parentPose.pos
+    .clone()
+    .add(new THREE.Vector3(...def.a).sub(parentRest).applyQuaternion(parentPose.quat));
+  const b = childPose.pos
+    .clone()
+    .add(new THREE.Vector3(...def.b).sub(childRest).applyQuaternion(childPose.quat));
+  return { a, b };
+}
+
+function cylinderState(def: HydraulicDef, world: Map<string, Pose>): CylinderState {
+  const { a, b } = cylinderEnds(def, world);
+  const delta = b.clone().sub(a);
+  const length = delta.length();
+  const axis = delta.clone().normalize();
+  return {
+    key: def.key,
+    lengthMm: length * 1000,
+    exposedMm: (length - def.barrel) * 1000,
+    axis: [axis.x, axis.y, axis.z],
   };
+}
+
+/** 驱动整机姿态。 */
+export function animateT800(model: AssembledModel, seconds: number): void {
+  lastSeconds = seconds;
+  model.resetNodes();
+  const angles = jointAngles(seconds);
+  const world = solveWorld(angles);
+
+  for (const joint of JOINTS) {
+    const node = model.getNode(nodeNameOf(joint.name));
+    if (!node) continue;
+    const pose = world.get(joint.name)!;
+    node.position.copy(pose.pos);
+    node.quaternion.copy(pose.quat);
+  }
+
+  // 液压缸：活塞杆节点每帧重算（杆端指住缸口，露出长度由 |AB| 决定）
+  for (const def of HYDRAULICS) {
+    const node = model.getNode(rodNodeName(def.key));
+    if (!node) continue;
+    const { a, b } = cylinderEnds(def, world);
+    const axis = b.clone().sub(a).normalize();
+    node.position.copy(b);
+    node.quaternion.setFromUnitVectors(cylinderAxis(def), axis);
+  }
 
   model.syncInstances();
   model.root.updateMatrixWorld(true);
 }
 
-const vec = (v: THREE.Vector3): Vec3 => [v.x, v.y, v.z];
+let lastSeconds = 0;
 
-/** 安装面法线（缸的 A / B 端）。 */
-function normalOf(spec: HydraulicSpec, end: "A" | "B"): Vec3 {
-  return spec[`normal${end}`];
+/** 液压缸读数（几何解）。 */
+export function t800CylinderReadout(_model: AssembledModel): CylinderState[] {
+  const world = solveWorld(jointAngles(lastSeconds));
+  return HYDRAULICS.map((def) => cylinderState(def, world));
 }
 
+/** 前端读数：关节角 / 步态相位。 */
 export function t800Readouts(): Array<{ label: string; value: string }> {
   return [
-    {
-      label: "髋 / 膝 / 踝",
-      value: `${lastPose.hipDeg.toFixed(1)}° / ${lastPose.kneeDeg.toFixed(1)}° / ${lastPose.ankleDeg.toFixed(1)}°`,
-    },
-    { label: "膝主缸露出杆长", value: `${lastPose.kneeExposedMm.toFixed(1)} mm` },
-    {
-      label: "驱动缸",
-      value:
-        `${T800_HYDRAULICS.length} 根 · ${CYLINDER_PART_SUFFIXES.length} 件/根 · ` +
-        `球头销 ${T800_HYDRAULICS.length * 2} 只`,
-    },
+    { label: "步态相位", value: `${(gaitPhase(lastSeconds) * 100).toFixed(0)} %` },
+    { label: "蒙皮部位", value: `${JOINTS.length} 件 · 120854 顶点` },
+    { label: "液压缸", value: `${HYDRAULICS.length} 根` },
+    { label: "模型高度", value: "1.90 m" },
   ];
 }
 
-/** 诊断用：当前帧各缸露出杆长（mm）。 */
-export function t800Pose(): T800Pose {
-  return lastPose;
-}
-
-/** 诊断用：静止状态下每根缸的 |AB| 与设计行程（mm）。 */
-export function t800RestLengths(): Array<{ key: string; name: string; lengthMm: number }> {
-  return T800_HYDRAULICS.map((spec) => ({
-    key: spec.key,
-    name: spec.name_cn,
-    lengthMm: cylinderDims(spec).L * 1000,
-  }));
+/** 诊断用：当前姿态描述。 */
+export function t800Pose(): { phase: number; bend: number } {
+  return { phase: gaitPhase(lastSeconds), bend: 0 };
 }

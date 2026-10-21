@@ -1,1 +1,1 @@
-T-800 right leg - 侧视 - t=2.20s - hip/knee/ankle 20.0/-59.9/21.7 deg - knee_main exposed rod 129.9 mm - 410 part definitions
+T-800 endoskeleton (real mesh) - 侧视 - t=2.20s - phase NaN% - 174 parts / 120854 verts
