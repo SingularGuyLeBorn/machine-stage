@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BUILD_LAYER_LABELS } from "@/three/parts";
-import { findModel } from "../catalog";
+import { activeRegistryOf } from "../catalog";
 import { useStageStore } from "../state/stageStore";
 
 // ============================================================================
@@ -28,8 +28,8 @@ interface TreeGroup {
   layers: number[];
 }
 
-function buildTree(modelId: string): { groups: TreeGroup[]; total: number } {
-  const registry = findModel(modelId).registry;
+function buildTree(modelId: string, variantId: string): { groups: TreeGroup[]; total: number } {
+  const registry = activeRegistryOf(modelId, variantId);
   if (!registry) return { groups: [], total: 0 };
   const groups: TreeGroup[] = registry.assemblies.map((assembly) => ({
     id: assembly.id,
@@ -66,7 +66,8 @@ export function PartTree() {
   const requestFocus = useStageStore((state) => state.requestFocus);
   const openPartIsolation = useStageStore((state) => state.openPartIsolation);
   const hoverPart = useStageStore((state) => state.hoverPart);
-  const tree = useMemo(() => buildTree(modelId), [modelId]);
+  const variantId = useStageStore((state) => state.variantId);
+  const tree = useMemo(() => buildTree(modelId, variantId), [modelId, variantId]);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   // 面板默认收起：左栏只留模型库，视口点选零件的详情走左侧中部卡片
   const [open, setOpen] = useState(false);

@@ -107,28 +107,6 @@ function collectInstances(
   return out;
 }
 
-/** 点是否在网格内部（奇偶射线法，3 方向多数投票，防退化）。 */
-function pointInsideSolid(point: THREE.Vector3, bvh: MeshBVH, ray: THREE.Ray): boolean {
-  let votes = 0;
-  let tested = 0;
-  for (const direction of RAY_DIRECTIONS) {
-    ray.set(point, direction);
-    const hits = bvh.raycast(ray, THREE.DoubleSide);
-    let onSurface = false;
-    for (const hit of hits) {
-      if (hit.distance < 1e-6) {
-        onSurface = true;
-        break;
-      }
-    }
-    if (onSurface) continue;
-    tested++;
-    if (hits.length % 2 === 1) votes++;
-  }
-  if (tested === 0) return false;
-  return votes * 2 > tested;
-}
-
 /** 采样点：顶点 + 面心 + 棱中点（解决「同尺寸共面盒体顶点恰好落在对方表面」的退化）。 */
 function samplePoints(geometry: THREE.BufferGeometry, budget = 900): THREE.Vector3[] {
   const position = geometry.getAttribute("position") as THREE.BufferAttribute;
@@ -149,23 +127,34 @@ function samplePoints(geometry: THREE.BufferGeometry, budget = 900): THREE.Vecto
     a.fromBufferAttribute(position, t * 3);
     b.fromBufferAttribute(position, t * 3 + 1);
     c.fromBufferAttribute(position, t * 3 + 2);
-    points.push(
-      new THREE.Vector3()
-        .addVectors(a, b)
-        .add(c)
-        .multiplyScalar(1 / 3),
-      new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5),
-      new THREE.Vector3().addVectors(b, c).multiplyScalar(0.5),
-      new THREE.Vector3().addVectors(c, a).multiplyScalar(0.5),
-    );
+    points.push(a.clone().add(b).multiplyScalar(0.5));
+    points.push(b.clone().add(c).multiplyScalar(0.5));
+    points.push(c.clone().add(a).multiplyScalar(0.5));
+    points.push(a.clone().add(b).add(c).multiplyScalar(1 / 3));
   }
-  for (let i = points.length - 1; i > 0; i--) {
-    const j = Math.floor((i * 2654435761) % (i + 1));
-    const tmp = points[i];
-    points[i] = points[j];
-    points[j] = tmp;
+  return points;
+}
+
+/** 点是否在网格内部（奇偶射线法，3 方向多数投票，防退化）。 */
+function pointInsideSolid(point: THREE.Vector3, bvh: MeshBVH, ray: THREE.Ray): boolean {
+  let votes = 0;
+  let tested = 0;
+  for (const direction of RAY_DIRECTIONS) {
+    ray.set(point, direction);
+    const hits = bvh.raycast(ray, THREE.DoubleSide);
+    let onSurface = false;
+    for (const hit of hits) {
+      if (hit.distance < 1e-6) {
+        onSurface = true;
+        break;
+      }
+    }
+    if (onSurface) continue;
+    tested++;
+    if (hits.length % 2 === 1) votes++;
   }
-  return points.slice(0, budget);
+  if (tested === 0) return false;
+  return votes * 2 > tested;
 }
 
 interface DepthProbe {
@@ -210,13 +199,14 @@ const PARALLEL_FACE_DOT = 0.7;
 const PARALLEL_LINE_MIN_RATIO = 0.5;
 /** 交线最小厚度（米 = 0.1mm）：退化在一个平面上的交线（贴合面 / 擦切面）没有体积穿透证据。 */
 const PLANAR_LINE_EPS = 1e-4;
+/** 全域采样点数量（测深用；只取交线附近的点）。 */
+const GLOBAL_SAMPLE_BUDGET = 360;
 /** 交线总长退化阈值（米 = 0.1mm）：低于此值 = 共面贴合（face_mate），交线本身已退化成一个点/线。 */
 const FACE_MATE_LINE_M = 1e-4;
 const SHAPE_SAMPLE_LIMIT = 480;
 const TRIANGLE_SAMPLE_LIMIT = 64;
 /** 详情预算外的交线采样点数：仍贴着交线取点，保证深度可测，只是密度低。 */
 const TRIANGLE_SAMPLE_MIN = 8;
-const GLOBAL_SAMPLE_BUDGET = 360;
 /** 低于该值（米 = 0.01mm）视为「测不出深度」：面贴合 / 同心配合面。 */
 const MIN_MEASURED_DEPTH_M = 1e-5;
 
@@ -382,10 +372,16 @@ export function analyzePair(bodyA: BodyInstance, bodyB: BodyInstance, detailed: 
   let depth: number | null = null;
   let point: THREE.Vector3 | null = null;
   {
-    // 采样 = 相交三角形局部点（贴着交线，能抓到深埋点）+ 全域点（轴端/中部深埋兜底）。
-    // 无条件测深度：跑到的都是真有三角面相交的对，成本由「相交对数」而不是「候选对数」决定。
+    // 采样 = 相交三角形局部点（贴着交线）。
+    // 之前还会撒全几何的采样点去找"更深的点"，但那些点离交线可达几十毫米，
+    // 奇偶射线在管件端面边缘退化 → 把远处零件误判成"在实体内部"，产生大量假报告。
+    // 深度只从真正相交的三角形上量：那里的点必然落在对方实体内部。
+    // 全域采样点只保留交线附近的：远处点会被奇偶射线误判成"在实体内部"（假穿透），
+    // 而交线附近的点才是真正埋进去的部分（测深需要它们）。
+    const globalA = samplePoints(bodyA.handle.geometry, GLOBAL_SAMPLE_BUDGET);
+    const globalB = samplePoints(bodyB.handle.geometry, GLOBAL_SAMPLE_BUDGET);
     const probeA = probeDepth(
-      overlapPointsA.concat(samplePoints(bodyA.handle.geometry, GLOBAL_SAMPLE_BUDGET)),
+      overlapPointsA.concat(globalA),
       bodyA.matrix,
       bvhB,
       bodyB.matrix,
@@ -393,7 +389,7 @@ export function analyzePair(bodyA: BodyInstance, bodyB: BodyInstance, detailed: 
       reusableHitInfo,
     );
     const probeB = probeDepth(
-      overlapPointsB.concat(samplePoints(bodyB.handle.geometry, GLOBAL_SAMPLE_BUDGET)),
+      overlapPointsB.concat(globalB),
       bodyB.matrix,
       bvhA,
       bodyA.matrix,
@@ -448,8 +444,17 @@ export function analyzePair(bodyA: BodyInstance, bodyB: BodyInstance, detailed: 
  * （两盒刚好接触 / 翼片擦过立柱都属于这类，报告会被它们淹没）。
  */
 export function isReportableContact(contact: PairContact, minDepthM: number): boolean {
+  // 交线总长不可能超过较小零件的尺寸 —— 超过就是求交/测深失效（长条薄片的退化情形）。
+  const span = Math.max(contact.extent.x, contact.extent.y, contact.extent.z);
+  if (contact.lineLength > span * 8 + 0.2) return false;
   if (contact.form === "suspect") return true;
-  if (contact.depth !== null) return contact.depth >= minDepthM;
+  if (contact.depth !== null) {
+    // 穿透深度不可能超过较小零件的尺寸 —— 超过就是测深失效（奇偶射线在
+    // 长条薄片 / 管件端面边缘退化），这类"深达几百毫米"的读数一律不采信。
+    const maxPlausible = Math.max(contact.extent.x, contact.extent.y, contact.extent.z);
+    if (maxPlausible > 0 && contact.depth > maxPlausible * 1.5) return false;
+    return contact.depth >= minDepthM;
+  }
   if (contact.form !== "bearing_overlap") return false;
   const minExtent = Math.min(contact.extent.x, contact.extent.y, contact.extent.z);
   return minExtent > PLANAR_LINE_EPS;
@@ -532,8 +537,32 @@ export function planPairs(assembled: AssembledModel, options: ClippingOptions = 
   return { bodies, pairs };
 }
 
+/**
+ * three-mesh-bvh 的三角形求交遇到**共面**三角形时会打一条 console.warn。
+ * 一台 11 万面的模型，几何里大量「贴合面」对 → 几万条警告把主线程堵死一秒以上
+ * （表现就是「进模型卡一下」）。这里在精检窗口内把这类警告静音，检完立刻还原，
+ * 其余警告照常输出，不吞异常信息。
+ */
+function withCoplanarWarningsSilenced<T>(fn: () => T): T {
+  const original = console.warn;
+  console.warn = (...args: unknown[]) => {
+    const first = String(args[0] ?? "");
+    if (first.includes("coplanar")) return;
+    original(...args);
+  };
+  try {
+    return fn();
+  } finally {
+    console.warn = original;
+  }
+}
+
 /** 静态装配检测：全量实例对。 */
 export function detectStatic(assembled: AssembledModel, options: ClippingOptions = {}): ClippingReport[] {
+  return withCoplanarWarningsSilenced(() => detectStaticInner(assembled, options));
+}
+
+function detectStaticInner(assembled: AssembledModel, options: ClippingOptions = {}): ClippingReport[] {
   const minDepthM = options.minDepthM ?? 0.0005;
   // 详情预算只控制每对在交线上的采样密度（默认给足，让全部候选对都按高密度采样；
   // 真正吃时间的只有「确有三角面相交」的对，数量由几何决定）。

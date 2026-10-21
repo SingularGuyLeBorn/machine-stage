@@ -29,7 +29,7 @@ export type Anchor = string;
  * （如歧管 runners: [{from: [x, "CONST", 0], to, r, bend}, …]）。递归定义，允许嵌套。
  */
 export type KitParam = number | string | boolean | KitParam[] | { [key: string]: KitParam };
-export type GeometrySpec =
+export type GeometrySpec = (
   | { type: "box"; w: Expr; h: Expr; d: Expr; bevel?: Expr }
   | { type: "plate"; w: Expr; h: Expr; t?: Expr; bevel?: Expr }
   | { type: "cylinder"; r: Expr; h: Expr; rTop?: Expr; segments?: number; bevel?: Expr }
@@ -42,7 +42,15 @@ export type GeometrySpec =
   | { type: "louver"; count: number; w: Expr; h: Expr; slantDeg?: number; t?: Expr }
   | { type: "weld"; from: ExprVec3; to: ExprVec3; radius?: Expr; seed?: number }
   | { type: "merge"; parts: Array<GeometrySpec & { at?: ExprVec3 }> }
-  | { type: "kit"; kit: string; params?: Record<string, KitParam> };
+  | { type: "kit"; kit: string; params?: Record<string, KitParam> }
+) & {
+  /**
+   * 几何镜像：声明后整块几何沿该轴取反（位置+法线+绕序），
+   * 用于「同一套零件声明生成左右对称件」——比复制一份坐标更不容易漂。
+   * 位置/旋转仍由零件自己的 at/rot 负责，这里只处理几何本体。
+   */
+  mirror?: "x" | "z";
+};
 
 /** 装配关系：位置从被引用对象派生，改常量时自动传播。 */
 export type MateSpec =
@@ -147,6 +155,17 @@ export interface ExpectedContactRule {
   reason: string;
   /** 覆盖深度守门（mm）。省略 = 用 whitelist.ts 的 DEFAULT_MAX_DEPTH_MM。 */
   maxDepthMm?: number;
+  /** 允许豁免 displaced 形态（构造性配合的咬合常被判成 displaced）。 */
+  allowDisplaced?: boolean;
+  /**
+   * 允许豁免 suspect 形态（成团 / 超长横穿交线）。
+   *
+   * 默认**不开**：suspect 一律进未豁免区人工审（框架纪律）。
+   * 只有当这一族的接触在物理上必然是「长交线」时才显式打开——
+   * 例如真实网格按蒙皮切分后的接缝（两块骨头沿一条长缝贴合），
+   * 或耳环整体嵌进骨头（嵌入面上的交线天然很长）。
+   */
+  allowSuspect?: boolean;
 }
 
 export interface ModelRegistry {

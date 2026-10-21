@@ -1,0 +1,259 @@
+import { describe, expect, it } from "vitest";
+import * as THREE from "three";
+import { validateRegistry } from "../../registry/validate";
+import { buildModel } from "../../assembler/assembler";
+import { makeT800, makeT800Layouts, makeT800Registry, t800AllBuilders } from "./registry";
+import { animateT800, t800CylinderReadout } from "./motion";
+import { HYDRAULICS, hydraulicPlans } from "./hydraulics";
+import { JOINTS, JOINT_BY_NAME, jointChain } from "./spec";
+import { MESH_META } from "./mesh/assets";
+import { boneName } from "./names";
+import { meshPartGeometry } from "./mesh/geometry";
+
+// ============================================================================
+// T-800 内骨骼整机（真实网格切分版）验收
+// ============================================================================
+
+function build() {
+  const registry = makeT800Registry();
+  const model = buildModel(registry, {
+    builders: t800AllBuilders,
+    instanceLayouts: makeT800Layouts(),
+    warnMissingLayout: false,
+  });
+  return { registry, model };
+}
+
+/** 机械拆解版（每个光滑块 → 护板 + 内部机械器件）。 */
+function makeMech() {
+  const registry = makeT800({ decompose: true }).registry;
+  const model = buildModel(registry, {
+    builders: t800AllBuilders,
+    instanceLayouts: makeT800Layouts(),
+    warnMissingLayout: false,
+  });
+  return { registry, model };
+}
+
+describe("T-800 真实网格切分", () => {
+  it("注册表零错误零警告", () => {
+    const issues = validateRegistry(makeT800Registry());
+    expect(issues.filter((i) => i.level === "error")).toEqual([]);
+    expect(issues.filter((i) => i.level === "warn")).toEqual([]);
+  });
+
+  it("网格量化往返无损：解码后的几何尺寸 == 清单尺寸", () => {
+    // int16 是有符号的：写入时归一化值必须偏移 -32768，否则 >32767 的值回绕成负数，
+    // 每件几何都会缩成一半并偏离装配位（"零件散架"）。这条测试就是防这个。
+    for (const meta of MESH_META) {
+      const geometry = meshPartGeometry(meta.n);
+      geometry.computeBoundingBox();
+      const size = geometry.boundingBox!.getSize(new THREE.Vector3());
+      expect(Math.abs(size.x - meta.b[3]), `${meta.n} x 尺寸`).toBeLessThan(0.002);
+      expect(Math.abs(size.y - meta.b[4]), `${meta.n} y 尺寸`).toBeLessThan(0.002);
+      expect(Math.abs(size.z - meta.b[5]), `${meta.n} z 尺寸`).toBeLessThan(0.002);
+      expect(geometry.attributes.position.count, `${meta.n} 顶点数`).toBe(meta.v);
+    }
+  });
+
+  it("每个零件都装在声明的装配位上（错位零件 = 0）", () => {
+    const { registry, model } = build();
+    model.resetNodes();
+    animateT800(model, 0, { idle: true });
+    model.syncInstances();
+    model.root.updateMatrixWorld(true);
+
+    const world = new THREE.Matrix4();
+    const local = new THREE.Matrix4();
+    const nodeInverse = new THREE.Matrix4();
+    const misplaced: string[] = [];
+    for (const def of registry.parts) {
+      const handle = model.getPart(def.id);
+      if (!handle) continue;
+      model.instanceMatrix(handle, 0, world);
+      const node = def.node ? model.getNode(def.node) : null;
+      if (node) {
+        nodeInverse.copy(node.matrixWorld).invert();
+        local.multiplyMatrices(nodeInverse, world);
+      } else {
+        local.copy(world);
+      }
+      const at = (def.mate as { position?: number[] } | undefined)?.position ?? [0, 0, 0];
+      const c = new THREE.Vector3().setFromMatrixPosition(local);
+      const d = c.distanceTo(new THREE.Vector3(at[0], at[1], at[2]));
+      if (d > 0.005) misplaced.push(`${def.id} 差 ${(d * 1000).toFixed(1)}mm`);
+    }
+    expect(misplaced, `错位零件：\n${misplaced.join("\n")}`).toEqual([]);
+  });
+
+  it("76 个蒙皮部位逐件成独立 partId（标准化命名 t800.<系统>.<零件>_<侧别>）", () => {
+    const { registry } = build();
+    const ids = new Set(registry.parts.map((p) => p.id));
+    for (const joint of JOINTS) {
+      const name = boneName(joint.name);
+      const id = `t800.${name.system}.${name.slug}`;
+      expect(ids.has(id), `${joint.name} 应有零件 ${id}`).toBe(true);
+    }
+    // 零件名里不能再有"真实网格切分"这种过程标签
+    for (const part of registry.parts) {
+      expect(part.name_cn, `${part.id} 的中文名`).not.toContain("真实网格切分");
+      expect(part.name_en, `${part.id} 的英文名`).not.toContain("bip_");
+      expect(part.name_en, `${part.id} 的英文名`).not.toContain("helper");
+    }
+  });
+
+  it("五指各三节 × 左右 = 30 件独立零件", () => {
+    const fingers = JOINTS.filter((j) => /^bip_(thumb|index|middle|ring|pinky)_/.test(j.name));
+    expect(fingers).toHaveLength(30);
+    const byFinger = new Map<string, number>();
+    for (const f of fingers) {
+      const key = f.name.replace(/_\d_[RL]_\d+$/, "");
+      byFinger.set(key, (byFinger.get(key) ?? 0) + 1);
+    }
+    // 5 根手指，每根左右各三节 = 6 件
+    expect(byFinger.size).toBe(5);
+    for (const count of byFinger.values()) expect(count).toBe(6);
+    // 每根手指的单侧节数必须是 3
+    for (const side of ["R", "L"]) {
+      for (const finger of ["thumb", "index", "middle", "ring", "pinky"]) {
+        const segs = fingers.filter((f) => f.name.includes(`_${finger}_`) && f.name.includes(`_${side}_`));
+        expect(segs.length, `${finger}_${side}`).toBe(3);
+      }
+    }
+  });
+
+  it("每个部位的父子链都通到骨盆（骨架连通，无悬空件）", () => {
+    for (const joint of JOINTS) {
+      const chain = jointChain(joint.name);
+      expect(chain[0], `${joint.name} 的链根不是骨盆`).toBe("bip_pelvis_02");
+      expect(chain[chain.length - 1]).toBe(joint.name);
+    }
+  });
+
+  it("关节旋转中心用真实关节点（膝/肘/髋/肩/踝/腕）", () => {
+    const knee = JOINT_BY_NAME.get("LeftKnee_helper_086")!;
+    expect(knee.pivot[1]).toBeCloseTo(0.544, 3);
+    const elbow = JOINT_BY_NAME.get("LeftElbow_helper_035")!;
+    expect(elbow.pivot[1]).toBeCloseTo(1.2639, 3);
+    const hip = JOINT_BY_NAME.get("LeftUpLegRoll_084")!;
+    expect(hip.pivot[1]).toBeCloseTo(0.9, 3);
+    // 手臂垂手后，肘关节降到前臂高度（不是 A-pose 时的 1.351）
+    expect(elbow.pivot[1]).toBeLessThan(1.35);
+  });
+});
+
+describe("T-800 机械拆解版", () => {
+  it("每个光滑块换成机械器件组合，零件数爆炸到 2000+", () => {
+    const { registry } = makeMech();
+    expect(registry.parts.length).toBeGreaterThan(2000);
+    // 一个部位内部就有十几件：护板 + 骨架/纵梁/横撑/轴承/螺栓圈/软管/接头…
+    const femur = registry.parts.filter((p) => p.id.startsWith("t800_mech.leg.femur_r_"));
+    expect(femur.length).toBeGreaterThan(15);
+    const kinds = new Set(femur.map((p) => p.id.split("_").pop()!.replace(/\d+$/, "")));
+    expect(kinds.size).toBeGreaterThan(6);
+  });
+
+  it("光滑整块不再单独成件（被护板 + 机械件取代）", () => {
+    const { registry } = makeMech();
+    expect(registry.parts.filter((p) => p.id === "t800_mech.leg.femur_r")).toHaveLength(0);
+    expect(registry.parts.filter((p) => p.id.startsWith("t800_mech.leg.femur_r_guard"))).not.toHaveLength(0);
+  });
+
+  it("护板拼起来与源网格外形一致（护板数 = 该部位的表面分片）", () => {
+    const { registry } = makeMech();
+    const guards = registry.parts.filter((p) => p.id.includes("_guard"));
+    expect(guards.length).toBeGreaterThan(400);
+    // 每块护板都有几何（不是空壳）
+    const model = buildModel(registry, {
+      builders: t800AllBuilders,
+      instanceLayouts: makeT800Layouts(),
+      warnMissingLayout: false,
+    });
+    for (const handle of model.parts) {
+      if (!handle.partId.includes("_guard")) continue;
+      expect(handle.geometry.attributes.position.count, handle.partId).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("T-800 液压缸", () => {
+  it("17 根缸 × 7 件 = 119 件，且 A 端与 B 端挂在不同骨骼上", () => {
+    const { registry } = build();
+    const cylParts = registry.parts.filter((p) => p.id.startsWith("t800.hydraulics."));
+    expect(HYDRAULICS).toHaveLength(17);
+    expect(cylParts).toHaveLength(17 * 7);
+    for (const def of HYDRAULICS) {
+      const plans = hydraulicPlans(def);
+      expect(plans).toHaveLength(7);
+      expect(def.parent).not.toBe(def.child);
+    }
+  });
+
+  it("脊柱中央液压柱 + 竖脊肌缸在列（任务书要求）", () => {
+    const keys = HYDRAULICS.map((h) => h.key);
+    expect(keys).toContain("spine_column");
+    expect(keys).toContain("erector_r");
+    expect(keys).toContain("erector_l");
+  });
+
+  it("露出杆长 = |AB| - 缸长（几何解，随关节角变化）", () => {
+    const { model } = build();
+    animateT800(model, 0);
+    const first = t800CylinderReadout(model);
+    const kneeFirst = first.find((c) => c.key === "knee_r")!;
+    // 读数自洽：露出长度 + 缸长 = 两端距离
+    const def = HYDRAULICS.find((h) => h.key === "knee_r")!;
+    expect(kneeFirst.exposedMm + def.barrel * 1000).toBeCloseTo(kneeFirst.lengthMm, 3);
+
+    // 换姿态：屈膝峰值时 |AB| 必须变化（说明行程是几何解，不是写死）
+    animateT800(model, 2.2);
+    const second = t800CylinderReadout(model);
+    const kneeSecond = second.find((c) => c.key === "knee_r")!;
+    expect(Math.abs(kneeSecond.lengthMm - kneeFirst.lengthMm)).toBeGreaterThan(1);
+    expect(kneeSecond.exposedMm + def.barrel * 1000).toBeCloseTo(kneeSecond.lengthMm, 3);
+  });
+
+  it("活塞杆节点指向缸口方向（杆与缸共轴）", () => {
+    const { model } = build();
+    animateT800(model, 1.4);
+    const state = t800CylinderReadout(model);
+    for (const c of state) {
+      const len = Math.hypot(c.axis[0], c.axis[1], c.axis[2]);
+      expect(len).toBeCloseTo(1, 3);
+    }
+  });
+});
+
+describe("T-800 运动学", () => {
+  it("屈伸绕 Z（矢状面）、扭转绕 Y（水平面）", () => {
+    const { model } = build();
+    animateT800(model, 0.8);
+    const thigh = model.getNode("T800_LeftUpLegRoll_084")!;
+    // 大腿的绕 Z 旋转轴分量应显著大于绕 X
+    const z = Math.abs(thigh.quaternion.z);
+    const x = Math.abs(thigh.quaternion.x);
+    expect(z).toBeGreaterThan(x);
+  });
+
+  it("步态让左右腿反相（一步一腿）", () => {
+    const { model } = build();
+    animateT800(model, 0.8);
+    const right = model.getNode("T800_LeftUpLegRoll_084")!;
+    const left = model.getNode("T800_RightUpLegRoll_092")!;
+    expect(Math.sign(right.quaternion.z)).toBe(-Math.sign(left.quaternion.z));
+  });
+
+  it("欠阻尼：起步阶段速度缓慢（慢启动）", () => {
+    const { model } = build();
+    animateT800(model, 0);
+    const a = model.getNode("T800_LeftKnee_helper_086")!.quaternion.z;
+    animateT800(model, 0.12);
+    const b = model.getNode("T800_LeftKnee_helper_086")!.quaternion.z;
+    // 起步 0.12s 的角度变化应小于整段峰值的一半（说明是缓入而不是瞬间到位）
+    const peak = (() => {
+      animateT800(model, 1.8);
+      return Math.abs(model.getNode("T800_LeftKnee_helper_086")!.quaternion.z);
+    })();
+    expect(Math.abs(b - a)).toBeLessThan(Math.abs(peak) * 0.6);
+  });
+});

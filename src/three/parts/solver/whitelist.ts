@@ -48,9 +48,15 @@ export function matchExpectedContact(
   report: ClippingReport,
   rules: readonly ExpectedContactRule[],
 ): ExpectedContactRule | null {
-  // 形态守门：豁免区只收 face_mate / bearing_overlap；suspect / displaced / 形态未知一律不放行。
-  if (report.form !== "face_mate" && report.form !== "bearing_overlap") return null;
   for (const rule of rules) {
+    // 形态守门：默认只收 face_mate / bearing_overlap；
+    // 族里显式声明 allowDisplaced 时才额外收 displaced（构造性配合常被判成 displaced）。
+    const formOk =
+      report.form === "face_mate" ||
+      report.form === "bearing_overlap" ||
+      (report.form === "displaced" && rule.allowDisplaced === true) ||
+      (report.form === "suspect" && rule.allowSuspect === true);
+    if (!formOk) continue;
     const forward = matchesPartId(rule.a, report.a) && matchesPartId(rule.b, report.b);
     const backward = matchesPartId(rule.a, report.b) && matchesPartId(rule.b, report.a);
     if (!forward && !backward) continue;

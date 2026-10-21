@@ -1,8 +1,9 @@
 import { Boxes, CloudRain, Crosshair, DoorOpen, Eye, Grid3x3, Layers, MousePointerClick, Tag } from "lucide-react";
-import { instanceKey } from "@/three/parts";
+import { useEffect, useReducer } from "react";
+import { instanceKey, type AssembledModel } from "@/three/parts";
 import { effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
 import { StageCanvas } from "../three/StageCanvas";
-import { findModel } from "../catalog";
+import { findModel, type StageModel } from "../catalog";
 import { useStageStore } from "../state/stageStore";
 import { ClippingDock } from "./ClippingPanel";
 import { EngineHud } from "./EngineHud";
@@ -14,6 +15,44 @@ import { CAMERA_MODE_LABELS } from "../three/viewpoints";
 // ============================================================================
 // Viewport —— 中栏：3D 视口 + 视口工具条 + 穿模报告抽屉 + 隔离小视图 + 读数图例
 // ============================================================================
+
+/**
+ * 实时读数：机构动画时关节角 / 活塞行程每帧都在变，必须跟着刷新。
+ * 单独一个 rAF 节流循环（约 12fps），不牵动整块视口重渲染。
+ */
+function LiveReadouts({
+  model,
+  assembled,
+}: {
+  model: StageModel;
+  assembled: AssembledModel | null;
+}) {
+  const [, bump] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    if (!model.readouts) return;
+    let raf = 0;
+    let last = 0;
+    const tick = (time: number) => {
+      if (time - last > 80) {
+        last = time;
+        bump();
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [model]);
+  if (!assembled || !model.readouts) return null;
+  return (
+    <>
+      {model.readouts(assembled).map((readout) => (
+        <span key={readout.label}>
+          {readout.label} <span className="num">{readout.value}</span>
+        </span>
+      ))}
+    </>
+  );
+}
 
 export function Viewport() {
   const modelId = useStageStore((state) => state.modelId);
@@ -36,7 +75,6 @@ export function Viewport() {
   const setCameraMode = useStageStore((state) => state.setCameraMode);
   const model = findModel(modelId);
   const stateLabel = model.states?.find((state) => state.id === machineState)?.label ?? machineState;
-  const readouts = assembled && model.readouts ? model.readouts(assembled) : [];
 
   // 实例检查器：选中重复件里的某一实例（在视口里直接点中单只负重轮）
   const selectedHandle = selectedPart && assembled ? assembled.getPart(selectedPart) : undefined;
@@ -250,11 +288,16 @@ export function Viewport() {
             三角面 <span className="num">{stats ? stats.triangles.toLocaleString("en-US") : "—"}</span>
           </span>
           <EngineHud />
-          {readouts.map((readout) => (
-            <span key={readout.label}>
-              {readout.label} <span className="num">{readout.value}</span>
+          {selectedPart ? (
+            <span className="viewport__selection" title={selectedPart}>
+              选中{" "}
+              <span className="num">
+                {selectedPart}
+                {selectedInstance !== null ? `[${selectedInstance}]` : ""}
+              </span>
             </span>
-          ))}
+          ) : null}
+          <LiveReadouts model={model} assembled={assembled} />
           {views.grid ? <span title="网格格距用于目测尺寸">网格 1 格 = 0.25 m</span> : null}
         </div>
       </div>
