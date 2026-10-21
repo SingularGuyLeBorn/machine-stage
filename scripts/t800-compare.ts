@@ -138,6 +138,8 @@ function renderModel(
   seconds: number,
   shot: Shot,
   explode = 0,
+  target?: THREE.Vector3,
+  scale?: number,
 ): Canvas {
   model.resetNodes();
   animateT800(model, seconds);
@@ -151,9 +153,11 @@ function renderModel(
   const up = new THREE.Vector3(0, 1, 0);
   const right = new THREE.Vector3().crossVectors(up, shot.dir).normalize();
   const camUp = new THREE.Vector3().crossVectors(shot.dir, right).normalize();
+  const s = scale ?? SCALE;
+  const t = target ?? new THREE.Vector3();
   const project = (p: THREE.Vector3): [number, number] => [
-    W / 2 + p.dot(right) * SCALE,
-    H - 60 - p.dot(camUp) * SCALE,
+    W / 2 + (p.dot(right) - t.dot(right)) * s,
+    H / 2 - (p.dot(camUp) - t.dot(camUp)) * s,
   ];
 
   const canvas = new Canvas(W, H);
@@ -213,6 +217,15 @@ function renderModel(
   return canvas;
 }
 
+/** 剖视渲染：指定目标点 + 缩放（看清内部机构）。 */
+function renderCutaway(
+  model: AssembledModel,
+  seconds: number,
+  shot: Shot & { target: THREE.Vector3; scale: number },
+): Canvas {
+  return renderModel(model, seconds, shot, 0, shot.target, shot.scale);
+}
+
 // ---------------------------------------------------------------- 出图
 const glb = buildModel(makeT800().registry, {
   builders: t800AllBuilders,
@@ -244,5 +257,28 @@ for (const shot of SHOTS) {
   const exploded = renderModel(mech, 0, shot, 1);
   writeFileSync(`${OUT}/mech-exploded-${shot.label}.png`, exploded.toPng());
   console.log("wrote", `mech-exploded-${shot.label}.png`, "(机械拆解版 · 爆炸视图)");
+}
+
+// 剖视特写：把护板隐藏，只看里面的机械器件
+{
+  for (const handle of mech.parts) {
+    if (handle.partId.includes("_guard")) handle.object.visible = false;
+  }
+  mech.root.updateMatrixWorld(true);
+  for (const shot of [
+    { dir: new THREE.Vector3(0.7071, 0, 0.7071), label: "leg", target: new THREE.Vector3(0, 0.45, 0.14), scale: 1500 },
+    { dir: new THREE.Vector3(0.7071, 0, 0.7071), label: "torso", target: new THREE.Vector3(0, 1.32, 0), scale: 1500 },
+  ]) {
+    const shotDef: Shot & { target: THREE.Vector3; scale: number } = {
+      dir: shot.dir,
+      label: shot.label,
+      target: shot.target,
+      scale: shot.scale,
+    };
+    const canvas = renderCutaway(mech, 0, shotDef);
+    writeFileSync(`${OUT}/mech-cutaway-${shot.label}.png`, canvas.toPng());
+    console.log("wrote", `mech-cutaway-${shot.label}.png`, "(剖视：隐藏护板，只看内部机械)");
+  }
+  for (const handle of mech.parts) handle.object.visible = true;
 }
 console.log("done");

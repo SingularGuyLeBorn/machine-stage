@@ -142,6 +142,15 @@ function jointAngles(seconds: number): Angles {
   y.set("Bip_Eyeball_R_045", gaze);
   y.set("Bip_Eyeball_L_043", gaze);
 
+  // 旋前旋后 / 内翻外翻（绕 Y = 肢体长轴）：真实机器人手腕脚踝是能转的
+  const pronate = 15 * Math.sin(2 * Math.PI * p + 0.8);
+  y.set("LeftLowerForeArm_helper_015", pronate);
+  y.set("RightLowerForeArm_helper_054", -pronate);
+  y.set("bip_hand_R_016", 9 * Math.sin(2 * Math.PI * p + 1.15));
+  y.set("bip_hand_L_055", -9 * Math.sin(2 * Math.PI * p + 1.15));
+  y.set("bip_foot_R_081", 7 * Math.sin(2 * Math.PI * p + 0.4));
+  y.set("bip_foot_L_089", -7 * Math.sin(2 * Math.PI * p + 0.4));
+
   // 眨眼：终结者的光学眼是**机械快门**（镜片翻下来挡住光路），
   // 每 4.2 秒一次，翻下 62° 再翻回来。
   const BLINK_PERIOD = 4.2;
@@ -426,12 +435,18 @@ export function t800CylinderReadout(_model: AssembledModel): CylinderState[] {
   return HYDRAULICS.map((def) => cylinderState(def, world));
 }
 
-/** 前端读数：关节角 / 步态相位。 */
-export function t800Readouts(): Array<{ label: string; value: string }> {
+/** 前端读数：关节相位 / 零件数 / 液压缸实时行程。 */
+export function t800Readouts(model: AssembledModel): Array<{ label: string; value: string }> {
+  const cylinders = t800CylinderReadout(model);
+  const knee = cylinders.find((c) => c.key === "knee_r");
+  const exposed = cylinders.map((c) => c.exposedMm);
+  const travel = exposed.length ? Math.max(...exposed) - Math.min(...exposed) : 0;
   return [
     { label: "步态相位", value: `${(gaitPhase(lastSeconds) * 100).toFixed(0)} %` },
-    { label: "蒙皮部位", value: `${JOINTS.length} 件 · 120854 顶点` },
-    { label: "液压缸", value: `${HYDRAULICS.length} 根` },
+    { label: "解剖部位", value: `${JOINTS.length} 件 · 120854 顶点` },
+    { label: "零件总数", value: `${model.parts.length} 件` },
+    { label: "液压缸", value: `${cylinders.length} 根 · 全行程 ${travel.toFixed(0)} mm` },
+    { label: "右膝活塞杆", value: `${knee ? knee.exposedMm.toFixed(1) : "-"} mm 外露` },
     { label: "模型高度", value: "1.90 m" },
   ];
 }

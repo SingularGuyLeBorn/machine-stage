@@ -1,1 +1,1 @@
-T-800 endoskeleton · iso 45° · t=0.00s · phase 0% · knee_r |AB|=118.2mm rod exposed=51.8mm · 235 parts / 120854 verts
+T-800 endoskeleton · iso 45° · t=0.00s · phase 0% · knee_r |AB|=118.2mm rod exposed=51.8mm · 245 parts / 120854 verts

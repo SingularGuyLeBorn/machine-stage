@@ -113,6 +113,13 @@ export function tendonGeometry(radius: number): THREE.BufferGeometry {
   return g;
 }
 
+/** 腱鞘筒几何：套在腱索外面的一小段管（固定长度 20 mm，随腱索方向转）。 */
+export function tendonSheathGeometry(radius: number): THREE.BufferGeometry {
+  const g = tubeGeometry(radius, radius * 0.78, 0.02, 10);
+  g.translate(0, 0.01, 0);
+  return g;
+}
+
 /** 滑轮几何：小圆轮（绕 X 转的扁轮）。 */
 export function pulleyGeometry(radius: number): THREE.BufferGeometry {
   const g = cylinderGeometry(radius, radius * 0.55, radius * 1.6, 12);

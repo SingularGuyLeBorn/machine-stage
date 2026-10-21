@@ -14,7 +14,13 @@ import { meshPartGeometryByIndex } from "./mesh/geometry";
 import { splitBoneIntoPlates } from "./mesh/plates";
 import { profileBone } from "./mesh/crossSection";
 import { buildMechParts, type MechKind, type Recipe } from "./mech";
-import { FINGER_BONES, FINGERS, pulleyGeometry, tendonGeometry } from "./tendon";
+import {
+  FINGER_BONES,
+  FINGERS,
+  pulleyGeometry,
+  tendonGeometry,
+  tendonSheathGeometry,
+} from "./tendon";
 import {
   HYDRAULICS,
   hydraulicGeometry,
@@ -368,6 +374,21 @@ export function makeT800(options: { decompose?: boolean } = {}): T800Bundle {
           at: from,
           hint: "屈肌腱：绕过指节滑轮，握拳时被拉长",
         });
+        // 腱鞘筒：套在腱索外面（掌面这一段）
+        if (seg === 0) {
+          builder.add({
+            id: `${prefix}.tendon.sheath_${finger}_${side.toLowerCase()}`,
+            cn: `${side === "R" ? "右" : "左"}${fingerCn[finger]}腱鞘筒`,
+            en: `${side === "R" ? "Right" : "Left"} ${finger} Tendon Sheath`,
+            asm: "hand",
+            geom: { type: "kit", kit: "t800TendonSheath", params: { finger, side } },
+            mat: "gunmetal",
+            layer: 2,
+            node: tendonNodeName(`${finger}_${side}_s1`),
+            at: from,
+            hint: "掌面腱鞘：屈肌腱在里面的通道",
+          });
+        }
       }
       for (const [i, j] of [prox, mid].entries()) {
         builder.add({
@@ -555,6 +576,7 @@ export const t800MeshBuilders: Record<string, GeometryBuilder> = {
     return hit.geometry;
   },
   t800Tendon: () => tendonGeometry(0.0022),
+  t800TendonSheath: () => tendonSheathGeometry(0.0042),
   t800Pulley: () => pulleyGeometry(0.0055),
   t800Hydraulic: (spec) => {
     const params = (spec as { params?: Record<string, KitParam> }).params ?? {};
