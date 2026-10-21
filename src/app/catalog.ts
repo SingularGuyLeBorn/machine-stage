@@ -69,6 +69,8 @@ export interface StageModel {
   builders?: Record<string, GeometryBuilder>;
   /** 动画：只驱动节点，每帧调用前框架已 resetNodes。t 为秒；state 用于多形态导演。 */
   animate?: (assembled: AssembledModel, seconds: number, state?: string) => void;
+  /** 纯展示比例（只缩放置换根节点，不改节点/动画/对接）；在包围盒与相机基准之前应用。 */
+  presentationScale?: [number, number, number];
   /** 这些状态由时钟推进（缺省只有 running）；多形态模型用它声明可动状态。 */
   animatedStates?: string[];
   /** 由 animate 直接改写实例矩阵的零件（pose 层的爆炸/拆解据此取本帧位姿）。 */
@@ -188,6 +190,7 @@ export const CATALOG: StageModel[] = [
     layouts: makeKingJoeLayouts(),
     builders: kingjoeModelBuilders,
     animatedStates: KINGJOE_ANIMATED_STATES,
+    presentationScale: [1.25, 0.78, 1.15],
     animate: (assembled, seconds, state) =>
       animateKingJoe(assembled, seconds, (state as KingJoeState) ?? "idle"),
     states: KINGJOE_STATE_LABELS.map((state) => ({ id: state.id, label: state.label, hint: state.hint })),
@@ -210,7 +213,7 @@ export const CATALOG: StageModel[] = [
     ],
     readouts: (assembled) => [
       { label: "定义零件", value: `${assembled.parts.length} 件` },
-      { label: "合体高度", value: "8.16 m" },
+      { label: "合体高度", value: "6.36 m" },
       { label: "对接面", value: "3 轴向 + 2 肩对接" },
       { label: "锥销 / 锁环", value: "12 / 5 组" },
     ],

@@ -177,6 +177,7 @@ function StageRuntime() {
       useStageStore.getState().reportFault(faultFromError(`装配 ${model.title}`, error));
       return;
     }
+    if (model.presentationScale) next.root.scale.set(...model.presentationScale);
     next.root.traverse((object) => {
       if ((object as THREE.Mesh).isMesh) {
         object.castShadow = true;

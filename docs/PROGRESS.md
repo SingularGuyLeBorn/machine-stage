@@ -1363,41 +1363,44 @@ y 1.078~1.105（顶面与舱盖齐平，下表面离赞助板顶板 1.075 留 3m
 | 项     | 结果                                                                                                                                                                       |
 | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 四体   | King Ship / King Chest（含双臂）/ King Stomach / King Legs，四个独立 assembly + 独立节点运动                                                                               |
-| 零件级 | **601 个定义件 / 800 个实例 / 319,610 三角面**；缸体/活塞/活塞杆/耳环/销轴、锥销/承座/锁环/锁爪/锁钩、喷管/叶片/作动器、足底减震垫、战损外挂板、飞控舵面、胸口发射内构逐件 |
+| 零件级 | **599 个定义件 / 818 个实例 / 326,498 三角面**；缸体/活塞/活塞杆/耳环/销轴、锥销/承座/锁环/锁爪/锁钩、喷管/叶片/作动器、足底减震垫、战损外挂板、飞控舵面、胸口发射内构逐件 |
 | 对接   | 3 对轴向接口（腿↔腹↔胸↔头）+ 2 套肩对接（环形导引 / 端面密封 / 双接近传感器 / 锁环 18°）；锥形销 45mm 入 56mm 承座孔、锁环 30°、端面密封/传感器/锁钩留 5–15mm 间隙         |
 | 动画   | idle / formation / combining / robot / firing / separation / crippled / damaged / scanning 九态；状态驱动时钟（catalog `animatedStates`）                                  |
 | 编队   | 纵队↔楔形连续变换（绝对时钟混合、翼船 ±18° 偏航）；合体起步快照上一编队形态，切换不跳位                                                                                    |
+| 外形   | 展示比例 1.25×/0.78×/1.15×；短粗肩荚、宽扁方脸 + 大耳荚、两块放大彩虹格栅；只改壳件/材质/展示缩放，节点与对接机构未改                                                      |
 | 飞控   | Ship 姿态舵面 ×4（编队时水平舵绕 X ±6°、垂直舵绕 Y ±5°）+ 作动器 ×4 + 控制板/LED/双线束，全部布置在四喷口上方与背板外侧                                                    |
 | 光学   | 胸口发射口：双充能环 + 四聚焦透镜 + 发光体 + 冷却套 + 安装环 + 双电容（带支架）逐件；充能/发射时环与透镜渐亮                                                               |
 | 合体   | 编队收敛 → 自下而上三段阻尼对接 → 电弧 → 销入槽 → 锁环过冲咔哒 → 双臂展开；可逆分离                                                                                        |
 | 特效   | 4 条电弧链/对接面、锁死闪光、锁环蓝光、怪光线双发射口、16 只喷口焰、重踏步震环/扬尘；均为场景级 FX，不参与零件检测                                                         |
 | 音效   | Web Audio 实时合成：三段锁环咔哒 + 双肩锁死、重踏步、展臂伺服、充能/怪光线、战损撞击/液压/装甲落地；事件谱与 motion 相位绑定，无外部资产                                   |
 | 受击   | 左大腿外挂装甲板 + 金饰条整块脱落（专用 `damagePanelL` 节点）、肘部液压滴溅 + 地面油洼、胸腹插接座内部电弧短路（腰甲遮挡）、`sensor_red` 熄灭                              |
-| 质感   | 银铬佩丹尼姆合金（钢拉丝纹理/机加工痕）、金环、彩瓷胸板、黑缝发光、肩荚鼓筒                                                                                                |
+| 质感   | 哑光金属灰（钢拉丝/机加工痕）、金环、黑框 4×6 彩虹发光格栅、黑缝发光、短粗肩荚鼓筒                                                                                         |
 | 门禁   | `vitest` **131 passed**；`tsc` / `build` ✓；静态穿模 **0**、悬空 **0**；七态 30fps 扫掠 **0**                                                                              |
 
 ### 验收证据
 
 - 静态/悬空：`npx vite-node scripts/diag-kingjoe.ts` → `static clipping=0 / unsupported=0`。
 - 全程扫掠：`npx vite-node scripts/diag-sweep-kj.ts` —— combining 10s@30fps / separation 4s / robot 6s / firing 3s / formation 3s / crippled 3s / damaged 3s，均为 **0 reports**，悬空 0。
-- 浏览器：生产构建 + `?qa=1`，`node scripts/capture-kingjoe.mjs`；headless Chrome rAF **57.3 fps**，录屏 606 帧 / 10.7s，含 1 条 Opus 音轨（45 chunks）。
-- 音轨校验：转码 AAC 48kHz 后 `volumedetect` 峰值 -12.5dB、均值 -39.1dB；`silencedetect` 在 **3.57 / 5.56 / 7.74 / 9.55s** 检出四次锁死脉冲，7.96s 检出展臂伺服，与 motion 的 3.0 / 5.0 / 7.2 / 9.0s 锁环相位一致（录屏从 formation 起 0.5s 后进入合体）。
-- 截图：`docs/screenshots/kingjoe-idle.jpg`、`kingjoe-formation.jpg`、`kingjoe-formation-wedge.jpg`、`kingjoe-docking-closeup.jpg`、`kingjoe-lock-closeup.jpg`、`kingjoe-docking-wide.jpg`、`kingjoe-combined.jpg`、`kingjoe-shoulder-dock.jpg`、`kingjoe-emitter.jpg`、`kingjoe-ship-rear.jpg`、`kingjoe-robot.jpg`、`kingjoe-footstep.jpg`、`kingjoe-damaged.jpg`、`kingjoe-firing.jpg`、`kingjoe-separation.jpg`、`kingjoe-crippled.jpg`。
+- 浏览器：生产构建 + `?qa=1`，`node scripts/capture-kingjoe.mjs`；headless Chrome rAF **60 fps**，录屏 642 帧 / 10.7s，含 1 条 Opus 音轨（42 chunks）；控制台只有 1 条 SwiftShader 着色器编译警告，无页面异常。
+- 音轨校验：转码 AAC 48kHz 后 `volumedetect` 峰值 -12.7dB、均值 -39.1dB；`silencedetect` 在 **3.55 / 5.55 / 7.76 / 9.56s** 检出四次锁死脉冲，7.96s 检出展臂伺服，与 motion 的 3.0 / 5.0 / 7.2 / 9.0s 锁环相位一致（录屏从 formation 起 0.5s 后进入合体）。
+- 截图：`docs/screenshots/kingjoe-idle.jpg`、`kingjoe-formation.jpg`、`kingjoe-formation-wedge.jpg`、`kingjoe-docking-closeup.jpg`、`kingjoe-lock-closeup.jpg`、`kingjoe-docking-wide.jpg`、`kingjoe-combined.jpg`、`kingjoe-shoulder-dock.jpg`、`kingjoe-emitter.jpg`、`kingjoe-ship-rear.jpg`、`kingjoe-robot.jpg`、`kingjoe-footstep.jpg`、`kingjoe-damaged.jpg`、`kingjoe-firing.jpg`、`kingjoe-separation.jpg`、`kingjoe-crippled.jpg`、`kingjoe-shape-pass.jpg`。
 - 重踏步：`kingjoe-footstep.jpg` 在 t=3.1s 左足落地冲击后取景，地面震环内径 0.56m（大于 0.52m 足长半轴），外圈随冲击衰减扩张，10 粒扬尘同步上扬。
 - 肩对接：`kingjoe-shoulder-dock.jpg` 用透视取右肩，可见金色环形导引面、端面密封、两只红色接近传感器与锁环同轴；对应 `arm_dock_guide / arm_dock_face_seal / arm_dock_sensor` 三件（8 实例）。
 - Ship 飞控：`kingjoe-ship-rear.jpg` 从船尾看四只舵面（水平/垂直各两片）、四个作动筒、控制板/LED 与双线束；舵面在编队态绕 X/Y 摆动，七态扫掠无干涉。
 - 胸口发射内构：`kingjoe-emitter.jpg` 近景可见双充能环、四聚焦透镜、发光体、铜色冷却套、金色安装环与两只带支架电容；相机从右前上方取景。
 - 编队变换：`kingjoe-formation.jpg` 为纵队相，`kingjoe-formation-wedge.jpg` 为 5.7s 楔形相；翼船 ±18° 偏航、胸/腹横向展开、腿体后撤，单测同时覆盖楔形起步合体的 0–2s。
 - 战损：`kingjoe-damaged.jpg` 在 2.4s 取景，左大腿外挂板（含金饰条）已落到左足外侧地面，`damagePanelL` 节点在世界 y≈0.10；地面油洼与肘部油滴可见。插接座电弧在腰甲内部，外部表现为 `sensor_red` 熄灭。
-- 录屏：`docs/recordings/kingjoe-combine-60fps.mp4`（60fps H.264 + AAC / 641 帧 / 10.7s / 938×734 / 969KB，四体编队 → 合体全程音效与咔哒）；缩略拼图 `docs/qa/kingjoe-combine-contact.jpg`。
+- 录屏：`docs/recordings/kingjoe-combine-60fps.mp4`（60fps H.264 + AAC / 641 帧 / 10.7s / 938×734 / 735KB，四体编队 → 合体全程音效与咔哒）；缩略拼图 `docs/qa/kingjoe-combine-contact.jpg`。
+- 外形对比：`docs/qa/kingjoe-shape-compare.jpg` 左为 1968 皮套参考、右为当前模型；当前已做到矮壮、扁头、彩虹胸、哑光灰，但胸廓仍偏平直箱体、腿围仍偏细，下一轮继续做圆筒壳。
 
 ### 关键口径 / 设计取舍
 
+- **外形只动壳件和展示缩放**：`presentationScale [1.25, 0.78, 1.15]` 在 StageCanvas 构建包围盒之前作用于 root，节点/动画/对接全部保持不变；肩荚改短粗鼓形，头壳/眼带加宽、耳荚放大，胸板放大为 4×6 六色发光格栅，主银色改哑光灰。七态扫掠仍为 0，说明机构没有被外形改动破坏。
 - **肩荚鼓筒**：参考图是巨型圆筒 + 金色端环；先做过方盒肩荚，视觉不像，改为 r490mm×860mm 鼓筒（两端金环），并把肩轴/液压/四联短筒重新对位。
 - **对接基盘与承座**：先把「上模块承力块 → 锥销/锁环」与「下模块基盘 → 环座/锥销座/锁钩」做成各自成组的结构；锁爪与锁钩轴向留 7.5mm、锁环 30° 咬合，扫掠不穿插。
 - **液压杆求解**：杆节点每帧按「缸筒出口 E' → 耳环 C'」的真实距离平移 + 转向；回缩部分滑进缸筒内孔，不对缸体做伸缩缩放。膝/髋/踝/肩/肘均接入。
 - **编队形态不重置相位**：纵队/楔形用绝对时钟的正弦混合，翼船偏航也随 blend 变化；进入合体时把上一帧编队形态快照作为起始位姿，收敛段同时把偏航淡回 0，锥销入槽前已完全对正。
-- **状态驱动时钟**：框架原来只有 `machineState === "running"` 推进时钟；`catalog.animatedStates` + `animate(…, state)` 让一个模型可以有多个可动形态（这是本里程碑唯一需要动 app 层的框架改动）。
+- **状态驱动时钟**：框架原来只有 `machineState === "running"` 推进时钟；`catalog.animatedStates` + `animate(…, state)` 让一个模型可以有多个可动形态（本里程碑的 app 层改动之一；外形展示比例另加 `presentationScale`，只缩放 root，不参与节点/动画/对接）。
 - **装配器修复**：`instances` 未显式声明 `instance_nodes` 时也应继承 `def.node`；否则腹/胸/头的实例件（瓷片、肩荚短筒、对接销）会掉在模型原点，四体错位。这个修复对虎式无影响（虎式实例件均无 node）。
 - **声音跟着机构相位走**：`soundScore.ts` 是纯函数事件谱（3.0/5.0/7.2s 三段锁环、7.4s 展臂、9.0s 双肩锁死、每 3s 重踏步、2.8s 怪光线循环），`audio.ts` 只用 Web Audio 合成，不加载音频资产；锁环用带通噪声双脉冲 + 92Hz 低频回弹，踏步用 64→38Hz 下滑。浏览器首次点击解锁 AudioContext；无头录屏用 CDP 注入可信点击并等待 `resume()`，只有 `running` 才接入音轨，避免静音轨卡住 MediaRecorder。
 - **重踏步只震地、不震屏**：`poseRobot` 在 u=0.5/1.0（t=3/6s）给出 0.14s 冲击包络，FX 在踝节点投影到地面画扩张环 + 10 粒扬尘，audio 同步 64→38Hz 踏步低频；相机与零件树保持稳定，避免检视时画面抖。震环内径必须大于宽足半长，否则会整圈藏在脚底。
@@ -1409,10 +1412,10 @@ y 1.078~1.105（顶面与舱盖齐平，下表面离赞助板顶板 1.075 留 3m
 
 ### 已知边界（下一轮优先）
 
-1. **四体件数分布**：总数 **601**（计划 ~580）；Ship 112 / Chest 207（含双臂、肩对接与发射内构）/ Stomach 100 / Legs 181。Chest/Legs 超 180，Ship 未到 ~120（眼带仍是整条灯带 + 7 片百叶，头部装甲按 5 块大板，尚未拆 3 透镜/调焦环/转动机构/护罩）；没有为数字加无支撑件。
+1. **四体件数分布**：总数 **599**（计划 ~580）；Ship 112 / Chest 205（含双臂、肩对接与发射内构）/ Stomach 100 / Legs 182。Chest/Legs 超 180，Ship 未到 ~120（眼带仍是整条灯带 + 7 片百叶，头部装甲按 5 块大板，尚未拆 3 透镜/调焦环/转动机构/护罩）；没有为数字加无支撑件。
 2. **腰部转角受包络限制**：`waist` 节点只做 ±4° 转身 / ±1.2° 侧倾 / 射击 ±1.6° 俯仰；腰鼓与上腹之间仅留约 4cm 轴向间隙，液压与线缆包络不允许更大弯腰，且暂无重心转移 / 根位移。
 3. **步行/爬行无地面 IK**：脚底随关节角度抬落，站立脚有轻微滑动；残缺形态是低姿态撑地，不是位移爬行。
-4. **视觉**：铬钢在灰棚里仍偏灰，头部/小腿比例与参考图还有差距；下一轮做头冠/小腿鼓包与更强的高光对比。
+4. **外形仍是第一版**：矮壮比例、哑光灰、彩虹胸板、扁头宽肩已按参考收；但胸/腹还是平直箱体，腿围与足部体量偏小，头颈堆叠偏高。下一轮把胸/腹换成圆筒壳、腿围加粗，并保留现有机构与七态零穿模。
 5. **战损不硬锁状态机**：插接座短路目前是腰甲内部电弧 + 传感器熄灭视觉与文案，没有持久化战损或禁用合体按钮；按“受击演示”使用，可手动切回其他动作。
 
 ### 复现命令

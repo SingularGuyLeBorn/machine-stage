@@ -79,9 +79,9 @@ for (const spec of HYDRAULICS) {
 }
 
 // —— 胸口彩色镶嵌：两块 3×4 阵列 ——
-export const MOSAIC_TILE_W = 0.16;
-export const MOSAIC_TILE_H = 0.105;
-export const MOSAIC_GAP = 0.018;
+export const MOSAIC_TILE_W = 0.13;
+export const MOSAIC_TILE_H = 0.085;
+export const MOSAIC_GAP = 0.012;
 export const MOSAIC_BACK_Z = 0.64;
 export const MOSAIC_TILE_Z = 0.6825;
 
@@ -89,20 +89,20 @@ export interface MosaicSlot {
   x: number;
   y: number;
   z: number;
-  color: "blue" | "rose" | "amber";
+  color: "blue" | "rose" | "amber" | "green" | "cyan" | "violet";
 }
 
 function buildMosaicSlots(): MosaicSlot[] {
   const slots: MosaicSlot[] = [];
-  const panelX = [-0.72, 0.72];
+  const panelX = [-0.63, 0.63];
   for (let panel = 0; panel < 2; panel++) {
-    for (let row = 0; row < 4; row++) {
-      for (let col = 0; col < 3; col++) {
-        const colorIndex = (panel * 2 + row + col) % 3;
-        const color = colorIndex === 0 ? "blue" : colorIndex === 1 ? "rose" : "amber";
+    for (let row = 0; row < 6; row++) {
+      for (let col = 0; col < 4; col++) {
+        const palette = ["blue", "rose", "amber", "green", "cyan", "violet"] as const;
+        const color = palette[(panel * 3 + row * 2 + col) % palette.length]!;
         slots.push({
-          x: panelX[panel]! + (col - 1) * (MOSAIC_TILE_W + MOSAIC_GAP),
-          y: 0.95 + (row - 1.5) * (MOSAIC_TILE_H + MOSAIC_GAP),
+          x: panelX[panel]! + (col - 1.5) * (MOSAIC_TILE_W + MOSAIC_GAP),
+          y: 0.95 + (row - 2.5) * (MOSAIC_TILE_H + MOSAIC_GAP),
           z: MOSAIC_TILE_Z,
           color,
         });
@@ -126,6 +126,9 @@ export const MOSAIC_COUNTS = {
   blue: MOSAIC_SLOTS.filter((slot) => slot.color === "blue").length,
   rose: MOSAIC_SLOTS.filter((slot) => slot.color === "rose").length,
   amber: MOSAIC_SLOTS.filter((slot) => slot.color === "amber").length,
+  green: MOSAIC_SLOTS.filter((slot) => slot.color === "green").length,
+  cyan: MOSAIC_SLOTS.filter((slot) => slot.color === "cyan").length,
+  violet: MOSAIC_SLOTS.filter((slot) => slot.color === "violet").length,
 };
 
 const shoulderBosses: InstanceLayout = ({ index }) =>
@@ -149,8 +152,8 @@ const podRims: InstanceLayout = ({ index }) =>
 const podStacks: InstanceLayout = ({ index }) => {
   const side = index < 4 ? -1 : 1;
   const i = index % 4;
-  const z = i < 2 ? -0.28 : 0.28;
-  const x = side * (i % 2 === 0 ? 1.47 : 1.77);
+  const z = i < 2 ? -0.18 : 0.18;
+  const x = side * (i % 2 === 0 ? 1.56 : 1.84);
   return new THREE.Matrix4().makeTranslation(x, 0, z);
 };
 
@@ -222,7 +225,7 @@ const emitterLenses: InstanceLayout = ({ index }) =>
     .multiply(new THREE.Matrix4().makeTranslation(0.075, 0, 0));
 
 const visorSlats: InstanceLayout = ({ index, count }) =>
-  new THREE.Matrix4().makeTranslation((index - (count - 1) / 2) * 0.12, 0, 0);
+  new THREE.Matrix4().makeTranslation((index - (count - 1) / 2) * 0.145, 0, 0);
 const crestFins: InstanceLayout = ({ index, count }) =>
   new THREE.Matrix4().makeTranslation((index - (count - 1) / 2) * 0.19, 0, 0);
 const shipCheeks: InstanceLayout = ({ index }) =>
@@ -264,8 +267,8 @@ export const KINGJOE_LAYOUTS: Record<string, InstanceLayout> = {
   kjShoulderFaceSeals: shoulderFaceSeals,
   kjShoulderDockSensors: shoulderDockSensors,
   kjMirrorX066: mirrorX(0.66),
-  kjMirrorX072: mirrorX(0.72),
-  kjMirrorX098: mirrorX(0.98),
+  kjMirrorX072: mirrorX(0.63),
+  kjMirrorX098: mirrorX(0.96),
   kjMirrorX068: mirrorX(0.68),
   kjMirrorX116: mirrorX(1.16),
   kjFingerGap3: fingerGap3,
@@ -288,5 +291,8 @@ export const KINGJOE_LAYOUTS: Record<string, InstanceLayout> = {
   kjMosaicBlue: mosaicLayout("blue"),
   kjMosaicRose: mosaicLayout("rose"),
   kjMosaicAmber: mosaicLayout("amber"),
+  kjMosaicGreen: mosaicLayout("green"),
+  kjMosaicCyan: mosaicLayout("cyan"),
+  kjMosaicViolet: mosaicLayout("violet"),
   ...clevisPins,
 };

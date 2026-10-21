@@ -180,7 +180,7 @@ export function addShipDetails(builder: KingJoeParts): void {
       geometry: { type: "cylinder", r: 0.1, h: 0.03, segments: 24, bevel: 0.005 },
       material: "silver_dark",
       node: A,
-      mate: mateAt(A, shipWorld(sx * 0.89, 0.62, 0), [0, 0, 90]),
+      mate: mateAt(A, shipWorld(sx * 0.995, 0.62, 0), [0, 0, 90]),
     });
     builder.add({
       id: pid(A, `ear_vent_${suffix}`),
@@ -191,7 +191,7 @@ export function addShipDetails(builder: KingJoeParts): void {
       geometry: { type: "cylinder", r: 0.04, h: 0.05, segments: 14, bevel: 0.003 },
       material: "sensor_red",
       node: A,
-      mate: mateAt(A, shipWorld(sx * 0.93, 0.62, 0), [0, 0, 90]),
+      mate: mateAt(A, shipWorld(sx * 1.045, 0.62, 0), [0, 0, 90]),
     });
     boltRingPart(builder, {
       id: pid(A, `ear_cap_bolts_${suffix}`),
@@ -199,7 +199,7 @@ export function addShipDetails(builder: KingJoeParts): void {
       name_en: "ear cap bolts",
       assembly: A,
       node: A,
-      world: shipWorld(sx * 0.915, 0.62, 0),
+      world: shipWorld(sx * 1.025, 0.62, 0),
       rotation: [0, 0, -90],
       count: 8,
       radius: 0.07,
@@ -680,25 +680,6 @@ export function addStomachDetails(builder: KingJoeParts): void {
 
 export function addChestDetails(builder: KingJoeParts): void {
   const A = "chest";
-  // 肩鼓四道束带
-  for (const [suffix, sx] of [
-    ["l", -1],
-    ["r", 1],
-  ] as const) {
-    for (const x of [1.32, 1.9]) {
-      builder.add({
-        id: pid(A, `pod_band_${suffix}_${x === 1.32 ? "a" : "b"}`),
-        name_cn: "肩鼓束带",
-        name_en: "shoulder drum band",
-        assembly: A,
-        layer: 4,
-        geometry: { type: "tube", rOuter: 0.515, rInner: 0.492, h: 0.03, segments: 40 },
-        material: "silver_bright",
-        node: A,
-        mate: mateAt(A, chestWorld(sx * x, 1.56, 0), [0, 0, 90]),
-      });
-    }
-  }
   // 肩檐金徽
   for (const [suffix, sx] of [
     ["l", -1],
