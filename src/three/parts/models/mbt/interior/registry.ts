@@ -243,7 +243,7 @@ function buildParts(): PartDefinition[] {
       build_order: 713,
       geometry: MERGE(B(0.14, 0.1, 0.12, [0, 0, 0], 0.008), B(0.1, 0.06, 0.02, [0, 0.02, 0.07], 0.003), C(0.028, 0.05, [0, -0.06, 0], 12)),
       material: "mbt_glass",
-      mate: A([-0.62 + p * 0.14, 1.78, 1.98], [MBT.GLACIS_ANGLE_DEG + 90, 0, 0]),
+      mate: A([-0.62 + p * 0.14, 1.63, 1.85]),
     });
   }
   add({

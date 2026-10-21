@@ -64,6 +64,56 @@ const smoothboreBarrel: GeometryBuilder = (spec) => {
   return mergeGeometries(parts);
 };
 
+/** 前大灯：灯体轴 +Z、透镜朝前、带护圈与翼子板支架。 */
+const headlight: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const r = num(p, "r", 0.105);
+  const len = num(p, "len", 0.16);
+  const parts: THREE.BufferGeometry[] = [];
+  const body = cylinderGeometry(r, len, r, 22, 0.004);
+  body.rotateX(Math.PI / 2);
+  parts.push(body);
+  const lens = cylinderGeometry(r * 0.82, 0.03, r * 0.82, 22, 0.002);
+  lens.rotateX(Math.PI / 2);
+  lens.translate(0, 0, len / 2 + 0.015);
+  parts.push(lens);
+  const ring = tubeGeometry(r + 0.012, r * 0.9, 0.035, 22);
+  ring.rotateX(Math.PI / 2);
+  ring.translate(0, 0, len / 2 + 0.012);
+  parts.push(ring);
+  for (const x of [-r * 0.6, r * 0.6]) {
+    parts.push(bevelBoxGeometry(0.018, r * 1.7, 0.018, 0.002).translate(x, 0, len / 2 + 0.055));
+  }
+  parts.push(bevelBoxGeometry(r * 1.45, 0.018, 0.018, 0.002).translate(0, r * 0.82, len / 2 + 0.055));
+  parts.push(bevelBoxGeometry(0.07, 0.23, 0.1, 0.003).translate(0, -r - 0.035, -0.02));
+  parts.push(bevelBoxGeometry(0.16, 0.03, 0.14, 0.002).translate(0, -r - 0.135, -0.02));
+  return mergeGeometries(parts);
+};
+
+/** 炮盾：中间留出炮管孔的装甲框 + 前缘护圈 + 并列机枪缺口。 */
+const mantlet: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.68);
+  const h = num(p, "h", 0.48);
+  const d = num(p, "d", 0.26);
+  const bore = num(p, "bore", 0.17);
+  const sideW = (w - bore) / 2;
+  const topH = (h - bore) / 2;
+  const parts: THREE.BufferGeometry[] = [];
+  parts.push(bevelBoxGeometry(sideW, h, d, 0.008).translate(-(bore + sideW) / 2, 0, 0));
+  parts.push(bevelBoxGeometry(sideW, h, d, 0.008).translate((bore + sideW) / 2, 0, 0));
+  parts.push(bevelBoxGeometry(bore, topH, d, 0.006).translate(0, (bore + topH) / 2, 0));
+  parts.push(bevelBoxGeometry(bore, topH, d, 0.006).translate(0, -(bore + topH) / 2, 0));
+  const collar = tubeGeometry(bore / 2 + 0.035, bore / 2, 0.07, 28);
+  collar.rotateX(Math.PI / 2);
+  collar.translate(0, 0, d / 2 + 0.02);
+  parts.push(collar);
+  for (const y of [-1, 1]) {
+    parts.push(bevelBoxGeometry(w + 0.02, 0.035, 0.05, 0.004).translate(0, y * (h / 2), d / 2 - 0.01));
+  }
+  return mergeGeometries(parts);
+};
+
 /** 楔形炮塔前斜板复合装甲包：三层板（外层钢 / 陶瓷 / 背板），法线 +Z。 */
 const compositePlate: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
@@ -139,7 +189,8 @@ const smokeCluster: GeometryBuilder = (spec) => {
   const r = num(p, "r", 0.038);
   const len = num(p, "len", 0.24);
   const parts: THREE.BufferGeometry[] = [];
-  parts.push(bevelBoxGeometry(0.34, 0.05, 0.16, 0.004));
+  parts.push(bevelBoxGeometry(0.34, 0.05, 0.16, 0.004).translate(0, -0.16, 0));
+  parts.push(bevelBoxGeometry(0.1, 0.12, 0.1, 0.003).translate(0, -0.08, -0.02));
   for (const x of [-0.09, 0.09]) {
     for (const y of [-0.09, 0.09]) {
       const t = tubeGeometry(r, r - 0.012, len, 14);
@@ -199,6 +250,8 @@ const camoPatch: GeometryBuilder = (spec) => {
 
 export const mbtHullKitBuilders: Record<string, GeometryBuilder> = {
   smoothboreBarrel,
+  headlight,
+  mantlet,
   compositePlate,
   eraCasing,
   eraExplosive,

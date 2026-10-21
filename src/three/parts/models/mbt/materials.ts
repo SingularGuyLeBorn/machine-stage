@@ -23,7 +23,7 @@ export const MBT_MATERIALS: ModelRegistry["materials"] = {
   mbt_track: { base: "#3b3d3a", metalness: 0.72, roughness: 0.58, preset: "steel_rough", envMapIntensity: 0.95 },
   mbt_track_worn: { base: "#58564e", metalness: 0.75, roughness: 0.5, preset: "steel_rough", envMapIntensity: 1 },
   mbt_era: { base: "#4e5741", metalness: 0.24, roughness: 0.7, preset: "primer", envMapIntensity: 0.85 },
-  mbt_era_steel: { base: "#5a6057", metalness: 0.55, roughness: 0.6, preset: "steel_rough", envMapIntensity: 0.95 },
+  mbt_era_steel: { base: "#383b32", metalness: 0.58, roughness: 0.56, preset: "steel_rough", envMapIntensity: 0.95 },
   mbt_explosive: { base: "#8a7a4e", metalness: 0.05, roughness: 0.9, preset: "rubber", envMapIntensity: 0.4 },
   mbt_ceramic: { base: "#a8a49a", metalness: 0.06, roughness: 0.82, preset: "cast", envMapIntensity: 0.7 },
   mbt_liner: { base: "#6a6557", metalness: 0.08, roughness: 0.88, preset: "primer", envMapIntensity: 0.6 },

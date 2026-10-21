@@ -220,10 +220,17 @@ const skirtPanel: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
   const w = num(p, "w", 0.62);
   const h = num(p, "h", 0.7);
+  const segments = Math.max(1, Math.round(num(p, "segments", 6)));
+  const gap = num(p, "gap", 0.012);
+  const segW = (w - gap * (segments - 1)) / segments;
   const parts: THREE.BufferGeometry[] = [];
-  parts.push(bevelBoxGeometry(w, h, 0.03, 0.004));
-  for (const y of [-h / 2 + 0.06, h / 2 - 0.06]) {
-    parts.push(bevelBoxGeometry(w * 0.9, 0.025, 0.05, 0.002).translate(0, y, 0));
+  for (let i = 0; i < segments; i++) {
+    const x = -w / 2 + segW / 2 + i * (segW + gap);
+    parts.push(bevelBoxGeometry(segW, h, 0.03, 0.004).translate(x, 0, 0));
+    for (const y of [-h / 2 + 0.06, h / 2 - 0.06]) {
+      parts.push(bevelBoxGeometry(segW * 0.9, 0.025, 0.05, 0.002).translate(x, y, 0));
+    }
+    parts.push(bevelBoxGeometry(0.14, 0.06, 0.05, 0.002).translate(x - segW * 0.38, h / 2 - 0.04, 0.02));
   }
   return mergeGeometries(parts);
 };

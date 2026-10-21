@@ -11,8 +11,13 @@ const js = arg("js", "null");
 const wait = Number(arg("wait", "600"));
 const out = arg("out", "docs/qa/shot.jpeg");
 
+const nav = arg("nav", "");
+const click = arg("click", "");
 const list = await (await fetch("http://127.0.0.1:9223/json/list")).json();
-const page = list.find((p) => p.type === "page" && p.url.includes("5173")) ?? list[0];
+const page =
+  list.find((p) => p.type === "page" && p.url.includes("5175")) ??
+  list.find((p) => p.type === "page" && p.url.includes("5173")) ??
+  list.find((p) => p.type === "page");
 const ws = new WebSocket(page.webSocketDebuggerUrl);
 let nextId = 1;
 const pending = new Map();
@@ -33,6 +38,10 @@ ws.addEventListener("message", (event) => {
 await new Promise((resolve) => ws.addEventListener("open", resolve, { once: true }));
 await send("Runtime.enable");
 await send("Page.enable");
+if (nav) {
+  await send("Page.navigate", { url: nav });
+  await new Promise((resolve) => setTimeout(resolve, 2600));
+}
 if (js !== "null") {
   const result = await send("Runtime.evaluate", {
     expression: js,
@@ -44,6 +53,18 @@ if (js !== "null") {
     process.exit(1);
   }
   console.log("js:", JSON.stringify(result.result?.value)?.slice(0, 400));
+}
+if (click) {
+  const [x, y] = click.split(",").map(Number);
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+  await send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1 });
+  await send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount: 1 });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const picked = await send("Runtime.evaluate", {
+    expression: "window.__stage?.store.getState().selectedPart ?? null",
+    returnByValue: true,
+  });
+  console.log("picked:", JSON.stringify(picked.result?.value));
 }
 await new Promise((resolve) => setTimeout(resolve, wait));
 const shot = await send("Page.captureScreenshot", { format: "jpeg", quality: 70 });

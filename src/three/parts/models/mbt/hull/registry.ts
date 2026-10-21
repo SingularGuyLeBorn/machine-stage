@@ -7,9 +7,9 @@ import { MBT_MATERIALS } from "../materials";
 // ============================================================================
 // models/mbt/hull/registry —— L4 外壳 / 复合装甲 / ERA / 滑膛炮 + L5 表面
 //
-// 车体：大倾角首上（33°）、复合装甲分层（钢面板 + 陶瓷 + 间隔 + 背板）、
-// 楔形炮塔（±24° 前斜板）、120mm 滑膛炮（热护套 + 抽烟装置）、
-// 90 块 ERA（首上 30 / 炮塔前 20 / 炮塔侧 16 / 侧裙 24），每块三层。
+// 车体：33.7° 浅倾角首上、复合装甲分层（钢面板 + 陶瓷 + 间隔 + 背板）、
+// 外凸楔形炮塔（±26° 前斜板）、120mm 滑膛炮（热护套 + 抽烟装置）、
+// 132 块 ERA（首上 20 / 炮塔前 16×2 / 炮塔侧 16×2 / 侧裙 24×2），每块三层。
 // ============================================================================
 
 const P = "mbt90.hull.";
@@ -31,15 +31,15 @@ function plus(a: [number, number, number], b: [number, number, number]): [number
 }
 
 // ERA 布局：类型 × 网格
-type EraGroup = { key: string; cols: number; rows: number; base: [number, number, number]; rot: [number, number, number]; stepX: number; stepY: number; size: [number, number, number]; node?: string };
+type EraGroup = { key: string; cols: number; rows: number; base: [number, number, number]; rot: [number, number, number]; stepX: number; stepY: number; size: [number, number, number]; normal?: number; node?: string };
 const ERA_GROUPS: EraGroup[] = [
-  { key: "glacis", cols: 5, rows: 6, base: [0, 1.38, 2.55], rot: [33, 0, 0], stepX: 0.5, stepY: 0.27, size: [0.44, 0.24, 0.13] },
-  { key: "cheek_r", cols: 5, rows: 4, base: [0.64, 2.08, 1.02], rot: [-8, -24, 0], stepX: 0.22, stepY: 0.14, size: [0.2, 0.13, 0.12], node: "Turret" },
-  { key: "cheek_l", cols: 5, rows: 4, base: [-0.64, 2.08, 1.02], rot: [-8, 24, 0], stepX: 0.22, stepY: 0.14, size: [0.2, 0.13, 0.12], node: "Turret" },
-  { key: "side_r", cols: 8, rows: 2, base: [1.3, 2.12, 0.1], rot: [0, 90, 0], stepX: 0.32, stepY: 0.16, size: [0.3, 0.14, 0.12], node: "Turret" },
-  { key: "side_l", cols: 8, rows: 2, base: [-1.3, 2.12, 0.1], rot: [0, -90, 0], stepX: 0.32, stepY: 0.16, size: [0.3, 0.14, 0.12], node: "Turret" },
-  { key: "skirt_r", cols: 12, rows: 1, base: [1.9, 1.08, -2.45], rot: [0, 90, 0], stepX: 0.46, stepY: 0, size: [0.42, 0.58, 0.12] },
-  { key: "skirt_l", cols: 12, rows: 1, base: [-1.9, 1.08, -2.45], rot: [0, -90, 0], stepX: 0.46, stepY: 0, size: [0.42, 0.58, 0.12] },
+  { key: "glacis", cols: 5, rows: 4, base: [0, 1.36, 2.54], rot: [MBT.GLACIS_PITCH_DEG, 0, 0], stepX: 0.5, stepY: 0.26, size: [0.44, 0.21, 0.13], normal: 0.105 },
+  { key: "cheek_r", cols: 4, rows: 4, base: [0.831, 2.08, 1.147], rot: [-8, 26, 0], stepX: 0.23, stepY: 0.14, size: [0.2, 0.13, 0.12], normal: 0.12, node: "Turret" },
+  { key: "cheek_l", cols: 4, rows: 4, base: [-0.831, 2.08, 1.147], rot: [-8, -26, 0], stepX: 0.23, stepY: 0.14, size: [0.2, 0.13, 0.12], normal: 0.12, node: "Turret" },
+  { key: "side_r", cols: 8, rows: 2, base: [1.3, 2.12, -0.35], rot: [0, 90, 0], stepX: 0.3, stepY: 0.16, size: [0.3, 0.14, 0.12], node: "Turret" },
+  { key: "side_l", cols: 8, rows: 2, base: [-1.3, 2.12, -0.35], rot: [0, -90, 0], stepX: 0.3, stepY: 0.16, size: [0.3, 0.14, 0.12], node: "Turret" },
+  { key: "skirt_r", cols: 12, rows: 2, base: [1.84, 1.04, -0.2], rot: [0, 90, 0], stepX: 0.44, stepY: 0.28, size: [0.4, 0.26, 0.1] },
+  { key: "skirt_l", cols: 12, rows: 2, base: [-1.84, 1.04, -0.2], rot: [0, -90, 0], stepX: 0.44, stepY: 0.28, size: [0.4, 0.26, 0.1] },
 ];
 function eraLayout(group: EraGroup): InstanceLayout {
   return ({ index }) => {
@@ -47,7 +47,7 @@ function eraLayout(group: EraGroup): InstanceLayout {
     const row = Math.floor(index / group.cols);
     const cx = (col - (group.cols - 1) / 2) * group.stepX;
     const cy = (row - (group.rows - 1) / 2) * group.stepY;
-    const local: [number, number, number] = [cx, cy, 0.1];
+    const local: [number, number, number] = [cx, cy, group.normal ?? 0.1];
     const offset = rotated(group.rot, local);
     const pos = plus(group.base, offset);
     const m = new THREE.Matrix4().compose(
@@ -67,7 +67,7 @@ export const HULL_LAYOUTS: Record<string, InstanceLayout> = Object.fromEntries(
 // 表面/附件实例布局（非节点件：模型坐标；节点件：节点局部坐标）
 const SURFACE_LAYOUTS: Record<string, InstanceLayout> = {
   "mbt.hull.headlight": ({ index }) =>
-    new THREE.Matrix4().makeTranslation(index === 0 ? -1.22 : 1.22, 1.42, 2.95),
+    new THREE.Matrix4().makeTranslation(index === 0 ? -1.45 : 1.45, 1.36, 2.74),
   "mbt.hull.towHook": ({ index }) =>
     new THREE.Matrix4().makeTranslation(index === 0 ? -0.92 : 0.92, 0.78, 3.18),
   "mbt.hull.liftingEyes": ({ index }) => {
@@ -105,7 +105,7 @@ const SURFACE_LAYOUTS: Record<string, InstanceLayout> = {
     return new THREE.Matrix4().makeTranslation(x, y, z);
   },
   "mbt.hull.eraRail": ({ index }) =>
-    new THREE.Matrix4().makeTranslation(index === 0 ? -1.35 : 1.35, 1.55, -0.3),
+    new THREE.Matrix4().makeTranslation(index === 0 ? -1.35 : 1.35, 2.12, -0.45),
   "mbt.hull.insignia": ({ index }) =>
     new THREE.Matrix4().makeRotationY(index === 0 ? Math.PI / 2 : -Math.PI / 2).setPosition(index === 0 ? 1.29 : -1.29, 2.2, 0.4),
   "mbt.hull.mud": ({ index }) => {
@@ -209,9 +209,9 @@ function buildParts(): PartDefinition[] {
     assembly: "hull_structure",
     build_layer: 4,
     build_order: 404,
-    geometry: MERGE(B(2.56, 1.18, 0.08, [0, 0, 0], 0.012), B(2.5, 0.08, 0.05, [0, 0.5, 0], 0.005)),
+    geometry: MERGE(B(2.56, 1.28, 0.08, [0, 0, 0], 0.012), B(2.5, 0.08, 0.05, [0, 0.53, 0], 0.005)),
     material: "mbt_paint",
-    mate: A([0, 1.38, 2.55], [33, 0, 0]),
+    mate: A([0, 1.36, 2.54], [MBT.GLACIS_PITCH_DEG, 0, 0]),
   });
   add({
     id: `${P}lower_front`,
@@ -220,9 +220,9 @@ function buildParts(): PartDefinition[] {
     assembly: "hull_structure",
     build_layer: 4,
     build_order: 405,
-    geometry: MERGE(B(2.5, 0.7, 0.07, [0, 0, 0], 0.01)),
+    geometry: MERGE(B(2.5, 0.6, 0.07, [0, 0, 0], 0.01)),
     material: "mbt_paint",
-    mate: A([0, 0.82, 3.06], [12, 0, 0]),
+    mate: A([0, 0.77, 3.13], [-10, 0, 0]),
   });
   add({
     id: `${P}rear_plate`,
@@ -242,9 +242,9 @@ function buildParts(): PartDefinition[] {
     assembly: "hull_structure",
     build_layer: 4,
     build_order: 407,
-    geometry: MERGE(B(2.66, 0.08, 1.9, [0, 0, 0], 0.01), B(2.5, 0.03, 1.7, [0, 0.055, 0], 0.006)),
+    geometry: MERGE(B(2.66, 0.08, 2.0, [0, 0, 0], 0.01), B(2.5, 0.03, 1.82, [0, 0.055, 0.04], 0.006)),
     material: "mbt_paint",
-    mate: A([0, MBT.HULL_DECK, 0.95]),
+    mate: A([0, MBT.HULL_DECK, 1.0]),
   });
   add({
     id: `${P}engine_deck`,
@@ -293,7 +293,7 @@ function buildParts(): PartDefinition[] {
     build_order: 411,
     geometry: MERGE(C(0.29, 0.06, [0, 0, 0], 24, 0.29), T(0.31, 0.28, 0.05, [0, 0, 0], 24), C(0.07, 0.03, [0, 0.05, 0], 16)),
     material: "mbt_paint",
-    mate: A([-0.55, 1.77, 2.05], [33, 0, 0]),
+    mate: A([-0.55, 1.83, 1.7]),
   });
   for (let p = 0; p < 3; p++) {
     add({
@@ -303,9 +303,9 @@ function buildParts(): PartDefinition[] {
       assembly: "hull_structure",
       build_layer: 4,
       build_order: 412,
-      geometry: MERGE(B(0.15, 0.1, 0.08, [0, 0, 0], 0.008), B(0.12, 0.06, 0.02, [0, 0.01, 0.05], 0.003)),
+      geometry: MERGE(B(0.15, 0.1, 0.08, [0, 0, 0], 0.008), B(0.12, 0.06, 0.02, [0, 0.01, 0.05], 0.003), B(0.11, 0.05, 0.06, [0, -0.07, 0], 0.004)),
       material: "mbt_glass",
-      mate: A([-0.74 + p * 0.16, 1.83, 2.12], [33, 0, 0]),
+      mate: A([-0.72 + p * 0.17, 1.91, 1.86]),
     });
   }
   add({
@@ -315,7 +315,7 @@ function buildParts(): PartDefinition[] {
     assembly: "hull_structure",
     build_layer: 4,
     build_order: 413,
-    geometry: MERGE(C(0.11, 0.12, [0, 0, 0], 20), C(0.095, 0.02, [0, 0.06, 0], 20), B(0.28, 0.03, 0.03, [0, 0.15, 0], 0.004), B(0.03, 0.22, 0.03, [0, 0, 0], 0.003)),
+    geometry: { type: "kit", kit: "headlight", params: { r: 0.105, len: 0.16 } },
     material: "mbt_lamp",
     mate: A([0, 0, 0]),
     instances: 2,
@@ -437,10 +437,10 @@ function buildParts(): PartDefinition[] {
     assembly: "composite_armor",
     build_layer: 4,
     build_order: 430,
-    geometry: { type: "kit", kit: "compositePlate", params: { w: 2.52, h: 1.14, outer: 0.04, ceramic: 0.07, backing: 0.04, gap: 0.012 } },
+    geometry: { type: "kit", kit: "compositePlate", params: { w: 2.52, h: 1.22, outer: 0.04, ceramic: 0.07, backing: 0.04, gap: 0.012 } },
     material: "mbt_paint",
-    mate: A(plus([0, 1.38, 2.55], rotated([33, 0, 0], [0, 0, 0.11])), [33, 0, 0]),
-    source: "首上复合装甲包：40mm 钢面板 + 70mm 陶瓷/复合夹层 + 12mm 间隔 + 40mm 钢背板，总厚约 160mm，倾角 33°。",
+    mate: A(plus([0, 1.36, 2.54], rotated([MBT.GLACIS_PITCH_DEG, 0, 0], [0, 0, -0.12])), [MBT.GLACIS_PITCH_DEG, 0, 0]),
+    source: "首上复合装甲包：40mm 钢面板 + 70mm 陶瓷/复合夹层 + 12mm 间隔 + 40mm 钢背板，总厚约 160mm；基甲板面与水平面成 33.7°，板顶后倾。",
   });
   add({
     id: `${P}armor_lower_outer`,
@@ -449,9 +449,9 @@ function buildParts(): PartDefinition[] {
     assembly: "composite_armor",
     build_layer: 4,
     build_order: 431,
-    geometry: { type: "kit", kit: "compositePlate", params: { w: 2.46, h: 0.66, outer: 0.035, ceramic: 0.05, backing: 0.035, gap: 0.01 } },
+    geometry: { type: "kit", kit: "compositePlate", params: { w: 2.46, h: 0.56, outer: 0.035, ceramic: 0.05, backing: 0.035, gap: 0.01 } },
     material: "mbt_paint",
-    mate: A(plus([0, 0.82, 3.06], rotated([12, 0, 0], [0, 0, 0.1])), [12, 0, 0]),
+    mate: A(plus([0, 0.77, 3.13], rotated([-10, 0, 0], [0, 0, -0.1])), [-10, 0, 0]),
   });
   for (const side of [-1, 1] as const) {
     const tag = side === 1 ? "r" : "l";
@@ -498,11 +498,11 @@ function buildParts(): PartDefinition[] {
     assembly: "turret",
     build_layer: 4,
     build_order: 450,
-    geometry: MERGE(B(1.12, 0.58, 0.045, [0, 0, 0], 0.01)),
+    geometry: MERGE(B(1.42, 0.58, 0.045, [0, 0, 0], 0.01)),
     material: "mbt_paint",
     dual: true,
     node: "Turret",
-    mate: A(TL(0.64, 2.08, 1.02), [-8, -24, 0]),
+    mate: A(TL(0.62, 2.08, 1.25), [-8, 26, 0]),
   });
   add({
     id: `${P}turret_cheek_ceramic`,
@@ -511,11 +511,11 @@ function buildParts(): PartDefinition[] {
     assembly: "turret",
     build_layer: 4,
     build_order: 451,
-    geometry: MERGE(B(1.06, 0.54, 0.08, [0, 0, 0], 0.008)),
+    geometry: MERGE(B(1.36, 0.54, 0.08, [0, 0, 0], 0.008)),
     material: "mbt_ceramic",
     dual: true,
     node: "Turret",
-    mate: A(TL(...plus([0.64, 2.08, 1.02], rotated([-8, -24, 0], [0, 0, 0.07])) as [number, number, number]), [-8, -24, 0]),
+    mate: A(TL(...plus([0.62, 2.08, 1.25], rotated([-8, 26, 0], [0, 0, -0.075])) as [number, number, number]), [-8, 26, 0]),
   });
   add({
     id: `${P}turret_cheek_backing`,
@@ -524,11 +524,11 @@ function buildParts(): PartDefinition[] {
     assembly: "turret",
     build_layer: 4,
     build_order: 452,
-    geometry: MERGE(B(1.08, 0.56, 0.04, [0, 0, 0], 0.008)),
+    geometry: MERGE(B(1.38, 0.56, 0.04, [0, 0, 0], 0.008)),
     material: "mbt_steel_dark",
     dual: true,
     node: "Turret",
-    mate: A(TL(...plus([0.64, 2.08, 1.02], rotated([-8, -24, 0], [0, 0, 0.13])) as [number, number, number]), [-8, -24, 0]),
+    mate: A(TL(...plus([0.62, 2.08, 1.25], rotated([-8, 26, 0], [0, 0, -0.14])) as [number, number, number]), [-8, 26, 0]),
   });
   add({
     id: `${P}turret_side`,
@@ -537,11 +537,11 @@ function buildParts(): PartDefinition[] {
     assembly: "turret",
     build_layer: 4,
     build_order: 453,
-    geometry: MERGE(B(0.09, 0.58, 3.0, [0, 0, 0], 0.01), B(0.04, 0.1, 2.9, [0.06, -0.18, 0], 0.005)),
+    geometry: MERGE(B(0.09, 0.58, 2.5, [0, 0, 0], 0.01), B(0.04, 0.1, 2.4, [0.06, -0.18, -0.03], 0.005)),
     material: "mbt_paint",
     dual: true,
     node: "Turret",
-    mate: A(TL(1.26, 2.08, -0.1)),
+    mate: A(TL(1.26, 2.08, -0.37)),
   });
   add({
     id: `${P}turret_side_ceramic`,
@@ -550,11 +550,11 @@ function buildParts(): PartDefinition[] {
     assembly: "turret",
     build_layer: 4,
     build_order: 454,
-    geometry: MERGE(B(0.06, 0.5, 2.8, [0, 0, 0], 0.008)),
+    geometry: MERGE(B(0.06, 0.5, 2.3, [0, 0, 0], 0.008)),
     material: "mbt_ceramic",
     dual: true,
     node: "Turret",
-    mate: A(TL(1.33, 2.08, -0.1)),
+    mate: A(TL(1.33, 2.08, -0.37)),
   });
   add({
     id: `${P}turret_rear`,
@@ -678,10 +678,10 @@ function buildParts(): PartDefinition[] {
     assembly: "turret",
     build_layer: 4,
     build_order: 464,
-    geometry: MERGE(T(0.24, 0.11, 0.44, [0, 0, 0], 32), B(0.5, 0.5, 0.12, [0, 0, -0.1], 0.008), B(0.38, 0.38, 0.08, [0, 0, -0.18], 0.006)),
+    geometry: { type: "kit", kit: "mantlet", params: { w: 0.68, h: 0.48, d: 0.26, bore: 0.17 } },
     material: "mbt_paint",
     node: "Gun",
-    mate: A([0, 0, 0], [90, 0, 0]),
+    mate: A([0, 0, -0.02]),
   });
   add({
     id: `${P}turret_mantlet_layer`,
@@ -690,10 +690,15 @@ function buildParts(): PartDefinition[] {
     assembly: "turret",
     build_layer: 4,
     build_order: 465,
-    geometry: MERGE(B(0.46, 0.46, 0.06, [0, 0, 0], 0.006)),
+    geometry: MERGE(
+      B(0.19, 0.48, 0.06, [-0.185, 0, 0], 0.006),
+      B(0.19, 0.48, 0.06, [0.185, 0, 0], 0.006),
+      B(0.18, 0.15, 0.06, [0, 0.165, 0], 0.006),
+      B(0.18, 0.15, 0.06, [0, -0.165, 0], 0.006),
+    ),
     material: "mbt_ceramic",
     node: "Gun",
-    mate: A([0, 0, -0.06]),
+    mate: A([0, 0, -0.17]),
   });
   add({
     id: `${P}cupola`,
@@ -744,7 +749,7 @@ function buildParts(): PartDefinition[] {
     geometry: MERGE(C(0.27, 0.05, [0, 0, 0], 24), T(0.3, 0.27, 0.05, [0, 0, 0], 24)),
     material: "mbt_paint",
     node: "Turret",
-    mate: A(TL(-0.45, 2.46, -0.95)),
+    mate: A(TL(-0.45, 2.56, -0.95)),
   });
   add({
     id: `${P}gunner_sight`,
@@ -771,8 +776,8 @@ function buildParts(): PartDefinition[] {
     mate: A([0, 0, 0]),
   });
   for (const [tag, x] of [
-    ["l", -1.42],
-    ["r", 1.42],
+    ["l", -1.06],
+    ["r", 1.06],
   ] as const) {
     add({
       id: `${P}smoke_launcher_${tag}`,
@@ -784,7 +789,7 @@ function buildParts(): PartDefinition[] {
       geometry: { type: "kit", kit: "smokeCluster", params: { r: 0.038, len: 0.24 } },
       material: "mbt_steel_dark",
       node: "Turret",
-      mate: A(TL(x, 2.14, -0.55), [0, tag === "l" ? -90 : 90, 0]),
+      mate: A(TL(x, 2.72, 1.27), [-8, tag === "l" ? -25 : 25, 0]),
     });
   }
   add({
@@ -992,10 +997,10 @@ function buildParts(): PartDefinition[] {
     assembly: "armament",
     build_layer: 4,
     build_order: 492,
-    geometry: MERGE(B(0.16, 0.16, 0.56, [0, 0, 0], 0.008), C(0.022, 0.5, [0, 0, 0.4], 12), C(0.05, 0.12, [0, 0.12, 0.18], 12)),
+    geometry: MERGE(B(0.12, 0.12, 0.22, [0, 0, 0], 0.006), B(0.026, 0.026, 0.5, [0, 0, 0.35], 0.004), B(0.05, 0.05, 0.06, [0, 0.06, 0.12], 0.003)),
     material: "mbt_steel_dark",
     node: "Gun",
-    mate: A([0.34, 0.04, 0]),
+    mate: A([0.28, 0.04, -0.3]),
   });
   add({
     id: `${P}gunner_sight_lens`,
@@ -1075,10 +1080,12 @@ function buildParts(): PartDefinition[] {
     build_order: 622,
     geometry: MERGE(B(0.06, 0.3, 2.3, [0, 0, 0], 0.004)),
     material: "mbt_steel_dark",
+    node: "Turret",
     mate: A([0, 0, 0]),
     instances: 2,
     indexed: true,
     instance_layout: "mbt.hull.eraRail",
+    instance_nodes: ["Turret", "Turret"],
   });
 
   // ================= 表面 / 附件 =================
@@ -1271,7 +1278,7 @@ export function makeHullRegistry(): ModelRegistry {
     materials: MBT_MATERIALS,
     parts: buildParts(),
     source_notes:
-      "现代主战坦克外壳：首上 33° 大倾角、楔形炮塔（±24° 前斜板）、复合装甲分层（钢/陶瓷/间隔/背板）、90 块 ERA（每块外壳+炸药+夹层）。" +
+      "现代主战坦克外壳：首上 33.7° 浅倾角、外凸楔形炮塔（±26° 前斜板）、复合装甲分层（钢/陶瓷/间隔/背板）、132 块 ERA（每块外壳+炸药+夹层）。" +
       "120mm 滑膛炮：无膛线身管、两段热护套、中段抽烟装置、炮闩/制退机/复进机/摇臂；三色迷彩、战术编号、随车工具、油桶、缆绳。",
     expectedContacts: CONTACTS,
   };
