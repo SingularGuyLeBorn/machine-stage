@@ -18,6 +18,8 @@ import { AK47_BUILDERS, makeAk47Layouts, makeAk47Registry } from "@/three/parts/
 import { AK47_MOTION_PARTS, animateAk47, getAk47Mode } from "@/three/parts/models/ak47/motion";
 import { M249_BUILDERS, makeM249Layouts, makeM249Registry } from "@/three/parts/models/m249/registry";
 import { M249_MOTION_PARTS, animateM249, getM249Mode } from "@/three/parts/models/m249/motion";
+import { M2HB_BUILDERS, makeM2hbLayouts, makeM2hbRegistry } from "@/three/parts/models/m2hb/registry";
+import { M2HB_MOTION_PARTS, animateM2hb, getM2hbMode } from "@/three/parts/models/m2hb/motion";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -216,9 +218,47 @@ export const CATALOG: StageModel[] = [
   {
     id: "m2hb",
     title: "M2HB 重机枪",
-    subtitle: "M-D：管退式自动机",
+    subtitle: "枪管短后坐 + 半自由枪机 · M3 三脚架 + T&E · 重力排壳",
     milestone: "M-D",
-    status: "planned",
+    status: "ready",
+    registry: makeM2hbRegistry(),
+    layouts: makeM2hbLayouts(),
+    builders: M2HB_BUILDERS,
+    motionParts: M2HB_MOTION_PARTS,
+    animate: (assembled, seconds) => {
+      animateM2hb(assembled, seconds, getM2hbMode());
+    },
+    readouts: () => [
+      { label: "自动原理", value: "枪管短后坐 + 半自由枪机" },
+      { label: "短后坐行程", value: "12 mm（枪管+延伸部）" },
+      { label: "枪机行程", value: "100 mm（加速子传能）" },
+      { label: "循环周期", value: "2.2 s/发" },
+      { label: "弹药", value: ".50 BMG M33（六分件）×14 链上" },
+    ],
+    states: [
+      { id: "idle", label: "装填静止", hint: "满链待击：可爆炸视图看半自由枪机" },
+      { id: "semi", label: "单发", hint: "打一发：枪管短后坐→加速子→枪机后坐→抽壳→复进" },
+      { id: "running", label: "连发", hint: "连续射击：弹链逐节步进，空弹壳底部重力排出" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "m2hb-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
+      { id: "m2hb-auto", group: "射击", label: "连发", kind: "machine-state", state: "running" },
+      { id: "m2hb-idle", group: "射击", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "枪管短后坐：击发后枪管+延伸部整体后坐 12mm（闭锁环抱紧枪机）——与导气式（AK/M249）完全不同。",
+      "加速子：枪管后坐末段摆臂下压，把 12mm 行程的能量加速传给枪机——枪机获得 100mm 行程（半自由枪机的灵魂）。",
+      "拉壳槽随动：枪机前端的螺面凹槽收着撞针——枪机后坐时撞针边退边抽壳；L 形退壳杠杆放大退壳力。",
+      "重力排壳：M2 无弹匣弹簧——空弹壳靠重力从枪身底部排出（12 槽弹壳池在枪下堆积）。",
+      "M3 三脚架 + T&E：高低/方向手轮每点击 50 密位（1 密位 ≈ 1m/1000m）；枪管深灰发蓝 vs 机匣磷化灰绿分色。",
+    ],
   },
   {
     id: "ak47",

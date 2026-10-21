@@ -89,8 +89,8 @@ describe("ModelList", () => {
     expect(screen.getByText("框架自检台")).toBeDefined();
     const tiger = screen.getByText("虎式坦克 Tiger I").closest("button")!;
     expect(tiger.disabled).toBe(false);
-    const m2hb = screen.getByText("M2HB 重机枪").closest("button")!;
-    expect(m2hb.disabled).toBe(true);
+    const j20 = screen.getByText("歼-20").closest("button")!;
+    expect(j20.disabled).toBe(true);
   });
 });
 

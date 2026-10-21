@@ -14,6 +14,7 @@ import { findModel, type StageModel } from "../catalog";
 import { faultFromError, useStageStore } from "../state/stageStore";
 import { setAk47Mode } from "@/three/parts/models/ak47/motion";
 import { setM249Mode } from "@/three/parts/models/m249/motion";
+import { setM2hbMode } from "@/three/parts/models/m2hb/motion";
 import { applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
 
 // ============================================================================
@@ -228,6 +229,7 @@ function StageRuntime() {
     const mode = machineState === "running" ? "auto" : machineState === "semi" ? "semi" : "idle";
     if (currentModelId === "ak47") setAk47Mode(mode);
     if (currentModelId === "m249") setM249Mode(mode);
+    if (currentModelId === "m2hb") setM2hbMode(mode);
   }, [machineState, currentModelId]);
 
   useFrame((_state, delta) => {
