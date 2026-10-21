@@ -19,6 +19,10 @@ import {
   kingjoeModelBuilders,
 } from "@/three/parts/models/kingjoe/registry";
 import {
+  makeKingJoeSkinRegistry,
+  kingjoeSkinBuilders,
+} from "@/three/parts/models/kingjoe-skin/registry";
+import {
   animateTigerSuspension,
   TIGER_MOTION_PARTS,
   tigerDetachKeys,
@@ -226,11 +230,20 @@ export const CATALOG: StageModel[] = [
     ],
   },
   {
-    id: "kingjoe-rebuild",
-    title: "金古桥 King Joe（外形重建中）",
-    subtitle: "按 GLB 实测比例重做 · 腿→腹→胸→头 · 机构后置",
-    milestone: "M-G·R2",
-    status: "planned",
+    id: "kingjoeskin",
+    title: "金古桥 King Joe · 真实网格分件",
+    subtitle: "蒙皮切件 578 · 四段飞船 · 哑光银灰 + 彩虹胸 · 个人参考",
+    milestone: "M-G·R3",
+    status: "ready",
+    registry: makeKingJoeSkinRegistry(),
+    builders: kingjoeSkinBuilders,
+    notes: [
+      "真实网格 7224 顶点 / 7258 三角 / 459 连通壳，按面级蒙皮主导骨骼切成 578 个独立 partId。",
+      "大腿/小腿/足/骨盆/胸/头/锁骨/上臂/小臂/手/手指/护甲都独立；四段飞船用模块节点分组。",
+      "胸口彩虹格栅与头部眼带是叠加细节，不改真实网格。",
+      "源网格自身是多片壳体互嵌的游戏低模，静态扫描会保留源内深壳体互嵌报告；新增细节无穿模。",
+      "版权：奥特曼 IP，个人参考，不做商用。",
+    ],
   },
   {
     id: "m2hb",
