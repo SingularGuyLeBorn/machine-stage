@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { cylinderGeometry, mergeGeometries, tubeGeometry } from "../../kernel/geometry";
+import { loftTube, profileBone, type BoneProfile } from "./mesh/crossSection";
 
 // ============================================================================
 // t800/mech —— 机械零件生成器
@@ -8,8 +9,9 @@ import { cylinderGeometry, mergeGeometries, tubeGeometry } from "../../kernel/ge
 // 而应该是**机械器件组合**：承力骨架 + 纵梁 + 横撑 + 轴承(外圈/内圈/密封)
 // + 螺栓圈 + 液压软管 + 管接头 + 油嘴。
 //
-// 外轮廓仍由「护板」（原网格表面分片）保持 —— 这里只生成**内部**的机械件，
-// 全部按部位的长轴与横截面尺寸推算，保证装得进原壳体内。
+// 尺寸来源：沿骨段长轴采样**真实截面**（mesh/crossSection.ts），
+// 得到"芯线 + 半径剖面"，所有机械件贴着这条芯线走 ——
+// 外形吻合源网格，又不会在凹处捅穿壳体。
 // ============================================================================
 
 /** 机械件种类。 */
@@ -40,14 +42,6 @@ export interface MechPart {
 
 /** 部位配方：决定生成哪些机械件。 */
 export type Recipe = "limb" | "torso" | "head" | "hand" | "finger" | "pin" | "eye";
-
-/** 部位的几何参数（来自原网格包围盒）。 */
-export interface BoneBox {
-  /** 包围盒中心 */
-  center: [number, number, number];
-  /** 包围盒尺寸 */
-  size: [number, number, number];
-}
 
 /** 按配方决定机械件清单。 */
 function planFor(recipe: Recipe): Array<{ kind: MechKind; count: number }> {
@@ -150,143 +144,154 @@ function tubeBetween(
   return geometry;
 }
 
-/** 生成一个部位的机械零件清单。 */
-export function buildMechParts(box: BoneBox, recipe: Recipe): MechPart[] {
-  const [cx, cy, cz] = box.center;
-  const [sx, sy, sz] = box.size;
-  // 长轴
-  let axis = 0;
-  if (sy > sx && sy >= sz) axis = 1;
-  else if (sz > sx && sz > sy) axis = 2;
-  const len = [sx, sy, sz][axis];
-  const p1 = [0, 1, 2].filter((k) => k !== axis);
-  const w = box.size[p1[0]];
-  const d = box.size[p1[1]];
-  const cross = Math.max(0.004, Math.min(w, d));
-  const mid = [cx, cy, cz];
+/**
+ * 生成一个部位的机械零件清单。
+ *
+ * @param geometry 该部位的网格（用于采样真实截面）
+ * @param recipe   机械配方
+ * @param origin   部位网格在模型坐标里的原点（网格本身以包围盒中心为原点）
+ */
+export function buildMechParts(
+  geometry: THREE.BufferGeometry,
+  recipe: Recipe,
+  origin: [number, number, number],
+): MechPart[] {
+  const profile: BoneProfile = profileBone(geometry);
+  const cores = profile.cores.map((c) => c.clone().add(new THREE.Vector3(...origin)));
+  const radii = profile.radii;
+  const n = cores.length;
 
-  const at = (t: number, u: number, v: number): THREE.Vector3 => {
-    const p = [0, 0, 0];
-    p[axis] = mid[axis] + t;
-    p[p1[0]] = mid[p1[0]] + u;
-    p[p1[1]] = mid[p1[1]] + v;
-    return new THREE.Vector3(p[0], p[1], p[2]);
-  };
+  // 局部正交基（垂直于主轴）
+  const e = new THREE.Vector3();
+  e.setComponent(profile.axis, 1);
+  const u = new THREE.Vector3();
+  u.setComponent((profile.axis + 1) % 3, 1);
+  const v = new THREE.Vector3().crossVectors(e, u).normalize();
+  u.crossVectors(v, e).normalize();
 
   const parts: MechPart[] = [];
   const counters: Partial<Record<MechKind, number>> = {};
-  const add = (kind: MechKind, geometry: THREE.BufferGeometry) => {
-    geometry.computeBoundingBox();
-    const c = (geometry.boundingBox ?? new THREE.Box3()).getCenter(new THREE.Vector3());
+  const add = (kind: MechKind, g: THREE.BufferGeometry) => {
+    g.computeBoundingBox();
+    const c = (g.boundingBox ?? new THREE.Box3()).getCenter(new THREE.Vector3());
     const idx = counters[kind] ?? 0;
     counters[kind] = idx + 1;
-    // 几何以自身中心为原点（与零件装配位一致）
-    geometry.translate(-c.x, -c.y, -c.z);
-    parts.push({ kind, index: idx, geometry, center: [c.x, c.y, c.z] });
+    g.translate(-c.x, -c.y, -c.z);
+    parts.push({ kind, index: idx, geometry: g, center: [c.x, c.y, c.z] });
   };
 
-  const half = len * 0.5;
+  // 安全半径：取剖面最小值（保证任何一件都不会捅出壳体）
+  const minR = Math.max(0.003, Math.min(...radii));
+  // 机械件尺寸封顶：大件（大骨盆/胸廓）的局部空腔很大，不封顶会变成"套在身上的铁圈"
+  const CAP = 0.032;
+  /** 按局部可用半径取尺寸，并封顶。 */
+  const sz = (r: number, k: number): number => Math.min(r * k, CAP);
+
+  /** 站位索引（按参数比例）。 */
+  const station = (frac: number): number =>
+    Math.max(0, Math.min(n - 1, Math.round(frac * (n - 1))));
+
   const plan = planFor(recipe);
 
   for (const { kind, count } of plan) {
     for (let i = 0; i < count; i++) {
       switch (kind) {
         case "frame": {
-          // 承力骨架：主筒 + 两根副筒（三角截面）
-          const r = cross * (recipe === "eye" ? 0.2 : 0.16);
-          add(kind, tubeBetween(at(-half * 0.68, 0, 0), at(half * 0.68, 0, 0), r, 16));
+          // 承力骨架：主筒沿芯线放样（半径按局部剖面走）
+          const rs = radii.map((r) => sz(r, recipe === "eye" ? 0.35 : 0.26));
+          add(kind, loftTube(cores, rs, 14));
           if (recipe === "limb" || recipe === "torso" || recipe === "head" || recipe === "hand") {
-            const off = cross * 0.2;
+            // 两根副筒：沿芯线偏移
             for (const s of [-1, 1]) {
-              add(
-                kind,
-                tubeBetween(
-                  at(-half * 0.6, off * 0.55, off * s * 0.7),
-                  at(half * 0.6, off * 0.55, off * s * 0.7),
-                  r * 0.62,
-                  12,
-                ),
+              const pts = cores.map((c, k) =>
+                c.clone().addScaledVector(u, sz(radii[k], 0.2)).addScaledVector(v, sz(radii[k], 0.26) * s),
               );
+              const rs2 = radii.map((r) => sz(r, 0.14));
+              add(kind, loftTube(pts, rs2, 10));
             }
           }
           break;
         }
         case "rail": {
-          const off = cross * 0.19;
           const s = i % 2 === 0 ? -1 : 1;
-          add(
-            kind,
-            tubeBetween(
-              at(-half * 0.62, off * 0.85, off * s * 0.85),
-              at(half * 0.62, off * 0.85, off * s * 0.85),
-              Math.max(0.0025, cross * 0.1),
-              10,
-            ),
+          const pts = cores.map((c, k) =>
+            c.clone().addScaledVector(u, sz(radii[k], 0.18)).addScaledVector(v, sz(radii[k], 0.2) * s),
           );
+          const rs = radii.map((r) => Math.max(0.0015, sz(r, 0.1)));
+          add(kind, loftTube(pts, rs, 8));
           break;
         }
         case "brace": {
-          const t = -half * 0.52 + (i + 0.5) * ((half * 1.04) / count);
-          const r = cross * 0.45;
-          add(kind, tubeBetween(at(t, -r, 0), at(t, r, 0), Math.max(0.0025, cross * 0.085), 10));
-          add(
-            kind,
-            tubeBetween(at(t, 0, -r), at(t, 0, r), Math.max(0.0025, cross * 0.085), 10),
-          );
+          // 横撑：放在某个站位，长度按该站位的可用半径（封顶，免得捅出壳体）
+          const si = station((i + 0.5) / count);
+          const r = radii[si];
+          const c = cores[si];
+          const half = sz(r, 0.5);
+          add(kind, tubeBetween(c.clone().addScaledVector(u, -half), c.clone().addScaledVector(u, half), Math.max(0.0018, sz(r, 0.07)), 8));
+          add(kind, tubeBetween(c.clone().addScaledVector(v, -half), c.clone().addScaledVector(v, half), Math.max(0.0018, sz(r, 0.07)), 8));
           break;
         }
         case "shaft": {
-          const r = Math.max(0.002, cross * 0.16);
-          add(kind, tubeBetween(at(-half * 0.66, 0, 0), at(half * 0.66, 0, 0), r, 12));
+          const rs = radii.map((r) => Math.max(0.0015, sz(r, 0.2)));
+          add(kind, loftTube(cores, rs, 10));
           break;
         }
         case "bushing": {
-          const t = i % 2 === 0 ? -half * 0.56 : half * 0.56;
-          const r = cross * 0.14;
-          add(kind, tubeBetween(at(t - 0.012, 0, 0), at(t + 0.012, 0, 0), r, 14, r * 0.62));
+          const si = station(i % 2 === 0 ? 0.18 : 0.82);
+          const r = radii[si];
+          const c = cores[si];
+          const dir = new THREE.Vector3().subVectors(cores[si + 1] ?? cores[si], cores[si - 1] ?? cores[si]).normalize();
+          add(kind, tubeBetween(c.clone().addScaledVector(dir, -0.006), c.clone().addScaledVector(dir, 0.006), sz(r, 0.3), 12, sz(r, 0.3) * 0.66));
           break;
         }
         case "clip": {
-          const t = i % 2 === 0 ? -half * 0.48 : half * 0.48;
-          const r = cross * 0.2;
-          add(kind, tubeBetween(at(t - 0.004, 0, 0), at(t + 0.004, 0, 0), r, 16, r * 0.78));
+          const si = station(i % 2 === 0 ? 0.2 : 0.8);
+          const r = radii[si];
+          const c = cores[si];
+          const dir = new THREE.Vector3().subVectors(cores[si + 1] ?? cores[si], cores[si - 1] ?? cores[si]).normalize();
+          add(kind, tubeBetween(c.clone().addScaledVector(dir, -0.003), c.clone().addScaledVector(dir, 0.003), sz(r, 0.5), 14, sz(r, 0.5) * 0.76));
           break;
         }
         case "bearing_outer": {
-          const t = i % 2 === 0 ? -half * 0.64 : half * 0.64;
-          const r = cross * 0.3;
-          add(kind, tubeBetween(at(t - 0.016, 0, 0), at(t + 0.016, 0, 0), r, 20, r * 0.7));
+          const si = station(i % 2 === 0 ? 0.04 : 0.96);
+          const r = radii[si];
+          const c = cores[si];
+          const dir = new THREE.Vector3().subVectors(cores[si + 1] ?? cores[si], cores[si - 1] ?? cores[si]).normalize();
+          add(kind, tubeBetween(c.clone().addScaledVector(dir, -0.012), c.clone().addScaledVector(dir, 0.012), sz(r, 0.5), 16, sz(r, 0.5) * 0.68));
           break;
         }
         case "bearing_inner": {
-          const t = i % 2 === 0 ? -half * 0.88 : half * 0.88;
-          const r = cross * 0.2;
-          add(kind, tubeBetween(at(t - 0.018, 0, 0), at(t + 0.018, 0, 0), r, 18, r * 0.55));
+          const si = station(i % 2 === 0 ? 0.04 : 0.96);
+          const r = radii[si];
+          const c = cores[si];
+          const dir = new THREE.Vector3().subVectors(cores[si + 1] ?? cores[si], cores[si - 1] ?? cores[si]).normalize();
+          add(kind, tubeBetween(c.clone().addScaledVector(dir, -0.014), c.clone().addScaledVector(dir, 0.014), sz(r, 0.34), 14, sz(r, 0.34) * 0.66));
           break;
         }
         case "bearing_seal": {
-          const t = i % 2 === 0 ? -half * 0.88 : half * 0.88;
-          const r = cross * 0.24;
-          add(kind, tubeBetween(at(t - 0.004, 0, 0), at(t + 0.004, 0, 0), r, 18, r * 0.72));
+          const si = station(i % 2 === 0 ? 0.04 : 0.96);
+          const r = radii[si];
+          const c = cores[si];
+          const dir = new THREE.Vector3().subVectors(cores[si + 1] ?? cores[si], cores[si - 1] ?? cores[si]).normalize();
+          add(kind, tubeBetween(c.clone().addScaledVector(dir, -0.003), c.clone().addScaledVector(dir, 0.003), sz(r, 0.4), 14, sz(r, 0.4) * 0.75));
           break;
         }
         case "bolts": {
-          // 螺栓圈：一圈小螺栓（合成一件几何）
-          const t = i % 2 === 0 ? -half * 0.66 : half * 0.66;
-          const ringR = cross * 0.24;
-          const n = 10;
+          // 螺栓圈：沿芯线端点的一圈小螺栓
+          const si = station(i % 2 === 0 ? 0.02 : 0.98);
+          const r = radii[si];
+          const c = cores[si];
+          const dir = new THREE.Vector3().subVectors(cores[si + 1] ?? cores[si], cores[si - 1] ?? cores[si]).normalize();
+          const ringR = sz(r, 0.36);
+          const count = 10;
           const bolts: THREE.BufferGeometry[] = [];
-          for (let b = 0; b < n; b++) {
-            const a = (b / n) * Math.PI * 2;
-            const u = Math.cos(a) * ringR;
-            const v = Math.sin(a) * ringR;
-            const g = cylinderGeometry(Math.max(0.0015, cross * 0.045), 0.012, Math.max(0.0015, cross * 0.045), 6);
-            const q = new THREE.Quaternion().setFromUnitVectors(
-              new THREE.Vector3(0, 1, 0),
-              new THREE.Vector3(0, 1, 0),
-            );
+          const boltR = Math.max(0.0012, sz(r, 0.05));
+          for (let b = 0; b < count; b++) {
+            const a = (b / count) * Math.PI * 2;
+            const g = cylinderGeometry(boltR, 0.01, boltR, 6);
+            const p = c.clone().addScaledVector(u, Math.cos(a) * ringR).addScaledVector(v, Math.sin(a) * ringR);
+            const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
             g.applyQuaternion(q);
-            const p = at(t, u, v);
             g.translate(p.x, p.y, p.z);
             bolts.push(g);
           }
@@ -296,33 +301,43 @@ export function buildMechParts(box: BoneBox, recipe: Recipe): MechPart[] {
           break;
         }
         case "hose": {
-          // 液压软管：沿肢体侧面走一根带弯的管
+          // 液压软管：沿芯线一侧走一根带弯的管（只走中段，端部不甩出去）
           const s = i % 2 === 0 ? -1 : 1;
-          const off = cross * 0.24;
-          const pts = [
-            at(-half * 0.6, off * 0.45, off * s * 0.9),
-            at(-half * 0.22, off * 0.85, off * s * 1.0),
-            at(half * 0.2, off * 0.7, off * s * 0.85),
-            at(half * 0.6, off * 0.4, off * s * 0.9),
-          ];
+          const from = station(0.12);
+          const to = station(0.88);
+          const pts: THREE.Vector3[] = [];
+          for (let k = from; k <= to; k++) {
+            const r = radii[k];
+            pts.push(
+              cores[k]
+                .clone()
+                .addScaledVector(u, sz(r, 0.22))
+                .addScaledVector(v, sz(r, 0.26) * s),
+            );
+          }
+          if (pts.length < 2) break;
           const curve = new THREE.CatmullRomCurve3(pts);
-          const g = new THREE.TubeGeometry(curve, 16, Math.max(0.002, cross * 0.075), 8, false);
+          const g = new THREE.TubeGeometry(curve, 18, Math.max(0.0016, sz(minR, 0.1)), 8, false);
           add(kind, g);
           break;
         }
         case "fitting": {
-          const t = -half * 0.5 + (i / Math.max(1, count - 1)) * half * 1.0;
-          const r = Math.max(0.002, cross * 0.1);
-          add(kind, tubeBetween(at(t, offOf(cross, 0.34), 0), at(t, offOf(cross, 0.34), 0), r, 10));
+          const si = station(0.15 + (i / Math.max(1, count - 1)) * 0.7);
+          const r = radii[si];
+          const c = cores[si];
+          const dir = new THREE.Vector3().subVectors(cores[si + 1] ?? cores[si], cores[si - 1] ?? cores[si]).normalize();
+          const rr = Math.max(0.0016, sz(r, 0.12));
+          const off = sz(r, 0.45);
+          add(kind, tubeBetween(c.clone().addScaledVector(u, off), c.clone().addScaledVector(u, off).addScaledVector(dir, rr * 1.6), rr, 10));
           break;
         }
         case "nipple": {
-          const t = i % 2 === 0 ? -half * 0.26 : half * 0.26;
-          const r = Math.max(0.0015, cross * 0.06);
-          add(
-            kind,
-            tubeBetween(at(t, offOf(cross, 0.26), 0), at(t, offOf(cross, 0.26) + r * 2, 0), r, 6),
-          );
+          const si = station(i % 2 === 0 ? 0.35 : 0.65);
+          const r = radii[si];
+          const c = cores[si];
+          const rr = Math.max(0.0012, sz(r, 0.07));
+          const off = sz(r, 0.4);
+          add(kind, tubeBetween(c.clone().addScaledVector(v, off), c.clone().addScaledVector(v, off + rr * 1.4), rr, 6));
           break;
         }
       }
@@ -330,9 +345,4 @@ export function buildMechParts(box: BoneBox, recipe: Recipe): MechPart[] {
   }
 
   return parts;
-}
-
-/** 垂直于长轴的偏移量（装在肢体的一侧）。 */
-function offOf(cross: number, k: number): number {
-  return cross * k;
 }
