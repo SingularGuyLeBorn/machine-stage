@@ -21,6 +21,12 @@ import {
 import { makeKingJoeSkinRegistry, kingjoeSkinBuilders } from "@/three/parts/models/kingjoe-skin/registry";
 import { makeKingJoeWholeRegistry } from "@/three/parts/models/kingjoe-whole/registry";
 import { kingjoeWholeBuilders } from "@/three/parts/models/kingjoe-whole/kits";
+import {
+  makeKingJoeLowerLayouts,
+  makeKingJoeLowerRegistry,
+} from "@/three/parts/models/kingjoe-lower/registry";
+import { kingjoeLowerBuilders } from "@/three/parts/models/kingjoe-lower/kits";
+import { animateKingJoeLower, type KingJoeLowerState } from "@/three/parts/models/kingjoe-lower/motion";
 import { animateKingJoeSkin, type KingJoeSkinState } from "@/three/parts/models/kingjoe-skin/motion";
 import {
   animateTigerSuspension,
@@ -306,6 +312,69 @@ export const CATALOG: StageModel[] = [
       "这是单件外观体，不是水密实体：内部仍是源壳层叠。若要做水密实体/剖切，需要另行重拓扑并接受细节损失。",
       "分离/合体/怪光线在主卡「金古桥 King Joe」；578 分件查看在「真实网格分件」卡。",
       "版权：奥特曼 IP，个人参考，不做商用。",
+    ],
+  },
+  {
+    id: "kingjoelower",
+    title: "金古桥 King Joe · 髋缝两体拆分",
+    subtitle: "King Legs 腿体 ↔ 骨盆以上 · 4 组隐藏楔榫 · 分离/合体电弧 · 非平面自然接缝",
+    milestone: "M-G·R3.2",
+    status: "ready",
+    registry: makeKingJoeLowerRegistry(),
+    layouts: makeKingJoeLowerLayouts(),
+    builders: kingjoeLowerBuilders,
+    animatedStates: ["separating", "combining"],
+    animate: (assembled, seconds, state) =>
+      animateKingJoeLower(assembled, seconds, (state as KingJoeLowerState) ?? "idle"),
+    states: [
+      {
+        id: "idle",
+        label: "合体待机",
+        hint: "髋鼓围住骨盆中柱；4 组楔榫/榫槽藏在髋腔与骨盆壳内，外观与整机单件一致",
+      },
+      {
+        id: "separating",
+        label: "下身分离",
+        hint: "上半身沿 +Y 提起 1.3m；髋缝电弧拉长、拉断，下半身站在地面不动",
+      },
+      {
+        id: "separated",
+        label: "分离停放",
+        hint: "楔榫完全退出槽底；下半身中央榫口/楔榫与上身骨盆中柱各自可见",
+      },
+      {
+        id: "combining",
+        label: "阻尼合体",
+        hint: "上半身下降，最后一段髋缝电弧重新接通，锁死瞬间闪光",
+      },
+    ],
+    actions: [
+      { id: "kjl-separate", group: "髋缝", label: "下身分离", kind: "machine-state", state: "separating" },
+      { id: "kjl-park", group: "髋缝", label: "分离停放", kind: "machine-state", state: "separated" },
+      { id: "kjl-combine", group: "髋缝", label: "阻尼合体 + 电弧", kind: "machine-state", state: "combining" },
+      { id: "kjl-idle", group: "髋缝", label: "合体待机", kind: "machine-state", state: "idle" },
+      { id: "kjl-xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "kjl-labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "kjl-grid", group: "展示", label: "网格", kind: "view-toggle", view: "grid" },
+      { id: "kjl-reset", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "kjl-scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "kjl-scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    readouts: (assembled) => [
+      { label: "零件", value: `${assembled.parts.length} 件` },
+      { label: "皮肤三角", value: "15,248 个" },
+      { label: "髋缝", value: "3.60 m（King Legs 分界）" },
+      { label: "榫卯", value: "中央榫口 + 4 楔榫/槽" },
+    ],
+    notes: [
+      "参考分体玩具：King Legs 腿体飞船是下半身（腿+髋鼓），上半身从骨盆开始；髋鼓整体留在下半身，骨盆中柱归上半身。",
+      "分界不是平面切的：髋鼓围住骨盆中柱，中柱就是源结构自带的中央定位榫；髋腔口有中央榫口承座，髋缝另加 4 组楔榫（下半身）与 4 组榫槽（上半身骨盆内壁）。",
+      "合体时榫头/榫槽藏在髋腔与骨盆壳内；分离时上半身沿 +Y 提起 1.3m，楔榫从槽底退出，下半身站在地面不动。",
+      "动作：分离时电弧拉长、拉断；合体时上身下降，最后一段电弧重新接通并锁死闪光。电弧是场景 FX，不参与零件树与穿模检测。",
+      "皮肤：下半身 1,510 三角 / 3 材质组，上半身 13,738 三角 / 12 材质组，合计 15,248 三角；内部不焊接/不布尔/不重拓扑。",
+      "自检：合体态、分离终态、分离/合体全程未豁免穿模为 0、悬空为 0；只有藏在髋腔/骨盆壳内的榫件与源髋部互锁按带原因的深度白名单豁免。",
+      "整机单件外观在「整体实心（单件）」卡；四体编队/分离/怪光线在主卡「金古桥 King Joe」。",
+      "版权：奥特曼 IP；本工程仅个人参考，不做商用。",
     ],
   },
   {
