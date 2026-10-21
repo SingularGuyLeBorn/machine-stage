@@ -134,11 +134,11 @@ const SURFACE_LAYOUTS: Record<string, InstanceLayout> = {
     return new THREE.Matrix4().makeTranslation(x, y, z);
   },
   "mbt.hull.tarps": ({ index }) =>
-    new THREE.Matrix4().makeTranslation(index === 0 ? -0.55 : 0.55, 2.25, -2.5 - MBT.TURRET_Z),
+    new THREE.Matrix4().makeRotationZ(Math.PI / 2).setPosition(0, 2.42, -2.72 - index * 0.26),
   "mbt.hull.antennas": ({ index }) =>
     new THREE.Matrix4().makeTranslation(index === 0 ? -1.0 : 1.0, 2.55, -1.4 - MBT.TURRET_Z),
   "mbt.hull.stowage": ({ index }) =>
-    new THREE.Matrix4().makeTranslation(index === 0 ? -0.62 : 0.62, 2.25, -2.6 - MBT.TURRET_Z),
+    new THREE.Matrix4().makeTranslation(index === 0 ? -0.55 : 0.55, 2.05, -2.82),
   "mbt.hull.spareTrack": ({ index }) =>
     new THREE.Matrix4().makeTranslation(1.33, 2.02, -0.75 + index * 0.18 - MBT.TURRET_Z),
 };
@@ -776,8 +776,8 @@ function buildParts(): PartDefinition[] {
     mate: A([0, 0, 0]),
   });
   for (const [tag, x] of [
-    ["l", -1.06],
-    ["r", 1.06],
+    ["l", -0.92],
+    ["r", 0.92],
   ] as const) {
     add({
       id: `${P}smoke_launcher_${tag}`,
@@ -789,7 +789,7 @@ function buildParts(): PartDefinition[] {
       geometry: { type: "kit", kit: "smokeCluster", params: { r: 0.038, len: 0.24 } },
       material: "mbt_steel_dark",
       node: "Turret",
-      mate: A(TL(x, 2.72, 1.27), [-8, tag === "l" ? -25 : 25, 0]),
+      mate: A(TL(x, 2.785, 1.1), [-8, tag === "l" ? -25 : 25, 0]),
     });
   }
   add({
@@ -815,7 +815,7 @@ function buildParts(): PartDefinition[] {
     assembly: "turret",
     build_layer: 5,
     build_order: 612,
-    geometry: MERGE(B(0.8, 0.42, 0.7, [0, 0, 0], 0.012), B(0.82, 0.04, 0.72, [0, 0.23, 0], 0.006)),
+    geometry: MERGE(B(0.8, 0.42, 0.5, [0, 0, 0], 0.012), B(0.82, 0.04, 0.52, [0, 0.23, 0], 0.006)),
     material: "mbt_canvas",
     node: "Turret",
     mate: A([0, 0, 0]),
@@ -1124,7 +1124,7 @@ function buildParts(): PartDefinition[] {
     build_order: 632,
     geometry: { type: "kit", kit: "fuelDrum", params: { r: 0.3, h: 0.8 } },
     material: "mbt_paint_dark",
-    mate: A([-0.55, 1.38, -3.45], [-10, 0, 0]),
+    mate: A([-0.55, 1.38, -3.66], [10, 0, 0]),
   });
   add({
     id: `${P}fuel_drum_r`,
@@ -1135,7 +1135,7 @@ function buildParts(): PartDefinition[] {
     build_order: 633,
     geometry: { type: "kit", kit: "fuelDrum", params: { r: 0.3, h: 0.8 } },
     material: "mbt_paint_dark",
-    mate: A([0.55, 1.38, -3.45], [-10, 0, 0]),
+    mate: A([0.55, 1.38, -3.66], [10, 0, 0]),
   });
   add({
     id: `${P}tow_cable`,
@@ -1144,9 +1144,9 @@ function buildParts(): PartDefinition[] {
     assembly: "surface",
     build_layer: 5,
     build_order: 634,
-    geometry: MERGE(C(0.03, 2.2, [0, 0, 0], 12), C(0.03, 0.3, [0, 0, 0], 12)),
+    geometry: MERGE(C(0.03, 2.2, [0, 0, 0], 12), C(0.03, 0.3, [0, 0, 0], 12), B(0.08, 0.06, 0.08, [0, 0.75, 0], 0.003), B(0.08, 0.06, 0.08, [0, -0.75, 0], 0.003)),
     material: "mbt_steel_dark",
-    mate: A([1.2, 1.55, -2.5], [0, 0, 90]),
+    mate: A([-1.6, 1.26, -0.3], [90, 0, 0]),
   });
   add({
     id: `${P}surface_number`,

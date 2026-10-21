@@ -56,6 +56,7 @@ if (js !== "null") {
 }
 if (click) {
   const [x, y] = click.split(",").map(Number);
+  await new Promise((resolve) => setTimeout(resolve, 350));
   await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
   await send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1 });
   await send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount: 1 });

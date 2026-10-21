@@ -1154,7 +1154,7 @@ function buildParts(): PartDefinition[] {
       build_order: 416,
       geometry: { type: "weld", from, to, radius: 0.009, seed: tag === "supply" ? 3 : 4 },
       material: "mbt_steel_dark",
-      mate: A(enginePoint([0, 0, 0])),
+      mate: A([0, 0, 0]),
     });
   }
   add({
@@ -1184,7 +1184,7 @@ function buildParts(): PartDefinition[] {
         { type: "weld", from: enginePoint([0, 0.72, 0.34]), to, radius: 0.006, seed: i + 20 },
       ),
       material: "mbt_steel",
-      mate: A(enginePoint([0, 0, 0])),
+      mate: A([0, 0, 0]),
     });
   }
 
@@ -1268,7 +1268,7 @@ function buildParts(): PartDefinition[] {
       build_order: 456,
       geometry: { type: "weld", from: [turbo[0], turbo[1] + 0.12, turbo[2]], to: [turbo[0], enginePoint([0, 0.1, 0.2])[1], enginePoint([0, 0.1, 0.2])[2]], radius: 0.008, seed: side + 30 },
       material: "mbt_copper",
-      mate: A(enginePoint([0, 0, 0])),
+      mate: A([0, 0, 0]),
     });
     add({
       id: `mbt90.engine.exhaust_manifold_${tag}`,
@@ -1288,9 +1288,31 @@ function buildParts(): PartDefinition[] {
       assembly: "turbo",
       build_layer: 3,
       build_order: 458,
-      geometry: { type: "weld", from: bankPoint(side, side * 0.42, 0.39, side * 0.16), to: turbo, radius: 0.042, seed: side + 40 },
+      geometry: MERGE(
+        {
+          type: "weld",
+          from: bankPoint(side, side * 0.85, 0.39, side * 0.16),
+          to: side === 1 ? [0.85, 1.3, -1.95] : [-0.9, 1.25, -2.05],
+          radius: 0.042,
+          seed: side + 40,
+        },
+        {
+          type: "weld",
+          from: side === 1 ? [0.85, 1.3, -1.95] : [-0.9, 1.25, -2.05],
+          to: side === 1 ? [0.7, 0.98, -2.2] : [-0.8, 0.98, -2.4],
+          radius: 0.042,
+          seed: side + 41,
+        },
+        {
+          type: "weld",
+          from: side === 1 ? [0.7, 0.98, -2.2] : [-0.8, 0.98, -2.4],
+          to: turbo,
+          radius: 0.042,
+          seed: side + 42,
+        },
+      ),
       material: "mbt_rust",
-      mate: A(enginePoint([0, 0, 0])),
+      mate: A([0, 0, 0]),
     });
     add({
       id: `mbt90.engine.intake_plenum_${tag}`,
@@ -1310,9 +1332,31 @@ function buildParts(): PartDefinition[] {
       assembly: "turbo",
       build_layer: 3,
       build_order: 460,
-      geometry: { type: "weld", from: [turbo[0] + (side === 1 ? 0.08 : -0.08), turbo[1], turbo[2]], to: bankPoint(side, side * 0.42, 0.55, side * 0.15), radius: 0.028, seed: side + 50 },
+      geometry: MERGE(
+        {
+          type: "weld",
+          from: [turbo[0] + (side === 1 ? 0.08 : -0.08), turbo[1], turbo[2]],
+          to: [side * 0.28, 1.32, -2.92],
+          radius: 0.028,
+          seed: side + 50,
+        },
+        {
+          type: "weld",
+          from: [side * 0.28, 1.32, -2.92],
+          to: [side * 0.8, 1.65, -2.4],
+          radius: 0.028,
+          seed: side + 51,
+        },
+        {
+          type: "weld",
+          from: [side * 0.8, 1.65, -2.4],
+          to: bankPoint(side, side * 0.42, 0.55, side * 0.15),
+          radius: 0.028,
+          seed: side + 52,
+        },
+      ),
       material: "mbt_alu",
-      mate: A(enginePoint([0, 0, 0])),
+      mate: A([0, 0, 0]),
     });
   }
   add({
@@ -1463,15 +1507,40 @@ function buildParts(): PartDefinition[] {
         assembly: "cooling",
         build_layer: 3,
         build_order: 509,
-        geometry: {
-          type: "weld",
-          from: enginePoint([side * 0.86, h === 0 ? 0.66 : 0.04, -0.7]),
-          to: enginePoint([0.42, h === 0 ? 0.22 : 0.0, 0.26]),
-          radius: 0.022,
-          seed: 60 + h * 2 + (side === 1 ? 1 : 0),
-        },
+        geometry:
+          h === 0
+            ? MERGE(
+                {
+                  type: "weld",
+                  from: enginePoint([side * 0.86, 0.66, -0.7]),
+                  to: [side * 0.98, 1.62, -2.35],
+                  radius: 0.022,
+                  seed: 60 + (side === 1 ? 1 : 0),
+                },
+                {
+                  type: "weld",
+                  from: [side * 0.98, 1.62, -2.35],
+                  to: [side * 0.94, 1.52, -2.1],
+                  radius: 0.022,
+                  seed: 62 + (side === 1 ? 1 : 0),
+                },
+                {
+                  type: "weld",
+                  from: [side * 0.94, 1.52, -2.1],
+                  to: enginePoint([side * 0.92, 0.32, 0.26]),
+                  radius: 0.022,
+                  seed: 64 + (side === 1 ? 1 : 0),
+                },
+              )
+            : {
+                type: "weld",
+                from: enginePoint([side * 0.86, 0.04, -0.7]),
+                to: enginePoint([side * 0.92, 0.02, 0.26]),
+                radius: 0.022,
+                seed: 66 + (side === 1 ? 1 : 0),
+              },
         material: "mbt_rubber_worn",
-        mate: A(enginePoint([0, 0, 0])),
+        mate: A([0, 0, 0]),
       });
     }
   }
@@ -1576,9 +1645,9 @@ function buildParts(): PartDefinition[] {
     assembly: "lube",
     build_layer: 3,
     build_order: 527,
-    geometry: { type: "weld", from: enginePoint([0.3, -0.02, -0.36]), to: enginePoint([0.38, -0.14, 0.26]), radius: 0.012, seed: 70 },
+    geometry: { type: "weld", from: enginePoint([0.5, -0.12, -0.36]), to: enginePoint([0.52, -0.16, 0.26]), radius: 0.012, seed: 70 },
     material: "mbt_steel_dark",
-    mate: A(enginePoint([0, 0, 0])),
+    mate: A([0, 0, 0]),
   });
 
   // ======================= 起动 / 附件 =======================

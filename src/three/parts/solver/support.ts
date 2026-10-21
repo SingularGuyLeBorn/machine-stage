@@ -80,6 +80,75 @@ function collectBodies(assembled: AssembledModel, options: SupportOptions): Body
  * 扫描所有实例的最近支撑邻居。返回按间隙降序排列的疑似悬空报告。
  * O(n²) AABB 距离：虎式 1995 实例约 2M 次比较，量级与一次静态穿模检测相当。
  */
+export interface FloatingIsland {
+  size: number;
+  refs: string[];
+}
+
+export interface FloatingIslandReport {
+  total: number;
+  components: number;
+  rootedSize: number;
+  islandInstances: number;
+  islands: FloatingIsland[];
+}
+
+/**
+ * 连通性检查：把 <= maxGapM 的实例连成图，最大连通分量视为「接在整车上」，
+ * 其余分量即整组悬空孤岛。成对支撑检测会把互相靠近的一团悬空件误判为有支撑，
+ * 连通性检查专门补这个洞（例如管路整体偏移到车尾外）。
+ */
+export function detectFloatingIslands(
+  assembled: AssembledModel,
+  options: SupportOptions = {},
+): FloatingIslandReport {
+  const maxGapM = options.maxGapM ?? DEFAULT_SUPPORT_GAP_M;
+  const bodies = collectBodies(assembled, options);
+  const n = bodies.length;
+  const parent = new Int32Array(n);
+  for (let i = 0; i < n; i++) parent[i] = i;
+  const find = (x: number): number => {
+    let root = x;
+    while (parent[root] !== root) root = parent[root]!;
+    while (parent[x] !== x) {
+      const next = parent[x]!;
+      parent[x] = root;
+      x = next;
+    }
+    return root;
+  };
+  const union = (a: number, b: number) => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[rb] = ra;
+  };
+  for (let i = 0; i < n; i++) {
+    const a = bodies[i]!.box;
+    for (let j = i + 1; j < n; j++) {
+      if (aabbGap(a, bodies[j]!.box) <= maxGapM) union(i, j);
+    }
+  }
+  const groups = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    const list = groups.get(root) ?? [];
+    list.push(i);
+    groups.set(root, list);
+  }
+  const sorted = [...groups.values()].sort((a, b) => b.length - a.length);
+  const islands: FloatingIsland[] = sorted.slice(1).map((indices) => ({
+    size: indices.length,
+    refs: indices.slice(0, 8).map((index) => bodies[index]!.ref),
+  }));
+  return {
+    total: n,
+    components: sorted.length,
+    rootedSize: sorted[0]?.length ?? 0,
+    islandInstances: islands.reduce((sum, island) => sum + island.size, 0),
+    islands,
+  };
+}
+
 export function detectUnsupportedParts(
   assembled: AssembledModel,
   options: SupportOptions = {},

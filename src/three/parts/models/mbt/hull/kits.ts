@@ -177,8 +177,9 @@ const bustleRack: GeometryBuilder = (spec) => {
       parts.push(bevelBoxGeometry(0.035, h, 0.035, 0.002).translate(x, 0, z));
     }
   }
+  parts.push(bevelBoxGeometry(w * 0.96, 0.02, d * 0.94, 0.003).translate(0, -h / 2 + 0.012, 0));
   for (let i = 0; i < 7; i++) {
-    parts.push(bevelBoxGeometry(w, 0.012, 0.02, 0.001).translate(0, -h / 2 + 0.02, -d / 2 + (i + 0.5) * (d / 7)));
+    parts.push(bevelBoxGeometry(w, 0.012, 0.02, 0.001).translate(0, -h / 2 + 0.03, -d / 2 + (i + 0.5) * (d / 7)));
   }
   return mergeGeometries(parts);
 };
@@ -190,6 +191,7 @@ const smokeCluster: GeometryBuilder = (spec) => {
   const len = num(p, "len", 0.24);
   const parts: THREE.BufferGeometry[] = [];
   parts.push(bevelBoxGeometry(0.34, 0.05, 0.16, 0.004).translate(0, -0.16, 0));
+  parts.push(bevelBoxGeometry(0.26, 0.09, 0.14, 0.003).translate(0, -0.225, 0));
   parts.push(bevelBoxGeometry(0.1, 0.12, 0.1, 0.003).translate(0, -0.08, -0.02));
   for (const x of [-0.09, 0.09]) {
     for (const y of [-0.09, 0.09]) {
