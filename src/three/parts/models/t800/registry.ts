@@ -199,6 +199,18 @@ function mechFor(
 }
 
 /**
+ * 装配微调（模型空间偏移）。
+ * 源网格把光学眼**埋进颅骨内部**（面朝前的位置刚好落在壳体里），
+ * 渲出来完全看不见红眼 → 沿 +X 顶出来，让红眼露在脸面上。
+ */
+const PART_OFFSET: Record<string, [number, number, number]> = {
+  Bip_Eyeball_R_045: [0.036, 0.002, 0],
+  Bip_Eyeball_L_043: [0.036, 0.002, 0],
+  EXT_LeftEyeCine_02_046: [0.04, 0.002, 0],
+  EXT_RightEyeCine_02_044: [0.04, 0.002, 0],
+};
+
+/**
  * 构建 T-800 注册表。
  *
  * @param options.decompose
@@ -269,24 +281,30 @@ export function makeT800(options: { decompose?: boolean } = {}): T800Bundle {
   for (let index = 0; index < JOINTS.length; index++) {
     const joint = JOINTS[index];
     const name = boneName(joint.name);
+    // 装配微调：源网格把光学眼**埋进颅骨内部**（面朝前的位置刚好在壳体里），
+    // 渲出来完全看不见红眼 → 沿 +X 顶出来一点，让红眼露在脸面上。
+    const offset = PART_OFFSET[joint.name];
+    const at: [number, number, number] = offset
+      ? [joint.center[0] + offset[0], joint.center[1] + offset[1], joint.center[2] + offset[2]]
+      : joint.center;
     // 机械拆解版：光滑整块被「护板 + 内部机械器件」取代，不再单独成件
     if (!decompose)
-    builder.add({
-      id: `t800.${name.system}.${name.slug}`,
-      cn: name.cn,
-      en: name.en,
-      asm: joint.asm,
-      geom: {
-        type: "kit",
-        kit: "t800Mesh",
-        params: { partIndex: index },
-      },
-      mat: joint.mat,
-      layer: joint.asm === "hand" ? 2 : 1,
-      node: nodeNameOf(joint.name),
-      at: joint.center,
-      hint: `${name.en} · ${joint.size.map((v) => (v * 1000).toFixed(0)).join("×")} mm`,
-    });
+      builder.add({
+        id: `t800.${name.system}.${name.slug}`,
+        cn: name.cn,
+        en: name.en,
+        asm: joint.asm,
+        geom: {
+          type: "kit",
+          kit: "t800Mesh",
+          params: { partIndex: index },
+        },
+        mat: joint.mat,
+        layer: joint.asm === "hand" ? 2 : 1,
+        node: nodeNameOf(joint.name),
+        at,
+        hint: `${name.en} · ${joint.size.map((v) => (v * 1000).toFixed(0)).join("×")} mm`,
+      });
 
     // ---- 机械拆解版：把光滑块换成「护板 + 内部机械器件」----
     if (decompose) {
