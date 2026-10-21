@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { GeometryBuilder } from "../../assembler/geometry";
 import whole from "./whole.generated.json";
 import core from "./core.generated.json";
+import patch from "./patch.generated.json";
 
 // ============================================================================
 // models/kingjoe-whole/kits —— 整机单件（原皮表面 + 内部闭合实心核）
@@ -32,8 +33,16 @@ interface CoreData {
   index: string;
 }
 
+interface PatchData {
+  meta: { tris: number; boundary_tris: number; gap_tris: number };
+  position: string;
+  normal: string;
+  index: string;
+}
+
 const SHELL = whole as unknown as ShellData;
 const CORE = core as unknown as CoreData;
+const PATCH = patch as unknown as PatchData;
 
 function decode(base64: string): ArrayBuffer {
   const binary = atob(base64);
@@ -50,21 +59,30 @@ const filledBuilder: GeometryBuilder = () => {
   const corePositions = new Float32Array(decode(CORE.position));
   const coreNormals = new Float32Array(decode(CORE.normal));
   const coreIndices = new Uint32Array(decode(CORE.index));
+  const patchPositions = new Float32Array(decode(PATCH.position));
+  const patchNormals = new Float32Array(decode(PATCH.normal));
+  const patchIndices = new Uint32Array(decode(PATCH.index));
 
   const shellVerts = shellPositions.length / 3;
   const coreVerts = corePositions.length / 3;
-  const positions = new Float32Array((shellVerts + coreVerts) * 3);
+  const patchVerts = patchPositions.length / 3;
+  const positions = new Float32Array((shellVerts + coreVerts + patchVerts) * 3);
   positions.set(shellPositions, 0);
   positions.set(corePositions, shellVerts * 3);
-  const normals = new Float32Array((shellVerts + coreVerts) * 3);
+  positions.set(patchPositions, (shellVerts + coreVerts) * 3);
+  const normals = new Float32Array((shellVerts + coreVerts + patchVerts) * 3);
   normals.set(shellNormals, 0);
   normals.set(coreNormals, shellVerts * 3);
-  const uvs = new Float32Array((shellVerts + coreVerts) * 2);
+  normals.set(patchNormals, (shellVerts + coreVerts) * 3);
+  const uvs = new Float32Array((shellVerts + coreVerts + patchVerts) * 2);
   uvs.set(shellUvs, 0);
 
-  const indices = new Uint32Array(shellIndices.length + coreIndices.length);
+  const indices = new Uint32Array(shellIndices.length + coreIndices.length + patchIndices.length);
   indices.set(shellIndices, 0);
   for (let i = 0; i < coreIndices.length; i++) indices[shellIndices.length + i] = coreIndices[i]! + shellVerts;
+  const patchOffset = shellVerts + coreVerts;
+  const patchIndexStart = shellIndices.length + coreIndices.length;
+  for (let i = 0; i < patchIndices.length; i++) indices[patchIndexStart + i] = patchIndices[i]! + patchOffset;
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -73,6 +91,7 @@ const filledBuilder: GeometryBuilder = () => {
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));
   SHELL.meta.groups.forEach((group, index) => geometry.addGroup(group.start, group.count, index));
   geometry.addGroup(shellIndices.length, coreIndices.length, SHELL.meta.groups.length);
+  geometry.addGroup(patchIndexStart, patchIndices.length, SHELL.meta.groups.length + 1);
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;

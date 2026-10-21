@@ -274,7 +274,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoewhole",
     title: "金古桥 King Joe · 整体实心（单件）",
-    subtitle: "原皮表面 15,248 三角 + 内部闭合实心核 41,836 三角 · 1 个 partId · 不是中空壳",
+    subtitle: "原皮表面 + 内部闭合实心核 + 缝隙补面 · 1 个 partId · 不是中空壳",
     milestone: "M-G·R3.1",
     status: "ready",
     registry: makeKingJoeWholeRegistry(),
@@ -298,11 +298,13 @@ export const CATALOG: StageModel[] = [
       { label: "零件", value: "1 件" },
       { label: "表面三角", value: "15,248 个" },
       { label: "内核三角", value: "41,836 个" },
+      { label: "补缝三角", value: "14,189 个" },
       { label: "内核体积", value: "9.80 m³" },
     ],
     notes: [
       "表面仍是真实网格 578 源件 + 21 个叠加细节的 15,248 个原三角形，保留原 UV/12 组材质，外观与「真实网格分件」合体态一致。",
-      "内部不是空的：用 0.06m 体素把整机重网格成闭合实体（41,836 三角，边界边 0，体积约 9.8 m³），内缩 1% 后与原皮表面合并到同一个 partId；原皮缝隙里看到的是实心金属核，不是空腔。",
+      "内部不是空的：用 0.06m 体素把整机重网格成闭合实体（41,836 三角，边界边 0，体积约 9.8 m³），内缩 1% 后与原皮表面合并到同一个 partId。",
+      "补缝：外壳边界补面 82 三角；下半身甲片缝隙/脚部空档用 1.0 外包络补实心膜 14,107 三角（胸甲彩虹区与双手区不补，避免盖住细节），合计补缝 14,189 三角。",
       "这不是「表面一层、内部还是空的」薄壳；x-ray 透视可以直接看到内部实心核。",
       "单件仍是 1 个 partId；没有拆分、三体、横切、榫卯或新增外部零件。两体/三体/实心横切卡已按要求移除。",
       "外部核证据：docs/qa/kingjoe-whole-core.jpg（内核实体渲染）、docs/qa/kingjoe-whole-solid-xray.jpg（透视下的内核）。",
