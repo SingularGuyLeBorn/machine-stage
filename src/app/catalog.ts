@@ -93,7 +93,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "t800_mech",
     title: "T-800 内骨骼 · 机械拆解版",
-    subtitle: "M-G：每个光滑块换成机械器件组合（2073 个零件）",
+    subtitle: "M-G：每个光滑块换成机械器件组合（护板 + 骨架/轴承/螺栓/缸，3080 件）",
     milestone: "M-G",
     status: "ready",
     registry: makeT800MechRegistry(),
@@ -130,8 +130,8 @@ export const CATALOG: StageModel[] = [
   },
   {
     id: "t800",
-    title: "T-800 内骨骼 · 整机",
-    subtitle: "M-G：真实网格按蒙皮切分（76 骨骼部位 + 17 根关节液压缸）",
+    title: "T-800 内骨骼 · GLB 原型",
+    subtitle: "M-G：真实网格按蒙皮切分（76 骨骼部位 + 17 根关节液压缸，245 件）",
     milestone: "M-G",
     status: "ready",
     registry: makeT800Registry(),
