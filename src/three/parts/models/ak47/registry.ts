@@ -84,8 +84,8 @@ export const AK47_ASSEMBLIES: ModelRegistry["assemblies"] = [
 export const AK47_EXTRA_CONSTANTS = {
   SELECTOR_PIVOT_Y: -0.020,
   SELECTOR_PIVOT_Z: -0.072,
-  TRIGGER_Y: -0.026,
-  TRIGGER_PIVOT_Z: -0.052,
+  TRIGGER_Y: -0.042,
+  TRIGGER_PIVOT_Z: -0.075,
   CARRIER_FRONT_Z: -0.03,
   CARRIER_TRAVEL: 0.07,
   RECOIL_SPRING_ABUT_Z: -0.215,
@@ -498,12 +498,12 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: {
       type: "merge",
       parts: [
-        // 脊（扁平杠杆主体：低于机匣底板，从鼻到尾齿）
-        { type: "box", w: 0.008, h: 0.003, d: 0.03, bevel: 0.0006, at: [0, -0.0015, -0.008] },
+        // 脊（长杠杆主体：铰点在弹匣下方，向上穿过枪机框底窗到击针尾）
+        { type: "box", w: 0.008, h: 0.004, d: 0.03, bevel: 0.0006, at: [0, 0.012, -0.006] },
         // 伸臂（脊 → 鼻）
-        { type: "box", w: 0.008, h: 0.01, d: 0.006, bevel: 0.0006, at: [0, 0.005, -0.005] },
-        // 鼻（打击面：顶端距击针尾盘 4mm）
-        { type: "box", w: 0.008, h: 0.01, d: 0.008, bevel: 0.0008, at: [0, 0.015, -0.005] },
+        { type: "box", w: 0.008, h: 0.014, d: 0.006, bevel: 0.0006, at: [0, 0.026, -0.005] },
+        // 鼻（打击面：顶端距击针尾盘 2mm）
+        { type: "box", w: 0.008, h: 0.01, d: 0.008, bevel: 0.0008, at: [0, 0.033, -0.005] },
         // 尾齿（阻铁挂机齿：待击时被阻铁托住）
         { type: "box", w: 0.006, h: 0.008, d: 0.008, bevel: 0.0008, at: [0, -0.012, 0.012] },
         // 待击压面（枪机框复进时压过它完成待击）
@@ -526,7 +526,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "kit", kit: "coilSpring", params: { r: 0.006, wireR: 0.0009, len: 0.045, coils: 7 } },
     material: "steel_spring",
     node: "AkHammer",
-    mate: { type: "absolute", position: [0, -0.022, 0.017] },
+    mate: { type: "absolute", position: [0, -0.022, 0.012] },
     source: "击锤簧：⌀12 × 45 7 圈粗簧，提供击发能量（枪机框复进时压缩蓄能）。",
   },
   {
@@ -584,7 +584,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     },
     material: "steel_worn",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.03, -0.046] },
+    mate: { type: "absolute", position: [0, -0.062, -0.05] },
     source: "阻铁：挂住击锤尾齿；被扳机上缘压下时解脱。单发模式下每次击发后自动重新挂住（半自动），连发模式下被快慢机杠杆抬开（全自动）。",
   },
   {
@@ -597,7 +597,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "box", w: 0.004, h: 0.014, d: 0.01, bevel: 0.0006 },
     material: "steel_worn",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.042, -0.058] },
+    mate: { type: "absolute", position: [0, -0.05, -0.062] },
     source: "单发阻铁：半自动时在扳机回位过程中挂住枪机框带回的击锤，实现「扣一次打一发」。",
   },
   {
@@ -642,7 +642,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "cylinder", r: 0.0022, h: 0.038, segments: 10 },
     material: "ejector_steel",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.026, -0.062], rotation: [0, 0, 90] },
+    mate: { type: "absolute", position: [0, -0.04, -0.068], rotation: [0, 0, 90] },
     source: "⌀4.4 × 38 击锤轴销（拆发射机组的必拆件）。",
   },
   {
@@ -655,7 +655,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "cylinder", r: 0.0022, h: 0.038, segments: 10 },
     material: "ejector_steel",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.026, -0.052], rotation: [0, 0, 90] },
+    mate: { type: "absolute", position: [0, -0.042, -0.075], rotation: [0, 0, 90] },
     source: "扳机轴销 ⌀4.4 × 38。",
   },
   {
@@ -682,7 +682,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: {
       type: "kit",
       kit: "magazineBody",
-      params: { w: 0.03, wallT: 0.0016, backT: 0.0022, depth: 0.0605, arc: 0.198, segs: 26, lipSegs: 3 },
+      params: { w: 0.03, wallT: 0.0016, backT: 0.0022, depth: 0.067, arc: 0.198, segs: 34, lipSegs: 3 },
     },
     material: "steel_blued",
     node: "AkRecoil",
