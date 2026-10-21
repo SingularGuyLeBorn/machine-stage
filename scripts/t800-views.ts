@@ -144,8 +144,8 @@ const CLOSEUPS: Record<string, ViewDef & { view: View; tag: string; seconds: num
     dir: new THREE.Vector3(1, 0, 0),
     up: new THREE.Vector3(0, 1, 0),
     label: "头部特写",
-    target: [0.03, 1.76, -0.01],
-    scale: 1700,
+    target: [0.06, 1.78, -0.01],
+    scale: 2600,
     tag: "closeup-head",
     seconds: 0,
   },
@@ -280,7 +280,7 @@ function renderAt(
             [bx, by],
             [cx, cy],
           ],
-          depth: [a.dot(dir), b.dot(dir), c.dot(dir)],
+          depth: [-a.dot(dir), -b.dot(dir), -c.dot(dir)],
           color,
         });
       }

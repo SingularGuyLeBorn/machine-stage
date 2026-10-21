@@ -206,7 +206,7 @@ function renderModel(
             const w1 = ((cx - px) * (ay - py) - (ax - px) * (cy - py)) / area;
             const w2 = 1 - w0 - w1;
             if (w0 < 0 || w1 < 0 || w2 < 0) continue;
-            const depth = w0 * a.dot(shot.dir) + w1 * b.dot(shot.dir) + w2 * c.dot(shot.dir);
+            const depth = w0 * -a.dot(shot.dir) + w1 * -b.dot(shot.dir) + w2 * -c.dot(shot.dir);
             if (!canvas.putDepth(x, y, depth)) continue;
             canvas.set(x, y, color);
           }

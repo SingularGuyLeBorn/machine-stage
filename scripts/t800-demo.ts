@@ -170,7 +170,7 @@ function renderAt(seconds: number, view: "side" | "iso"): { png: Buffer; caption
             [bx, by],
             [cx, cy],
           ],
-          depth: [a.dot(dir), b.dot(dir), c.dot(dir)],
+          depth: [-a.dot(dir), -b.dot(dir), -c.dot(dir)],
           color,
         });
       }
