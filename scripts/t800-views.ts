@@ -227,9 +227,10 @@ function renderAt(
   seconds: number,
   view: View,
   override?: { dir: THREE.Vector3; up: THREE.Vector3; target?: [number, number, number]; scale?: number },
+  idle = false,
 ): { png: Buffer; caption: string } {
   model.resetNodes();
-  animateT800(model, seconds);
+  animateT800(model, seconds, { idle });
   model.syncInstances();
   model.root.updateMatrixWorld(true);
   const project = makeProjector(view, override?.target, override?.scale);
@@ -300,7 +301,7 @@ function renderAt(
 }
 
 const frames: Array<[number, string]> = [
-  [4.8, "view-00-stand"],
+  [0, "view-00-stand"],
   [0.0, "view-01-step-right"],
   [1.6, "view-02-lift-right"],
   [3.2, "view-03-step-left"],
@@ -312,7 +313,7 @@ const frames: Array<[number, string]> = [
 ];
 
 for (const [seconds, name] of frames) {
-  const { png, caption } = renderAt(seconds, "side");
+  const { png, caption } = renderAt(seconds, "side", undefined, name === "view-00-stand");
   writeFileSync(`${OUT}/${name}.png`, png);
   writeFileSync(`${OUT}/${name}.txt`, `${caption}\n`, "utf8");
   console.log("wrote", name, "t=", seconds);
@@ -321,10 +322,10 @@ for (const [seconds, name] of frames) {
 // 正视 / 斜 45°：站姿 + 屈膝峰值
 for (const view of ["front", "iso"] as View[]) {
   for (const [seconds, tag] of [
-    [4.8, "stand"],
+    [0, "stand"],
     [2.2, "peak"],
   ] as Array<[number, string]>) {
-    const { png, caption } = renderAt(seconds, view);
+    const { png, caption } = renderAt(seconds, view, undefined, tag === "stand");
     const name = `${view}-${tag}`;
     writeFileSync(`${OUT}/${name}.png`, png);
     writeFileSync(`${OUT}/${name}.txt`, `${caption}\n`, "utf8");

@@ -55,11 +55,9 @@ interface Angles {
 /** 屈伸幅度（度）。 */
 const HIP_MAX = 17;
 const KNEE_MAX = 68;
-const ANKLE_MAX = 22;
 const TOE_MAX = 20;
 const SHOULDER_MAX = 15;
 const ELBOW_MAX = 48;
-const WRIST_MAX = 16;
 /** 手指卷曲角（度，每节）。 */
 const FINGER_CURL = 30;
 /** 脊椎静态前倾（度）：腰 → 胸 → 颈，配合步态起伏。 */
@@ -95,20 +93,16 @@ function jointAngles(seconds: number): Angles {
   // 膝：屈曲（负 = 小腿向后收）
   z.set("LeftKnee_helper_086", -KNEE_MAX * kneeR);
   z.set("RightKnee_helper_094", -KNEE_MAX * kneeL);
-  // 踝：踩平 + 蹬地
-  z.set("bip_foot_R_081", 8 * kneeR - ANKLE_MAX * 0.25 * hipR);
-  z.set("bip_foot_L_089", 8 * kneeL - ANKLE_MAX * 0.25 * hipL);
+  // 踝/腕/趾：留到链式求解时按"父级累计角"补偿（脚掌贴地、手掌不歪）
   // 趾：蹬地
   z.set("bip_toe_R_085", -TOE_MAX * pulse(right + 0.45));
   z.set("bip_toe_L_093", -TOE_MAX * pulse(left + 0.45));
 
-  // 肩/肘/腕：与同侧腿反相
+  // 肩/肘：与同侧腿反相
   z.set("bip_upperArm_R_08", -SHOULDER_MAX * hipR);
   z.set("bip_upperArm_L_047", -SHOULDER_MAX * hipL);
   z.set("LeftElbow_helper_035", ELBOW_MAX * (0.22 + 0.78 * pulse(right + 0.1)));
   z.set("RightElbow_helper_075", ELBOW_MAX * (0.22 + 0.78 * pulse(left + 0.1)));
-  z.set("bip_hand_R_016", -WRIST_MAX * pulse(right + 0.1));
-  z.set("bip_hand_L_055", -WRIST_MAX * pulse(left + 0.1));
 
   // 脊椎：前倾 + 水平拧转（腰弯随步态起伏）
   const twist = 5 * Math.sin(2 * Math.PI * p);
@@ -130,15 +124,22 @@ function jointAngles(seconds: number): Angles {
   y.set("Bip_Eyeball_R_045", gaze);
   y.set("Bip_Eyeball_L_043", gaze);
 
-  // 五指：抓握（握拳相位与摆动相关）
+  // 五指：抓握 —— **腱索联动**
+  // 屈肌腱从掌面跨过近节关节拉到中节：近节卷多少，中节被动跟着卷；
+  // 末节有自己的屈肌（小指节由中节带一点）。所以是**比例链**，不是各自独立。
   const gripR = pulse(right + 0.35);
   const gripL = pulse(left + 0.35);
+  /** 每根手指的节间传动比（近 → 中 → 末）。 */
+  const FINGER_RATIO = [1.0, 1.35, 0.72];
   for (const joint of JOINTS) {
     const m = /^bip_(thumb|index|middle|ring|pinky)_([0-2])_(R|L)_/.exec(joint.name);
     if (!m) continue;
     const seg = Number(m[2]);
     const grip = m[3] === "R" ? gripR : gripL;
-    z.set(joint.name, FINGER_CURL * (0.3 + 0.32 * seg) * grip);
+    // 传动比的累乘 → 末节 = 近节 × 1.35 × 0.72
+    let ratio = 1;
+    for (let k = 0; k < seg; k++) ratio *= FINGER_RATIO[k];
+    z.set(joint.name, FINGER_CURL * ratio * grip);
   }
 
   for (const joint of JOINTS) {
@@ -146,6 +147,33 @@ function jointAngles(seconds: number): Angles {
     if (!y.has(joint.name)) y.set(joint.name, 0);
   }
   return { z, y };
+}
+
+/**
+ * 末端补偿：踝/腕按**父链累计角**反向补偿，脚掌贴地、手掌随臂不歪。
+ * 必须在链式顺序里算（父先子后），所以单独跑一遍。
+ *
+ * 脚：抵掉整条腿链（髋 + 膝）的累计角 → 支撑期脚掌与地面平行。
+ * 手：只抵掉**肩**的摆角（不含肘的屈曲）——手是挂在小臂上的，
+ * 肘弯多少手就跟着转多少，只是手腕本身保持中立位。
+ */
+function refineAngles(angles: Angles): void {
+  const accum = new Map<string, number>();
+  for (const joint of ORDERED) {
+    const parentAccum = joint.parent ? (accum.get(joint.parent) ?? 0) : 0;
+    let local = angles.z.get(joint.name) ?? 0;
+    if (joint.name.startsWith("bip_foot_")) {
+      // 踝：抵掉整条腿链的累计角
+      local = -parentAccum + 4;
+    } else if (joint.name.startsWith("bip_hand_")) {
+      // 腕：只抵掉肩的摆角（沿父链往上找 upperArm）
+      const shoulder = jointChain(joint.name).find((n) => /upperArm/i.test(n));
+      const shoulderAccum = shoulder ? (accum.get(shoulder) ?? 0) : 0;
+      local = -shoulderAccum;
+    }
+    angles.z.set(joint.name, local);
+    accum.set(joint.name, parentAccum + local);
+  }
 }
 
 /** 关节姿态（世界位姿）。 */
@@ -228,10 +256,21 @@ function cylinderState(def: HydraulicDef, world: Map<string, Pose>): CylinderSta
 }
 
 /** 驱动整机姿态。 */
-export function animateT800(model: AssembledModel, seconds: number): void {
+export function animateT800(
+  model: AssembledModel,
+  seconds: number,
+  options: { idle?: boolean } = {},
+): void {
   lastSeconds = seconds;
   model.resetNodes();
-  const angles = jointAngles(seconds);
+  // 待机：站姿（不迈步）—— 步态循环里总有一条腿屈着，静止展示用站姿更干净
+  const angles: Angles = options.idle
+    ? { z: new Map(), y: new Map() }
+    : jointAngles(seconds);
+  if (options.idle) {
+    for (const [name, deg] of Object.entries(SPINE_BEND)) angles.z.set(name, deg);
+  }
+  refineAngles(angles);
   const world = solveWorld(angles);
 
   for (const joint of JOINTS) {
@@ -260,7 +299,9 @@ let lastSeconds = 0;
 
 /** 液压缸读数（几何解）。 */
 export function t800CylinderReadout(_model: AssembledModel): CylinderState[] {
-  const world = solveWorld(jointAngles(lastSeconds));
+  const angles = jointAngles(lastSeconds);
+  refineAngles(angles);
+  const world = solveWorld(angles);
   return HYDRAULICS.map((def) => cylinderState(def, world));
 }
 
