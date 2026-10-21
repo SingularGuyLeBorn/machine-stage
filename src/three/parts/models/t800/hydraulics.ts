@@ -347,7 +347,6 @@ export function hydraulicGeometry(def: HydraulicDef, kind: HydKind): THREE.Buffe
       const h = 0.014;
       geometry = cylinderGeometry(def.r - WALL - 0.0012, h, def.r - WALL - 0.0012, 20);
       const c = rodNear.clone().add(axis.clone().multiplyScalar(h / 2));
-      geometry.translate(0, 0, 0);
       place(geometry, rodNear.clone().sub(axis.clone().multiplyScalar(h / 2)), c);
       break;
     }

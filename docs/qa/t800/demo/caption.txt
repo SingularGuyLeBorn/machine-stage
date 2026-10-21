@@ -1,1 +1,1 @@
-T-800 right leg · iso 45° · t=0.00s · hip/knee/ankle 0.0/0.0/0.0 deg · knee_main rod 200.3 mm
+T-800 endoskeleton · iso 45° · t=0.00s · phase 0% · knee_r |AB|=118.2mm rod exposed=51.8mm · 177 parts / 120854 verts
