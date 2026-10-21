@@ -5,7 +5,8 @@ import {
   JOINT_STD,
   JOINT_Y,
   NODES,
-  T800_HYDRAULICS,
+  PELVIS_NODE,
+  legHydraulics,
   mountKitParams,
 } from "../spec";
 import { addCylinder } from "./cylinder";
@@ -24,8 +25,15 @@ import { addCylinder } from "./cylinder";
 
 const Z90: [number, number, number] = [90, 0, 0];
 
-export function buildUpper(builder: PartBuilder, layouts: Record<string, InstanceLayout>): void {
+export function buildUpper(
+  builder: PartBuilder,
+  layouts: Record<string, InstanceLayout>,
+  central = true,
+): void {
   // ---- 髋关节（骨盆段，固定）----
+  // 骨盆框板 / 髋轭 / 加强板是三跨中央件，只允许右腿构建器声明一次；
+  // 左腿镜像时若再声明一次，会在 z=0 处得到两套重叠的横梁。
+  if (central) {
   builder.add({
     id: "t800.hip.pelvis",
     cn: "骨盆框板",
@@ -34,7 +42,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     geom: { type: "box", w: 0.34, h: 0.014, d: 0.24, bevel: 0.004 },
     mat: "frame",
     layer: 1,
-    node: NODES.base,
+    node: PELVIS_NODE,
     at: [0, 1.5062, 0],
     hint: "骨盆开放框板坐在髋轭顶面上（前侧挖空看穿内部）",
   });
@@ -46,29 +54,47 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     geom: {
       type: "merge",
       parts: [
-        { type: "box", w: 0.018, h: 0.13, d: 0.11, bevel: 0.004, at: [-0.13, 0, 0] },
-        { type: "box", w: 0.018, h: 0.13, d: 0.11, bevel: 0.004, at: [0.13, 0, 0] },
-        { type: "box", w: 0.28, h: 0.016, d: 0.11, bevel: 0.004, at: [0, 0.0663, 0] },
-        { type: "box", w: 0.28, h: 0.014, d: 0.1, bevel: 0.004, at: [0, -0.0645, 0] },
-        { type: "box", w: 0.024, h: 0.132, d: 0.02, bevel: 0.003, at: [0, -0.0065, 0.036] },
-        { type: "box", w: 0.024, h: 0.132, d: 0.02, bevel: 0.003, at: [0, -0.0065, -0.036] },
+        // 两侧立板（跨过双髋，z ∈ ±130mm）
+        { type: "box", w: 0.018, h: 0.13, d: 0.26, bevel: 0.004, at: [-0.13, 0, 0] },
+        { type: "box", w: 0.018, h: 0.13, d: 0.26, bevel: 0.004, at: [0.13, 0, 0] },
+        // 上下横梁（下横梁抬到髋伸展缸顶面以上，中央留出缸体/耳环的活动窗口）
+        { type: "box", w: 0.28, h: 0.016, d: 0.26, bevel: 0.004, at: [0, 0.0663, 0] },
+        { type: "box", w: 0.28, h: 0.014, d: 0.24, bevel: 0.004, at: [0, 0.030, 0] },
+        // 四根叉耳立柱：把两条腿的髋窝座吊在横梁上
+        { type: "box", w: 0.024, h: 0.132, d: 0.02, bevel: 0.003, at: [0, -0.0065, 0.049] },
+        { type: "box", w: 0.024, h: 0.132, d: 0.02, bevel: 0.003, at: [0, -0.0065, 0.121] },
+        { type: "box", w: 0.024, h: 0.132, d: 0.02, bevel: 0.003, at: [0, -0.0065, -0.049] },
+        { type: "box", w: 0.024, h: 0.132, d: 0.02, bevel: 0.003, at: [0, -0.0065, -0.121] },
+        // 四条腿的髋缸凸台：右腿屈曲缸在 +Z、右腿伸展缸在 -Z，左腿反之
         {
           type: "kit",
           kit: "t800Boss",
           params: { faceR: 0.016, len: 0.016, boreR: 0.002, boreDepth: 0.0005, dir: 1 },
-          at: [0.13, -0.035, 0.071],
+          at: [0.13, -0.035, 0.135],
         },
         {
           type: "kit",
           kit: "t800Boss",
           params: { faceR: 0.016, len: 0.016, boreR: 0.002, boreDepth: 0.0005, dir: -1 },
-          at: [-0.13, -0.035, -0.071],
+          at: [-0.13, -0.035, -0.135],
+        },
+        {
+          type: "kit",
+          kit: "t800Boss",
+          params: { faceR: 0.016, len: 0.016, boreR: 0.002, boreDepth: 0.0005, dir: -1 },
+          at: [0.13, -0.035, -0.135],
+        },
+        {
+          type: "kit",
+          kit: "t800Boss",
+          params: { faceR: 0.016, len: 0.016, boreR: 0.002, boreDepth: 0.0005, dir: 1 },
+          at: [-0.13, -0.035, 0.135],
         },
       ],
     },
     mat: "bone",
     layer: 1,
-    node: NODES.base,
+    node: PELVIS_NODE,
     at: [0, 1.425, 0],
     hint: "髋轭是 U 形开口架（两侧立板 + 上下横梁 + 两个缸安装凸台），中间全开：髋销、球头座、缸耳全露着",
   });
@@ -80,7 +106,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     geom: { type: "cylinder", r: 0.005, h: 0.006, segments: 12, bevel: 0.0008 },
     mat: "dark_chrome",
     layer: 4,
-    node: NODES.base,
+    node: PELVIS_NODE,
     at: [0.159, 1.42, 0],
     rot: [0, 0, 90],
     hint: "把髋部加强板锁在髋轭上的螺栓头",
@@ -93,10 +119,12 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     geom: { type: "plate", w: 0.1, h: 0.09, t: 0.012, bevel: 0.003 },
     mat: "chrome",
     layer: 3,
-    node: NODES.base,
+    node: PELVIS_NODE,
     at: [0.1475, 1.42, 0],
     rot: [0, 90, 0],
   });
+  } // central pelvis parts
+
   builder.add({
     id: "t800.hip.socket",
     cn: "髋窝座（叉耳）",
@@ -247,7 +275,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     mat: "servo",
     layer: 5,
     node: NODES.base,
-    at: [0.128, 1.462, 0.0695],
+    at: [0.128, 1.462, 0.0615],
     rot: [90, 0, 0],
     hint: "读取髋关节转角，驱动伺服阀闭环",
   });
@@ -259,13 +287,13 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
     geom: { type: "boltCircle", count: 4, radius: 0.02, boltR: 0.006, boltH: 0.01 },
     mat: "dark_chrome",
     layer: 4,
-    node: NODES.base,
+    node: PELVIS_NODE,
     at: [-0.13, 1.5157, -0.06],
     hint: "骨盆基座板的固定螺栓圈（与躯干接口，避开阀块）",
   });
 
   // ---- 髋部两根驱动缸（缸体挂骨盆，活塞杆挂大腿）----
-  for (const spec of T800_HYDRAULICS.filter((item) => item.parent === "base")) {
+  for (const spec of legHydraulics(builder.side).filter((item) => item.parent === "base")) {
     addCylinder(builder, spec, { asm: "hip", prefix: "cyl", label: spec.name_cn });
   }
 
@@ -505,7 +533,7 @@ export function buildUpper(builder: PartBuilder, layouts: Record<string, Instanc
   ]);
 
   // ---- 膝部两根驱动缸（缸体挂大腿，活塞杆挂小腿）----
-  for (const spec of T800_HYDRAULICS.filter((item) => item.parent === "hip")) {
+  for (const spec of legHydraulics(builder.side).filter((item) => item.parent === "hip")) {
     addCylinder(builder, spec, { asm: "thigh", prefix: "cyl", label: spec.name_cn });
   }
 }

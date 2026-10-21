@@ -1,7 +1,7 @@
 // 性能探针：拆解装配与首帧各阶段耗时
 import { performance } from "node:perf_hooks";
 import { buildModel } from "../src/three/parts/assembler/assembler";
-import { makeT800Layouts, makeT800Registry, t800Builders } from "../src/three/parts/models/t800/registry";
+import { makeT800Layouts, makeT800Registry, t800AllBuilders } from "../src/three/parts/models/t800/registry";
 
 let t = performance.now();
 const registry = makeT800Registry();
@@ -9,7 +9,7 @@ const tRegistry = performance.now() - t;
 
 t = performance.now();
 const model = buildModel(registry, {
-  builders: t800Builders,
+  builders: t800AllBuilders,
   instanceLayouts: makeT800Layouts(),
   warnMissingLayout: false,
 });

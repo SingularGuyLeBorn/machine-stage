@@ -174,6 +174,9 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
       });
     }
     if (mirrored) built = mirrorGeometry(built);
+    // 零件自己声明的镜像（左右对称件共用一套几何声明）
+    const mirrorAxis = (resolved as { mirror?: "x" | "z" } | undefined)?.mirror;
+    if (mirrorAxis) built = mirrorGeometry(built, mirrorAxis);
     assertFiniteGeometry(built, owner);
     built.computeBoundingBox();
     built.computeBoundingSphere();

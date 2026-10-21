@@ -28,6 +28,44 @@ export const JOINT_Y = {
 } as const;
 
 /**
+ * 腿的横向半间距（米）：右腿在 +Z、左腿在 -Z，髋间距 170mm。
+ * spec 里的坐标是**腿局部坐标**（z=0 = 腿中线），落世界时统一走 sideZ()。
+ */
+export const LEG_Z = 0.125;
+
+/** 侧别：1 = 右腿，-1 = 左腿。 */
+export type LegSide = 1 | -1;
+
+/** 腿局部 z → 世界 z。 */
+export function sideZ(side: LegSide, z: number): number {
+  return side * (LEG_Z + z);
+}
+
+/** 单腿的节点名（左右各一套；骨盆节点另有一套，不参与镜像）。 */
+export function legNodes(side: LegSide): {
+  base: string;
+  hip: string;
+  knee: string;
+  ankle: string;
+} {
+  const s = side > 0 ? "" : "L";
+  return {
+    base: `T800Base${s}`,
+    hip: `T800Hip${s}`,
+    knee: `T800Knee${s}`,
+    ankle: `T800Ankle${s}`,
+  };
+}
+
+/** 骨盆节点（双腿共用，不镜像）。 */
+export const PELVIS_NODE = "T800Pelvis";
+
+/** 侧别镜像 Euler：绕 Z 轴镜像 → (rx, ry, rz) → (-rx, -ry, rz)。 */
+export function mirrorEuler(rot: readonly [number, number, number]): [number, number, number] {
+  return [-rot[0], -rot[1], rot[2]];
+}
+
+/**
  * 关节中心的 X（模型坐标，+X 前）。
  * 膝盖比髋略后 20mm：股骨轴线后倾，大腿本体（股四头肌）再前移，
  * 于是大腿前缘鼓出；小腿本体后移到踝缸后方，形成小腿肚后凸。
@@ -430,21 +468,46 @@ export const T800_HYDRAULICS: HydraulicSpec[] = CYLINDER_SEEDS.map((seed) => ({
   lr: seed.lr,
 }));
 
-/** 节点名（必须符合 [A-Za-z][A-Za-z0-9_]* 规范）。 */
-export const NODES = {
-  base: "T800Base",
-  hip: "T800Hip",
-  knee: "T800Knee",
-  ankle: "T800Ankle",
-} as const;
+/** 节点名（必须符合 [A-Za-z][A-Za-z0-9_]* 规范）——右腿一套。 */
+export const NODES = legNodes(1);
 
-/** 节点 pivot（模型坐标）。 */
+/** 节点名 → 左右两套（骨盆节点两腿共用，不参与镜像）。 */
+export const NODE_NAMES: Record<string, string> = {
+  [NODES.base]: NODES.base,
+  [NODES.hip]: NODES.hip,
+  [NODES.knee]: NODES.knee,
+  [NODES.ankle]: NODES.ankle,
+  [PELVIS_NODE]: PELVIS_NODE,
+};
+
+/** 节点 pivot（模型坐标）：腿的节点横移 ±LEG_Z，骨盆节点在正中。 */
 export const NODE_PIVOT: Record<string, Vec3> = {
-  [NODES.base]: [0, 0, 0],
+  [NODES.base]: [0, JOINT_Y.hip, 0],
   [NODES.hip]: [0, JOINT_Y.hip, 0],
   [NODES.knee]: [JOINT_X.knee, JOINT_Y.knee, 0],
   [NODES.ankle]: [0, JOINT_Y.ankle, 0],
+  [PELVIS_NODE]: [0, 0, 0],
 };
+
+// 左腿节点也有自己的 pivot：instanceLayout() 用 NODE_PIVOT 换算实例的节点局部坐标，
+// 只登记右腿会让左腿实例多叠一次 1.3m 的髋高（装配后表现为整条腿飞到躯干上方）。
+for (const name of Object.values(legNodes(-1))) {
+  const right = Object.keys(NODE_NAMES).find((key) => NODE_NAMES[key] === name.replace(/L$/, ""));
+  if (!right) continue;
+  const local = NODE_PIVOT[right];
+  NODE_PIVOT[name] = [local[0], local[1], -LEG_Z - local[2]];
+}
+
+/** 侧别化的节点 pivot（左腿在 -Z）。 */
+export function legPivot(node: string, side: LegSide): Vec3 | undefined {
+  // 节点名可能是右腿名（T800Hip）或左腿名（T800HipL）——都映射回同一份局部 pivot
+  const base = node.endsWith("L") && node !== PELVIS_NODE ? node.slice(0, -1) : node;
+  const canonical = Object.keys(NODE_NAMES).find((key) => NODE_NAMES[key] === base);
+  if (!canonical) return undefined;
+  if (canonical === PELVIS_NODE) return [0, 0, 0];
+  const local = NODE_PIVOT[canonical];
+  return [local[0], local[1], sideZ(side, local[2])];
+}
 
 /** 液压缸节点名。 */
 export const HYDRAULIC_NODE = (spec: HydraulicSpec, end: "cyl" | "rod") =>
@@ -514,6 +577,61 @@ export const T800_STUDS: StudMount[] = T800_HYDRAULICS.flatMap((spec) => [
     normal: MOUNTS[`${spec.key}_b`].normal,
   },
 ]);
+
+/**
+ * 侧别化的安装点：世界 z = sideZ(side, 局部 z)，法线的 z 分量随侧别翻转。
+ * 右腿的 +Z 面（装甲侧）对左腿就是 -Z 面 —— 镜像后结构自洽。
+ */
+export function legMounts(side: LegSide): Record<string, MountSpec> {
+  const out: Record<string, MountSpec> = {};
+  for (const [key, mount] of Object.entries(MOUNTS)) {
+    out[key] = {
+      ...mount,
+      at: [mount.at[0], mount.at[1], sideZ(side, mount.at[2])],
+      normal: [mount.normal[0], mount.normal[1], side * mount.normal[2]] as Vec3,
+    };
+  }
+  return out;
+}
+
+/** 侧别化的六根液压缸（A/B 球心随之镜像）。 */
+export function legHydraulics(side: LegSide): HydraulicSpec[] {
+  const mounts = legMounts(side);
+  return CYLINDER_SEEDS.map((seed) => ({
+    key: seed.key,
+    name_cn: seed.name_cn,
+    name_en: seed.name_en,
+    parent: seed.parent,
+    child: seed.child,
+    A: mountBall(mounts[seed.a]),
+    B: mountBall(mounts[seed.b]),
+    normalA: mounts[seed.a].normal,
+    normalB: mounts[seed.b].normal,
+    rBody: seed.rBody,
+    lc: seed.lc,
+    lr: seed.lr,
+  }));
+}
+
+/** 侧别化的球头销安装点。 */
+export function legStuds(side: LegSide): StudMount[] {
+  return legHydraulics(side).flatMap((spec) => [
+    {
+      key: spec.key,
+      end: "A" as const,
+      node: SEGMENT_NODE[spec.parent],
+      ball: spec.A,
+      normal: MOUNTS[`${spec.key}_a`].normal,
+    },
+    {
+      key: spec.key,
+      end: "B" as const,
+      node: SEGMENT_NODE[spec.child],
+      ball: spec.B,
+      normal: MOUNTS[`${spec.key}_b`].normal,
+    },
+  ]);
+}
 
 /** 两点距离。 */
 export function length(spec: HydraulicSpec): number {

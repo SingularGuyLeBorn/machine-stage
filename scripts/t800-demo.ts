@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import * as THREE from "three";
 import { buildModel } from "../src/three/parts/assembler/assembler";
-import { makeT800Layouts, makeT800Registry, t800Builders } from "../src/three/parts/models/t800/registry";
+import { makeT800Layouts, makeT800Registry, t800AllBuilders } from "../src/three/parts/models/t800/registry";
 import { animateT800, t800Pose } from "../src/three/parts/models/t800/motion";
 
 const OUT = "docs/qa/t800/demo";
@@ -12,7 +12,7 @@ mkdirSync(OUT, { recursive: true });
 
 const registry = makeT800Registry();
 const model = buildModel(registry, {
-  builders: t800Builders,
+  builders: t800AllBuilders,
   instanceLayouts: makeT800Layouts(),
   warnMissingLayout: false,
 });

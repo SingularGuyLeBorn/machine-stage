@@ -18,13 +18,13 @@ const NODE_PATTERN = /^[A-Za-z][A-Za-z0-9_]*$/;
 // 层号 → build_order 基调区间（校验用）：build_order 是全局单调整数，区间只要求每层占一段、
 // 不与相邻层重叠。L1 留 200 格是因为虎式整机的核心机构（HL230 全机约 110 个具名零件）全归 L1；
 // 其余层各留 100 格（车体/蒙皮等层以实例数取胜，具名零件不多）。
-const LAYER_RANGE: Record<number, [number, number]> = {
-  1: [100, 299],
-  2: [300, 399],
-  3: [400, 499],
-  4: [500, 599],
-  5: [600, 699],
-};
+/**
+ * build_order 只要求「全局唯一 + ≥100」。
+ * 早期按层分 100 槽的固定区间是为单模型（虎式整机约 300 件）设计的；
+ * 整机 T-800（双腿 + 骨盆 + 脊柱 + 躯干 + 双臂 + 头）零件数过千，
+ * 层内槽位不再够用 —— 改为按层分段（LAYER_BASE 拉开间距）但不设上限。
+ */
+const MIN_BUILD_ORDER = 100;
 
 export const BUILD_LAYER_LABELS: Record<number, { name_cn: string; name_en: string }> = {
   1: { name_cn: "核心机构", name_en: "core mechanism" },
@@ -103,15 +103,12 @@ export function validateRegistry(registry: ModelRegistry): ValidationIssue[] {
     }
     if (!BUILD_LAYER_LABELS[part.build_layer]) {
       error("E006", `零件 "${part.id}" 的 build_layer=${part.build_layer} 越界（1..5）`, where);
-    } else {
-      const [lo, hi] = LAYER_RANGE[part.build_layer];
-      if (part.build_order < lo || part.build_order > hi) {
-        warn(
-          "W002",
-          `零件 "${part.id}" 的 build_order=${part.build_order} 不在 L${part.build_layer} 区间 [${lo}, ${hi}]`,
-          where,
-        );
-      }
+    } else if (part.build_order < MIN_BUILD_ORDER) {
+      error(
+        "E006",
+        `零件 "${part.id}" 的 build_order=${part.build_order} 低于下限 ${MIN_BUILD_ORDER}`,
+        where,
+      );
     }
     if (seenOrders.has(part.build_order)) {
       error(
