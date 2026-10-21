@@ -62,6 +62,8 @@ interface Angles {
   y: Map<string, number>;
   /** 落地冲击强度（左右各一），脚跟触地那一下最大 */
   land: { r: number; l: number };
+  /** 整机转身（水平面偏转，度） */
+  turn: number;
 }
 
 /** 屈伸幅度（度）。 */
@@ -159,7 +161,13 @@ function jointAngles(seconds: number): Angles {
     if (!y.has(joint.name)) y.set(joint.name, 0);
   }
   // 落地冲击：脚跟触地（膝屈到位的瞬间）
-  return { z, y, land: { r: impact(right + 0.25), l: impact(left + 0.25) } };
+  // 转身：整机的水平面缓慢偏转（机械行走时躯干带一点偏摆）
+  return {
+    z,
+    y,
+    land: { r: impact(right + 0.25), l: impact(left + 0.25) },
+    turn: 6 * Math.sin(2 * Math.PI * p),
+  };
 }
 
 /**
@@ -224,6 +232,15 @@ function solveWorld(angles: Angles): Map<string, Pose> {
       : rest.clone();
     // 骨盆：落地时下沉一下（机械腿的重量感）
     if (!joint.parent) pos.y -= 0.009 * (angles.land.r + angles.land.l);
+    // 骨盆：整机的**转身**（水平面缓慢偏转），子链跟着转
+    if (!joint.parent) {
+      quat.premultiply(
+        new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(0, 1, 0),
+          THREE.MathUtils.degToRad(angles.turn),
+        ),
+      );
+    }
     world.set(joint.name, { pos, quat });
   }
   return world;
@@ -281,7 +298,7 @@ export function animateT800(
   model.resetNodes();
   // 待机：站姿（不迈步）—— 步态循环里总有一条腿屈着，静止展示用站姿更干净
   const angles: Angles = options.idle
-    ? { z: new Map(), y: new Map(), land: { r: 0, l: 0 } }
+    ? { z: new Map(), y: new Map(), land: { r: 0, l: 0 }, turn: 0 }
     : jointAngles(seconds);
   if (options.idle) {
     for (const [name, deg] of Object.entries(SPINE_BEND)) angles.z.set(name, deg);
