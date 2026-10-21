@@ -71,8 +71,6 @@ export interface StageModel {
   animate?: (assembled: AssembledModel, seconds: number, state?: string) => void;
   /** 纯展示比例（只缩放置换根节点，不改节点/动画/对接）；在包围盒与相机基准之前应用。 */
   presentationScale?: [number, number, number];
-  /** 保留在代码里但不在模型库展示（旧外形/参考版本）。 */
-  hidden?: boolean;
   /** 这些状态由时钟推进（缺省只有 running）；多形态模型用它声明可动状态。 */
   animatedStates?: string[];
   /** 由 animate 直接改写实例矩阵的零件（pose 层的爆炸/拆解据此取本帧位姿）。 */
@@ -188,7 +186,6 @@ export const CATALOG: StageModel[] = [
     subtitle: "四体分离合体 · 锥销/锁环真实对接 · 反重力编队 · 怪光线",
     milestone: "M-G",
     status: "ready",
-    hidden: true,
     registry: makeKingJoeRegistry(),
     layouts: makeKingJoeLayouts(),
     builders: kingjoeModelBuilders,
