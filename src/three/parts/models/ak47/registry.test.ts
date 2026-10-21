@@ -79,8 +79,9 @@ describe("ak47 注册表回归", () => {
       const d = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
       expect(d, `弹 ${i}↔${i + 1} 中心距 ${(d * 1000).toFixed(1)}mm`).toBeGreaterThan(0.01135);
     }
-    // 底部弹随弧倾斜 ~28°
-    expect(magRoundTransform(29).alpha).toBeGreaterThan(0.4);
+    // 底部弹随弧倾斜 15°（真实 AK：上段近垂直、弯集中在下段）
+    expect(magRoundTransform(29).alpha).toBeGreaterThan(0.2);
+    expect(magRoundTransform(29).alpha).toBeLessThan(0.32);
   });
 
   it("双列横错：顶部收敛、下部全错距", () => {

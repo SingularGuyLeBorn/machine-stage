@@ -170,7 +170,7 @@ export const AK47_CONSTANTS = {
 //   · 满弹堆叠长 14.5 × 10.2 ≈ 148mm（弹匣内高 ≈150mm，与实车一致）。
 // ---------------------------------------------------------------------------
 const MAG_PITCH = 0.0115; // 列内弹距（> 底缘+弹体半径 10.65mm，保证零穿模）
-const MAG_ALPHA_MAX = (28 * Math.PI) / 180; // 堆叠方向总偏角（香蕉匣）
+const MAG_ALPHA_MAX = (15 * Math.PI) / 180; // 堆叠方向总偏角（真实 AK 弹匣上段近垂直、弯集中在底部）
 const MAG_ARC_BEND = 1.4; // 弯曲进程指数（头部直、尾部弯）
 const MAG_STAGGER_X = 0.005; // 双列横向半距
 const MAG_INTEGRATE_STEPS = 240;
