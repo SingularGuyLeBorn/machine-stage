@@ -461,24 +461,30 @@ export function animateTigerFiring(assembled: AssembledModel, seconds: number): 
 // 演示件 tags fx：构建时隐藏、不参与穿模/支撑检测，坐标全部是 Turret 节点局部系。
 // ---------------------------------------------------------------------------
 export const TIGER_LOAD_HOLD = 5.2;
-export const TIGER_LOAD_FIRE = 3.0;
-const LOAD_FIRE_OFFSET = 1.9; // t' = t - 1.9 → 正好落进 animateTigerFiring 的时间轴
+export const TIGER_LOAD_FIRE = 2.9;
+const LOAD_FIRE_OFFSET = 1.7; // t' = t - 1.7 → 正好落进 animateTigerFiring 的时间轴
 const LOAD_ROUND_PARTS = [
   "tiger.interior.loading_round_case",
   "tiger.interior.loading_round_shell",
 ];
 const LOAD_CASE_PART = "tiger.interior.ejected_case";
-const LOAD_START: [number, number, number] = [-1.15, 1.7, 0.3];
-const LOAD_ALIGN: [number, number, number] = [-1.71, 1.45, 0];
-const LOAD_RAMMED: [number, number, number] = [-2.47, 1.45, 0];
-const LOAD_TILT_END = 0.45;
-const LOAD_CARRY_START = 0.45;
-const LOAD_CARRY_END = 1.65;
-const LOAD_RAM_START = 1.95;
-const LOAD_RAM_END = 2.55;
-const LOAD_ROUND_HIDE = 3.15;
-const LOAD_EJECT_START = 3.5;
-const LOAD_EJECT_END = 4.35;
+// 局部 +Y（弹头方向）恒定横置 → 世界 -X：不再原地竖转（0.76m 长的弹在 1.65m 高的
+// 炮塔里竖转必然扫穿顶甲——这是用户看到的「顶破壳子」的来源）。
+const LOAD_START: [number, number, number] = [-1.15, 1.74, 0.3];
+const LOAD_CARRY_END: [number, number, number] = [-1.49, 1.71, 0.05];
+const LOAD_ALIGN: [number, number, number] = [-1.49, 1.45, 0.05];
+// 药室只有 350 长（模型口径）：筒底停在药室尾端 -2.35，弹头进膛 0.4m；
+// 筒口 -2.67 停在炮管尾端面（-2.70）之前，不顶炮管。
+const LOAD_RAMMED: [number, number, number] = [-2.43, 1.45, 0];
+const LOAD_CARRY_START = 0.35;
+const LOAD_CARRY_END_T = 1.2;
+const LOAD_ALIGN_START = 1.25;
+const LOAD_ALIGN_END = 1.8;
+const LOAD_RAM_START = 1.85;
+const LOAD_RAM_END = 2.45;
+const LOAD_ROUND_HIDE = 2.9;
+const LOAD_EJECT_START = 3.7;
+const LOAD_EJECT_END = 4.5;
 
 const lerp3 = (
   a: readonly [number, number, number],
@@ -496,50 +502,55 @@ export interface TigerLoadPose {
   visible: boolean;
 }
 
-/** 弹的位姿（纯函数，便于单测）：起点在待发架上方，终点膛内。 */
+/** 弹的位姿（纯函数，便于单测）：横置从待发架上方 → 炮闩后方 → 沿膛线推入。 */
 export function tigerLoadRoundPose(t: number): TigerLoadPose {
-  const tilt = (Math.PI / 2) * smoothstep(0, LOAD_TILT_END, t);
   let position: [number, number, number];
   if (t < LOAD_CARRY_START) {
     position = [...LOAD_START];
-  } else if (t < LOAD_CARRY_END) {
-    const u = smoothstep(LOAD_CARRY_START, LOAD_CARRY_END, t);
-    position = lerp3(LOAD_START, LOAD_ALIGN, u);
-    position[1] += 0.07 * Math.sin(Math.PI * u); // 递弹弧线：中途抬 70mm
+  } else if (t < LOAD_CARRY_END_T) {
+    const u = smoothstep(LOAD_CARRY_START, LOAD_CARRY_END_T, t);
+    position = lerp3(LOAD_START, LOAD_CARRY_END, u);
+  } else if (t < LOAD_ALIGN_START) {
+    position = [...LOAD_CARRY_END];
+  } else if (t < LOAD_ALIGN_END) {
+    position = lerp3(LOAD_CARRY_END, LOAD_ALIGN, smoothstep(LOAD_ALIGN_START, LOAD_ALIGN_END, t));
   } else if (t < LOAD_RAM_START) {
     position = [...LOAD_ALIGN];
   } else {
     position = lerp3(LOAD_ALIGN, LOAD_RAMMED, smoothstep(LOAD_RAM_START, LOAD_RAM_END, t));
+    // 进入闩口前的 150ms 内把 z 收到 0（炮膛轴线）
+    position[2] = LOAD_ALIGN[2] * (1 - Math.min(1, (t - LOAD_RAM_START) / 0.15));
   }
-  return { position, tilt, visible: t < LOAD_ROUND_HIDE };
+  return { position, tilt: Math.PI / 2, visible: t < LOAD_ROUND_HIDE };
 }
 
-/** 空筒抛出位姿：从膛底掉到吊篮地板上，边落边滚。 */
+/** 空筒抛出位姿：从药室掉到吊篮地板上，边落边滚。 */
 export function tigerLoadCasePose(t: number): {
   position: [number, number, number];
   spin: number;
   visible: boolean;
 } {
   const u = smoothstep(LOAD_EJECT_START, LOAD_EJECT_END, t);
+  // 从闩口后方抽出再落下（不能从药室里直接掉——会穿过闩室/复进机实体）
   const position: [number, number, number] = [
-    -2.3 + 0.42 * u,
-    1.44 - 0.26 * u * u,
-    0.02 + 0.22 * u,
+    -2.0 + 0.6 * u,
+    1.44 - 0.22 * u * u,
+    -0.02 * u,
   ];
-  return { position, spin: u * Math.PI * 2.4, visible: t >= LOAD_EJECT_START };
+  return { position, spin: Math.PI / 2 + u * Math.PI, visible: t >= LOAD_EJECT_START };
 }
 
-/** 闩体行程（0 闭锁 / -160mm 全开）：装填开一次、抛壳再开一次。 */
+/** 闩体行程（0 闭锁 / -160mm 全开）：先开闩才有装填通道，抛壳再开一次。 */
 export function tigerLoadingBlockOffset(t: number): number {
-  const open = (a: number, b: number) => -TIGER_BLOCK_DROP * smoothstep(a, b, t);
-  if (t < 1.45) return 0;
-  if (t < 1.8) return open(1.45, 1.8);
-  if (t < 2.55) return -TIGER_BLOCK_DROP;
-  if (t < 2.85) return -TIGER_BLOCK_DROP * (1 - smoothstep(2.55, 2.85, t));
-  if (t < 3.4) return 0;
-  if (t < 3.7) return open(3.4, 3.7);
-  if (t < 4.0) return -TIGER_BLOCK_DROP;
-  if (t < 4.3) return -TIGER_BLOCK_DROP * (1 - smoothstep(4.0, 4.3, t));
+  const ramp = (a: number, b: number) => -TIGER_BLOCK_DROP * smoothstep(a, b, t);
+  if (t < 1.05) return 0;
+  if (t < 1.5) return ramp(1.05, 1.5);
+  if (t < 2.45) return -TIGER_BLOCK_DROP;
+  if (t < 2.8) return -TIGER_BLOCK_DROP * (1 - smoothstep(2.45, 2.8, t));
+  if (t < 3.5) return 0;
+  if (t < 3.8) return ramp(3.5, 3.8);
+  if (t < 4.1) return -TIGER_BLOCK_DROP;
+  if (t < 4.4) return -TIGER_BLOCK_DROP * (1 - smoothstep(4.1, 4.4, t));
   return 0;
 }
 
@@ -555,8 +566,12 @@ function poseLoadPart(
   const handle = assembled.getPart(id);
   if (!handle) return;
   handle.object.visible = visible;
-  if (!visible) return;
-  loadMatrix.makeRotationZ(tilt).setPosition(position[0], position[1], position[2]);
+  if (visible) {
+    loadMatrix.makeRotationZ(tilt).setPosition(position[0], position[1], position[2]);
+  } else {
+    // 不可见时缩到 0 并挪出车外：避免残留包围盒参与扫掠/遮挡
+    loadMatrix.makeScale(0, 0, 0).setPosition(0, -5, 0);
+  }
   handle.setInstanceMatrix(0, loadMatrix);
 }
 
