@@ -118,7 +118,8 @@ async function main() {
     const s = window.__stage.store.getState(); const a = s.assembled;
     let instances = 0; for (const p of a.parts) instances += p.instances.length;
     const box = a.root ? null : null;
-    return { parts: a.parts.length, instances, modelId: s.modelId, reports: s.reports?.length ?? null, state: s.machineState };
+    return { parts: a.parts.length, instances, modelId: s.modelId, reports: s.reports?.length ?? null, state: s.machineState,
+      partition: s.reportPartition ? { active: s.reportPartition.active.length, expected: s.reportPartition.expected.length } : null };
   })()`);
   console.log("loaded", JSON.stringify(stats));
   if (MODEL === "kingjoeskin") {
@@ -135,6 +136,65 @@ async function main() {
     await setState("separated");
     await sleep(1500);
     await shot("kingjoe-skin-card-separated");
+    const errors = await evaluate(`(window.__qaErrors ?? []).slice(0, 10)`);
+    console.log("page errors", JSON.stringify(errors));
+    chrome.kill();
+    return;
+  }
+  if (MODEL === "kingjoelower") {
+    await setState("idle");
+    await setCamera([0.6, 4.0, 13.5], [0, 3.5, 0]);
+    await sleep(1200);
+    await shot("kingjoe-lower-front", CROP);
+    await shot("kingjoe-lower-card");
+    await setCamera([9.2, 6.6, 11.2], [0, 3.7, 0]);
+    await sleep(500);
+    await shot("kingjoe-lower-threeq", CROP);
+    await setCamera([2.8, 4.2, 4.4], [0, 3.9, 0]);
+    await sleep(500);
+    await shot("kingjoe-lower-seam-idle", CROP);
+    await evaluate(`window.__stage.store.getState().setView("xray", true); true`);
+    await sleep(700);
+    await shot("kingjoe-lower-joint-xray-idle", CROP);
+    await evaluate(`window.__stage.store.getState().setView("xray", false); true`);
+
+    // 分离动作：前段髋缝电弧仍在，随后拉断
+    await setCamera([3.4, 4.3, 5.2], [0, 3.7, 0]);
+    await setState("separating");
+    await sleep(420);
+    await shot("kingjoe-lower-separating-arc", CROP);
+    await shot("kingjoe-lower-card-separating");
+    await setCamera([9.6, 6.8, 12.4], [0, 4.0, 0]);
+    await sleep(650);
+    await shot("kingjoe-lower-separating", CROP);
+    await sleep(1000);
+    await setState("separated");
+    await sleep(300);
+    await setCamera([0.6, 5.0, 16.5], [0, 4.3, 0]);
+    await sleep(500);
+    await shot("kingjoe-lower-separated-front", CROP);
+    await setCamera([9.6, 7.4, 12.6], [0, 4.3, 0]);
+    await sleep(500);
+    await shot("kingjoe-lower-separated", CROP);
+    await setCamera([3.4, 5.0, 5.6], [0, 4.2, 0]);
+    await sleep(500);
+    await shot("kingjoe-lower-seam-separated", CROP);
+    await evaluate(`window.__stage.store.getState().setView("xray", true); true`);
+    await sleep(700);
+    await shot("kingjoe-lower-joint-xray", CROP);
+    await evaluate(`window.__stage.store.getState().setView("xray", false); true`);
+
+    // 合体：末段电弧重新接通，锁死闪光
+    await setCamera([3.4, 4.3, 5.2], [0, 3.7, 0]);
+    await setState("combining");
+    await sleep(1150);
+    await shot("kingjoe-lower-combining-arc", CROP);
+    await sleep(300);
+    await shot("kingjoe-lower-combining-lock", CROP);
+    await shot("kingjoe-lower-card-combining");
+    await setCamera([0.6, 4.0, 13.5], [0, 3.5, 0]);
+    await sleep(700);
+    await shot("kingjoe-lower-combined", CROP);
     const errors = await evaluate(`(window.__qaErrors ?? []).slice(0, 10)`);
     console.log("page errors", JSON.stringify(errors));
     chrome.kill();

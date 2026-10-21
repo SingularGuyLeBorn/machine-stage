@@ -1506,3 +1506,52 @@ node scripts/capture-preview.mjs                 # 需本机 Chrome；输出到 
 - 框架：`PartDefinition.materialGroups` + 装配器 group 校验；`applyHighlight` 支持材质数组；`applyXray` 已支持数组；单件模型支撑检测豁免（`bodies.length <= 1`）。
 - 门禁：vitest **136**；tsc/build ✓；整机单件 1 件、静态报告 0、支撑 0；578 卡保持原白名单。
 - 阶段 2（合理方向飞散/阻尼+电弧）与阶段 3（内部机械替换）未做，等阶段 1 验收。
+
+### 追加：髋缝两体拆分（King Legs ↔ 上身，2026-10-21）
+
+参考 `E:\Downloads\JGQ` 的分体玩具照片：下半身是 **King Legs 腿体飞船（腿+髋鼓）**，骨盆中柱属于上半身。上一版把骨盆并入下半身、在 3.93–3.99 腰线分离，对照参考图后撤回；本版改回真实髋缝，仍不使用平面切割。
+
+| 项     | 结果                                                                                                                                                                                                                                  |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 拆分   | 下半身 = legs 总成（腿 + 髋鼓，**1,510 三角 / 3 材质组**，最高 3.598m）；上半身 = 骨盆以上（**13,738 三角 / 12 材质组**，骨盆中柱最低 2.570m）；合计 **15,248 三角**，三角形/UV/材质不丢                                |
+| 接缝   | 髋鼓围住骨盆中柱的源装甲边界（约 3.60m），非平面；中柱是源结构自带的中央定位榫，分离时沿髋腔退出                                                                                                                                    |
+| 榫卯   | 下半身：中央榫口承座（rOuter 0.60 / rInner 0.30 / h 0.06）+ **4 组楔榫**（底 0.20 / 顶 0.14 / 高 0.24m，R 0.52，45°）；上半身：**4 组榫槽**（槽口朝下，侧隙 5mm）；合体藏在髋腔/骨盆壳内，分离后露出                                                                 |
+| 动作   | `idle / separating / separated / combining`；上半身提起 **1.30m**（中柱完全退出），下半身站在地面不动；分离 1.5s、合体 1.7s，状态切换从上一帧高度平滑过渡                                                                              |
+| 电弧   | 8 条抖动电弧 + 髋缝光环保 + 点光；分离时拉长、拉断；合体末段重新接通，锁死时白色闪光核心爆发一下；FX 不参与零件树/穿模/悬空检测                                                                                                      |
+| 门禁   | `vitest` **141 passed（17 文件）**；`tsc` / `build` ✓；合体态 **active 0 / expected 11 / unsupported 0**；分离终态 **active 0**；分离/合体 30fps 扫掠 **active 0**；浏览器加载 active 0 / expected 11，page errors 0                  |
+| 外观   | 合体态与「整机单件」同相机正视图：**SSIM 0.9986 / PSNR 47.1 dB**（裁掉状态栏，900×620）；金色楔榫合体时藏进髋腔，正面无外露                                                                                                            |
+
+**白名单（只覆盖隐藏榫件与源髋部互锁）**
+
+- `lower.body ↔ upper.body`：髋鼓/骨盆中柱的源网格髋部互锁，深度上限 800mm（源壳互嵌，分离/合体时沿髋腔滑动）；
+- `hip_seat ↔ lower.body` 180mm：承座嵌在髋腔口；
+- `hip_seat ↔ upper.body` 500mm：承座合体时藏在骨盆下缘，中柱穿过中央榫口；
+- `hip_tenon ↔ upper.body` 320mm：楔榫藏在骨盆壳内；
+- `hip_socket ↔ upper.body` 320mm：榫槽嵌在骨盆内壁。
+- 榫头/榫槽之间保持 5mm 侧隙，不进入白名单；未豁免报告在合体态、分离终态和两条动画扫掠中都是 0。
+
+**验收证据**
+
+- `docs/qa/kingjoe-lower-card.jpg`：前端卡片 + 合体整机 + 动作/状态机。
+- `docs/qa/kingjoe-lower-separated.jpg` / `-separated-front.jpg` / `-seam-separated.jpg`：分离停放，髋腔中央榫口 + 4 楔榫与上身中柱。
+- `docs/qa/kingjoe-lower-separating-arc.jpg`、`-combining-arc.jpg`、`-combining-lock.jpg`：分离/合体电弧与锁死闪光。
+- `docs/qa/kingjoe-lower-joint.jpg`（合体缝 / 分离电弧 / 分离髋口）与 `kingjoe-lower-arcs.jpg`（分离 / 合体 / 锁死）。
+- `docs/qa/kingjoe-lower-vs-whole.jpg`：整机单件 vs 本卡合体态。
+- `docs/qa/kingjoe-lower-joint-xray-idle.jpg` / `-joint-xray.jpg`：透视下榫头与榫槽的隐藏配合。
+
+**已知边界**
+
+1. 源网格仍是互嵌薄壳，不是水密实体；上半身骨盆底部是源壳内腔，分离后能看到腔体和一根源网格细三角，本版未做重拓扑。
+2. 榫槽藏在骨盆壳内，普通合体视角不可见，只能用透视或分离后观察；下半身的中央榫口与楔榫是常态可见的榫卯部分。
+3. 中央榫口承座/楔榫是为了演示榫卯与定位方向新增的硬件；未做强度、摩擦或自锁分析。
+4. 四体编队/飞散/怪光线仍在主卡；本卡只做 King Legs ↔ 上半身两体的分离/合体。
+
+**复现**
+
+```bash
+npx vite-node scripts/build-kingjoe-lower.ts     # 生成髋缝两组皮
+npx vite-node scripts/diag-kingjoe-lower.ts      # 静态/分离/合体扫掠
+npm test && npm run build
+PREVIEW_URL='http://localhost:5176/?qa=1' PREVIEW_MODEL=kingjoelower node scripts/capture-preview.mjs
+```
+
