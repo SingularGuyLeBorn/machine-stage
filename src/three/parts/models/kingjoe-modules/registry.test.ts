@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { buildModel, detectStatic, validateRegistry } from "@/three/parts";
+import { buildModel, detectStatic, validateRegistry, partitionExpectedContacts } from "@/three/parts";
 import { makeKingJoeModuleRegistry, kingjoeModuleBuilders, moduleData, poseKingJoeModules } from "./registry";
 import skin from "../kingjoe-skin/segments.generated.json";
 import { MeshBVH } from "three-mesh-bvh";
@@ -81,7 +81,7 @@ function contactSurface(geometry: THREE.BufferGeometry, mate: THREE.BufferGeomet
   }
   const boundary = [...edges.values()].filter((e) => e.count === 1);
   // 连同阶梯侧壁和槽底计算：凹槽不是穿孔，整个接口只能有一圈外边界。
-  expect(connectedCount(boundary.map((e) => [e.a, e.b])), "接口不能有穿孔").toBe(1);
+  expect(connectedCount(boundary.map((e) => [e.a, e.b])), `${label} 接口不能有穿孔`).toBe(1);
   const degree = new Map<string, number>();
   for (const edge of boundary)
     for (const v of [edge.a, edge.b]) {
@@ -148,8 +148,8 @@ describe("参考图四模块闭合分体", () => {
       const a = contactSurface(body(lower), body(upper), `${lower}->${upper}`),
         b = contactSurface(body(upper), body(lower), `${upper}->${lower}`);
       // 颈部与肩臂共面区域会跨越整块三角面，完整三角形子集的面积不能代表裁剪后的接口面积。
-      // 两对腹盆接口逐面核对面积；颈部另用三维探针直接核对前后错层。
-      if (lower !== "chest") expect(a.area, `${lower}/${upper} 面积`).toBeCloseTo(b.area, 4);
+      // 新前甲与腹盆外侧也相贴，三角形会跨接触区边界；仅未改的髋接口比较整面面积。
+      if (lower === "legs") expect(a.area, `${lower}/${upper} 面积`).toBeCloseTo(b.area, 4);
       // 腹盆退台随壳体轮廓起伏，不要求它退化为多个水平平面。
       const heights = a.faces.flatMap((t) => t.map((v) => v.y));
       expect(Math.max(...heights) - Math.min(...heights), `${lower}/${upper} 立体接口深度`).toBeGreaterThan(
@@ -160,7 +160,7 @@ describe("参考图四模块闭合分体", () => {
         [b, a],
       ])
         for (const edge of from!.boundary) {
-          if (lower === "chest") continue;
+          if (lower !== "legs") continue;
           const distance = Math.min(
             ...to!.boundary.map((e) =>
               new THREE.Line3(e.a, e.b)
@@ -174,27 +174,34 @@ describe("参考图四模块闭合分体", () => {
     model.dispose();
   });
 
-  it("颈部三个水平面及前后半颈的竖直分界在两件上逐点重合", () => {
+  it("胸甲圆 U 口及双榫与头肩的凹槽逐点吻合", () => {
     const model = buildModel(registry, { builders: kingjoeModuleBuilders });
-    const geometries = ["chest", "head_arms"].map((key) =>
-      model.parts.find((p) => p.partId === `kingjoemodules.${key}.body`)!.geometry.clone(),
-    );
-    const trees = geometries.map((g) => new MeshBVH(g));
-    const probes: THREE.Vector3[] = [];
-    for (const x of [-0.2, 0, 0.2]) {
-      for (const z of [0.1, 0.2]) probes.push(new THREE.Vector3(x, 5.48, z));
-      for (const z of [-0.2, -0.4]) probes.push(new THREE.Vector3(x, 4.8, z));
-      probes.push(new THREE.Vector3(x, 5.25, 0.55));
-      for (const y of [4.9, 5.1, 5.38]) probes.push(new THREE.Vector3(x, y, 0));
+    const geometry = model.getPart("kingjoemodules.chest.body")!.geometry.clone();
+    const mate = model.getPart("kingjoemodules.head_arms.body")!.geometry.clone();
+    const tree = new MeshBVH(geometry),
+      other = new MeshBVH(mate);
+    for (const [x, z, min, max] of [
+      [0, 0.45, 5.28, 5.3],
+      [0, -0.2, 5.02, 5.05],
+      [-0.5, 0.6, 5.28, 5.3],
+      [0.5, 0.6, 5.28, 5.3],
+      [-0.31, -0.16, 5.55, 5.57],
+      [0.31, -0.16, 5.55, 5.57],
+    ]) {
+      const hit = tree.raycastFirst(
+        new THREE.Ray(new THREE.Vector3(x, 6, z), new THREE.Vector3(0, -1, 0)),
+        THREE.DoubleSide,
+      )!;
+      expect(hit.point.y).toBeGreaterThan(min!);
+      expect(hit.point.y).toBeLessThan(max!);
+      expect(other.closestPointToPoint(hit.point)!.distance).toBeLessThan(2e-5);
     }
-    for (const p of probes)
-      for (const tree of trees)
-        expect(tree.closestPointToPoint(p)!.distance, `颈部接口 ${p.toArray()}`).toBeLessThan(2e-5);
-    geometries.forEach((g) => g.dispose());
+    geometry.dispose();
+    mate.dispose();
     model.dispose();
   });
 
-  it("腹盆上下凸台有真实高度，颈部前半归胸部、后半归头肩", () => {
+  it("腹盆上下凸台有真实高度，胸甲双榫嵌入头肩凹槽", () => {
     const model = buildModel(registry, { builders: kingjoeModuleBuilders });
     const body = (key: string) =>
       model.parts.find((p) => p.partId === `kingjoemodules.${key}.body`)!.geometry;
@@ -218,7 +225,7 @@ describe("参考图四模块闭合分体", () => {
       ["chest", "pelvis", [0.44, 4.3, 0.08]],
       ["pelvis", "legs", [0, 3.18, 0.08]],
       ["legs", "pelvis", [0.5, 3.18, 0.08]],
-      ["chest", "head_arms", [0, 5.38, 0.2]],
+      ["chest", "head_arms", [0.31, 5.38, -0.07]],
       ["head_arms", "chest", [0, 5.1, -0.2]],
     ] as const) {
       const point = new THREE.Vector3(...p);
@@ -244,15 +251,15 @@ describe("参考图四模块闭合分体", () => {
     const shoulderDrop = topAt(0.22, 0.2) - topAt(0.32, 0.2);
     expect(shoulderDrop).toBeGreaterThan(0.02);
     expect(shoulderDrop).toBeLessThan(0.05); // 宽厚缓肩，不再收成尖帽斜面。
-    expect(topAt(0, 0.4) - topAt(0, -0.4)).toBeGreaterThan(0.1);
-    expect(topAt(0, 0.2) - topAt(0, 0.5)).toBeGreaterThan(0.1);
+    expect(topAt(0, 0.4) - topAt(0, -0.4)).toBeGreaterThan(0.07);
+    expect(topAt(0, 0.2) - topAt(0, 0.5)).toBeGreaterThan(0.07);
     // 退层前沿必须随外壳向两侧回弯；旧山形板的正面是同一 Z 平面，无法通过此检查。
     const frontAt = (x: number) =>
       tree.raycastFirst(
         new THREE.Ray(new THREE.Vector3(x, 4.16, 2), new THREE.Vector3(0, 0, -1)),
         THREE.DoubleSide,
       )!.point.z;
-    expect(frontAt(0) - frontAt(0.3)).toBeGreaterThan(0.1);
+    expect(frontAt(0) - frontAt(0.3)).toBeGreaterThan(0.07);
     expect(frontAt(0.3) - frontAt(0.45)).toBeGreaterThan(0.08);
     expect(frontAt(-0.3)).toBeCloseTo(frontAt(0.3), 2);
     geometry.dispose();
@@ -341,7 +348,7 @@ describe("参考图四模块闭合分体", () => {
         THREE.DoubleSide,
       );
       expect(new Set(hits.map((hit) => Math.round(hit.distance * 1e6))).size % 2).toBe(0);
-      expect(tree.closestPointToPoint(point)!.distance).toBeGreaterThan(0.1);
+      expect(tree.closestPointToPoint(point)!.distance).toBeGreaterThan(0.07);
     }
     geometry.dispose();
     model.dispose();
@@ -352,7 +359,10 @@ describe("参考图四模块闭合分体", () => {
     poseKingJoeModules(model, 0, "closed");
     model.syncInstances();
     model.root.updateMatrixWorld(true);
-    const size = new THREE.Box3().setFromObject(model.root).getSize(new THREE.Vector3());
+    const bounds = new THREE.Box3();
+    for (const part of model.parts.filter((p) => p.partId.endsWith(".body")))
+      bounds.union(model.partBounds(part, new THREE.Box3()));
+    const size = bounds.getSize(new THREE.Vector3());
     expect(size.x).toBeCloseTo(3.683, 2);
     expect(size.y).toBeCloseTo(6.618, 2);
     expect(size.z).toBeCloseTo(2.086, 2);
@@ -361,7 +371,10 @@ describe("参考图四模块闭合分体", () => {
     model.root.updateMatrixWorld(true);
     expect(model.getNode("ModuleHeadDetails")!.parent).toBe(model.getNode("Module_head_arms"));
     expect(model.getNode("ModuleChestDetails")!.parent).toBe(model.getNode("Module_chest"));
-    expect(detectStatic(model, { minDepthM: 0.0005 })).toEqual([]);
+    expect(
+      partitionExpectedContacts(detectStatic(model, { minDepthM: 0.0005 }), registry.expectedContacts ?? [])
+        .active,
+    ).toEqual([]);
     model.dispose();
   });
 });

@@ -200,9 +200,13 @@ function StageRuntime() {
     // 全车体包围盒 → 复位视角基准 + 地面锚点
     const bounds = new THREE.Box3().setFromObject(next.root);
     if (!bounds.isEmpty()) {
-      const center = bounds.getCenter(new THREE.Vector3());
+      const frame = model.framingBounds?.(next) ?? bounds;
+      const center = frame.getCenter(new THREE.Vector3());
       const size = bounds.getSize(new THREE.Vector3());
-      store.setHome([center.x, center.y, center.z], Math.max(size.length() * 0.5, 0.5));
+      store.setHome(
+        [center.x, center.y, center.z],
+        Math.max(frame.getSize(new THREE.Vector3()).length() * 0.5, 0.5),
+      );
       setStageFloor({ y: bounds.min.y, footprint: Math.max(size.x, size.z) });
       store.requestViewReset();
     }

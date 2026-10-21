@@ -1,8 +1,9 @@
 import * as THREE from "three";
+import { MeshBVH } from "three-mesh-bvh";
 import type { GeometryBuilder } from "../../assembler/geometry";
 import { buildGeometry } from "../../assembler/geometry";
-import type { AssembledModel } from "../../assembler/assembler";
 import type { ModelRegistry, PartDefinition } from "../../registry/types";
+import { moduleOffsets, animateKingJoeModules } from "./motion";
 import { KINGJOE_SKIN_MATERIALS } from "../kingjoe-skin/materials";
 import { makeKingJoeSkinDetails } from "../kingjoe-skin/details";
 import data from "./modules.generated.json";
@@ -38,6 +39,17 @@ for (const detail of makeKingJoeSkinDetails()) {
   kingjoeModuleBuilders[`kjDetail_${detail.id}`] = (_spec, context) => {
     const geometry = buildGeometry(detail.geometry, context);
     const position = geometry.getAttribute("position");
+    if (detail.assembly === "chest") {
+      const cx = detail.mate?.type === "absolute" ? Number(detail.mate.position?.[0] ?? 0) : 0;
+      for (let i = 0; i < position.count; i++) {
+        const x = cx + position.getX(i);
+        // 每片彩窗沿肺叶切线倾斜，保持各层平行，避免低面数背板与彩条互相穿插。
+        const bend = detail.dual ? 0.1 * (1 - (cx / 1.02) ** 2) - ((0.2 * cx) / 1.02 ** 2) * (x - cx) : 0.1;
+        position.setZ(i, position.getZ(i) - bend);
+        if (detail.id.endsWith("grille_spine")) position.setY(i, position.getY(i) * 0.8 + 0.13);
+      }
+      geometry.computeVertexNormals();
+    }
     if (detail.geometry.type === "cylinder") {
       // 旧回转体把轴心半径钳到 0.0002m，眼部两端因此有针孔。将轴心环收至轴线，保留全部外侧倒角。
       for (let i = 0; i < position.count; i++) {
@@ -71,17 +83,145 @@ const NAMES: Record<string, string> = {
   head_arms: "头肩与完整双臂",
 };
 
-// [OM-FREEPLAY] 展开布局沿参考图排列；注册表静止姿态与查看姿态共用，初始取景才能包含全部模块。
-function moduleOffsets(gap: number): Record<string, [number, number, number]> {
-  return {
-    head_arms: [-gap, -1.3, 0],
-    chest: [0, -0.1, 1.5],
-    pelvis: [0, -1.3, 1.5],
-    legs: [gap, 0, 0],
-  };
+// 闭合旋转体：圆头、细杆与根部套筒同一张封闭网格，沿节点 Y 轴伸缩。
+function closedLathe(profile: number[][]) {
+  const geometry = new THREE.LatheGeometry(
+    profile.map(([r, y]) => new THREE.Vector2(r, y)),
+    20,
+  );
+  const p = geometry.getAttribute("position"),
+    index = geometry.index!,
+    kept: number[] = [];
+  for (let i = 0; i < index.count; i += 3) {
+    const ids = [index.getX(i), index.getX(i + 1), index.getX(i + 2)];
+    const [a, b, c] = ids.map((j) => new THREE.Vector3().fromBufferAttribute(p, j));
+    if (b!.sub(a!).cross(c!.sub(a!)).length() > 1e-12) kept.push(...ids);
+  }
+  geometry.setIndex(kept);
+  return geometry;
 }
+kingjoeModuleBuilders.kjAntenna = () =>
+  closedLathe([
+    [0, 0],
+    [0.027, 0],
+    [0.027, 0.14],
+    [0.018, 0.82],
+    [0.041, 0.85],
+    [0.05, 0.88],
+    [0.041, 0.915],
+    [0, 0.93],
+  ]);
+kingjoeModuleBuilders.kjSocket = () =>
+  closedLathe([
+    [0, -0.115],
+    [0.055, -0.115],
+    [0.067, -0.085],
+    [0.067, -0.035],
+    [0.05, 0],
+    [0, 0],
+  ]);
+kingjoeModuleBuilders.kjVane = () =>
+  closedLathe([
+    [0, -0.0125],
+    [0.095, -0.0125],
+    [0.11, -0.004],
+    [0.11, 0.004],
+    [0.095, 0.0125],
+    [0, 0.0125],
+  ]).scale(1, 1, 0.77);
+
+// [OM-FREEPLAY] 天线根部依照参考图配置；尺寸按原 GLB 的模块宽度换算。
+const ANTENNAS = [
+  { key: "head_arms", base: [1.55, 5.71, -0.03], direction: [1, 0.15, 0] },
+  { key: "chest", base: [0.58, 5.28, 0.65], direction: [0.2, 1, 0] },
+  { key: "pelvis", base: [0.4, 4.34, -0.04], direction: [0.55, 1, -0.06] },
+  // 原圆盖的中心和主轴，来自源网格圆盖的平面拟合；不是髋鼓包围盒中心。
+  { key: "legs", base: [0.9043, 3.2765, 0.8636], direction: [0.718, -0.048, 0.694] },
+] as const;
 
 export function makeKingJoeModuleRegistry(): ModelRegistry {
+  const antennaNodes: ModelRegistry["nodes"] = [];
+  const antennaParts: PartDefinition[] = [];
+  for (const spec of ANTENNAS)
+    for (const side of [-1, 1]) {
+      const name = `Antenna_${spec.key}_${side < 0 ? "l" : "r"}`;
+      const direction = new THREE.Vector3(
+        side * spec.direction[0],
+        spec.direction[1],
+        spec.direction[2],
+      ).normalize();
+      const e = new THREE.Euler().setFromQuaternion(
+        new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction),
+      );
+      const source = data.parts.find((p) => p.key === spec.key)!;
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.BufferAttribute(new Float32Array(decode(source.position)), 3),
+      );
+      geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(decode(source.index)), 1));
+      const tree = new MeshBVH(geometry);
+      const seed = new THREE.Vector3(side * spec.base[0], spec.base[1], spec.base[2]);
+      const hit = tree.raycastFirst(
+        new THREE.Ray(seed.clone().addScaledVector(direction, 2), direction.clone().negate()),
+        THREE.DoubleSide,
+      );
+      if (!hit) throw new Error(`${name} 未找到本体安装面`);
+      const mount = hit.point;
+      geometry.dispose();
+      const mountName = `Mount_${spec.key}_${side < 0 ? "l" : "r"}`;
+      antennaNodes.push({
+        name: mountName,
+        parent: `Module_${spec.key}`,
+        pivot: mount.toArray(),
+        rest_rotation: [(e.x * 180) / Math.PI, (e.y * 180) / Math.PI, (e.z * 180) / Math.PI],
+      });
+      antennaNodes.push({ name, parent: mountName, pivot: [0, -0.035, 0], motion: "scalar" });
+      antennaParts.push({
+        id: `kingjoemodules.${spec.key}.antenna_${side < 0 ? "l" : "r"}`,
+        name_cn: `${NAMES[spec.key]}伸缩天线`,
+        name_en: "telescopic antenna",
+        assembly: spec.key,
+        build_layer: 3,
+        build_order: 30 + antennaParts.length,
+        node: name,
+        geometry: { type: "kit", kit: "kjAntenna" },
+        material: "kjr_silver",
+        mate: { type: "absolute", position: [0, 0, 0] },
+      });
+      antennaParts.push({
+        id: `kingjoemodules.${spec.key}.socket_${side < 0 ? "l" : "r"}`,
+        name_cn: `${NAMES[spec.key]}天线套筒`,
+        name_en: "embedded antenna socket",
+        assembly: spec.key,
+        build_layer: 3,
+        build_order: 30 + antennaParts.length,
+        node: mountName,
+        geometry: { type: "kit", kit: "kjSocket" },
+        material: "kjr_silver_dark",
+        mate: { type: "absolute", position: [0, 0, 0] },
+      });
+    }
+  for (const side of [-1, 1]) {
+    antennaNodes.push({
+      name: `LegVane_${side < 0 ? "l" : "r"}`,
+      parent: `Mount_legs_${side < 0 ? "l" : "r"}`,
+      pivot: [side * 0.14, -0.005, 0],
+      motion: "rotate",
+    });
+    antennaParts.push({
+      id: `kingjoemodules.legs.vane_${side < 0 ? "l" : "r"}`,
+      name_cn: "髋鼓展开护片",
+      name_en: "hip flight vane",
+      assembly: "legs",
+      build_layer: 3,
+      build_order: 30 + antennaParts.length,
+      node: `LegVane_${side < 0 ? "l" : "r"}`,
+      geometry: { type: "kit", kit: "kjVane" },
+      material: "kjr_silver_dark",
+      mate: { type: "absolute", position: [-side * 0.11, 0, 0] },
+    });
+  }
   const bodies: PartDefinition[] = data.parts.map((part, i) => ({
     id: `kingjoemodules.${part.key}.body`,
     name_cn: NAMES[part.key]!,
@@ -112,7 +252,7 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
       HIP_SEAM: String(data.hip),
       WAIST_SEAM: String(data.waist),
       NECK_SEAM: String(data.neck),
-      // [OM-FREEPLAY] 沿参考图横向摆放便于检查；这里只设静态姿态，不接入旧合体动画。
+      // [OM-FREEPLAY] 分离终态沿参考图横向摆放，便于查看四个完整分体。
       DISPLAY_SPACING: 3.8,
     },
     assemblies: data.parts.map((part) => ({
@@ -126,9 +266,13 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
         name: `Module_${part.key}`,
         parent: "root",
         pivot: [
-          part.key === "head_arms" ? "-DISPLAY_SPACING" : part.key === "legs" ? "DISPLAY_SPACING" : 0,
-          moduleOffsets(0)[part.key]![1],
-          moduleOffsets(0)[part.key]![2],
+          part.key === "head_arms"
+            ? "-DISPLAY_SPACING"
+            : part.key === "legs"
+              ? "DISPLAY_SPACING"
+              : moduleOffsets(0)[part.key as keyof ReturnType<typeof moduleOffsets>][0],
+          moduleOffsets(0)[part.key as keyof ReturnType<typeof moduleOffsets>][1],
+          moduleOffsets(0)[part.key as keyof ReturnType<typeof moduleOffsets>][2],
         ] as [string | number, number, number],
         motion: "translate" as const,
       })),
@@ -140,27 +284,74 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
         pivot: [0, 5.65, 0],
         rest_rotation: [0, 180, 0],
       },
+      ...antennaNodes,
     ],
     materials: {
       ...KINGJOE_SKIN_MATERIALS,
       // [OM-FREEPLAY] 新封口以低反光深银区分，保留原表面的银灰外观。
       kjr_cap: { base: "#606a73", metalness: 0.45, roughness: 0.65 },
     },
-    parts: [...bodies, ...details],
-    expectedContacts: [],
+    parts: [...bodies, ...details, ...antennaParts],
+    expectedContacts: [
+      {
+        family: "hip_hinge",
+        a: "kingjoemodules.legs.body",
+        b: "kingjoemodules.legs.vane*",
+        reason: "护片铰接边埋入髋鼓圆盖，转动时保持连接",
+        maxDepthMm: 10,
+        anyForm: true,
+      },
+      ...ANTENNAS.flatMap((spec) =>
+        [-1, 1].flatMap((side) => {
+          const suffix = side < 0 ? "l" : "r",
+            prefix = `kingjoemodules.${spec.key}`;
+          return [
+            {
+              family: "antenna_mount",
+              a: `${prefix}.body`,
+              b: `${prefix}.socket_${suffix}`,
+              reason: "固定套筒完全埋入本体，顶端与安装面齐平",
+              maxDepthMm: 130,
+              anyForm: true,
+            },
+            {
+              family: "antenna_mount",
+              a: `${prefix}.body`,
+              b: `${prefix}.antenna_${suffix}`,
+              reason: "伸缩杆根部始终埋在本体内",
+              maxDepthMm: 60,
+              anyForm: true,
+            },
+            {
+              family: "antenna_mount",
+              a: `${prefix}.socket_${suffix}`,
+              b: `${prefix}.antenna_${suffix}`,
+              reason: "伸缩杆穿过固定套筒",
+              maxDepthMm: 100,
+              anyForm: true,
+            },
+          ];
+        }),
+      ),
+      {
+        family: "chest_frame",
+        a: "kingjoemodules.chest.body",
+        b: "kingjoemodules.chest.grille_frame*",
+        reason: "彩窗银框嵌入弧形胸甲前面，沿肺叶切线安装",
+        maxDepthMm: 16,
+        anyForm: true,
+      },
+      {
+        family: "chest_frame",
+        a: "kingjoemodules.chest.grille_frame*",
+        b: "kingjoemodules.chest.grille_back*",
+        reason: "彩窗背板与银框沿同一倾斜平面贴合",
+        maxDepthMm: 1,
+      },
+    ],
   };
 }
 
-export function poseKingJoeModules(model: AssembledModel, _seconds: number, state?: string): void {
-  const gap = model.constants.DISPLAY_SPACING!;
-  const offsets = moduleOffsets(gap);
-  for (const part of data.parts) {
-    const node = model.getNode(`Module_${part.key}`);
-    if (node) {
-      const offset = state === "closed" ? [0, 0, 0] : offsets[part.key]!;
-      node.position.set(offset[0]!, offset[1]!, offset[2]!);
-    }
-  }
-}
+export const poseKingJoeModules = animateKingJoeModules;
 
 export const moduleData = data;

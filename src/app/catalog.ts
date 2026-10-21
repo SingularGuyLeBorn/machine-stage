@@ -26,6 +26,8 @@ import {
   kingjoeModuleBuilders,
   poseKingJoeModules,
 } from "@/three/parts/models/kingjoe-modules/registry";
+import { moduleMotionBounds } from "@/three/parts/models/kingjoe-modules/motion";
+import type { Box3 } from "three";
 import { animateKingJoeSkin, type KingJoeSkinState } from "@/three/parts/models/kingjoe-skin/motion";
 import {
   animateTigerSuspension,
@@ -80,6 +82,8 @@ export interface StageModel {
   animate?: (assembled: AssembledModel, seconds: number, state?: string) => void;
   /** 纯展示比例（只缩放置换根节点，不改节点/动画/对接）；在包围盒与相机基准之前应用。 */
   presentationScale?: [number, number, number];
+  /** 可动总成的完整行程范围，用于初始取景。 */
+  framingBounds?: (assembled: AssembledModel) => Box3;
   /** 这些状态由时钟推进（缺省只有 running）；多形态模型用它声明可动状态。 */
   animatedStates?: string[];
   /** 由 animate 直接改写实例矩阵的零件（pose 层的爆炸/拆解据此取本帧位姿）。 */
@@ -113,13 +117,29 @@ export const CATALOG: StageModel[] = [
     registry: makeKingJoeModuleRegistry(),
     builders: kingjoeModuleBuilders,
     animate: poseKingJoeModules,
+    framingBounds: moduleMotionBounds,
+    animatedStates: ["combining", "separation"],
     states: [
       { id: "idle", label: "分体检查", hint: "双臂整体跟随头肩；四模块静态展开" },
       { id: "closed", label: "整机检查", hint: "回到原模型装配位置，不播放合体动画" },
+      {
+        id: "combining",
+        label: "电弧合体",
+        hint: "腿部就位后，腹盆、胸甲、头肩依次沿曲线吸合；电花由小到大，最后轻微回弹",
+      },
+      { id: "separation", label: "展开分体", hint: "四体从起步沿空间曲线展开，天线伸出、髋鼓护片打开" },
     ],
     actions: [
       { id: "modules-open", group: "分体", label: "分体检查", kind: "machine-state", state: "idle" },
       { id: "modules-close", group: "分体", label: "整机检查", kind: "machine-state", state: "closed" },
+      { id: "modules-combine", group: "动画", label: "电弧合体", kind: "machine-state", state: "combining" },
+      {
+        id: "modules-separate",
+        group: "动画",
+        label: "展开分体",
+        kind: "machine-state",
+        state: "separation",
+      },
       { id: "modules-reset", group: "展示", label: "重置视角", kind: "reset-view" },
     ],
     readouts: () => [
@@ -130,8 +150,9 @@ export const CATALOG: StageModel[] = [
     ],
     notes: [
       "按参考图分为头肩与双臂、胸甲、腹盆、腿部；手臂按原骨骼归组，不经过躯干切平面。",
-      "外形来自原 GLB，保留法线与 UV，沿用银灰金属、彩虹胸栅与眼部细节。原 GLB 本身未附带图像贴图。",
-      "腹盆中央隆起、两侧斜落，前后逐层退台；上下凸起分别嵌入胸甲和腿部的对应凹槽。颈部前半归胸部、后半归头肩。四个主体各自闭合连通，原合体动作与电弧不变。",
+      "保留原 GLB 的头部、四肢与腹盆细节，胸甲按参考图重塑为圆润双瓣，颈槽和肩根使用配对曲面。沿用银灰金属、彩虹胸栅与眼部细节。",
+      "腹盆上下凸起嵌入对应凹槽，原髋鼓完整归腿部。胸甲中央为圆 U 口，两侧双榫嵌入头肩凹槽；双臂根部带圆润护甲。",
+      "四体沿连续曲线飞出，天线从本体套筒伸出；合体按腿部、腹盆、胸甲、头肩依次完成，电花由小到大，近距减速后吸合回弹。",
     ],
   },
   {
