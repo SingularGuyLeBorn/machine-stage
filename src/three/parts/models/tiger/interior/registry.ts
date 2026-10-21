@@ -2237,9 +2237,9 @@ function buildInteriorParts(): PartDefinition[] {
     geometry: {
       type: "merge",
       parts: [
-        { type: "cylinder", r: 0.051, h: 0.4, at: [0, 0, 0], segments: 20, bevel: 0.003 },
-        { type: "cylinder", r: 0.055, h: 0.022, at: [0, -0.19, 0], segments: 20, bevel: 0.002 },
-        { type: "tube", rOuter: 0.052, rInner: 0.044, h: 0.05, at: [0, 0.215, 0], segments: 20 },
+        { type: "cylinder", r: 0.051, h: 0.26, at: [0, 0, 0], segments: 20, bevel: 0.003 },
+        { type: "cylinder", r: 0.055, h: 0.022, at: [0, -0.12, 0], segments: 20, bevel: 0.002 },
+        { type: "tube", rOuter: 0.052, rInner: 0.044, h: 0.035, at: [0, 0.135, 0], segments: 20 },
       ],
     },
     material: "case_brass",
@@ -2247,7 +2247,7 @@ function buildInteriorParts(): PartDefinition[] {
     node: "Turret",
     tags: ["fx"],
     source:
-      "装填演示药筒（与待发药筒同口径 ⌀102×400，筒口收口环 ⌀104/⌀88）：局部 +Y = 弹头方向，动画里整支横转 90° 送进炮膛；它是演示件（tags fx），构建时隐藏、不参与穿模/支撑检测。",
+      "装填演示药筒（⌀102×260，筒口收口环 ⌀104/⌀88）：模型炮尾药室只有 350 长（比实车短），故演示弹全长 0.58m、横置插入后筒底停在药室尾端 -2.35、筒口停在炮管尾端面之前；局部 +Y = 弹头方向。演示件（tags fx），构建时隐藏。",
   });
 
   add({
@@ -2260,9 +2260,9 @@ function buildInteriorParts(): PartDefinition[] {
     geometry: {
       type: "merge",
       parts: [
-        { type: "cylinder", r: 0.044, h: 0.19, at: [0, 0.385, 0], segments: 20, bevel: 0.002 },
-        { type: "cylinder", r: 0.044, h: 0.08, rTop: 0.02, at: [0, 0.52, 0], segments: 20, bevel: 0.002 },
-        { type: "cylinder", r: 0.0455, h: 0.02, at: [0, 0.3, 0], segments: 20, bevel: 0.001 },
+        { type: "cylinder", r: 0.042, h: 0.17, at: [0, 0.215, 0], segments: 20, bevel: 0.002 },
+        { type: "cylinder", r: 0.042, h: 0.07, rTop: 0.02, at: [0, 0.335, 0], segments: 20, bevel: 0.002 },
+        { type: "cylinder", r: 0.0435, h: 0.016, at: [0, 0.145, 0], segments: 20, bevel: 0.001 },
       ],
     },
     material: "steel_worn",
@@ -2270,7 +2270,7 @@ function buildInteriorParts(): PartDefinition[] {
     node: "Turret",
     tags: ["fx"],
     source:
-      "装填演示弹丸（Pzgr. 39 ⌀88×190 + 风帽锥 80 + 弹带）：与药筒同一演示坐标，动画中与药筒同步（同一条矩阵），弹底坐在筒口 y 0.29。",
+      "装填演示弹丸（Pzgr. 39，弹体 ⌀84 / 弹带 ⌀87）：比炮膛 ⌀88 小 1mm，避免扫掠时与膛壁零间隙；与药筒同一矩阵，弹底坐在筒口 y 0.16。",
   });
 
   add({
@@ -2283,8 +2283,8 @@ function buildInteriorParts(): PartDefinition[] {
     geometry: {
       type: "merge",
       parts: [
-        { type: "cylinder", r: 0.051, h: 0.4, at: [0, 0, 0], segments: 20, bevel: 0.003 },
-        { type: "cylinder", r: 0.055, h: 0.022, at: [0, -0.19, 0], segments: 20, bevel: 0.002 },
+        { type: "cylinder", r: 0.051, h: 0.26, at: [0, 0, 0], segments: 20, bevel: 0.003 },
+        { type: "cylinder", r: 0.055, h: 0.022, at: [0, -0.12, 0], segments: 20, bevel: 0.002 },
       ],
     },
     material: "case_brass",
