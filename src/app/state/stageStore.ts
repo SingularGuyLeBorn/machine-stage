@@ -353,8 +353,17 @@ export const useStageStore = create<StageState>((set, get) => ({
   resetParams: () => set((state) => ({ overrides: {}, rebuildToken: state.rebuildToken + 1 })),
 
   attach: (assembled) => {
-    set({ assembled });
-    get().runScan("static");
+    // 切换模型时不再自动跑整机静态扫描：MBT 级模型一次扫描数十秒，
+    // 会把主线程卡住。改为按需扫描（ClippingPanel / 动画面板手动触发）。
+    set({
+      assembled,
+      scanPhase: "idle",
+      scanKind: null,
+      allReports: [],
+      reports: [],
+      reportPartition: { active: [], expected: [] },
+      scanMs: null,
+    });
   },
 
   detach: () => set({ assembled: null, stats: null }),

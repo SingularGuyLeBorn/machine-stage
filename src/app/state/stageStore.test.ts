@@ -122,10 +122,12 @@ describe("stageStore 参数与扫描", () => {
     expect(useStageStore.getState().rebuildToken).toBe(2);
   });
 
-  it("attach 后自动静态扫描：故意重叠 1mm → 实例级报告", async () => {
+  it("attach 后按需静态扫描：故意重叠 1mm → 实例级报告", async () => {
     vi.useFakeTimers();
     const model = buildTestModel({ GAP: 0.001 });
     useStageStore.getState().attach(model);
+    expect(useStageStore.getState().scanPhase).toBe("idle");
+    useStageStore.getState().runScan("static");
     expect(useStageStore.getState().scanPhase).toBe("scanning");
     vi.runAllTimers();
     const state = useStageStore.getState();
@@ -144,11 +146,13 @@ describe("stageStore 参数与扫描", () => {
     vi.useFakeTimers();
     const bad = buildTestModel({ GAP: 0.001 });
     useStageStore.getState().attach(bad);
+    useStageStore.getState().runScan("static");
     vi.runAllTimers();
     expect(useStageStore.getState().reports).toHaveLength(1);
 
     const good = buildTestModel({ GAP: -0.002 });
     useStageStore.getState().attach(good);
+    useStageStore.getState().runScan("static");
     vi.runAllTimers();
     expect(useStageStore.getState().reports).toEqual([]);
     bad.dispose();
