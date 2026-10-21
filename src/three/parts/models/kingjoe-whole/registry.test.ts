@@ -17,12 +17,14 @@ describe("kingjoewhole 整机单件（内部实心）", () => {
     expect(handle.def.materialGroups?.length).toBe(registry.constants.MATERIAL_GROUPS);
     expect(handle.geometry.groups.length).toBe(registry.constants.MATERIAL_GROUPS);
     expect(handle.geometry.groups.at(-1)!.materialIndex).toBe(Number(registry.constants.MATERIAL_GROUPS) - 1);
-    expect(handle.def.materialGroups?.at(-1)).toBe("kjr_core");
+    expect(handle.def.materialGroups?.at(-1)).toBe("kjr_silver");
+    expect(handle.def.materialGroups?.at(-2)).toBe("kjr_core");
     expect(handle.geometry.index!.count / 3).toBe(registry.constants.TRIANGLES);
     expect(registry.constants.SHELL_TRIANGLES).toBe(15248);
     expect(registry.constants.CORE_TRIANGLES).toBeGreaterThan(30000);
     expect(registry.constants.CORE_BOUNDARY_EDGES).toBe(0);
     expect(registry.constants.CORE_VOLUME).toBeGreaterThan(9);
+    expect(registry.constants.PATCH_TRIANGLES).toBeGreaterThan(1000);
   });
 
   it("合体外形与真实网格一致，内核藏在原皮内，单件无穿模/无悬空误报", () => {
