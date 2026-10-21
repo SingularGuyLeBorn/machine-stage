@@ -136,17 +136,23 @@ def chest_envelope():
 
 def shoulder_armour():
     """沿原倾斜肩根加圆润护甲，直接并入头臂实体。"""
-    return union([paint(m.Manifold.sphere(1,48).scale((.29,.31,.35))
-                       .rotate((0,0,side*24)).translate((side*.84,5.05,-.04))) for side in [-1,1]])
+    return union([paint(m.Manifold.sphere(1,48).scale((.20,.16,.22))
+                       .rotate((0,0,side*24)).translate((side*.84,5.14,-.04))) for side in [-1,1]])
 
 
 def lung_front():
     """照片中的连体双肺前甲：宽平上缘、圆侧肩、中央下缘上提，四周滚圆。"""
-    xs=np.linspace(-1.02,1.02,97)
-    upper=[(x,5.29-.25*(abs(x)/1.02)**4) for x in xs]
-    lower=[(x,3.94+.35*np.exp(-(x/.32)**2)+.12*(abs(x)/1.02)**6) for x in xs]
-    outline=m.CrossSection([lower+list(reversed(upper))])
-    outline=outline.offset(-.18,m.JoinType.Round).offset(.18,m.JoinType.Round)
+    # 从照片描出整圈轮廓：上窄下宽、外侧鼓出、中央下缘上提；不是圆角矩形。
+    anchors=np.array([[0,5.30],[.62,5.29],[.73,5.15],[.78,4.91],[.91,4.55],
+                      [.97,4.19],[.86,3.84],[.65,3.82],[.30,3.98],[0,4.13],
+                      [-.30,3.98],[-.65,3.82],[-.86,3.84],[-.97,4.19],
+                      [-.91,4.55],[-.78,4.91],[-.73,5.15],[-.62,5.29]])
+    contour=[]
+    for i,p1 in enumerate(anchors):
+        p0,p2,p3=anchors[(i-1)%len(anchors)],anchors[(i+1)%len(anchors)],anchors[(i+2)%len(anchors)]
+        for t in np.linspace(0,1,8,endpoint=False):
+            contour.append(.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t*t+(-p0+3*p1-3*p2+p3)*t*t*t))
+    outline=m.CrossSection([np.asarray(contour)[::-1]])
     vertices=[]; rings=128
     center=np.array([0,4.64])
     for z in np.linspace(.32,.81,17):
@@ -344,10 +350,12 @@ def main():
     trunk,legs=remainder.split_by_plane((0,1,0),(HIP+WAIST)/2)
     # 只重塑胸甲正面；原头部、四肢及背部的 GLB 表面仍然保留。
     front_plate=lung_front()
-    front_region=paint(m.Manifold.cube((2.8,1.37,2)).translate((-1.4,3.925,.34)))
-    front_owner=paint(m.Manifold.cube((2.8,1.36,2)).translate((-1.4,3.932,.30)))
-    collar=front_plate.translate((0,.16,-.02)) ^ paint(m.Manifold.cube((4,.35,3)).translate((-2,5.12,-1)))
-    trunk=union([trunk-front_region,front_plate-pelvis_mask,collar])
+    front_region=paint(m.Manifold.cube((2.8,1.555,2)).translate((-1.4,3.75,.34)))
+    front_owner=paint(m.Manifold.cube((2.8,1.552,2)).translate((-1.4,3.74,.30)))
+    skirt=front_plate ^ paint(m.Manifold.cube((3,.25,1)).translate((-1.5,3.71,.78)))
+    # 颈口内部仅补薄的连接唇，不能再次沿整个前甲顶边加一圈外露横板。
+    collar=front_plate.translate((0,.055,-.035)) ^ paint(m.Manifold.cube((1.38,.22,2)).translate((-.69,5.18,-.5)))
+    trunk=union([trunk-front_region,front_plate-pelvis_mask,skirt-pelvis,collar])
     # 先按基准高度分开，再转移同一段实体形成凹凸互补结构；不分别近似雕刻两面。
     leg_connections = []
     # 原上臂根部直接接入头肩后半，保留原 GLB 的倾斜肩颈，不另挂竖直肩座。
@@ -365,14 +373,26 @@ def main():
         sweep=union([piece,piece.translate((0,2,-1))]).hull() ^ shoulder_zone
         if not sweep.is_empty():rounded_sweeps.append(paint(sweep.hull().minkowski_sum(m.Manifold.sphere(.035,16))))
     # 榫与槽共用后倾模具，沿上后方退出；圆肩避让面同向扫掠，允许从起步就斜向飞出。
-    neck_mask=union([chest_envelope()-seats,front_owner]).transform([[1,0,0,0],[0,1,0,0],[0,-.5,1,2.6]])
-    below_head,head=trunk.split(neck_mask-arms-union(rounded_sweeps))
+    neck_mask=union([chest_envelope(),front_owner]).transform([[1,0,0,0],[0,1,0,0],[0,-.5,1,2.6]])
+    # 运动避让是留空，不能把整段扫掠体分给头肩当作护甲，遮住原大臂。
+    trunk=trunk-(union(rounded_sweeps)+seats-arms)
+    below_head,head=trunk.split(neck_mask-arms)
     head = union([head,arms])
     head = union([piece for piece in head.decompose() if piece.volume()>1e-10])
-    assert len(head.decompose()) == 1, [(p.volume(),p.bounding_box()) for p in head.decompose()]
-    head_connections = []
+    head,head_connections = connect(head,'头肩')
+    # 头颈的小连接桥也沿同一释放方向留槽；静态闭合不代表圆桥可以从包裹它的槽里退出。
+    bridge_sweeps=[]
+    for connection in head_connections:
+        if connection['gap'] > .08:
+            bridge=capsule(connection['a'],connection['b'],connection['radius'])
+            # [OM-FREEPLAY] 连接桥释放槽留 1mm 局部间隙，避免圆桥根部零角度擦边；双榫配合面不加此间隙。
+            bridge_sweeps.append(union([bridge,bridge.translate((0,.6,-.3))]).hull().minkowski_sum(m.Manifold.sphere(.001,12)))
+    if bridge_sweeps:
+        release=union(bridge_sweeps)
+        below_head=below_head-release
+        trunk=trunk-(release-head)
     # 双臂完整保留；躯干为原上臂让出空间，不反向削掉手臂内侧。
-    below_head = below_head - arms
+    below_head = below_head - head
     # 腿部向下的扫掠保护原髋鼓完整轮廓，并为腹盆留下可竖直脱开的凹槽。
     chest=below_head
     chest = union([p for p in chest.decompose() if abs(p.volume())>1e-10])
@@ -380,10 +400,10 @@ def main():
     legs = union([p for p in legs.decompose() if p.volume()>1e-10])
     result = [('legs',legs,leg_connections),('pelvis',pelvis,[]),('chest',chest,[]),('head_arms',head,head_connections)]
     # 拼回时无重叠体积，也不因凹槽加工丢掉体积。
-    assembled = union([trunk,arms,legs,pelvis])
+    assembled = union([trunk,head,arms,legs,pelvis])
     partition = union([b for _,b,_ in result])
     # 前甲曲面采用 Float32 放样，容差与下方最终网格审核一致。
-    assert abs(sum(b.volume() for _,b,_ in result)-partition.volume()) < 1e-5
+    assert abs(sum(b.volume() for _,b,_ in result)-partition.volume()) < 1e-5, [(ka,kb,(a^b).volume()) for i,(ka,a,_) in enumerate(result) for kb,b,_ in result[i+1:]]
     assert abs((assembled-partition).volume()) < 1e-4
     assert abs((partition-assembled).volume()) < 1e-4
     print('final',[(k,len(b.decompose()),b.volume()) for k,b,_ in result],flush=True)

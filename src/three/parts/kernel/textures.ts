@@ -41,6 +41,8 @@ export interface MaterialSpec {
   emissiveIntensity?: number;
   doubleSided?: boolean;
   flatShading?: boolean;
+  /** 使用网格顶点颜色，例如有厚度的彩色玻璃。 */
+  vertexColors?: boolean;
   /** 战术编号 / 贴花：canvas 文字贴图（透明底，白字黑边）。 */
   decal?: string;
 }
@@ -661,6 +663,7 @@ export function createMaterialLibrary(specs: Record<string, MaterialSpec>): {
       envMapIntensity: spec.envMapIntensity ?? 1,
       side: spec.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
       flatShading: spec.flatShading ?? false,
+      vertexColors: spec.vertexColors ?? false,
     };
     // 漆面用 physical（clearcoat）：标准材质给不出清漆的二次高光。
     const material =

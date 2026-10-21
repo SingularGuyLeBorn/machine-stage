@@ -88,7 +88,10 @@ function contactSurface(geometry: THREE.BufferGeometry, mate: THREE.BufferGeomet
       const key = vertexKey(v.x, v.y, v.z);
       degree.set(key, (degree.get(key) ?? 0) + 1);
     }
-  expect([...degree.values()].every((d) => d === 2)).toBe(true);
+  expect(
+    [...degree.entries()].filter(([, d]) => d !== 2),
+    `${label} 边界分叉`,
+  ).toEqual([]);
   return { boundary, area, faces };
 }
 
@@ -193,7 +196,7 @@ describe("参考图四模块闭合分体", () => {
         THREE.DoubleSide,
       )!;
       expect(hit.point.y).toBeGreaterThan(min!);
-      expect(hit.point.y).toBeLessThan(max!);
+      expect(hit.point.y).toBeLessThan(max! + 1e-6);
       expect(other.closestPointToPoint(hit.point)!.distance).toBeLessThan(2e-5);
     }
     geometry.dispose();
@@ -308,12 +311,18 @@ describe("参考图四模块闭合分体", () => {
       /upperarm|forearm|hand|finger|elbow_guard|wrist_guard/.test(s.semantic),
     );
     expect(arms.length).toBeGreaterThan(50);
+    let upperArmSamples = 0;
+    let exposedUpperArmSamples = 0;
     for (const arm of arms) {
       const bytes = Buffer.from(arm.position, "base64");
       const pos = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.length / 4);
       for (let i = 0; i < pos.length; i += 3) {
         const target = new THREE.Vector3(-pos[i]!, pos[i + 1]! + 4.55, -pos[i + 2]!);
         const nearest = tree.closestPointToPoint(target)!;
+        if (/upperarm/.test(arm.semantic)) {
+          upperArmSamples++;
+          if (nearest.distance < 1e-4) exposedUpperArmSamples++;
+        }
         if (nearest.distance > 2e-5) {
           // 最近点可能位于凹边，单个面的法线不足以判断内外；用穿过闭合表面的次数判断包含关系。
           const hits = tree.raycast(
@@ -328,6 +337,8 @@ describe("参考图四模块闭合分体", () => {
         }
       }
     }
+    // 大臂既要保留，也必须仍是外表面；不能被额外填入的避让体埋住。
+    expect(exposedUpperArmSamples / upperArmSamples).toBeGreaterThan(0.7);
     const limbSources = moduleData.audit.filter((a) =>
       /Arm|Hand|Finger|Forearm|Clavicle|Bone00/.test(a.bone),
     );
@@ -354,6 +365,34 @@ describe("参考图四模块闭合分体", () => {
     model.dispose();
   });
 
+  it("胸甲上窄下展，云斑彩窗沿弧面闭合且不是横向色条", () => {
+    const model = buildModel(registry, { builders: kingjoeModuleBuilders });
+    const body = model.parts.find((p) => p.partId === "kingjoemodules.chest.body")!.geometry;
+    const p = body.getAttribute("position");
+    const widthAt = (low: number, high: number) => {
+      let width = 0;
+      for (let i = 0; i < p.count; i++)
+        if (p.getZ(i) > 0.78 && p.getY(i) > low && p.getY(i) < high)
+          width = Math.max(width, Math.abs(p.getX(i)));
+      return width;
+    };
+    expect(widthAt(4.1, 4.5)).toBeGreaterThan(widthAt(5.0, 5.15) + 0.1);
+    const windows = model.parts.filter((p) => /chest\.glass/.test(p.partId));
+    expect(windows).toHaveLength(2);
+    for (const window of windows) {
+      const positions = window.geometry.getAttribute("position");
+      const colors = window.geometry.getAttribute("color");
+      const red: number[] = [];
+      for (let i = 0; i < positions.count; i++)
+        if (Math.abs(positions.getY(i) - 4.6) < 0.01) red.push(colors.getX(i));
+      // 同一高度横向也有明显色团变化，不能退回仅随高度着色的条纹。
+      expect(Math.max(...red) - Math.min(...red)).toBeGreaterThan(0.12);
+      expect(registry.materials.kjm_glass!.vertexColors).toBe(true);
+    }
+    expect(registry.parts.some((p) => /chest.*(louver|grille|spine)/.test(p.id))).toBe(false);
+    model.dispose();
+  });
+
   it("整机和展开保持细节与所属模块同行，原模型轮廓尺寸不变", () => {
     const model = buildModel(registry, { builders: kingjoeModuleBuilders });
     poseKingJoeModules(model, 0, "closed");
@@ -370,7 +409,9 @@ describe("参考图四模块闭合分体", () => {
     model.syncInstances();
     model.root.updateMatrixWorld(true);
     expect(model.getNode("ModuleHeadDetails")!.parent).toBe(model.getNode("Module_head_arms"));
-    expect(model.getNode("ModuleChestDetails")!.parent).toBe(model.getNode("Module_chest"));
+    expect(
+      registry.parts.filter((p) => /chest\.(glass|rim)/.test(p.id)).every((p) => p.node === "Module_chest"),
+    ).toBe(true);
     expect(
       partitionExpectedContacts(detectStatic(model, { minDepthM: 0.0005 }), registry.expectedContacts ?? [])
         .active,

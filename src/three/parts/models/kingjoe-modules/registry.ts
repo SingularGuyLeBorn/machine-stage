@@ -7,6 +7,7 @@ import { moduleOffsets, animateKingJoeModules } from "./motion";
 import { KINGJOE_SKIN_MATERIALS } from "../kingjoe-skin/materials";
 import { makeKingJoeSkinDetails } from "../kingjoe-skin/details";
 import data from "./modules.generated.json";
+import { chestWindowBuilders, chestWindowParts } from "./chest-windows";
 
 // 原装甲与内部连接结构布尔融合；每个主体单独连通，阶梯凹凸接口由同一模具切出。
 function decode(value: string): ArrayBuffer {
@@ -35,21 +36,10 @@ export const kingjoeModuleBuilders: Record<string, GeometryBuilder> = Object.fro
 );
 
 // 原倒角细节含零面积三角形；仅在本卡清除退化面，旧模型及旧动画几何保持不变。
-for (const detail of makeKingJoeSkinDetails()) {
+for (const detail of makeKingJoeSkinDetails().filter((p) => p.assembly === "ship")) {
   kingjoeModuleBuilders[`kjDetail_${detail.id}`] = (_spec, context) => {
     const geometry = buildGeometry(detail.geometry, context);
     const position = geometry.getAttribute("position");
-    if (detail.assembly === "chest") {
-      const cx = detail.mate?.type === "absolute" ? Number(detail.mate.position?.[0] ?? 0) : 0;
-      for (let i = 0; i < position.count; i++) {
-        const x = cx + position.getX(i);
-        // 每片彩窗沿肺叶切线倾斜，保持各层平行，避免低面数背板与彩条互相穿插。
-        const bend = detail.dual ? 0.1 * (1 - (cx / 1.02) ** 2) - ((0.2 * cx) / 1.02 ** 2) * (x - cx) : 0.1;
-        position.setZ(i, position.getZ(i) - bend);
-        if (detail.id.endsWith("grille_spine")) position.setY(i, position.getY(i) * 0.8 + 0.13);
-      }
-      geometry.computeVertexNormals();
-    }
     if (detail.geometry.type === "cylinder") {
       // 旧回转体把轴心半径钳到 0.0002m，眼部两端因此有针孔。将轴心环收至轴线，保留全部外侧倒角。
       for (let i = 0; i < position.count; i++) {
@@ -75,6 +65,7 @@ for (const detail of makeKingJoeSkinDetails()) {
     return geometry;
   };
 }
+Object.assign(kingjoeModuleBuilders, chestWindowBuilders);
 
 const NAMES: Record<string, string> = {
   legs: "腿部模块",
@@ -236,14 +227,16 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
     mate: { type: "absolute", position: [0, 0, 0] },
     source: "原 GLB 表面与法线、UV；内部补实并融合为单实体，共用模具切出阶梯嵌合接口",
   }));
-  const details: PartDefinition[] = makeKingJoeSkinDetails().map((part, i) => ({
-    ...part,
-    geometry: { type: "kit", kit: `kjDetail_${part.id}` },
-    id: part.id.replace("kingjoeskin.", "kingjoemodules."),
-    assembly: part.assembly === "ship" ? "head_arms" : "chest",
-    node: part.assembly === "ship" ? "ModuleHeadDetails" : "ModuleChestDetails",
-    build_order: 5 + i,
-  }));
+  const details: PartDefinition[] = makeKingJoeSkinDetails()
+    .filter((p) => p.assembly === "ship")
+    .map((part, i) => ({
+      ...part,
+      geometry: { type: "kit", kit: `kjDetail_${part.id}` },
+      id: part.id.replace("kingjoeskin.", "kingjoemodules."),
+      assembly: "head_arms",
+      node: "ModuleHeadDetails",
+      build_order: 5 + i,
+    }));
   return {
     model: "kingjoemodules",
     title: "金古桥 · 参考图分体",
@@ -277,7 +270,6 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
         motion: "translate" as const,
       })),
       // 原叠加细节沿用原皮模块坐标；主体生成数据已经旋转到 +Z。
-      { name: "ModuleChestDetails", parent: "Module_chest", pivot: [0, 4.55, 0], rest_rotation: [0, 180, 0] },
       {
         name: "ModuleHeadDetails",
         parent: "Module_head_arms",
@@ -288,10 +280,19 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
     ],
     materials: {
       ...KINGJOE_SKIN_MATERIALS,
+      kjm_glass: {
+        base: "#ffffff",
+        metalness: 0.18,
+        roughness: 0.34,
+        vertexColors: true,
+        clearcoat: 0.65,
+        clearcoatRoughness: 0.2,
+      },
+      kjm_window_rim: { base: "#13191a", metalness: 0.12, roughness: 0.46 },
       // [OM-FREEPLAY] 新封口以低反光深银区分，保留原表面的银灰外观。
       kjr_cap: { base: "#606a73", metalness: 0.45, roughness: 0.65 },
     },
-    parts: [...bodies, ...details, ...antennaParts],
+    parts: [...bodies, ...details, ...chestWindowParts, ...antennaParts],
     expectedContacts: [
       {
         family: "hip_hinge",
@@ -336,17 +337,10 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
       {
         family: "chest_frame",
         a: "kingjoemodules.chest.body",
-        b: "kingjoemodules.chest.grille_frame*",
-        reason: "彩窗银框嵌入弧形胸甲前面，沿肺叶切线安装",
+        b: "kingjoemodules.chest.rim*",
+        reason: "圆润黑边嵌入胸甲，前后曲率沿胸甲外壳贴合",
         maxDepthMm: 16,
         anyForm: true,
-      },
-      {
-        family: "chest_frame",
-        a: "kingjoemodules.chest.grille_frame*",
-        b: "kingjoemodules.chest.grille_back*",
-        reason: "彩窗背板与银框沿同一倾斜平面贴合",
-        maxDepthMm: 1,
       },
     ],
   };
