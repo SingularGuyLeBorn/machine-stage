@@ -16,6 +16,9 @@ import {
   tigerInstanceLabel,
 } from "@/three/parts/models/tiger/motion";
 import { TIGER_LIDS, type TigerLidSpec } from "@/three/parts/models/tiger/lids";
+import { makeMbtLayouts, makeMbtRegistry } from "@/three/parts/models/mbt/registry";
+import { mbtKitBuilders } from "@/three/parts/models/mbt/kits";
+import { animateMbt, MBT_MOTION_PARTS } from "@/three/parts/models/mbt/motion";
 import type { CameraMode } from "./three/viewpoints";
 
 // ============================================================================
@@ -269,6 +272,44 @@ export const CATALOG: StageModel[] = [
       "破碎形态由 damageSeed 随机：单穿孔 / 大口径爆裂 / 双孔，位置在安全区内抖动；战损组「随机破口」换一组并保持相机。",
       "舱盖可交互：悬停盖板出现提示，单击开/合；前舱盖默认开启，视口右上「舱盖」可一键全开/全合。装填手舱口与车长塔顶盖在炮塔顶甲板上开了真孔，开盖能看进战斗室；加油口底座也可点击开盖。",
       "内饰 79 件，按参考图补成真坦克那样的「机械丛林」：驾驶室（方向盘 / 5 只活表 / 3 只带真防滑孔的踏板 / 变速与转向杆 / 保险丝盒·继电器盒·断路器三排 / 灭火器 / 座椅安全带 / 航向机枪与 Fu5 电台），战斗室与吊篮（TURZF 3 式瞄具三段 / 车长塔周向 7 具潜望镜 / 270° 吊篮护栏 / 待发弹架 4 只弹箱 / 备用弹鼓 / 吊篮支柱 4 根 / 同轴 MG34 机匣 / 急救箱 / 双灭火器 / 扶手 / 铭牌警示牌），侧壁与后隔板沿壁走 5 条多股线束干（TubeGeometry + 波纹护套 + 4 只卡箍）与机油压力管。开「透视」或从舱盖真孔看进去即见全貌。",
+    ],
+  },
+  {
+    id: "mbt90",
+    title: "MBT-90 主战坦克",
+    subtitle: "虚构型号 · 楔形复合装甲 / 反应装甲 / 7 对负重轮 · 从头建模",
+    milestone: "M-D",
+    status: "ready",
+    registry: makeMbtRegistry(),
+    layouts: makeMbtLayouts(),
+    builders: mbtKitBuilders,
+    animate: animateMbt,
+    motionParts: MBT_MOTION_PARTS,
+    states: [
+      { id: "idle", label: "停机", hint: "动力包 / 行走 / 炮塔全静止，可拖构建滑杆看装配" },
+      { id: "running", label: "原地空转", hint: "负重轮与履带低速滚动，观察悬挂与履带板路径" },
+      { id: "drive", label: "行进演示", hint: "车体前后 0.9m，7 对负重轮/主动轮/诱导轮与履带同步滚动" },
+      { id: "aim", label: "炮塔瞄准", hint: "炮塔 ±23° 回转 + 火炮 ±3.4° 俯仰（4s 循环）" },
+      { id: "fire", label: "主炮击发", hint: "炮身后坐 320mm + 炮口焰，4s 循环" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "mbt-run", group: "机构", label: "原地空转", kind: "machine-state", state: "running" },
+      { id: "mbt-drive", group: "机构", label: "行进演示", kind: "machine-state", state: "drive" },
+      { id: "mbt-aim", group: "火炮", label: "炮塔瞄准", kind: "machine-state", state: "aim" },
+      { id: "mbt-fire", group: "火力", label: "主炮击发", kind: "machine-state", state: "fire" },
+      { id: "mbt-stop", group: "机构", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "mbt-explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "mbt-xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "mbt-labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "mbt-reset", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "mbt-scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "mbt-scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "与虎式完全不同的形：大倾角首上（33°）、楔形炮塔前斜板（±24° 后倾 8°）、反应装甲首上 2×5 / 炮塔 2×6 / 侧裙 2×6。",
+      "七对负重轮 + 双销耳挂胶履带板（172 块全实例化）；120mm 滑膛炮带热护套与抽气装置，炮口段近代主战坦克布局。",
+      "动力包（发动机/传动/双风扇/双油箱/排气）在 L1，拖构建滑杆能从内到外看装配；炮塔/火炮/后坐由 Turret / Gun / GunRecoil 三个节点驱动。",
     ],
   },
   {
