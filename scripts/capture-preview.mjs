@@ -141,6 +141,62 @@ async function main() {
     chrome.kill();
     return;
   }
+  if (MODEL === "kingjoethree") {
+    await setState("idle");
+    await setCamera([0.6, 4.0, 13.5], [0, 3.5, 0]);
+    await sleep(1200);
+    await shot("kingjoe-three-front", CROP);
+    await shot("kingjoe-three-card");
+    await setCamera([9.2, 6.6, 11.2], [0, 3.7, 0]);
+    await sleep(500);
+    await shot("kingjoe-three-threeq", CROP);
+    await setCamera([3.4, 4.4, 5.6], [0, 4.0, 0]);
+    await sleep(500);
+    await shot("kingjoe-three-seam-idle", CROP);
+    await evaluate(`window.__stage.store.getState().setView("xray", true); true`);
+    await sleep(700);
+    await shot("kingjoe-three-xray-idle", CROP);
+    await evaluate(`window.__stage.store.getState().setView("xray", false); true`);
+
+    await setCamera([9.6, 6.8, 12.6], [0, 4.2, 0]);
+    await setState("separating");
+    await sleep(600);
+    await shot("kingjoe-three-separating-arc", CROP);
+    await shot("kingjoe-three-card-separating");
+    await sleep(900);
+    await shot("kingjoe-three-separating", CROP);
+    await sleep(600);
+    await setState("separated");
+    await sleep(300);
+    await setCamera([0.8, 5.2, 18.0], [0, 4.5, 0]);
+    await sleep(500);
+    await shot("kingjoe-three-separated-front", CROP);
+    await setCamera([10.4, 8.0, 13.6], [0, 4.8, 0]);
+    await sleep(500);
+    await shot("kingjoe-three-separated", CROP);
+    await setCamera([3.6, 4.9, 5.8], [0, 4.4, 0]);
+    await sleep(500);
+    await shot("kingjoe-three-seam-separated", CROP);
+    await evaluate(`window.__stage.store.getState().setView("xray", true); true`);
+    await sleep(700);
+    await shot("kingjoe-three-xray-separated", CROP);
+    await evaluate(`window.__stage.store.getState().setView("xray", false); true`);
+
+    await setCamera([9.6, 6.8, 12.6], [0, 4.2, 0]);
+    await setState("combining");
+    await sleep(1400);
+    await shot("kingjoe-three-combining-arc", CROP);
+    await sleep(350);
+    await shot("kingjoe-three-combining-lock", CROP);
+    await shot("kingjoe-three-card-combining");
+    await setCamera([0.6, 4.0, 13.5], [0, 3.5, 0]);
+    await sleep(700);
+    await shot("kingjoe-three-combined", CROP);
+    const errors = await evaluate(`(window.__qaErrors ?? []).slice(0, 10)`);
+    console.log("page errors", JSON.stringify(errors));
+    chrome.kill();
+    return;
+  }
   if (MODEL === "kingjoelower") {
     await setState("idle");
     await setCamera([0.6, 4.0, 13.5], [0, 3.5, 0]);

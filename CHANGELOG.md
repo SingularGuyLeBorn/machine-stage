@@ -42,6 +42,14 @@
 - **髋缝电弧 FX**：8 条抖动电弧 + 髋缝光环 + 点光 + 白色闪光核心；场景级 FX，不参与零件树/穿模/悬空检测；随 `AssembledModel.dispose` 释放。
 - **验收**：静态 active 0 / expected 11 / unsupported 0；分离终态 active 0；分离/合体 30fps 扫掠 active 0；`vitest` **141 passed（17 文件）**；`tsc` / `build` ✓；合体态与整机单件正视图 SSIM **0.9986** / PSNR **47.1 dB**。浏览器证据 `docs/qa/kingjoe-lower-card.jpg`、`-separating-arc`、`-combining-arc`、`-combining-lock`、`-separated*`、`-joint*`、`-arcs`、`-vs-whole`。
 
+### 新增（M-G·R3.3 · 三体拆分）
+
+- **三组按源归属**：下半身 = legs 总成 + pelvis（腿部+髋部，1,855 三角 / 4 材质组）；躯干 = abdomen + chest 非手部件（腹部+胸部+肩臂/锁骨/肘腕护甲，8,143 / 10）；头手 = ship.head + 头部细节 + chest.hand/finger（脑袋+两只手，5,250 / 6）。合计 15,248 三角，不切三角形、不焊接、不布尔、不重拓扑。
+- **接缝**：腰缝（骨盆/腹甲约 3.986–4.222m）保留 4 组楔榫/榫槽；颈根/双腕沿用源关节边界。躯干提起 0.6m 退出腰缝。
+- **头手路径**：手在腕部，直接上提会穿小臂；头手组先沿 +Z 0.7m 脱离肩颈/双腕，再沿 +Y 1.6m 提起；下半身站地不动。
+- **三处电弧**：腰缝 / 颈根 / 双腕；分离拉断，合体末段接通并锁死闪光；FX 不参与零件树/穿模/悬空检测。
+- **验收**：`vitest` **146 passed（18 文件）**；`tsc` / `build` ✓；合体态 active 0 / expected 3 / unsupported 0；分离终态 active 0；分离/合体 30fps 扫掠 active 0；合体态与整机单件 SSIM **0.9992** / PSNR **49.0 dB**。证据 `docs/qa/kingjoe-three-*`。
+
 ### 进行中
 
 - **M-B**：虎式坦克 L1 —— Maybach HL230 V12 发动机（缸体 / 曲轴 / 活塞 / 双风扇）+ 求解器联动。
