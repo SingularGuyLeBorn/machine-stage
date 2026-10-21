@@ -19,6 +19,8 @@ import { TIGER_LIDS, type TigerLidSpec } from "@/three/parts/models/tiger/lids";
 import { makeMbtLayouts, makeMbtRegistry } from "@/three/parts/models/mbt/registry";
 import { mbtKitBuilders } from "@/three/parts/models/mbt/kits";
 import { animateMbt, MBT_MOTION_PARTS } from "@/three/parts/models/mbt/motion";
+import { edriveBuilders, makeEdriveLayouts, makeEdriveRegistry } from "@/three/parts/models/edrive/registry";
+import { animateEdrive, EDRIVE_MOTION_PARTS, edriveReadouts } from "@/three/parts/models/edrive/motion";
 import type { CameraMode } from "./three/viewpoints";
 import {
   makeT800,
@@ -437,6 +439,61 @@ export const CATALOG: StageModel[] = [
       "自动装弹机全链：转盘选弹 → 提弹臂 → 推弹杆 → 炮闩关闭；击发后座 + 抽烟装置排烟 + 抛壳。",
       "ERA 单块爆炸 / 尾舱泄压板掀开 vs 泄压失败炮塔掀飞两个分支；车长独立热像仪 CITV 的猎-歼链路。",
       "开「透视」看发动机活塞/气门、自动装弹机转盘与弹药；拖构建滑杆按 build_order 自内向外回放。",
+    ],
+  },
+  {
+    id: "ed90",
+    title: "ED-90 电驱坦克",
+    subtitle: "6×800V 动力电池 / 双电机独立驱动 / SiC 电控 / 快充 + 能量回收 / 静音 · 瞬时扭矩 · 热失控",
+    milestone: "M-F",
+    status: "ready",
+    registry: makeEdriveRegistry(),
+    layouts: makeEdriveLayouts(),
+    builders: edriveBuilders,
+    animate: animateEdrive,
+    motionParts: EDRIVE_MOTION_PARTS,
+    readouts: edriveReadouts,
+    states: [
+      { id: "idle", label: "静音待机", hint: "纯电静音：无发动机、无排气；仪表显示电量/母线电压/电机温度" },
+      { id: "silent_drive", label: "静音行驶", hint: "双电机低噪驱动履带，车体低频起伏，静音滑行（噪声约 42dB）" },
+      { id: "boost", label: "瞬时加速", hint: "电机瞬时扭矩，0→加速无换挡顿挫；功率表打到 1200kW" },
+      { id: "e_steer_left", label: "差速左转", hint: "左电机 900rpm / 右电机 3200rpm，左右履带差速转向" },
+      { id: "e_steer_right", label: "差速右转", hint: "右电机 900rpm / 左电机 3200rpm，电动差速右转" },
+      { id: "regen", label: "能量回收", hint: "制动/下坡：电机反拖发电，电量表上升，回收功率约 −420kW" },
+      { id: "charging", label: "快充", hint: "充电桩接快充口：装甲盖打开、充电枪锁止、800V 快充（电量爬升）" },
+      { id: "battery_hit", label: "电池被击中", hint: "电池包中弹：短路火星 → 热失控火球/浓烟，Pack 5 顶部泄压" },
+      { id: "thermal_runaway", label: "热失控", hint: "热失控持续蔓延：高温/火焰/烟，电量骤降" },
+      { id: "aim", label: "炮塔瞄准", hint: "炮塔回转 + 火炮俯仰（复用 MBT 火力系统）" },
+      { id: "loading", label: "自动装弹机", hint: "转盘选弹 → 提弹臂 → 推弹杆 → 炮闩关闭" },
+      { id: "fire", label: "主炮击发", hint: "120mm 滑膛炮后坐 → 炮口焰 → 抽烟装置排烟 → 抛壳" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "ed-silent", group: "电驱", label: "静音行驶", kind: "machine-state", state: "silent_drive" },
+      { id: "ed-boost", group: "电驱", label: "瞬时加速", kind: "machine-state", state: "boost" },
+      { id: "ed-left", group: "电驱", label: "差速左转", kind: "machine-state", state: "e_steer_left" },
+      { id: "ed-right", group: "电驱", label: "差速右转", kind: "machine-state", state: "e_steer_right" },
+      { id: "ed-stop", group: "电驱", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "ed-regen", group: "能量", label: "能量回收", kind: "machine-state", state: "regen" },
+      { id: "ed-charge", group: "能量", label: "快充", kind: "machine-state", state: "charging" },
+      { id: "ed-battery-hit", group: "防护", label: "电池被击中", kind: "machine-state", state: "battery_hit" },
+      { id: "ed-runaway", group: "防护", label: "热失控", kind: "machine-state", state: "thermal_runaway" },
+      { id: "ed-aim", group: "火力", label: "炮塔瞄准", kind: "machine-state", state: "aim" },
+      { id: "ed-loading", group: "火力", label: "自动装弹", kind: "machine-state", state: "loading" },
+      { id: "ed-fire", group: "火力", label: "主炮击发", kind: "machine-state", state: "fire" },
+      { id: "ed-explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "ed-xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "ed-thermal", group: "展示", label: "热像仪视角", kind: "view-toggle", view: "thermal" },
+      { id: "ed-labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "ed-reset", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "ed-scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "ed-scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "966 个零件定义 / 3771 实例：6 组 800V 动力电池（3 模组 ×12 芯/包，共 216 芯，BMS + 液冷板 + 防爆阀）+ 左右独立驱动电机（定子/转子/磁钢/旋变/减速器逐件）+ SiC 控制器 ×2 + VCU/高压配电盒/OBC/DC-DC + 橙色高压线束 + 快充口 + 电驱仪表。",
+      "电驱特性：静音行驶（无发动机/排气）、瞬时扭矩（1200kW 峰值演示）、左右电机差速转向、制动/下坡能量回收、800V 快充（充电桩/电缆/装甲盖开合）。",
+      "电池受击：Pack 5 中弹 → 短路火星 → 热失控火球/浓烟，仪表温度升到 900°C；与 MBT 的燃油殉爆是两种不同的战损。",
+      "复用 MBT-90 的车体/楔形炮塔/120mm 滑膛炮/自动装弹机/履带液气悬挂；柴油机与机械变速箱整体移除。",
     ],
   },
   {
