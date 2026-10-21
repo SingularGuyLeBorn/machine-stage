@@ -29,6 +29,7 @@ export function splitBoneIntoPlates(geometry: THREE.BufferGeometry): Plate[] {
   const index = geometry.index;
   if (!index) return [];
   const idx = index.array;
+  const idxAttr = index;
 
   // 长轴 = 骨段长度方向
   let axis = 0;
@@ -48,7 +49,7 @@ export function splitBoneIntoPlates(geometry: THREE.BufferGeometry): Plate[] {
   // 每个面归到一格（面心在轴向/周向的坐标）
   const cells = new Map<number, number[]>();
   for (let f = 0; f < idx.length; f += 3) {
-    const p = (i: number, k: number) => position.getComponent(index.getX(i), k);
+    const p = (i: number, k: number) => position.getComponent(idxAttr.getX(i), k);
     const t = (p(idx[f], axis) + p(idx[f + 1], axis) + p(idx[f + 2], axis)) / 3;
     const a1 = (axis + 1) % 3;
     const a2 = (axis + 2) % 3;
@@ -69,6 +70,14 @@ export function splitBoneIntoPlates(geometry: THREE.BufferGeometry): Plate[] {
   const plates: Plate[] = [];
   for (const faces of cells.values()) {
     if (faces.length < 2) continue;
+    // 「局部覆盖」：每格里只保留**外侧**那部分面（内圈让开），
+    // 于是护板只盖住骨头的外轮廓，内部机械器件从敞口露出来。
+    // 这样外形仍与源网格吻合（外表面完整），但不是"整面糊死"。
+    const cellR = faces.map((f) => faceRadius(f));
+    const rMax = Math.max(...cellR);
+    const keep = faces.filter((_, k) => cellR[k] >= rMax * 0.62);
+    if (keep.length < 2) continue;
+
     const pos: number[] = [];
     const out: number[] = [];
     const map = new Map<number, number>();
@@ -89,10 +98,10 @@ export function splitBoneIntoPlates(geometry: THREE.BufferGeometry): Plate[] {
       pos.push(px - comp[0] * s, py - comp[1] * s, pz - comp[2] * s);
       return id;
     };
-    for (const f of faces) {
-      const a = push(index.getX(f));
-      const b = push(index.getX(f + 1));
-      const c = push(index.getX(f + 2));
+    for (const f of keep) {
+      const a = push(idxAttr.getX(f));
+      const b = push(idxAttr.getX(f + 1));
+      const c = push(idxAttr.getX(f + 2));
       out.push(a, b, c);
     }
     const g = new THREE.BufferGeometry();
@@ -106,4 +115,29 @@ export function splitBoneIntoPlates(geometry: THREE.BufferGeometry): Plate[] {
     plates.push({ geometry: g, center });
   }
   return plates;
+
+  /** 面心到长轴线的距离（径向位置）。 */
+  function faceRadius(f: number): number {
+    const a1 = (axis + 1) % 3;
+    const a2 = (axis + 2) % 3;
+    const cx =
+      (position.getX(idxAttr.getX(f)) +
+        position.getX(idxAttr.getX(f + 1)) +
+        position.getX(idxAttr.getX(f + 2))) /
+      3;
+    const cy =
+      (position.getY(idxAttr.getX(f)) +
+        position.getY(idxAttr.getX(f + 1)) +
+        position.getY(idxAttr.getX(f + 2))) /
+      3;
+    const cz =
+      (position.getZ(idxAttr.getX(f)) +
+        position.getZ(idxAttr.getX(f + 1)) +
+        position.getZ(idxAttr.getX(f + 2))) /
+      3;
+    void cz;
+    const u = cx - (mn[a1] + mx[a1]) / 2;
+    const v = cy - (mn[a2] + mx[a2]) / 2;
+    return Math.hypot(u, v);
+  }
 }
