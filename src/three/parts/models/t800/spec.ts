@@ -1,4 +1,5 @@
 import { classifyJoint, type JointAsm, type JointMat } from "./mesh/classes";
+import { registerFingerNames } from "./names";
 import { MESH_META } from "./mesh/assets";
 
 // ============================================================================
@@ -96,6 +97,9 @@ export const JOINTS: JointDef[] = MESH_META.map((meta) => {
     kind: meta.k,
   };
 });
+
+// 五指的标准名按部位清单匹配（源网格的指骨编号不规则）
+registerFingerNames(JOINTS.map((j) => j.name));
 
 /** 部位名 → 定义。 */
 export const JOINT_BY_NAME = new Map(JOINTS.map((j) => [j.name, j]));
