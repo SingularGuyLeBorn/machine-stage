@@ -1,7 +1,7 @@
 import type { NodeDef } from "../../registry/types";
 import { KJ } from "./constants";
 import { hydraulicNodeName } from "./rig";
-import { HYDRAULICS, NOZZLE_LOCAL, restDirection, rotationFromY, sideSign, type Side } from "./rig";
+import { HYDRAULICS, NOZZLE_LOCAL, restDirection, rotationFromY, type Side } from "./rig";
 
 // ============================================================================
 // models/kingjoe/nodes —— 可动节点骨架
@@ -34,7 +34,7 @@ const modules: NodeDef[] = [
 const waist: NodeDef = {
   name: "waist",
   parent: "stomach",
-  pivot: [0, 0.49, 0],
+  pivot: [0, KJ.WAIST_OFFSET, 0],
   motion: "rotate",
   axis: "y",
   note: "腰部转轴：上腹/胸/头绕腰鼓旋转，腿↔腹接口不动",
@@ -85,21 +85,29 @@ const nozzles: NodeDef[] = (["ship", "chest", "stomach", "legs"] as const).flatM
   })),
 );
 
+/** 左臂/左腿坐标取负值直接镜像到右侧。 */
+const mirrorX = (side: Side, leftValue: number): number => (side === "r" ? -leftValue : leftValue);
+
 function legNodes(side: Side): NodeDef[] {
-  const s = sideSign(side);
   return [
-    { name: `hip_${side}`, parent: "legs", pivot: [KJ.LEG_X * s, KJ.HIP_Y, 0], motion: "rotate", axis: "x" },
+    {
+      name: `hip_${side}`,
+      parent: "legs",
+      pivot: [mirrorX(side, -KJ.HIP_X), KJ.HIP_Y, KJ.HIP_Z],
+      motion: "rotate",
+      axis: "x",
+    },
     {
       name: `knee_${side}`,
       parent: `hip_${side}`,
-      pivot: [0, KJ.KNEE_Y - KJ.HIP_Y, 0],
+      pivot: [mirrorX(side, -(KJ.KNEE_X - KJ.HIP_X)), KJ.KNEE_Y - KJ.HIP_Y, KJ.KNEE_Z - KJ.HIP_Z],
       motion: "rotate",
       axis: "x",
     },
     {
       name: `ankle_${side}`,
       parent: `knee_${side}`,
-      pivot: [0, KJ.ANKLE_Y - KJ.KNEE_Y, 0],
+      pivot: [mirrorX(side, -(KJ.ANKLE_X - KJ.KNEE_X)), KJ.ANKLE_Y - KJ.KNEE_Y, KJ.ANKLE_Z - KJ.KNEE_Z],
       motion: "rotate",
       axis: "x",
     },
@@ -107,36 +115,38 @@ function legNodes(side: Side): NodeDef[] {
 }
 
 function armNodes(side: Side): NodeDef[] {
-  const s = sideSign(side);
   const out: NodeDef[] = [
     {
       name: `arm_${side}`,
       parent: "chest",
-      pivot: [KJ.SHOULDER_X * s, KJ.SHOULDER_Y, 0],
+      pivot: [mirrorX(side, -KJ.SHOULDER_X), KJ.SHOULDER_Y, KJ.SHOULDER_Z],
       motion: "rotate",
       axis: "x",
     },
     {
       name: `forearm_${side}`,
       parent: `arm_${side}`,
-      pivot: [0, -KJ.UPPER_ARM_L, 0],
+      pivot: [mirrorX(side, -KJ.ELBOW_DX), -KJ.UPPER_ARM_L, KJ.ELBOW_DZ],
       motion: "rotate",
       axis: "x",
     },
     {
       name: `hand_${side}`,
       parent: `forearm_${side}`,
-      pivot: [0, -KJ.FOREARM_L, 0],
+      pivot: [mirrorX(side, -KJ.WRIST_DX), -KJ.FOREARM_L, KJ.WRIST_DZ],
       motion: "rotate",
       axis: "x",
     },
   ];
   for (let finger = 0; finger < 3; finger++) {
-    const x = (finger - 1) * 0.13;
     out.push({
       name: `finger_${side}_${finger}`,
       parent: `hand_${side}`,
-      pivot: [x, -0.43, 0.06],
+      pivot: [
+        mirrorX(side, KJ.FINGER_PIVOT_DX[finger]!),
+        KJ.FINGER_PIVOT_DY[finger]!,
+        KJ.FINGER_PIVOT_DZ[finger]!,
+      ],
       motion: "rotate",
       axis: "x",
     });

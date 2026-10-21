@@ -297,6 +297,6 @@ export function addStomachParts(builder: KingJoeParts): void {
     layer: 4,
   });
 
-  addAntigravity(builder, A, [0, 0.33, -0.05], 0.4, U);
+  addAntigravity(builder, A, [0, 0.5, 0], 0.4, U);
   addNozzles(builder, A, { parentNode: U, yOffset: -0.49 });
 }

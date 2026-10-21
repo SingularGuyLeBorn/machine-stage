@@ -32,21 +32,30 @@ export const ROOT_ORIGIN: Record<string, Vec3> = {
 /** 关节节点在世界（装配态）坐标系里的原点。 */
 export function jointOrigin(side: Side): Record<string, Vec3> {
   const s = sideSign(side);
-  const legX = KJ.LEG_X * s;
-  const armX = KJ.SHOULDER_X * s;
   const shoulderY = KJ.CHEST_Y + KJ.SHOULDER_Y;
   const elbowY = shoulderY - KJ.UPPER_ARM_L;
   const wristY = elbowY - KJ.FOREARM_L;
+  const elbow: Vec3 = [(KJ.SHOULDER_X + KJ.ELBOW_DX) * s, elbowY, KJ.SHOULDER_Z + KJ.ELBOW_DZ];
+  const wrist: Vec3 = [
+    (KJ.SHOULDER_X + KJ.ELBOW_DX + KJ.WRIST_DX) * s,
+    wristY,
+    KJ.SHOULDER_Z + KJ.ELBOW_DZ + KJ.WRIST_DZ,
+  ];
+  const finger = (index: 0 | 1 | 2): Vec3 => [
+    wrist[0] - KJ.FINGER_PIVOT_DX[index] * s,
+    wristY + KJ.FINGER_PIVOT_DY[index],
+    wrist[2] + KJ.FINGER_PIVOT_DZ[index],
+  ];
   return {
-    [`hip_${side}`]: [legX, KJ.HIP_Y, 0],
-    [`knee_${side}`]: [legX, KJ.KNEE_Y, 0],
-    [`ankle_${side}`]: [legX, KJ.ANKLE_Y, 0],
-    [`arm_${side}`]: [armX, shoulderY, 0],
-    [`forearm_${side}`]: [armX, elbowY, 0],
-    [`hand_${side}`]: [armX, wristY, 0],
-    [`finger_${side}_0`]: [armX - 0.13, wristY - 0.43, 0.06],
-    [`finger_${side}_1`]: [armX, wristY - 0.43, 0.06],
-    [`finger_${side}_2`]: [armX + 0.13, wristY - 0.43, 0.06],
+    [`hip_${side}`]: [KJ.HIP_X * s, KJ.HIP_Y, KJ.HIP_Z],
+    [`knee_${side}`]: [KJ.KNEE_X * s, KJ.KNEE_Y, KJ.KNEE_Z],
+    [`ankle_${side}`]: [KJ.ANKLE_X * s, KJ.ANKLE_Y, KJ.ANKLE_Z],
+    [`arm_${side}`]: [KJ.SHOULDER_X * s, shoulderY, KJ.SHOULDER_Z],
+    [`forearm_${side}`]: elbow,
+    [`hand_${side}`]: wrist,
+    [`finger_${side}_0`]: finger(0),
+    [`finger_${side}_1`]: finger(1),
+    [`finger_${side}_2`]: finger(2),
   };
 }
 
@@ -98,26 +107,26 @@ const LEG_HYDRAULICS: Omit<HydraulicSpec, "side">[] = [
   {
     id: "hip_main",
     barrelNode: "legs",
-    exit: [KJ.LEG_X, KJ.HIP_Y - 0.26, -0.52],
+    exit: [KJ.LEG_X, KJ.HIP_Y - 0.26, -0.28],
     tipNode: "hip_{s}",
-    tip: [KJ.LEG_X, KJ.HIP_Y - 0.7, -0.38],
+    tip: [KJ.LEG_X, KJ.HIP_Y - 0.7, -0.22],
     joint: "髋主驱动",
-    mount: [0.56, 3.28, -0.47],
+    mount: [0.45, 3.34, -0.3],
   },
   {
     id: "knee_main",
     barrelNode: "hip_{s}",
-    exit: [KJ.LEG_X, KJ.KNEE_Y + 0.62, 0.52],
+    exit: [KJ.LEG_X, KJ.KNEE_Y + 0.62, 0.26],
     tipNode: "knee_{s}",
-    tip: [KJ.LEG_X, KJ.KNEE_Y + 0.18, 0.46],
+    tip: [KJ.LEG_X, KJ.KNEE_Y + 0.18, 0.22],
     joint: "膝主驱动",
   },
   {
     id: "ankle_main",
     barrelNode: "knee_{s}",
-    exit: [KJ.LEG_X, KJ.ANKLE_Y + 0.52, -0.4],
+    exit: [KJ.LEG_X, KJ.ANKLE_Y + 0.52, -0.25],
     tipNode: "ankle_{s}",
-    tip: [KJ.LEG_X, KJ.ANKLE_Y + 0.12, -0.37],
+    tip: [KJ.LEG_X, KJ.ANKLE_Y + 0.12, -0.2],
     joint: "踝主驱动",
   },
 ];
@@ -126,18 +135,18 @@ const ARM_HYDRAULICS: Omit<HydraulicSpec, "side">[] = [
   {
     id: "shoulder_main",
     barrelNode: "chest",
-    exit: [KJ.SHOULDER_X + 0.4, KJ.CHEST_Y + KJ.SHOULDER_Y - 0.18, 0.31],
+    exit: [KJ.SHOULDER_X + 0.4, KJ.CHEST_Y + KJ.SHOULDER_Y - 0.18, 0.24],
     tipNode: "arm_{s}",
-    tip: [KJ.SHOULDER_X + 0.4, KJ.CHEST_Y + KJ.SHOULDER_Y - 0.62, 0.3],
+    tip: [KJ.SHOULDER_X + 0.4, KJ.CHEST_Y + KJ.SHOULDER_Y - 0.62, 0.22],
     joint: "肩主驱动",
-    mount: [KJ.SHOULDER_POD_CX + KJ.SHOULDER_POD_W / 2, KJ.CHEST_Y + KJ.SHOULDER_Y, 0.5],
+    mount: [KJ.SHOULDER_POD_CX + KJ.SHOULDER_POD_W / 2, KJ.CHEST_Y + KJ.SHOULDER_Y, 0.38],
   },
   {
     id: "elbow_main",
     barrelNode: "arm_{s}",
-    exit: [KJ.SHOULDER_X + 0.12, KJ.CHEST_Y + KJ.SHOULDER_Y - 0.6, -0.34],
+    exit: [KJ.SHOULDER_X + 0.12, KJ.CHEST_Y + KJ.SHOULDER_Y - 0.6, -0.22],
     tipNode: "forearm_{s}",
-    tip: [KJ.SHOULDER_X + 0.12, KJ.CHEST_Y + KJ.SHOULDER_Y - 1.12, -0.355],
+    tip: [KJ.SHOULDER_X + 0.12, KJ.CHEST_Y + KJ.SHOULDER_Y - 1.12, -0.2],
     joint: "肘主驱动",
   },
 ];
@@ -167,7 +176,7 @@ export function nodeOrigin(name: string): Vec3 {
   if (name === "root") return [0, 0, 0];
   if (name === "legs") return ROOT_ORIGIN.legs;
   if (name === "stomach") return ROOT_ORIGIN.stomach;
-  if (name === "waist") return [0, KJ.STOMACH_Y + 0.49, 0];
+  if (name === "waist") return [0, KJ.STOMACH_Y + KJ.WAIST_OFFSET, 0];
   if (name === "chest") return ROOT_ORIGIN.chest;
   if (name === "ship") return ROOT_ORIGIN.ship;
   if (name.startsWith("rod")) {

@@ -376,6 +376,6 @@ export function addShipParts(builder: KingJoeParts): void {
     spacing: 0.08,
     rotation: [90, 0, 0],
   });
-  addAntigravity(builder, A, [0, 0.58, -0.35], 0.5);
+  addAntigravity(builder, A, [0, 0.55, 0], 0.5);
   addNozzles(builder, A);
 }

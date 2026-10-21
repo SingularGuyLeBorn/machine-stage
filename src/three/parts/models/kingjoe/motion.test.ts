@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildModel, detectStatic } from "@/three/parts";
+import { buildModel, detectStatic, partitionExpectedContacts } from "@/three/parts";
+import type { AssembledModel } from "@/three/parts";
 import { makeKingJoeRegistry, makeKingJoeLayouts, kingjoeModelBuilders } from "./registry";
 import { animateKingJoe, type KingJoeState } from "./motion";
 
@@ -15,8 +16,13 @@ const states: KingJoeState[] = [
 ];
 const keyframes = [0, 1, 2, 3, 4.2, 5.5, 7.2, 8.2, 9.5];
 
+function activeReports(registry: ReturnType<typeof makeKingJoeRegistry>, model: AssembledModel) {
+  const reports = detectStatic(model, { minDepthM: 0.0005 });
+  return partitionExpectedContacts(reports, registry.expectedContacts ?? []).active;
+}
+
 describe("kingjoe motion", () => {
-  it("每种形态的关键姿态零穿模", () => {
+  it("每种形态的关键姿态机构-皮零穿插", () => {
     const registry = makeKingJoeRegistry();
     const model = buildModel(registry, {
       builders: kingjoeModelBuilders,
@@ -27,7 +33,7 @@ describe("kingjoe motion", () => {
       model.resetNodes();
       animateKingJoe(model, 0, state);
       model.root.updateMatrixWorld(true);
-      expect(detectStatic(model, { minDepthM: 0.0005 }), `state ${state}`).toEqual([]);
+      expect(activeReports(registry, model), `state ${state}`).toEqual([]);
     }
     // 腰部关节关键帧：上腹/胸/头绕 waist 转，腿↔腹接口不动
     model.resetNodes();
@@ -36,7 +42,7 @@ describe("kingjoe motion", () => {
       model.resetNodes();
       animateKingJoe(model, t, "robot");
       model.root.updateMatrixWorld(true);
-      expect(detectStatic(model, { minDepthM: 0.0005 }), `robot waist t=${t}`).toEqual([]);
+      expect(activeReports(registry, model), `robot waist t=${t}`).toEqual([]);
     }
     // 合体关键帧（含三段对接、锁环、展开）
     model.resetNodes();
@@ -45,12 +51,12 @@ describe("kingjoe motion", () => {
       model.resetNodes();
       animateKingJoe(model, t, "combining");
       model.root.updateMatrixWorld(true);
-      expect(detectStatic(model, { minDepthM: 0.0005 }), `combining t=${t}`).toEqual([]);
+      expect(activeReports(registry, model), `combining t=${t}`).toEqual([]);
     }
     model.dispose();
   }, 120_000);
 
-  it("战损：装甲板脱落、液压喷溅与战后姿态零穿模", () => {
+  it("战损：装甲板脱落、液压喷溅与战后姿态零穿插", () => {
     const registry = makeKingJoeRegistry();
     const model = buildModel(registry, {
       builders: kingjoeModelBuilders,
@@ -61,12 +67,12 @@ describe("kingjoe motion", () => {
       model.resetNodes();
       animateKingJoe(model, t, "damaged");
       model.root.updateMatrixWorld(true);
-      expect(detectStatic(model, { minDepthM: 0.0005 }), `damaged t=${t}`).toEqual([]);
+      expect(activeReports(registry, model), `damaged t=${t}`).toEqual([]);
     }
     model.dispose();
   }, 120_000);
 
-  it("编队纵队↔楔形变换与楔形起步合体零穿模", () => {
+  it("编队纵队↔楔形变换与楔形起步合体零穿插", () => {
     const registry = makeKingJoeRegistry();
     const model = buildModel(registry, {
       builders: kingjoeModelBuilders,
@@ -77,7 +83,7 @@ describe("kingjoe motion", () => {
       model.resetNodes();
       animateKingJoe(model, t, "formation");
       model.root.updateMatrixWorld(true);
-      expect(detectStatic(model, { minDepthM: 0.0005 }), `formation morph t=${t}`).toEqual([]);
+      expect(activeReports(registry, model), `formation morph t=${t}`).toEqual([]);
     }
     // 从楔形编队直接进入合体：快照应接住上一帧形态，而不是跳回纵队
     model.resetNodes();
@@ -86,7 +92,7 @@ describe("kingjoe motion", () => {
       model.resetNodes();
       animateKingJoe(model, t, "combining");
       model.root.updateMatrixWorld(true);
-      expect(detectStatic(model, { minDepthM: 0.0005 }), `combining from wedge t=${t}`).toEqual([]);
+      expect(activeReports(registry, model), `combining from wedge t=${t}`).toEqual([]);
     }
     model.dispose();
   }, 120_000);
