@@ -21,6 +21,12 @@ import {
 import { makeKingJoeSkinRegistry, kingjoeSkinBuilders } from "@/three/parts/models/kingjoe-skin/registry";
 import { makeKingJoeWholeRegistry } from "@/three/parts/models/kingjoe-whole/registry";
 import { kingjoeWholeBuilders } from "@/three/parts/models/kingjoe-whole/kits";
+import {
+  makeKingJoePlaneRegistry,
+  kingjoePlaneBuilders,
+  poseKingJoePlane,
+  planeStats,
+} from "@/three/parts/models/kingjoe-plane/registry";
 import { animateKingJoeSkin, type KingJoeSkinState } from "@/three/parts/models/kingjoe-skin/motion";
 import {
   animateTigerSuspension,
@@ -99,6 +105,35 @@ export const TEST_ROTOR_OMEGA = 1.2;
 const testKit = makeTestRegistry();
 
 export const CATALOG: StageModel[] = [
+  {
+    id: "kingjoeplane",
+    title: "金古桥 · 平面分体验证",
+    subtitle: "第一刀：上下横切 · 平整封口 · 素色内核",
+    milestone: "截面验证",
+    status: "ready",
+    registry: makeKingJoePlaneRegistry(),
+    builders: kingjoePlaneBuilders,
+    animate: poseKingJoePlane,
+    states: [
+      { id: "idle", label: "展开检查", hint: "铜色区域为真实封口三角面" },
+      { id: "closed", label: "合拢检查", hint: "上下两面回到同一切平面" },
+    ],
+    actions: [
+      { id: "plane-open", group: "截面", label: "展开截面", kind: "machine-state", state: "idle" },
+      { id: "plane-close", group: "截面", label: "合拢检查", kind: "machine-state", state: "closed" },
+      { id: "plane-reset", group: "展示", label: "重置视角", kind: "reset-view" },
+    ],
+    readouts: () => [
+      { label: "切面高度", value: `${planeStats.height} m` },
+      { label: "开放边", value: "0" },
+      { label: "截面面积", value: `${planeStats.parts[0]!.cap_area.toFixed(3)} m²` },
+    ],
+    notes: [
+      "本卡先验证平面切割与封口，使用已有闭合内核；原 GLB 外皮、纹理和旧合体效果保留在原卡中。",
+      "上下是两个展示组，共含 9 个闭合连通块；横切也经过垂下的手，不是最终飞船模块分界。",
+      "切面沿实际轮廓三角化；生成时检查所有边恰有两个相反方向的邻面、正体积、切前切后体积守恒及上下截面面积一致。",
+    ],
+  },
   {
     id: "test",
     title: "框架自检台",
