@@ -27,8 +27,21 @@ import {
   t800AllBuilders,
 } from "@/three/parts/models/t800/registry";
 import { animateT800, t800Readouts } from "@/three/parts/models/t800/motion";
-import { AK47_BUILDERS, makeAk47Layouts, makeAk47Registry } from "@/three/parts/models/ak47/registry";
-import { AK47_MOTION_PARTS, animateAk47, getAk47Mode } from "@/three/parts/models/ak47/motion";
+import {
+  AK47_BUILDERS as AK47_G7_BUILDERS,
+  makeAk47Layouts as makeAk47G7Layouts,
+  makeAk47Registry as makeAk47G7Registry,
+} from "@/three/parts/models/guns7/ak47/registry";
+import {
+  AK47_MOTION_PARTS as AK47_G7_MOTION_PARTS,
+  animateAk47 as animateAk47G7,
+} from "@/three/parts/models/guns7/ak47/motion";
+import {
+  BISON_BUILDERS,
+  BISON_LAYOUTS_EXPORT,
+  bisonRegistry,
+} from "@/three/parts/models/guns7/bison/registry";
+import { BISON_MOTION_PARTS, animateBison } from "@/three/parts/models/guns7/bison/motion";
 import { M249_BUILDERS, makeM249Layouts, makeM249Registry } from "@/three/parts/models/m249/registry";
 import { M249_MOTION_PARTS, animateM249, getM249Mode } from "@/three/parts/models/m249/motion";
 import { M2HB_BUILDERS, makeM2hbLayouts, makeM2hbRegistry } from "@/three/parts/models/m2hb/registry";
@@ -480,6 +493,54 @@ export const CATALOG: StageModel[] = [
     ],
   },
   {
+    id: "bison",
+    title: "PP-19 野牛冲锋枪",
+    subtitle: "自由枪机 + 30 发螺旋弹筒 + 侧折叠骨架托 · 9×18mm PM",
+    milestone: "G-2",
+    status: "ready",
+    registry: bisonRegistry,
+    layouts: BISON_LAYOUTS_EXPORT,
+    builders: BISON_BUILDERS,
+    motionParts: BISON_MOTION_PARTS,
+    animate: (assembled, seconds, state) => {
+      animateBison(
+        assembled,
+        seconds,
+        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
+      );
+    },
+    readouts: () => [
+      { label: "自动原理", value: "自由枪机（无导气/无回转闭锁）" },
+      { label: "供弹方式", value: "30 发螺旋弹筒（膛内 1 + 螺旋槽 29）" },
+      { label: "循环速度", value: "1.15 s/发（约 700 发/分）" },
+      { label: "弹药", value: "9×18mm PM 马卡洛夫（六分件逐发独立）" },
+      { label: "零件", value: "64 定义 / 259 实例" },
+    ],
+    states: [
+      { id: "idle", label: "装配静止", hint: "满仓 30 发，可开爆炸视图看弹筒内部螺旋导轨" },
+      { id: "semi", label: "单发", hint: "一次自由枪机循环：击发、后坐、抽壳、托弹板推进一个槽" },
+      { id: "running", label: "连发", hint: "30 发连续循环，螺旋托弹板旋转 29 个槽距，空仓后停住" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 循环扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "bison-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
+      { id: "bison-auto", group: "射击", label: "连发 30 发", kind: "machine-state", state: "running" },
+      { id: "bison-idle", group: "射击", label: "停火", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "扫掠检测", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "野牛不是导气式：枪机/枪机框作为一个自由枪机整体后坐 58mm，没有导气活塞和回转闭锁凸笋；枪机节点保持 0°。",
+      "30 发弹筒由 29 个螺旋槽位 + 膛内 1 发组成；托弹板是单臂螺旋推板，沿导轨旋转并把弹推到供弹唇，不占用整圆截面。",
+      "弹筒外壳顶部开 110° 供弹口，前/后盖是环板；螺旋导轨只放在筒体中后段，避让供弹口的抬弹路径。",
+      "骨架托挂在机匣左侧的铰链座上，向左侧折叠 180°；这样后坐时枪机框不会撞到托架。",
+    ],
+  },
+  {
     id: "m249",
     title: "M249 班用自动武器",
     subtitle: "导气式 + 弹链供弹 · M27 可散链步进 · 快拆枪管",
@@ -574,12 +635,16 @@ export const CATALOG: StageModel[] = [
     subtitle: "导气式 + 枪机回转闭锁 · 30 发弹匣零件化 · 完整射击循环",
     milestone: "M-E",
     status: "ready",
-    registry: makeAk47Registry(),
-    layouts: makeAk47Layouts(),
-    builders: AK47_BUILDERS,
-    motionParts: AK47_MOTION_PARTS,
-    animate: (assembled, seconds) => {
-      animateAk47(assembled, seconds, getAk47Mode());
+    registry: makeAk47G7Registry(),
+    layouts: makeAk47G7Layouts(),
+    builders: AK47_G7_BUILDERS,
+    motionParts: AK47_G7_MOTION_PARTS,
+    animate: (assembled, seconds, state) => {
+      animateAk47G7(
+        assembled,
+        seconds,
+        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
+      );
     },
     readouts: () => [
       { label: "自动原理", value: "导气式（活塞长行程）" },
