@@ -241,7 +241,9 @@ describe("参考图四模块闭合分体", () => {
     expect(topAt(0, 0) - topAt(-0.3, 0)).toBeGreaterThan(0.12);
     expect(topAt(0, 0) - topAt(0.3, 0)).toBeGreaterThan(0.12);
     // 同一层正面轮廓是斜面；前后分层保留台肩，而非把四周按同一半径缩小。
-    expect(topAt(0.22, 0.2) - topAt(0.32, 0.2)).toBeGreaterThan(0.05);
+    const shoulderDrop = topAt(0.22, 0.2) - topAt(0.32, 0.2);
+    expect(shoulderDrop).toBeGreaterThan(0.02);
+    expect(shoulderDrop).toBeLessThan(0.05); // 宽厚缓肩，不再收成尖帽斜面。
     expect(topAt(0, 0.4) - topAt(0, -0.4)).toBeGreaterThan(0.1);
     expect(topAt(0, 0.2) - topAt(0, 0.5)).toBeGreaterThan(0.1);
     // 退层前沿必须随外壳向两侧回弯；旧山形板的正面是同一 Z 平面，无法通过此检查。
@@ -254,6 +256,40 @@ describe("参考图四模块闭合分体", () => {
     expect(frontAt(0.3) - frontAt(0.45)).toBeGreaterThan(0.08);
     expect(frontAt(-0.3)).toBeCloseTo(frontAt(0.3), 2);
     geometry.dispose();
+    model.dispose();
+  });
+
+  it("腹盆顶部为有限面积的小平顶，下面宽肩承托，胸甲同步留出平底凹槽", () => {
+    const model = buildModel(registry, { builders: kingjoeModuleBuilders });
+    const geometries = ["pelvis", "chest"].map((key) =>
+      model.parts.find((p) => p.partId === `kingjoemodules.${key}.body`)!.geometry.clone(),
+    );
+    const [pelvis, chest] = geometries.map((g) => new MeshBVH(g));
+    for (const x of [-0.08, 0, 0.08])
+      for (const z of [-0.03, 0, 0.03]) {
+        const point = new THREE.Vector3(x, 4.52, z);
+        const hit = pelvis!.raycastFirst(
+          new THREE.Ray(new THREE.Vector3(x, 5, z), new THREE.Vector3(0, -1, 0)),
+          THREE.DoubleSide,
+        )!;
+        expect(hit.point.y).toBeCloseTo(4.52, 5);
+        expect(hit.face!.normal.y).toBeCloseTo(1, 5);
+        expect(chest!.closestPointToPoint(point)!.distance).toBeLessThan(1e-6);
+      }
+    const flatArea = triangles(geometries[0]!)
+      .filter((t) => t.every((v) => Math.abs(v.y - 4.52) < 1e-6))
+      .reduce((sum, [a, b, c]) => sum + new THREE.Triangle(a!, b!, c!).getArea(), 0);
+    expect(flatArea).toBeGreaterThan(0.025);
+    expect(flatArea).toBeLessThan(0.09);
+    for (const x of [-0.3, 0.3]) {
+      const shoulder = pelvis!.raycastFirst(
+        new THREE.Ray(new THREE.Vector3(x, 5, 0.15), new THREE.Vector3(0, -1, 0)),
+        THREE.DoubleSide,
+      )!;
+      expect(shoulder.point.y).toBeGreaterThan(4.32);
+      expect(shoulder.point.y).toBeLessThan(4.47);
+    }
+    geometries.forEach((g) => g.dispose());
     model.dispose();
   });
 
