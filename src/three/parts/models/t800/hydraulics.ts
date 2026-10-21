@@ -113,8 +113,8 @@ const RAW: RawCyl[] = [
     key: "shoulder_r",
     parent: "bip_collar_R_07",
     child: "bip_upperArm_R_08",
-    a: [0.03, 1.5, 0.11],
-    b: [0.03, 1.44, 0.215],
+    a: [0.02, 1.565, 0.15],
+    b: [0.02, 1.5, 0.195],
     r: 0.024,
     rodR: 0.011,
   },
@@ -123,8 +123,8 @@ const RAW: RawCyl[] = [
     key: "elbow_r",
     parent: "LeftArmRoll_helper_010",
     child: "LeftUpperForeArm_helper_037",
-    a: [0.03, 1.4, 0.34],
-    b: [0.05, 1.3, 0.4],
+    a: [0.03, 1.3404, 0.245],
+    b: [0.05, 1.2253, 0.23],
     r: 0.02,
     rodR: 0.0095,
   },
@@ -133,8 +133,8 @@ const RAW: RawCyl[] = [
     key: "wrist_r",
     parent: "LeftLowerForeArm_helper_015",
     child: "bip_hand_R_016",
-    a: [0.12, 1.215, 0.52],
-    b: [0.15, 1.185, 0.56],
+    a: [0.12, 1.083, 0.255],
+    b: [0.15, 1.0343, 0.265],
     r: 0.015,
     rodR: 0.007,
   },
@@ -173,8 +173,8 @@ const RAW_LEFT: RawCyl[] = [
     key: "shoulder_l",
     parent: "bip_collar_L_042",
     child: "bip_upperArm_L_047",
-    a: [0.03, 1.5, -0.11],
-    b: [0.03, 1.44, -0.215],
+    a: [0.02, 1.565, -0.17],
+    b: [0.02, 1.5, -0.215],
     r: 0.024,
     rodR: 0.011,
   },
@@ -182,8 +182,8 @@ const RAW_LEFT: RawCyl[] = [
     key: "elbow_l",
     parent: "RightArmRoll_helper_049",
     child: "RightUpperForeArm_helper_077",
-    a: [0.03, 1.4, -0.34],
-    b: [0.05, 1.3, -0.4],
+    a: [0.03, 1.3533, -0.25],
+    b: [0.05, 1.2381, -0.235],
     r: 0.02,
     rodR: 0.0095,
   },
@@ -191,15 +191,25 @@ const RAW_LEFT: RawCyl[] = [
     key: "wrist_l",
     parent: "RightLowerForeArm_helper_054",
     child: "bip_hand_L_055",
-    a: [0.12, 1.215, -0.52],
-    b: [0.15, 1.185, -0.56],
+    a: [0.12, 1.0959, -0.26],
+    b: [0.15, 1.0472, -0.27],
     r: 0.015,
     rodR: 0.007,
   },
 ];
 
-/** 中轴两根：腰椎与颈。 */
+/** 中轴三根：脊柱中央液压柱、腰椎、颈。 */
 const RAW_SPINE: RawCyl[] = [
+  {
+    // 脊柱中央液压柱：骨盆 → 颈，背部正中，脊柱弯伸时它撑/收
+    key: "spine_column",
+    parent: "bip_pelvis_02",
+    child: "bip_neck_039",
+    a: [0.05, 1.08, 0.0],
+    b: [0.045, 1.6, 0.0],
+    r: 0.013,
+    rodR: 0.0065,
+  },
   {
     key: "lumbar",
     parent: "bip_pelvis_02",
@@ -232,8 +242,38 @@ function finalize(raw: RawCyl): HydraulicDef {
   };
 }
 
-/** 全部液压缸（14 根）。 */
-export const HYDRAULICS: HydraulicDef[] = [...RAW, ...RAW_LEFT, ...RAW_SPINE].map(finalize);
+/**
+ * 竖脊肌缸（左右各一）：骨盆 → 锁骨，背部两侧。
+ * 作用是"竖脊肌"——脊柱前弯时它们被拉长，脊柱后伸时被压缩。
+ */
+const RAW_ERECTOR: RawCyl[] = [
+  {
+    key: "erector_r",
+    parent: "bip_pelvis_02",
+    child: "bip_collar_R_07",
+    a: [-0.175, 1.12, 0.06],
+    b: [-0.165, 1.45, 0.12],
+    r: 0.016,
+    rodR: 0.008,
+  },
+  {
+    key: "erector_l",
+    parent: "bip_pelvis_02",
+    child: "bip_collar_L_042",
+    a: [-0.175, 1.12, -0.06],
+    b: [-0.165, 1.45, -0.12],
+    r: 0.016,
+    rodR: 0.008,
+  },
+];
+
+/** 全部液压缸（17 根）。 */
+export const HYDRAULICS: HydraulicDef[] = [
+  ...RAW,
+  ...RAW_LEFT,
+  ...RAW_SPINE,
+  ...RAW_ERECTOR,
+].map(finalize);
 
 /** 缸键 → 定义。 */
 export const HYDRAULIC_BY_KEY = new Map(HYDRAULICS.map((h) => [h.key, h]));

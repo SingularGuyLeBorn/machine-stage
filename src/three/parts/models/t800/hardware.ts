@@ -57,8 +57,8 @@ const CHEST: HardwareDef[] = [
   {
     key: "chest_pump",
     kind: HW_KIND.column,
-    at: [0.035, 1.2, 0.0],
-    to: [0.035, 1.34, 0.0],
+    at: [0.0, 1.2, 0.075],
+    to: [0.0, 1.34, 0.075],
     r: 0.019,
     material: "gunmetal",
     joint: "bip_spine_3_06",
@@ -66,8 +66,8 @@ const CHEST: HardwareDef[] = [
   {
     key: "chest_acc",
     kind: HW_KIND.column,
-    at: [-0.045, 1.22, 0.0],
-    to: [-0.045, 1.36, 0.0],
+    at: [0.0, 1.22, -0.075],
+    to: [0.0, 1.36, -0.075],
     r: 0.022,
     material: "chrome",
     joint: "bip_spine_3_06",
@@ -75,7 +75,7 @@ const CHEST: HardwareDef[] = [
   {
     key: "chest_valve",
     kind: HW_KIND.box,
-    at: [0.035, 1.37, 0.0],
+    at: [0.04, 1.38, -0.07],
     size: [0.035, 0.04, 0.07],
     material: "dark_chrome",
     joint: "bip_spine_3_06",
