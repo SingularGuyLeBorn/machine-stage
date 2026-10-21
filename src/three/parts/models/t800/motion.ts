@@ -62,11 +62,11 @@ const ELBOW_MAX = 48;
 const WRIST_MAX = 16;
 /** 手指卷曲角（度，每节）。 */
 const FINGER_CURL = 30;
-/** 脊椎静态前倾（度）。 */
+/** 脊椎静态前倾（度）：腰 → 胸 → 颈，配合步态起伏。 */
 const SPINE_BEND: Record<string, number> = {
-  bip_spine_1_04: -3,
-  bip_spine_2_05: 2,
-  bip_spine_3_06: 3,
+  bip_spine_1_04: -7,
+  bip_spine_2_05: 6,
+  bip_spine_3_06: 4,
   bip_neck_039: 2,
 };
 
@@ -110,12 +110,13 @@ function jointAngles(seconds: number): Angles {
   z.set("bip_hand_R_016", -WRIST_MAX * pulse(right + 0.1));
   z.set("bip_hand_L_055", -WRIST_MAX * pulse(left + 0.1));
 
-  // 脊椎：前倾 + 水平拧转
+  // 脊椎：前倾 + 水平拧转（腰弯随步态起伏）
   const twist = 5 * Math.sin(2 * Math.PI * p);
-  z.set("bip_spine_1_04", SPINE_BEND.bip_spine_1_04);
-  z.set("bip_spine_2_05", SPINE_BEND.bip_spine_2_05);
+  const lean = 4 * Math.sin(2 * Math.PI * p);
+  z.set("bip_spine_1_04", SPINE_BEND.bip_spine_1_04 + lean * 0.6);
+  z.set("bip_spine_2_05", SPINE_BEND.bip_spine_2_05 + lean * 0.3);
   z.set("bip_spine_3_06", SPINE_BEND.bip_spine_3_06);
-  z.set("bip_neck_039", SPINE_BEND.bip_neck_039);
+  z.set("bip_neck_039", SPINE_BEND.bip_neck_039 - lean * 0.2);
   y.set("bip_spine_2_05", twist * 0.5);
   y.set("bip_spine_3_06", -twist * 0.5);
   y.set("bip_neck_039", -twist * 0.6);
