@@ -18,6 +18,10 @@ import { setArmourWet } from "@/three/parts/kernel/armourSurface";
 import { TigerVfx } from "./vfx/TigerVfx";
 import { applyTigerLidPose, effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
 import { firstPersonView, type CameraMode } from "./viewpoints";
+import { setAk47Mode } from "@/three/parts/models/ak47/motion";
+import { setM249Mode } from "@/three/parts/models/m249/motion";
+import { setM2hbMode } from "@/three/parts/models/m2hb/motion";
+import { setM134Mode } from "@/three/parts/models/m134/motion";
 
 // ============================================================================
 // StageCanvas —— 中栏 3D 视口
@@ -249,27 +253,25 @@ function StageRuntime() {
   }, [modelId, variantId, rebuildToken, overrides]);
 
   // ---- 每帧纪律 ----
+  // AK-47 / M249 射击模式跟随状态机（单发/连发/停机）
+  const machineState = useStageStore((state) => state.machineState);
+  const currentModelId = useStageStore((state) => state.modelId);
+  useEffect(() => {
+    const mode = machineState === "running" ? "auto" : machineState === "semi" ? "semi" : "idle";
+    if (currentModelId === "ak47") setAk47Mode(mode);
+    if (currentModelId === "m249") setM249Mode(mode);
+    if (currentModelId === "m2hb") setM2hbMode(mode);
+    if (currentModelId === "m134") setM134Mode(mode);
+  }, [machineState, currentModelId]);
+
   useFrame((_state, delta) => {
     realTimeRef.current += Math.min(delta, 0.05);
     if (!assembled) return;
     const store = useStageStore.getState();
     const model = findModel(store.modelId);
     const state = store.machineState;
-    const running =
-      state === "running" ||
-      state === "driving" ||
-      state === "firing" ||
-      state === "mg_firing" ||
-      state === "aiming" ||
-      state === "refuel" ||
-      state === "loading" ||
-      state === "engine_start" ||
-      state === "burning" ||
-      state === "detonation" ||
-      state === "hit_light" ||
-      state === "hit_heavy" ||
-      state === "hit_oblique" ||
-      state === "hit_ricochet";
+    // running = 机构运转中（连发/单发演示都推进时钟；idle/scanning 传 0 回装配态）
+    const running = state !== "idle" && state !== "scanning";
     // 切换机器状态时重置动画时钟：击发必须从 0s 开始，悬挂演示也应从头起步。
     if (state !== lastStateRef.current) {
       lastStateRef.current = state;

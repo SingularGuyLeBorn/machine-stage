@@ -27,6 +27,14 @@ import {
   t800AllBuilders,
 } from "@/three/parts/models/t800/registry";
 import { animateT800, t800Readouts } from "@/three/parts/models/t800/motion";
+import { AK47_BUILDERS, makeAk47Layouts, makeAk47Registry } from "@/three/parts/models/ak47/registry";
+import { AK47_MOTION_PARTS, animateAk47, getAk47Mode } from "@/three/parts/models/ak47/motion";
+import { M249_BUILDERS, makeM249Layouts, makeM249Registry } from "@/three/parts/models/m249/registry";
+import { M249_MOTION_PARTS, animateM249, getM249Mode } from "@/three/parts/models/m249/motion";
+import { M2HB_BUILDERS, makeM2hbLayouts, makeM2hbRegistry } from "@/three/parts/models/m2hb/registry";
+import { M2HB_MOTION_PARTS, animateM2hb, getM2hbMode } from "@/three/parts/models/m2hb/motion";
+import { M134_BUILDERS, makeM134Layouts, makeM134Registry } from "@/three/parts/models/m134/registry";
+import { M134_MOTION_PARTS, animateM134, getM134Mode } from "@/three/parts/models/m134/motion";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -416,18 +424,180 @@ export const CATALOG: StageModel[] = [
     ],
   },
   {
+    id: "m249",
+    title: "M249 班用自动武器",
+    subtitle: "导气式 + 弹链供弹 · M27 可散链步进 · 快拆枪管",
+    milestone: "M-E",
+    status: "ready",
+    registry: makeM249Registry(),
+    layouts: makeM249Layouts(),
+    builders: M249_BUILDERS,
+    motionParts: M249_MOTION_PARTS,
+    animate: (assembled, seconds) => {
+      animateM249(assembled, seconds, getM249Mode());
+    },
+    readouts: () => [
+      { label: "自动原理", value: "导气式（短行程活塞）" },
+      { label: "闭锁方式", value: "枪机头回转 30°" },
+      { label: "供弹方式", value: "M27 可散弹链（步进 15mm/发）" },
+      { label: "循环周期", value: "1.4 s/发" },
+      { label: "弹药", value: "5.56×45 M855（六分件）×20 链上" },
+    ],
+    states: [
+      { id: "idle", label: "装填静止", hint: "满链待击：可爆炸视图看供弹机构" },
+      { id: "semi", label: "单发", hint: "打一发：拨弹齿步进一节，空链脱落" },
+      { id: "running", label: "连发", hint: "连续射击：弹链逐节前移，弹壳下抛" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "m249-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
+      { id: "m249-auto", group: "射击", label: "连发", kind: "machine-state", state: "running" },
+      { id: "m249-idle", group: "射击", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "弹链供弹：拨弹齿随枪机往复，每次把 M27 链钩进一个节距（15mm）；空链节从受弹机左侧脱落（可散链）。",
+      "导气式核心零件：导气箍（⌀3.8 导气孔 + 两档调节器）→ 活塞 = 操作杆 → 枪机框。",
+      "快拆枪管：捏提把旋转 1/4 圈即可更换过热枪管（连射发烫要换——班组火力的设计）。",
+      "M249 向下抛壳（车内射击时弹壳不砸人），与 AK-47 的右侧抛壳不同。",
+    ],
+  },
+  {
     id: "m2hb",
     title: "M2HB 重机枪",
-    subtitle: "M-D：管退式自动机",
+    subtitle: "枪管短后坐 + 半自由枪机 · M3 三脚架 + T&E · 重力排壳",
     milestone: "M-D",
-    status: "planned",
+    status: "ready",
+    registry: makeM2hbRegistry(),
+    layouts: makeM2hbLayouts(),
+    builders: M2HB_BUILDERS,
+    motionParts: M2HB_MOTION_PARTS,
+    animate: (assembled, seconds) => {
+      animateM2hb(assembled, seconds, getM2hbMode());
+    },
+    readouts: () => [
+      { label: "自动原理", value: "枪管短后坐 + 半自由枪机" },
+      { label: "短后坐行程", value: "12 mm（枪管+延伸部）" },
+      { label: "枪机行程", value: "100 mm（加速子传能）" },
+      { label: "循环周期", value: "2.2 s/发" },
+      { label: "弹药", value: ".50 BMG M33（六分件）×14 链上" },
+    ],
+    states: [
+      { id: "idle", label: "装填静止", hint: "满链待击：可爆炸视图看半自由枪机" },
+      { id: "semi", label: "单发", hint: "打一发：枪管短后坐→加速子→枪机后坐→抽壳→复进" },
+      { id: "running", label: "连发", hint: "连续射击：弹链逐节步进，空弹壳底部重力排出" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "m2hb-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
+      { id: "m2hb-auto", group: "射击", label: "连发", kind: "machine-state", state: "running" },
+      { id: "m2hb-idle", group: "射击", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "枪管短后坐：击发后枪管+延伸部整体后坐 12mm（闭锁环抱紧枪机）——与导气式（AK/M249）完全不同。",
+      "加速子：枪管后坐末段摆臂下压，把 12mm 行程的能量加速传给枪机——枪机获得 100mm 行程（半自由枪机的灵魂）。",
+      "拉壳槽随动：枪机前端的螺面凹槽收着撞针——枪机后坐时撞针边退边抽壳；L 形退壳杠杆放大退壳力。",
+      "重力排壳：M2 无弹匣弹簧——空弹壳靠重力从枪身底部排出（12 槽弹壳池在枪下堆积）。",
+      "M3 三脚架 + T&E：高低/方向手轮每点击 50 密位（1 密位 ≈ 1m/1000m）；枪管深灰发蓝 vs 机匣磷化灰绿分色。",
+    ],
   },
   {
     id: "ak47",
-    title: "AK-47",
-    subtitle: "M-E：导气式自动机",
+    title: "AK-47 突击步枪",
+    subtitle: "导气式 + 枪机回转闭锁 · 30 发弹匣零件化 · 完整射击循环",
     milestone: "M-E",
-    status: "planned",
+    status: "ready",
+    registry: makeAk47Registry(),
+    layouts: makeAk47Layouts(),
+    builders: AK47_BUILDERS,
+    motionParts: AK47_MOTION_PARTS,
+    animate: (assembled, seconds) => {
+      animateAk47(assembled, seconds, getAk47Mode());
+    },
+    readouts: () => [
+      { label: "自动原理", value: "导气式（活塞长行程）" },
+      { label: "闭锁方式", value: "枪机头回转 38°" },
+      { label: "循环周期", value: "1.8 s/发" },
+      { label: "理论射速", value: "600 发/分" },
+      { label: "弹药", value: "7.62×39（六分件）×30" },
+    ],
+    states: [
+      { id: "idle", label: "装填静止", hint: "满弹待击：可爆炸视图看内部机构" },
+      { id: "semi", label: "单发", hint: "打一发完整循环：击发→导气后坐→抛壳→复进供弹" },
+      { id: "running", label: "连发", hint: "连续射击：弹壳抛出堆积、枪口上跳、托弹板逐发上顶" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "ak-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
+      { id: "ak-auto", group: "射击", label: "连发", kind: "machine-state", state: "running" },
+      { id: "ak-idle", group: "射击", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "射击循环（1.8s）：扣扳机→阻铁释放击锤→击针击底火→弹头出膛（枪口焰）→燃气推活塞→枪机框后坐→枪机头回转开锁→抽壳抛壳→复进簧推回→推弹上膛→闭锁待击。",
+      "弹药零件化：每发 = 弹头(被甲+铅套+钢芯) + 弹壳 + 发射药 + 底火，30 发实例化堆叠在弧形弹匣内。",
+      "导气式核心零件：导气箍（⌀4.4 导气孔）→ 活塞+活塞杆 → 枪机框；闭锁由枪机头双凸笋在节套闭锁窗回转 38° 完成。",
+    ],
+  },
+  {
+    id: "m134",
+    title: "M134 加特林",
+    subtitle: "6 管旋转 · 每管独立枪机依次击发 · 外能源电机驱动",
+    milestone: "M-G",
+    status: "ready",
+    registry: makeM134Registry(),
+    layouts: makeM134Layouts(),
+    builders: M134_BUILDERS,
+    motionParts: M134_MOTION_PARTS,
+    animate: (assembled, seconds) => {
+      animateM134(assembled, seconds, getM134Mode());
+    },
+    readouts: () => [
+      { label: "自动原理", value: "转管式（外能源电机）" },
+      { label: "枪管数", value: "6 根（分布半径 32mm）" },
+      { label: "枪机", value: "6 套独立（凸轮槽驱动往复）" },
+      { label: "转子转速", value: "300 rpm（演示）" },
+      { label: "理论射速", value: "1800 发/分（真机 6000）" },
+    ],
+    states: [
+      { id: "idle", label: "停机", hint: "转子静止：可爆炸视图看 6 管 + 6 枪机" },
+      { id: "semi", label: "点射", hint: "短促点射：转子转起，逐管依次击发" },
+      { id: "running", label: "连发", hint: "全速旋转：枪口焰在击发位闪、弹壳瀑布式抛出" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "m134-semi", group: "射击", label: "点射", kind: "machine-state", state: "semi" },
+      { id: "m134-auto", group: "射击", label: "全速连发", kind: "machine-state", state: "running" },
+      { id: "m134-idle", group: "射击", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "转管式（皇冠机构）：6 根枪管 + 6 套独立枪机绕中心轴旋转，枪机导销插在转子尾端凸轮槽里——旋转中每套枪机依次完成 装填→闭锁→击发→抽壳→抛壳。",
+      "外能源：加特林没有导气/后坐自动机，全靠电机经 36:10 减速齿轮组驱动转子；射速 = 6 × 转子转速（真机 1000rpm → 6000 发/分）。",
+      "枪口焰只在击发位（正上方那根枪管）闪——与 AK/M249/M2HB 的「每发必闪」不同。",
+      "弹壳瀑布：6 管轮流抛壳，从左侧抛壳口连续抛出（14 槽弹壳池循环）。",
+    ],
   },
   {
     id: "j20",

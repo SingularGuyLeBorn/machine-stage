@@ -107,6 +107,31 @@ function collectInstances(
   return out;
 }
 
+/** 点是否在网格内部（奇偶射线法，3 方向多数投票，防退化）。 */
+function pointInsideSolid(point: THREE.Vector3, bvh: MeshBVH, ray: THREE.Ray): boolean {
+  let votes = 0;
+  let tested = 0;
+  for (const direction of RAY_DIRECTIONS) {
+    ray.set(point, direction);
+    const hits = bvh.raycast(ray, THREE.DoubleSide);
+    let onSurface = false;
+    for (const hit of hits) {
+      if (hit.distance < 1e-6) {
+        onSurface = true;
+        break;
+      }
+    }
+    if (onSurface) continue;
+    tested++;
+    if (hits.length % 2 === 1) votes++;
+  }
+  if (tested === 0) return false;
+  // 一致性判据（原为多数表决）：中空/开口壳体（枪械的弹匣壳、机匣、护木）在
+  // 多数表决下会把「腔内空腔」误判为实体——任一方向射线穿过开口即可证明在外部。
+  // 只在全部方向都判「内」时才认定在实体内，避免把腔体内容判成穿透。
+  return votes === tested;
+}
+
 /** 采样点：顶点 + 面心 + 棱中点（解决「同尺寸共面盒体顶点恰好落在对方表面」的退化）。 */
 function samplePoints(geometry: THREE.BufferGeometry, budget = 900): THREE.Vector3[] {
   const position = geometry.getAttribute("position") as THREE.BufferAttribute;
@@ -133,28 +158,6 @@ function samplePoints(geometry: THREE.BufferGeometry, budget = 900): THREE.Vecto
     points.push(a.clone().add(b).add(c).multiplyScalar(1 / 3));
   }
   return points;
-}
-
-/** 点是否在网格内部（奇偶射线法，3 方向多数投票，防退化）。 */
-function pointInsideSolid(point: THREE.Vector3, bvh: MeshBVH, ray: THREE.Ray): boolean {
-  let votes = 0;
-  let tested = 0;
-  for (const direction of RAY_DIRECTIONS) {
-    ray.set(point, direction);
-    const hits = bvh.raycast(ray, THREE.DoubleSide);
-    let onSurface = false;
-    for (const hit of hits) {
-      if (hit.distance < 1e-6) {
-        onSurface = true;
-        break;
-      }
-    }
-    if (onSurface) continue;
-    tested++;
-    if (hits.length % 2 === 1) votes++;
-  }
-  if (tested === 0) return false;
-  return votes * 2 > tested;
 }
 
 interface DepthProbe {
