@@ -7,7 +7,7 @@ import { KINGJOE_SKIN_MATERIALS } from "../kingjoe-skin/materials";
 import { makeKingJoeSkinDetails } from "../kingjoe-skin/details";
 import data from "./modules.generated.json";
 
-// GLB 原表面逐壳闭合后归组；双臂只归属头肩模块，不参与躯干横切。
+// 原装甲与内部连接结构布尔融合；每个主体单独连通，阶梯凹凸接口由同一模具切出。
 function decode(value: string): ArrayBuffer {
   return Uint8Array.from(atob(value), (c) => c.charCodeAt(0)).buffer;
 }
@@ -94,7 +94,7 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
     material: part.groups[0]!.material,
     materialGroups: part.groups.map((g) => g.material),
     mate: { type: "absolute", position: [0, 0, 0] },
-    source: "原 GLB 顶点、法线和 UV；逐壳闭合，四肢不横切",
+    source: "原 GLB 表面与法线、UV；内部补实并融合为单实体，共用模具切出阶梯嵌合接口",
   }));
   const details: PartDefinition[] = makeKingJoeSkinDetails().map((part, i) => ({
     ...part,
@@ -107,8 +107,9 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
   return {
     model: "kingjoemodules",
     title: "金古桥 · 参考图分体",
-    subtitle: "完整双臂 · 原 GLB 外形 · 闭合装甲",
+    subtitle: "完整双臂 · 连通主体 · 阶梯嵌合接口",
     constants: {
+      HIP_SEAM: String(data.hip),
       WAIST_SEAM: String(data.waist),
       NECK_SEAM: String(data.neck),
       // [OM-FREEPLAY] 沿参考图横向摆放便于检查；这里只设静态姿态，不接入旧合体动画。
