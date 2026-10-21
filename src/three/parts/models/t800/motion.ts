@@ -66,6 +66,8 @@ interface Angles {
   land: { r: number; l: number };
   /** 整机转身（水平面偏转，度） */
   turn: number;
+  /** 躯干侧倾（度）——支撑腿一侧下沉 */
+  roll: number;
 }
 
 /** 屈伸幅度（度）。 */
@@ -178,6 +180,8 @@ function jointAngles(seconds: number): Angles {
     y,
     land: { r: impact(right + 0.25), l: impact(left + 0.25) },
     turn: 6 * Math.sin(2 * Math.PI * p),
+    // 躯干侧倾：重心压到支撑腿一侧
+    roll: 3.2 * Math.sin(2 * Math.PI * p + 0.6),
   };
 }
 
@@ -245,10 +249,17 @@ function solveWorld(angles: Angles): Map<string, Pose> {
     if (!joint.parent) pos.y -= 0.009 * (angles.land.r + angles.land.l);
     // 骨盆：整机的**转身**（水平面缓慢偏转），子链跟着转
     if (!joint.parent) {
+      // 整机转身（绕 Y）+ 躯干侧倾（绕 X）
       quat.premultiply(
         new THREE.Quaternion().setFromAxisAngle(
           new THREE.Vector3(0, 1, 0),
           THREE.MathUtils.degToRad(angles.turn),
+        ),
+      );
+      quat.premultiply(
+        new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(1, 0, 0),
+          THREE.MathUtils.degToRad(angles.roll),
         ),
       );
     }
@@ -309,7 +320,7 @@ export function animateT800(
   model.resetNodes();
   // 待机：站姿（不迈步）—— 步态循环里总有一条腿屈着，静止展示用站姿更干净
   const angles: Angles = options.idle
-    ? { z: new Map(), y: new Map(), land: { r: 0, l: 0 }, turn: 0 }
+    ? { z: new Map(), y: new Map(), land: { r: 0, l: 0 }, turn: 0, roll: 0 }
     : jointAngles(seconds);
   if (options.idle) {
     for (const [name, deg] of Object.entries(SPINE_BEND)) angles.z.set(name, deg);

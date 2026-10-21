@@ -142,11 +142,12 @@ function mechMaterial(kind: MechKind): string {
     case "fitting":
       return "gunmetal";
     case "bolts":
+    case "bearing_outer":
+    case "shaft":
       return "dark_chrome";
     case "frame":
     case "rail":
     case "brace":
-    case "shaft":
       return "chrome";
     default:
       return "mirror";

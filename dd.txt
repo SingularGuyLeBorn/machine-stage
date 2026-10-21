@@ -4,8 +4,8 @@ npm warn Unknown user config "canvas_binary_host_mirror". This will stop working
 npm warn Unknown user config "electron_mirror". This will stop working in the next major version of npm.
 注册表校验：0 错 / 0 警
 零件定义 235 / 实例 235
-静态穿模报告 420（未豁免 0 / 已豁免 420）
-扫掠 16 帧穿模报告 6784（未豁免 0 / 已豁免 6784）
+静态穿模报告 421（未豁免 0 / 已豁免 421）
+扫掠 16 帧穿模报告 6789（未豁免 0 / 已豁免 6789）
   （唯一对 0 个）
 悬空候选（未挂到骨架的部位）：0
 父子骨骼几何间隙 > 120mm 的部位：0
