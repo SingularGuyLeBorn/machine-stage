@@ -14,9 +14,13 @@ function build() {
 }
 
 describe("ak47 静态穿模门禁", () => {
-  // TODO(guns-line): 门禁暂挂起——detect 的奇偶深度测验在「零厚度车削面 + 实例自对」上
-  // 系统性误判（弹匣排布已数值验证干净：相邻弹心距 ≥ 11.5mm > 底缘 ⌀11.35）。
-  // 修复方向：给 lathe 剖面加端盖闭合实体，或检测器对实例自对跳过。见 docs/PROGRESS.md。
+  // TODO(guns-line): 门禁暂挂起（152 类）。已定位两类根因，均需较大几何重构：
+  //  A) 火控组与弹匣井空间冲突：扳机杆/击锤簧落在弹匣上部弹体所在区间
+  //     （真实 AK 弹匣井前移、扳机护圈在井后——需整体后移火控 30mm 并重排弹匣弧）；
+  //  B) 枪机框尾段与弹匣供弹位：已补 120° 底部让位窗，但实例级相交仍存
+  //     （carrier↔ammo 一族），需连枪机框内腔一起改部分圆。
+  // 检测器侧已改进：pointInsideSolid 由多数表决改为一致性判据（中空壳体不再误判）。
+  // 见 docs/PROGRESS.md §M-E「已知缺口」。
   it.skip("装配态未豁免报告为 0 条", () => {
     const built = build();
     const reports = detectStatic(built);
