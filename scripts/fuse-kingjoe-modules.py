@@ -22,9 +22,12 @@ PELVIS_TOP = [
     (1.04, 1.04, 1.04, 3.93, 3.93),
     (0.99, 1.00, 1.00, 4.04, 4.26),
     (0.94, 0.78, 0.80, 4.04, 4.26),
-    (0.86, 0.68, 0.64, 4.22, 4.45),
-    (0.80, 0.40, 0.42, 4.22, 4.45),
-    (0.28, 0.23, 0.20, 4.48, 4.52),
+    (0.86, 0.68, 0.64, 4.26, 4.40),
+    (0.80, 0.40, 0.42, 4.26, 4.40),
+    # 宽肩面先向内缓收，再接短小顶座；末圈等高，封顶为一整块平面。
+    (0.48, 0.30, 0.29, 4.40, 4.45),
+    (0.30, 0.23, 0.20, 4.47, 4.47),
+    (0.26, 0.20, 0.17, 4.52, 4.52),
 ]
 # 下方按向下的局部深度放样，保持中央深、两侧浅的对应凹凸。
 PELVIS_BOTTOM = [
@@ -182,12 +185,13 @@ def connect(body, name):
 
 
 def export(key, body, connections):
-    # 以 0.01mm 容差清除布尔共面求交产生的微小边，再编码成浏览器 Float32。
+    # 腹盆与胸甲的平顶缓肩交角小，简化精度提高到 0.001mm；其余模块保持原精度。
     appearance = body.to_mesh().vert_properties
     props = {}
     for row in appearance:
         props.setdefault(tuple(np.round(row[:3],6)), []).append(row[3:])
-    body = body.set_properties(0, lambda p, old: []).set_tolerance(1e-5).simplify(1e-5)
+    tolerance = 1e-6 if key in ('pelvis','chest') else 1e-5
+    body = body.set_properties(0, lambda p, old: []).set_tolerance(tolerance).simplify(tolerance)
     assert len(body.decompose()) == 1, key
     mesh = body.to_mesh()
     vp, faces = mesh.vert_properties, mesh.tri_verts
