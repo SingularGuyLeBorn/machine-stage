@@ -15,6 +15,7 @@ import {
   t800AllBuilders,
 } from "../src/three/parts/models/t800/registry";
 import { animateT800 } from "../src/three/parts/models/t800/motion";
+import { applyExplode } from "../src/app/three/pose";
 
 const OUT = "docs/qa/t800/compare";
 mkdirSync(OUT, { recursive: true });
@@ -132,11 +133,20 @@ const SHOTS: Shot[] = [
   { dir: new THREE.Vector3(0.7071, 0, 0.7071), label: "iso" },
 ];
 
-function renderModel(model: AssembledModel, seconds: number, shot: Shot): Canvas {
+function renderModel(
+  model: AssembledModel,
+  seconds: number,
+  shot: Shot,
+  explode = 0,
+): Canvas {
   model.resetNodes();
   animateT800(model, seconds);
   model.syncInstances();
-  model.root.updateMatrixWorld(true);
+  if (explode > 0) {
+    // 爆炸视图（用 app 里的同一套逻辑，存档与页面所见一致）
+    applyExplode(model, explode);
+    model.root.updateMatrixWorld(true);
+  }
 
   const up = new THREE.Vector3(0, 1, 0);
   const right = new THREE.Vector3().crossVectors(up, shot.dir).normalize();
@@ -227,5 +237,12 @@ for (const shot of SHOTS) {
   }
   writeFileSync(`${OUT}/glb-vs-mech-${shot.label}.png`, out.toPng());
   console.log("wrote", `glb-vs-mech-${shot.label}.png`, "(左：GLB 原型 / 右：机械拆解版)");
+}
+
+// 爆炸视图：机械版拆开看内部层次
+for (const shot of SHOTS) {
+  const exploded = renderModel(mech, 0, shot, 1);
+  writeFileSync(`${OUT}/mech-exploded-${shot.label}.png`, exploded.toPng());
+  console.log("wrote", `mech-exploded-${shot.label}.png`, "(机械拆解版 · 爆炸视图)");
 }
 console.log("done");
