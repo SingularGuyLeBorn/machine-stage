@@ -78,9 +78,9 @@ describe("kingjoeskin real-mesh parts", () => {
     model.root.updateMatrixWorld(true);
     const reports = detectStatic(model, { minDepthM: 0.0005 });
     const split = partitionExpectedContacts(reports, registry.expectedContacts ?? []);
-    const active = split.active.map((item) => [item.report.a, item.report.b] as const);
-    // 源网格是多片壳体互嵌的游戏低模：允许源内报告，但绝不允许新增件参与。
-    expect(active.every(([a, b]) => a.includes(".src_") && b.includes(".src_"))).toBe(true);
+    // 源网格是多片壳体互嵌的游戏低模：源内报告全部按白名单豁免（anyForm），
+    // 未豁免报告必须为 0，新增彩虹胸/眼带也不得参与。
+    expect(split.active).toEqual([]);
     // 构造性接触白名单不能退化成空表。
     expect(split.expected.length).toBeGreaterThan(300);
   }, 180_000);
