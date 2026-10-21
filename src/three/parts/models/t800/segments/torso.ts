@@ -16,18 +16,18 @@ import { SPINE_NODES, VERTEBRAE, perNodeLayout } from "./spine";
 
 /** 肋骨 12 对：自上而下 [高度, 前后半径, 左右半径, 下垂量]。 */
 const RIB_PROFILE: Array<[number, number, number, number]> = [
-  [1.886, 0.076, 0.063, 0.026],
-  [1.863, 0.094, 0.080, 0.030],
-  [1.839, 0.108, 0.094, 0.034],
-  [1.816, 0.120, 0.106, 0.036],
-  [1.792, 0.128, 0.115, 0.036],
-  [1.769, 0.134, 0.120, 0.034],
-  [1.745, 0.138, 0.123, 0.031],
-  [1.722, 0.139, 0.123, 0.028],
-  [1.698, 0.137, 0.120, 0.024],
-  [1.675, 0.132, 0.114, 0.020],
-  [1.651, 0.124, 0.105, 0.016],
-  [1.628, 0.113, 0.093, 0.012],
+  [1.906, 0.076, 0.063, 0.026],
+  [1.888, 0.094, 0.080, 0.030],
+  [1.870, 0.108, 0.094, 0.034],
+  [1.852, 0.120, 0.106, 0.036],
+  [1.834, 0.128, 0.115, 0.036],
+  [1.816, 0.134, 0.120, 0.034],
+  [1.798, 0.138, 0.123, 0.031],
+  [1.780, 0.139, 0.123, 0.028],
+  [1.762, 0.137, 0.120, 0.024],
+  [1.744, 0.132, 0.114, 0.020],
+  [1.726, 0.124, 0.105, 0.016],
+  [1.708, 0.113, 0.093, 0.012],
 ];
 
 /** 肋骨分成 4 组（半径渐变用组区分），每组 3 根。 */
@@ -41,7 +41,6 @@ export function buildTorso(builder: PartBuilder, layouts: Record<string, Instanc
       const from = g * 3;
       const rows = RIB_PROFILE.slice(from, from + 3);
       const avgRz = rows.reduce((s, r) => s + r[2], 0) / rows.length;
-      const avgDrop = rows.reduce((s, r) => s + r[3], 0) / rows.length;
       const avgVertR = VERTEBRAE[5 + from][2];
       builder.add({
         id: `t800.torso.ribs${suffix}_${g}`,
@@ -52,15 +51,14 @@ export function buildTorso(builder: PartBuilder, layouts: Record<string, Instanc
           type: "kit",
           kit: "t800Rib",
           params: {
-            rx: 0.09,
-            rootX: -(1.05 * avgVertR + 0.022),
-            xEnd: 0.13,
+            rootZ: avgVertR * 1.828 + 0.008,
             rz: avgRz,
-            startDeg: 180,
-            endDeg: 0,
-            r: 0.0075,
-            rEnd: 0.006,
-            drop: avgDrop,
+            xEnd: 0.13,
+            back: 0.022,
+            r: 0.0055,
+            rEnd: 0.0045,
+            frontZ: 0.012 + (from === 0 ? 0 : from === 3 ? 1 : from === 6 ? 2 : 3) * 0.011,
+            drop: 0.026,
           },
           ...(side < 0 ? { mirror: "z" as const } : {}),
         },
@@ -77,7 +75,7 @@ export function buildTorso(builder: PartBuilder, layouts: Record<string, Instanc
       layouts[`t800.torso.ribs${suffix}_${g}`] = perNodeLayout(
         rows.map(([y], i) => {
           const vert = VERTEBRAE[5 + from + i];
-          return [vert[1], y, side < 0 ? 0.02 : 0] as [number, number, number];
+          return [vert[1], y, 0] as [number, number, number];
         }),
       );
     }
@@ -108,7 +106,7 @@ export function buildTorso(builder: PartBuilder, layouts: Record<string, Instanc
       geom: {
         type: "kit",
         kit: "t800Clavicle",
-        params: { side, xFront: 0.1, xBack: -0.02, z: 0.15, r: 0.0085 },
+        params: { side, xFront: 0.1, xBack: -0.02, z: 0.15, r: 0.0075, frontZ: 0.026 },
         ...(side < 0 ? { mirror: "z" as const } : {}),
       },
       mat: "chrome",
@@ -127,13 +125,13 @@ export function buildTorso(builder: PartBuilder, layouts: Record<string, Instanc
       cn: `肩胛骨（${side > 0 ? "右" : "左"}）`,
       en: `Scapula (${side > 0 ? "right" : "left"})`,
       asm: "torso",
-      geom: { type: "plate", w: 0.1, h: 0.13, t: 0.007, bevel: 0.002 },
+      geom: { type: "plate", w: 0.06, h: 0.11, t: 0.007, bevel: 0.002 },
       mat: "chrome",
       layer: 3,
       node: SPINE_NODES[23],
       local: true,
-      at: [-0.06, -0.06, 0.045],
-      rot: [0, 18, 0],
+      at: [-0.09, -0.055, 0.082],
+      rot: [0, 8, 0],
       hint: "背面扁板：肩带的结构件",
     });
   }
@@ -144,12 +142,12 @@ export function buildTorso(builder: PartBuilder, layouts: Record<string, Instanc
     cn: "燃料电池外壳",
     en: "Fuel cell housing",
     asm: "torso",
-    geom: { type: "box", w: 0.055, h: 0.085, d: 0.05, bevel: 0.005 },
+    geom: { type: "box", w: 0.04, h: 0.07, d: 0.08, bevel: 0.004 },
     mat: "dark_chrome",
     layer: 3,
     node: SPINE_NODES[9],
     local: true,
-    at: [0.085, -0.015, 0],
+    at: [0.06, -0.05, 0],
     hint: "胸口正中的可拆动力单元（终结者2 可拆出）",
   });
   builder.add({
@@ -157,19 +155,23 @@ export function buildTorso(builder: PartBuilder, layouts: Record<string, Instanc
     cn: "电芯（实例族）",
     en: "Cell stack family",
     asm: "torso",
-    geom: { type: "cylinder", r: 0.006, h: 0.045, segments: 16, bevel: 0.001 },
+    geom: { type: "cylinder", r: 0.005, h: 0.05, segments: 16, bevel: 0.001 },
     mat: "brass",
     layer: 4,
     node: SPINE_NODES[9],
     local: true,
-    at: [0.028, -0.015, 0],
+    at: [0, 0, 0],
     inst: 6,
     layout: "t800.torso.cells",
     instNodes: repeatNode(SPINE_NODES[9], 6),
     hint: "电芯排：动力单元里一列圆柱电池",
   });
   layouts["t800.torso.cells"] = perNodeLayout(
-    Array.from({ length: 6 }, (_, i) => [0, 0, -0.02 + i * 0.014] as [number, number, number]),
+    Array.from({ length: 6 }, (_, i) => [
+      VERTEBRAE[9][1] + 0.06,
+      VERTEBRAE[9][0] - 0.05,
+      -0.03 + i * 0.012,
+    ] as [number, number, number]),
   );
 
   // ================= 胸腔液压管路 =================
@@ -183,14 +185,18 @@ export function buildTorso(builder: PartBuilder, layouts: Record<string, Instanc
     layer: 4,
     node: SPINE_NODES[8],
     local: true,
-    at: [-0.045, 0, 0],
+    at: [0, 0, 0],
     inst: 6,
     layout: "t800.torso.chest_lines",
     instNodes: repeatNode(SPINE_NODES[8], 6),
     hint: "胸腔两侧的管路束（从脊柱绕到胸前动力单元）",
   });
   layouts["t800.torso.chest_lines"] = perNodeLayout(
-    Array.from({ length: 6 }, (_, i) => [0, 0, -0.05 + i * 0.02] as [number, number, number]),
+    Array.from({ length: 6 }, (_, i) => [
+      VERTEBRAE[8][1] - 0.05,
+      VERTEBRAE[8][0],
+      -0.05 + i * 0.02,
+    ] as [number, number, number]),
   );
 }
 

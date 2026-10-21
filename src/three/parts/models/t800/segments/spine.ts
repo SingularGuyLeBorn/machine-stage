@@ -69,12 +69,12 @@ export function buildSpine(builder: PartBuilder, layouts: Record<string, Instanc
     cn: "骶骨",
     en: "Sacrum",
     asm: "spine",
-    geom: { type: "kit", kit: "t800Vertebra", params: { h: 0.07, r: 0.034, archW: 0.03, spinous: 0.02, spinousTilt: 75 } },
+    geom: { type: "kit", kit: "t800Vertebra", params: { h: 0.07, r: 0.034, archW: 0.03, spinous: 0.02, spinousTilt: 75, transverse: 0.028 } },
     mat: "bone",
     layer: 1,
     node: SPINE_NODES[0],
     local: true,
-    at: [-0.05, -0.05, 0],
+    at: [-0.075, -0.05, 0],
     hint: "骶骨：脊柱底端与骨盆顶板的承力连接块",
   });
 
@@ -95,11 +95,12 @@ export function buildSpine(builder: PartBuilder, layouts: Record<string, Instanc
         type: "kit",
         kit: "t800Vertebra",
         params: {
-          h: 0.01,
+          h: 0.008,
           r: group.r,
           archW: group.r * 0.9,
           spinous: group.r * 0.5,
           spinousTilt: 75,
+          transverse: group.r * 0.9,
         },
       },
       mat: "chrome",
@@ -119,9 +120,9 @@ export function buildSpine(builder: PartBuilder, layouts: Record<string, Instanc
 
   // ---- 23 枚椎间盘（节间弹性段，深色橡胶；按椎径分三组）----
   const discGroups: Array<{ key: string; cn: string; from: number; to: number; r: number }> = [
-    { key: "lumbar", cn: "腰椎间盘", from: 0, to: 5, r: 0.028 },
-    { key: "thoracic", cn: "胸椎间盘", from: 5, to: 17, r: 0.018 },
-    { key: "cervical", cn: "颈椎间盘", from: 17, to: 23, r: 0.012 },
+    { key: "lumbar", cn: "腰椎间盘", from: 0, to: 5, r: 0.024 },
+    { key: "thoracic", cn: "胸椎间盘", from: 5, to: 17, r: 0.0145 },
+    { key: "cervical", cn: "颈椎间盘", from: 17, to: 23, r: 0.0095 },
   ];
   for (const group of discGroups) {
     const count = group.to - group.from;
@@ -130,7 +131,7 @@ export function buildSpine(builder: PartBuilder, layouts: Record<string, Instanc
       cn: `${group.cn}（实例族）`,
       en: `${group.cn} family`,
       asm: "spine",
-      geom: { type: "kit", kit: "t800Disc", params: { h: 0.006, r: group.r } },
+      geom: { type: "kit", kit: "t800Disc", params: { h: 0.005, r: group.r } },
       mat: "rubber",
       layer: 4,
       node: SPINE_NODES[group.from],
@@ -143,40 +144,12 @@ export function buildSpine(builder: PartBuilder, layouts: Record<string, Instanc
     });
     layouts[`t800.spine.discs_${group.key}`] = perNodeLayout(
       VERTEBRAE.slice(group.from, group.to).map(([y, x], i) => {
-        const next = VERTEBRAE[i + 1];
+        const next = VERTEBRAE[group.from + i + 1];
         return [x + (next[1] - x) * 0.5, y + (next[0] - y) * 0.5, 0] as [number, number, number];
       }),
     );
   }
 
-  // ---- 椎骨横突：从椎体侧面伸出（竖脊肌与肋骨的挂点），按椎径分三组 ----
-  const transverseGroups: Array<{ key: string; cn: string; from: number; to: number; r: number }> = [
-    { key: "lumbar", cn: "腰椎横突", from: 0, to: 5, r: 0.030 },
-    { key: "thoracic", cn: "胸椎横突", from: 5, to: 17, r: 0.021 },
-    { key: "cervical", cn: "颈椎横突", from: 17, to: 24, r: 0.014 },
-  ];
-  for (const group of transverseGroups) {
-    const count = group.to - group.from;
-    builder.add({
-      id: `t800.spine.transverse_${group.key}`,
-      cn: `${group.cn}（实例族）`,
-      en: `${group.cn} family`,
-      asm: "spine",
-      geom: { type: "cylinder", r: 0.004, h: 0.02, segments: 10 },
-      mat: "dark_chrome",
-      layer: 3,
-      node: SPINE_NODES[group.from],
-      local: true,
-      at: [0, 0, 0],
-      inst: count,
-      layout: `t800.spine.transverse_${group.key}`,
-      instNodes: SPINE_NODES.slice(group.from, group.to),
-      hint: "横突销：从椎体侧面伸出，竖脊肌与肋根挂在上面",
-    });
-    layouts[`t800.spine.transverse_${group.key}`] = perNodeLayout(
-      VERTEBRAE.slice(group.from, group.to).map(([y, x]) => [x, y, group.r + 0.0125] as [number, number, number]),
-    );
-  }
 }
 
 /** 颈椎顶部（寰椎）高度——头骨挂点。 */

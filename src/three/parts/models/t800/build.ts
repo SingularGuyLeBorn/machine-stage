@@ -40,6 +40,8 @@ export interface PartSpec {
   at?: ExprVec3;
   /** 已经是节点局部坐标（液压件、rest_rotation 节点） */
   local?: boolean;
+  /** at 是**模型坐标**（不参与腿的横向镜像；手臂/头骨用） */
+  modelSpace?: boolean;
   rot?: ExprVec3;
   inst?: number;
   layout?: string;
@@ -56,11 +58,26 @@ export class PartBuilder {
   private readonly counters: Record<BuildLayer, number>;
   /** 侧别：1 = 右腿，-1 = 左腿（-1 时整条腿沿 Z 镜像）。 */
   readonly side: LegSide;
+  private readonly pivots: Record<string, [number, number, number]>;
 
-  constructor(side: LegSide = 1, counters?: Record<BuildLayer, number>) {
+  constructor(
+    side: LegSide = 1,
+    counters?: Record<BuildLayer, number>,
+    /** 额外节点的 pivot（手臂 / 头骨），模型坐标 */
+    pivots?: Record<string, [number, number, number]>,
+  ) {
     this.side = side;
     // 左右腿共用计数器：build_order 全局唯一，但仍按层递增（自内向外）
     this.counters = counters ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    this.pivots = pivots ?? {};
+  }
+
+  /** 节点 pivot（模型坐标）：腿节点走侧别换算，手臂/头骨节点查附加表。 */
+  pivotOf(node: string): [number, number, number] {
+    const extra = this.pivots[node];
+    if (extra) return extra;
+    const leg = legPivot(node, this.side);
+    return leg ?? [0, 0, 0];
   }
 
   /** 右腿节点名 → 左腿节点名。 */
@@ -92,7 +109,7 @@ export class PartBuilder {
       const z = Number(at[2]);
       // 腿局部坐标 → 世界坐标（z 走侧别）；节点局部件（local）只做镜像；
       // 骨盆件本来就是世界坐标（两腿共用），不参与换算。
-      pos = isPelvis
+      pos = isPelvis || spec.modelSpace
         ? [Number(at[0]), Number(at[1]), z]
         : [
             Number(at[0]),
@@ -100,7 +117,7 @@ export class PartBuilder {
             spec.local ? (side > 0 ? z : -z) : sideZ(side, z),
           ];
       if (node && !spec.local && !spec.inst) {
-        const pivot = legPivot(node, side) ?? [0, 0, 0];
+        const pivot = this.pivotOf(node);
         pos = [pos[0] - pivot[0], pos[1] - pivot[1], pos[2] - pivot[2]];
       }
     }

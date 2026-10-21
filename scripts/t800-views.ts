@@ -56,8 +56,8 @@ function encodePng(width: number, height: number, rgb: Uint8Array): Buffer {
 // ---------------------------------------------------------------- 画布
 const W = 900;
 const H = 1500;
-const SCALE = 780;
-const X_SHIFT = 0.05;
+const SCALE = 560;
+const X_SHIFT = 0.0;
 
 class Canvas {
   data: Uint8Array;
