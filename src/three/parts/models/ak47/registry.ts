@@ -682,7 +682,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: {
       type: "kit",
       kit: "magazineBody",
-      params: { w: 0.03, wallT: 0.0016, backT: 0.0022, depth: 0.067, arc: 0.198, segs: 34, lipSegs: 3 },
+      params: { w: 0.03, wallT: 0.0016, backT: 0.0022, depth: 0.067, arc: 0.215, segs: 36, lipSegs: 3 },
     },
     material: "steel_blued",
     node: "AkRecoil",
@@ -1117,8 +1117,8 @@ const recoilSpringCoil: InstanceLayout = ({ index, count }) => {
 
 /** 托弹簧圈：沿弹匣堆叠弧铺在底板（末发下方）与满弹托弹板之间。 */
 const magSpringCoil: InstanceLayout = ({ index, count }) => {
-  const u0 = magRoundArc(29) + 0.008;
-  const u1 = u0 + 0.011;
+  const u0 = magRoundArc(29) + 0.018;
+  const u1 = u0 + 0.012;
   const u = u0 + ((index + 0.5) / count) * (u1 - u0);
   const { pos, alpha } = magSlotTransform(u);
   const m = new THREE.Matrix4().makeRotationX(Math.PI / 2 + alpha);

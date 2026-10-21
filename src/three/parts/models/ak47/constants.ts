@@ -153,8 +153,8 @@ export const AK47_CONSTANTS = {
 
   // ---- 台面 ----
   STAGE_Y: 0.3, // 枪膛轴离地高度（展示台基准：实例布局为 root 空间，需加此偏移对齐零件）
-  FOLLOWER_Y: -0.18, // 托弹板静止位（满弹）
-  FOLLOWER_Z: -0.056,
+  FOLLOWER_Y: -0.198, // 托弹板静止位（末发下方 10mm）
+  FOLLOWER_Z: -0.058,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -234,7 +234,7 @@ export function magRoundAngle(i: number): number {
 /** 任意弧长 u 处的堆叠方向与位置（兼容旧调用）。 */
 export function magSlotTransform(u: number, _opts?: { R?: number; half?: number }) {
   const uTotal = magRoundArc(29);
-  const seg = Math.max(0, Math.min(u, uTotal));
+  const seg = Math.max(0, Math.min(u, uTotal + 0.035)); // 允许托弹板/托弹簧越过末发弧位
   let y = -0.010;
   let z = -0.0304;
   const steps = MAG_INTEGRATE_STEPS;
@@ -244,7 +244,7 @@ export function magSlotTransform(u: number, _opts?: { R?: number; half?: number 
     y += dy * step;
     z += dz * step;
   }
-  const a = magStackAngle(seg, uTotal);
+  const a = magStackAngle(Math.min(seg, uTotal), uTotal);
   return {
     pos: [0, y, z] as [number, number, number],
     axis: [0, -Math.cos(a), -Math.sin(a)] as [number, number, number],
