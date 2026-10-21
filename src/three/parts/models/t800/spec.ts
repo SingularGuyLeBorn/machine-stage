@@ -54,12 +54,12 @@ export const PIVOT_OVERRIDE: Record<string, [number, number, number]> = {
   bip_toe_L_093: [0.124, 0.03, -0.232],
   // 右臂（+Z 侧）
   bip_upperArm_R_08: [0.0, 1.53, 0.2],
-  LeftElbow_helper_035: [0.024, 1.351, 0.399],
-  bip_hand_R_016: [0.155, 1.2, 0.545],
-  // 左臂（-Z 侧）
+  LeftElbow_helper_035: [0.0237, 1.2639, 0.2368],
+  bip_hand_R_016: [0.15, 1.09, 0.25],
+  // 左臂（−Z 侧）
   bip_upperArm_L_047: [0.0, 1.53, -0.22],
-  RightElbow_helper_075: [0.024, 1.351, -0.419],
-  bip_hand_L_055: [0.155, 1.21, -0.565],
+  RightElbow_helper_075: [0.0237, 1.2642, -0.2564],
+  bip_hand_L_055: [0.15, 1.09, -0.27],
   // 躯干中轴
   bip_spine_1_04: [-0.03, 1.16, -0.01],
   bip_spine_2_05: [-0.03, 1.19, -0.01],

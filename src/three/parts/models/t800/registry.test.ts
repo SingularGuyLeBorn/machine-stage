@@ -69,23 +69,32 @@ describe("T-800 真实网格切分", () => {
     const knee = JOINT_BY_NAME.get("LeftKnee_helper_086")!;
     expect(knee.pivot[1]).toBeCloseTo(0.544, 3);
     const elbow = JOINT_BY_NAME.get("LeftElbow_helper_035")!;
-    expect(elbow.pivot[1]).toBeCloseTo(1.351, 3);
+    expect(elbow.pivot[1]).toBeCloseTo(1.2639, 3);
     const hip = JOINT_BY_NAME.get("LeftUpLegRoll_084")!;
     expect(hip.pivot[1]).toBeCloseTo(0.9, 3);
+    // 手臂垂手后，肘关节降到前臂高度（不是 A-pose 时的 1.351）
+    expect(elbow.pivot[1]).toBeLessThan(1.35);
   });
 });
 
 describe("T-800 液压缸", () => {
-  it("14 根缸 × 7 件 = 98 件，且 A 端与 B 端挂在不同骨骼上", () => {
+  it("17 根缸 × 7 件 = 119 件，且 A 端与 B 端挂在不同骨骼上", () => {
     const { registry } = build();
     const cylParts = registry.parts.filter((p) => p.id.startsWith("t800.hydraulics."));
-    expect(HYDRAULICS).toHaveLength(14);
-    expect(cylParts).toHaveLength(14 * 7);
+    expect(HYDRAULICS).toHaveLength(17);
+    expect(cylParts).toHaveLength(17 * 7);
     for (const def of HYDRAULICS) {
       const plans = hydraulicPlans(def);
       expect(plans).toHaveLength(7);
       expect(def.parent).not.toBe(def.child);
     }
+  });
+
+  it("脊柱中央液压柱 + 竖脊肌缸在列（任务书要求）", () => {
+    const keys = HYDRAULICS.map((h) => h.key);
+    expect(keys).toContain("spine_column");
+    expect(keys).toContain("erector_r");
+    expect(keys).toContain("erector_l");
   });
 
   it("露出杆长 = |AB| - 缸长（几何解，随关节角变化）", () => {

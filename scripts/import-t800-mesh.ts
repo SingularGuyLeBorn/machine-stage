@@ -78,6 +78,44 @@ for (let i = 0; i < vertCount; i++) {
   verts[i * 3 + 2] = oz * scale;
 }
 
+// ---------------------------------------------------------------- 姿态修正
+// 源网格是 A 字张开的绑定姿势；把两侧手臂（肩以下）绕肩关节转到垂手站姿。
+// 旋转必须烘焙进顶点（见 mesh/pose.ts 的说明）。
+{
+  const { ARM_POSE_DEG, isArmSideJoint, rotateAboutX, shoulderPivot } = await import(
+    "../src/three/parts/models/t800/mesh/pose"
+  );
+  // 每个部位的 z 重心 → 判左右
+  const zSum = new Float64Array(jointNames.length);
+  const zCount = new Int32Array(jointNames.length);
+  for (let i = 0; i < vertCount; i++) {
+    const j = vertJoint[i];
+    zSum[j] += verts[i * 3 + 2];
+    zCount[j]++;
+  }
+  let rotated = 0;
+  for (let j = 0; j < jointNames.length; j++) {
+    const name = jointNames[j];
+    if (!isArmSideJoint(name)) continue;
+    const side = zSum[j] / Math.max(1, zCount[j]) >= 0 ? 1 : -1;
+    const pivot = shoulderPivot(side);
+    const deg = side > 0 ? ARM_POSE_DEG : -ARM_POSE_DEG;
+    for (let i = 0; i < vertCount; i++) {
+      if (vertJoint[i] !== j) continue;
+      const p = rotateAboutX(
+        [verts[i * 3], verts[i * 3 + 1], verts[i * 3 + 2]],
+        pivot,
+        deg,
+      );
+      verts[i * 3] = p[0];
+      verts[i * 3 + 1] = p[1];
+      verts[i * 3 + 2] = p[2];
+    }
+    rotated++;
+  }
+  console.log(`姿态修正：${rotated} 个手臂部位绕肩转 ${ARM_POSE_DEG}°`);
+}
+
 // ---------------------------------------------------------------- 面归属
 const faceJoint = new Int32Array(faceCount);
 for (let f = 0; f < faceCount; f++) {
