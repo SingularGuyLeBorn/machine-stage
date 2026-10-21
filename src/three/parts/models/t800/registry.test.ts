@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as THREE from "three";
 import { validateRegistry } from "../../registry/validate";
 import { buildModel } from "../../assembler/assembler";
 import { makeT800Layouts, makeT800Registry, t800AllBuilders } from "./registry";
@@ -6,6 +7,7 @@ import { animateT800, t800CylinderReadout } from "./motion";
 import { HYDRAULICS, hydraulicPlans } from "./hydraulics";
 import { JOINTS, JOINT_BY_NAME, jointChain } from "./spec";
 import { MESH_META } from "./mesh/assets";
+import { meshPartGeometry } from "./mesh/geometry";
 
 // ============================================================================
 // T-800 内骨骼整机（真实网格切分版）验收
@@ -26,6 +28,50 @@ describe("T-800 真实网格切分", () => {
     const issues = validateRegistry(makeT800Registry());
     expect(issues.filter((i) => i.level === "error")).toEqual([]);
     expect(issues.filter((i) => i.level === "warn")).toEqual([]);
+  });
+
+  it("网格量化往返无损：解码后的几何尺寸 == 清单尺寸", () => {
+    // int16 是有符号的：写入时归一化值必须偏移 -32768，否则 >32767 的值回绕成负数，
+    // 每件几何都会缩成一半并偏离装配位（"零件散架"）。这条测试就是防这个。
+    for (const meta of MESH_META) {
+      const geometry = meshPartGeometry(meta.n);
+      geometry.computeBoundingBox();
+      const size = geometry.boundingBox!.getSize(new THREE.Vector3());
+      expect(Math.abs(size.x - meta.b[3]), `${meta.n} x 尺寸`).toBeLessThan(0.002);
+      expect(Math.abs(size.y - meta.b[4]), `${meta.n} y 尺寸`).toBeLessThan(0.002);
+      expect(Math.abs(size.z - meta.b[5]), `${meta.n} z 尺寸`).toBeLessThan(0.002);
+      expect(geometry.attributes.position.count, `${meta.n} 顶点数`).toBe(meta.v);
+    }
+  });
+
+  it("每个零件都装在声明的装配位上（错位零件 = 0）", () => {
+    const { registry, model } = build();
+    model.resetNodes();
+    animateT800(model, 0, { idle: true });
+    model.syncInstances();
+    model.root.updateMatrixWorld(true);
+
+    const world = new THREE.Matrix4();
+    const local = new THREE.Matrix4();
+    const nodeInverse = new THREE.Matrix4();
+    const misplaced: string[] = [];
+    for (const def of registry.parts) {
+      const handle = model.getPart(def.id);
+      if (!handle) continue;
+      model.instanceMatrix(handle, 0, world);
+      const node = def.node ? model.getNode(def.node) : null;
+      if (node) {
+        nodeInverse.copy(node.matrixWorld).invert();
+        local.multiplyMatrices(nodeInverse, world);
+      } else {
+        local.copy(world);
+      }
+      const at = (def.mate as { position?: number[] } | undefined)?.position ?? [0, 0, 0];
+      const c = new THREE.Vector3().setFromMatrixPosition(local);
+      const d = c.distanceTo(new THREE.Vector3(at[0], at[1], at[2]));
+      if (d > 0.005) misplaced.push(`${def.id} 差 ${(d * 1000).toFixed(1)}mm`);
+    }
+    expect(misplaced, `错位零件：\n${misplaced.join("\n")}`).toEqual([]);
   });
 
   it("76 个蒙皮部位逐件成独立 partId", () => {

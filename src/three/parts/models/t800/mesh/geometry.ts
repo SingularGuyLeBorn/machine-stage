@@ -41,7 +41,10 @@ export function meshPartGeometry(name: string): THREE.BufferGeometry {
   if (!meta) throw new Error(`t800.mesh：没有名为 "${name}" 的部位`);
   const buf = payloadBuffer();
   const view = new DataView(buf);
-  const base = view.getUint32(0, true);
+  // 每件在载荷里的字节偏移写在清单里 —— 必须按件跳过去。
+  // （早期版本固定读第一条记录 → 所有零件都拿到同一份几何，只按各自包围盒拉伸，
+  //   整个模型其实一直是"脊柱几何被拉成所有零件"。）
+  const base = meta.o ?? view.getUint32(0, true);
   const vCount = view.getUint32(base + 4, true);
   const iCount = view.getUint32(base + 8, true);
   const wide = view.getUint8(base + 12) === 1;
@@ -55,7 +58,8 @@ export function meshPartGeometry(name: string): THREE.BufferGeometry {
     const k = i % 3;
     const origin = k === 0 ? minX : k === 1 ? minY : minZ;
     const ext = k === 0 ? extX : k === 1 ? extY : extZ;
-    positions[i] = origin + (q[i] / 65535) * ext;
+    // 写入时归一化值整体偏移了 -32768（int16 有符号），这里加回来。
+    positions[i] = origin + ((q[i] + 32768) / 65535) * ext;
   }
   const indices = vCount > 65535 ? new Uint32Array(iCount) : new Uint16Array(iCount);
   if (wide) {

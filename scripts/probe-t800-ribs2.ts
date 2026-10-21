@@ -26,7 +26,7 @@ const iOffset = vOffset + vCount * 3 * 2;
 const [minX, minY, minZ, extX, extY, extZ] = MESH_META[idx].b;
 const q = new Int16Array(buf, vOffset, vCount * 3);
 const y = new Float64Array(vCount);
-for (let i = 0; i < vCount; i++) y[i] = minY + (q[i * 3 + 1] / 65535) * extY;
+for (let i = 0; i < vCount; i++) y[i] = minY + ((q[i * 3 + 1] + 32768) / 65535) * extY;
 
 const BINS = 80;
 const hist = new Int32Array(BINS);
@@ -47,8 +47,8 @@ console.log(out.join("\n"));
 // 顶点相对躯干中轴（x≈0.007, z≈-0.01）的角度分布，看肋骨是不是环向排布
 const ang = new Int32Array(36);
 for (let i = 0; i < vCount; i++) {
-  const dx = minX + (q[i * 3] / 65535) * extX - 0.007;
-  const dz = minZ + (q[i * 3 + 2] / 65535) * extZ + 0.01;
+  const dx = minX + ((q[i * 3] + 32768) / 65535) * extX - 0.007;
+  const dz = minZ + ((q[i * 3 + 2] + 32768) / 65535) * extZ + 0.01;
   const a = Math.atan2(dz, dx);
   const bin = Math.min(35, Math.floor(((a + Math.PI) / (2 * Math.PI)) * 36));
   ang[bin]++;

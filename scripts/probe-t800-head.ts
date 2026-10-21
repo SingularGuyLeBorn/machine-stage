@@ -32,7 +32,7 @@ function partOf(name: string) {
     for (let k = 0; k < 3; k++) {
       const origin = k === 0 ? minX : k === 1 ? minY : minZ;
       const ext = k === 0 ? extX : k === 1 ? extY : extZ;
-      p.push(origin + (q[i * 3 + k] / 65535) * ext);
+      p.push(origin + ((q[i * 3 + k] + 32768) / 65535) * ext);
     }
     pos.push(p);
   }

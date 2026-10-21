@@ -12,7 +12,6 @@ import {
   rodNodeName,
   type HydKind,
 } from "./hydraulics";
-import { HARDWARE, hardwareCenter, hardwareGeometry } from "./hardware";
 
 // ============================================================================
 // t800/registry —— T-800 内骨骼（真实网格切分 + 关节液压缸）
@@ -44,7 +43,6 @@ const ASM_LABEL: Record<string, { cn: string; en: string }> = {
   leg: { cn: "腿", en: "Leg" },
   foot: { cn: "足", en: "Foot" },
   hydraulics: { cn: "液压", en: "Hydraulics" },
-  hardware: { cn: "关节硬件", en: "Joint hardware" },
 };
 
 const assemblies: ModelRegistry["assemblies"] = Object.entries(ASM_LABEL).map(([id, v]) => ({
@@ -142,27 +140,6 @@ export function makeT800(): T800Bundle {
     }
   }
 
-  // ---- 关节硬件（球铰）与胸腔动力组 ----
-  for (let hwIndex = 0; hwIndex < HARDWARE.length; hwIndex++) {
-    const hw = HARDWARE[hwIndex];
-    builder.add({
-      id: `t800.hardware.${hw.key}`,
-      cn: `关节硬件 · ${hw.key}`,
-      en: `Hardware ${hw.key}`,
-      asm: "hardware",
-      geom: {
-        type: "kit",
-        kit: "t800Hardware",
-        params: { hwIndex },
-      },
-      mat: hw.material,
-      layer: 3,
-      node: nodeNameOf(hw.joint),
-      at: hardwareCenter(hw),
-      hint: "真实网格各骨为独立对象，关节处补球铰与动力组（参考图里的铬钢骨架）",
-    });
-  }
-
   bundle = {
     registry: {      model: "t800",
       title: "T-800 内骨骼 · 真实网格切分",
@@ -188,8 +165,9 @@ export function makeT800(): T800Bundle {
           a: "t800.mesh.*",
           b: "t800.mesh.*",
           reason:
-            "同一真实网格按蒙皮切分的相邻部位：接缝处表面重合（构造性接触，不是错位穿透）",
-          maxDepthMm: 12,
+            "同一真实网格按蒙皮切分的相邻部位：源网格里各骨本来就在同一原物体上互相穿插" +
+            "（躯干壳体与锁骨重叠 60mm 量级），切开后接缝处的重叠是构造性的，不是错位穿透",
+          maxDepthMm: 70,
           allowDisplaced: true,
           allowSuspect: true,
         },
@@ -197,17 +175,30 @@ export function makeT800(): T800Bundle {
           family: "t800-hydraulic-fit",
           a: "t800.hydraulics.*",
           b: "t800.*",
-          reason: "液压缸耳环/导向套与骨头的装配贴合（构造性接触）",
-          maxDepthMm: 12,
+          reason: "液压缸耳环/导向套/缸体嵌进骨头的装配贴合（构造性接触）",
+          maxDepthMm: 40,
           allowDisplaced: true,
           allowSuspect: true,
         },
         {
-          family: "t800-hardware-fit",
-          a: "t800.hardware.*",
-          b: "t800.*",
-          reason: "球铰/动力组与骨头的装配贴合（构造性接触）",
-          maxDepthMm: 14,
+          // 源网格里这两对骨本来就互相埋进去（同一个原物体被拆成两骨）：
+          //   · 躯干壳体 ↔ 左上臂段（上臂根就长在胸廓里）
+          //   · 骨盆 ↔ 左髋（髋球座就在骨盆内部）
+          // 深度超出上面"接缝族"的常规量级，单独立条写明，避免整族放水。
+          family: "t800-source-overlap",
+          a: "t800.mesh.bip_spine_3_06",
+          b: "t800.mesh.rightarmroll_helper_049",
+          reason: "源网格自身的骨间穿插：上臂根长在胸廓壳体内部（非装配错位）",
+          maxDepthMm: 95,
+          allowDisplaced: true,
+          allowSuspect: true,
+        },
+        {
+          family: "t800-source-overlap",
+          a: "t800.mesh.bip_pelvis_02",
+          b: "t800.mesh.bip_hip_l_082",
+          reason: "源网格自身的骨间穿插：髋球座嵌在骨盆内部（非装配错位）",
+          maxDepthMm: 95,
           allowDisplaced: true,
           allowSuspect: true,
         },
@@ -231,11 +222,6 @@ export const t800MeshBuilders: Record<string, GeometryBuilder> = {
     const params = (spec as { params?: Record<string, KitParam> }).params ?? {};
     const def = HYDRAULICS[Number(params.cylIndex ?? 0)];
     return hydraulicGeometry(def, Number(params.kind ?? 0) as HydKind);
-  },
-  t800Hardware: (spec) => {
-    const params = (spec as { params?: Record<string, KitParam> }).params ?? {};
-    const def = HARDWARE[Number(params.hwIndex ?? 0)];
-    return hardwareGeometry(def);
   },
 };
 

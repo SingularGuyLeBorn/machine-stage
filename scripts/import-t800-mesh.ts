@@ -267,6 +267,8 @@ const manifest: Array<{
   k: string;
   v: number;
   i: number;
+  /** 该件在载荷里的字节偏移（解码时直接跳过去） */
+  o: number;
   b: number[];
 }> = [];
 let header = Buffer.alloc(16);
@@ -287,7 +289,12 @@ for (const part of parts) {
   const vBuf = Buffer.alloc(vCount * 3 * 2);
   for (let i = 0; i < vCount; i++) {
     for (let k = 0; k < 3; k++) {
-      const q = Math.round(((part.positions[i * 3 + k] - mn[k]) / ext[k]) * 65535);
+      // int16 是**有符号**的：取值范围 [-32768, 32767]。
+      // 这里把 [0, 65535] 的归一化值整体偏移 -32768 再存，
+      // 解码时再加回 32768（见 mesh/geometry.ts）。
+      // ← 早期版本直接存 [0,65535]，>32767 的值回绕成负数，
+      //   每件几何都会缩成一半并偏离装配位（"零件散架"）。
+      const q = Math.round(((part.positions[i * 3 + k] - mn[k]) / ext[k]) * 65535) - 32768;
       vBuf.writeInt16LE(Math.max(-32768, Math.min(32767, q)), (i * 3 + k) * 2);
     }
   }
@@ -304,14 +311,15 @@ for (const part of parts) {
   rec.writeUInt8(wide ? 1 : 0, 12);
   rec.writeDoubleLE(mn[0], 16);
   chunks.push(Buffer.concat([rec, vBuf, iBuf]));
-  offset += rec.length + vBuf.length + iBuf.length;
   manifest.push({
     n: part.name,
     k: part.kind,
     v: vCount,
     i: iCount,
+    o: offset,
     b: [mn[0], mn[1], mn[2], ext[0], ext[1], ext[2]],
   });
+  offset += rec.length + vBuf.length + iBuf.length;
 }
 const payload = Buffer.concat(chunks);
 const b64 = payload.toString("base64");
@@ -339,6 +347,8 @@ export interface MeshPartMeta {
   v: number;
   /** 索引数 */
   i: number;
+  /** 该件在载荷里的字节偏移（解码时按它跳过去） */
+  o: number;
   /** 包围盒：原点 + 尺寸 */
   b: number[];
 }
