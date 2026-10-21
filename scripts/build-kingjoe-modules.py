@@ -1,7 +1,8 @@
-"""Blender 后台运行：保留 GLB 原面，按参考图归组、闭合壳体、仅切躯干。
+"""Blender 后台运行：保留 GLB 原面，按参考图归组、闭合源壳体。
 
 blender -b -P scripts/build-kingjoe-modules.py
 输入由已有 GLB 解析器读取；不用体素重建，不改旧动画模型。
+随后运行 python scripts/fuse-kingjoe-modules.py 融合连接结构并切分共用接口。
 """
 import base64
 import importlib.util
@@ -20,9 +21,7 @@ sys.dont_write_bytecode = True
 spec = importlib.util.spec_from_file_location('skin', ROOT / 'scripts/generate-kingjoe-skin.py')
 skin = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(skin)
-OUT = ROOT / 'src/three/parts/models/kingjoe-modules/modules.generated.json'
-# [OM-FREEPLAY] 参考图无尺寸；接缝按原胸甲上下边选取，仅用于躯干，不截断四肢。
-WAIST, NECK = 3.85, 5.2
+OUT = ROOT / 'qa-out/kingjoe-source-shells.json'
 
 
 def components(bm):
@@ -62,14 +61,6 @@ def close(bm):
         if vol < 0:
             bmesh.ops.reverse_faces(bm, faces=list(faces))
     bm.normal_update()
-
-
-def cut(bm, height, keep_above):
-    bmesh.ops.bisect_plane(bm, geom=list(bm.verts)+list(bm.edges)+list(bm.faces),
-                           plane_co=(0, height, 0), plane_no=(0, 1, 0),
-                           clear_inner=keep_above, clear_outer=not keep_above, dist=1e-7)
-    if bm.faces:
-        close(bm)
 
 
 MATERIALS = ['kjr_silver', 'kjr_silver_dark', 'kjr_dark', 'kjr_black', 'kjr_cap']
@@ -144,33 +135,14 @@ def main():
         backup.free()
         original_volume = volume(part.faces)
         before = sum(1 for f in part.faces if f[part.faces.layers.int.get('source_face')])
-        if group == 'torso':
-            pieces = [('pelvis', None, WAIST), ('chest', WAIST, NECK), ('head_arms', NECK, None)]
-        elif group == 'pelvis':
-            pieces = [('pelvis', None, WAIST), ('chest', WAIST, None)]
-        else:
-            pieces = [(group, None, None)]
-        volumes = []
-        for target, low, high in pieces:
-            split = part.copy()
-            if low is not None:
-                cut(split, low, True)
-            if high is not None and split.faces:
-                cut(split, high, False)
-            if split.faces:
-                close(split)
-                volumes.append(volume(split.faces))
-                modules[target].append(split)
-            else:
-                split.free()
-        assert abs(sum(volumes)-original_volume) < 1e-5
+        modules[group].append(part.copy())
         audit.append(dict(component=ci, bone=dominant, module=group, original_faces=before,
-                          cut=group in ('torso', 'pelvis'), thickened=thickened, volume=original_volume,
+                          cut=False, thickened=thickened, volume=original_volume,
                           bbox=[*coords.min(0).tolist(), *coords.max(0).tolist()]))
         part.free()
     bm.free()
     output = []
-    for key in ['legs', 'pelvis', 'chest', 'head_arms']:
+    for key in ['legs', 'pelvis', 'torso', 'head_arms']:
         positions, normals, uvs, index = [], [], [], []
         buckets = defaultdict(list)
         total_volume = 0
@@ -203,7 +175,7 @@ def main():
                            uv=enc(uvs, '<f4'), index=enc(index, '<u4'), groups=groups,
                            volume=total_volume, components=len(modules[key])))
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(dict(waist=WAIST, neck=NECK, parts=output, audit=audit), indent=2)+'\n')
+    OUT.write_text(json.dumps(dict(parts=output, audit=audit), indent=2)+'\n')
     print('MODULES', [(p['key'], p['components'], p['volume']) for p in output], flush=True)
 
 
