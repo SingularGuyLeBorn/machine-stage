@@ -17,4 +17,4 @@ const fmt = (r: (typeof reports)[number]) => `${r.depth_mm === null ? "  -  " : 
 for (const item of split.active.sort((a, b) => (b.report.depth_mm ?? 99) - (a.report.depth_mm ?? 99)).slice(0, 120)) console.log(fmt(item.report));
 const support = detectUnsupportedParts(model);
 console.log(`unsupported: ${support.length}`);
-for (const s of support.slice(0, 120)) console.log(`${(s.gap_m * 1000).toFixed(1).padStart(6)}mm  ${s.partId}`);
+for (const s of support.slice(0, 120)) console.log(`${(s.gap_mm * 1000).toFixed(1).padStart(6)}mm  ${s.partId}`);
