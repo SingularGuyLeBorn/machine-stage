@@ -247,7 +247,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     ] },
     material: "gunsteel",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, 0.026, -0.231] },
+    mate: { type: "absolute", position: [0, 0.028, -0.238] },
     source: "弧形表尺：800m 分划，照门扳起后高 12mm；与导气箍上的准星构成瞄准基线（基线长 378mm）。",
   },
   {
@@ -260,7 +260,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "kit", kit: "dustCoverKit", params: { len: 0.15, w: 0.03, sag: 0.005, t: 0.0016 } },
     material: "steel_blued",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, 0.0195, -0.15] },
+    mate: { type: "absolute", position: [0, 0.0215, -0.15] },
     source: "冲压防尘盖：175 × 36 弧形板，盖住机匣顶部的枪机通道；后部卡榫 + 前部弹簧压紧，取下一颗销即可摘下（便于分解枪机框）。",
   },
   {
@@ -302,7 +302,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     ] },
     material: "ejector_steel",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0.026, -0.033, -0.152], rotation: [0, 0, 90] },
+    mate: { type: "absolute", position: [0.032, -0.033, -0.152], rotation: [0, 0, 90] },
     source: "弹匣卡榫：右侧拨柄 + 榫舌，前挂后卡结构中卡住弹匣后壁的卡槽；按压拨柄弹匣前翻脱落。",
   },
   {
@@ -315,7 +315,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "kit", kit: "torsionSpring", params: { r: 0.005, wireR: 0.0006, coils: 3 } },
     material: "steel_spring",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0.026, -0.04, -0.15] },
+    mate: { type: "absolute", position: [0.032, -0.04, -0.15] },
     source: "卡榫扭簧：⌀1.2 钢丝 3 圈，保持卡榫榫舌始终咬合弹匣。",
   },
   // ===================== L1 导气活塞 =====================
@@ -456,7 +456,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     instances: 8,
     indexed: true,
     instance_layout: "ak47RecoilSpringCoil",
-    geometry: { type: "kit", kit: "coilSpring", params: { r: 0.0068, wireR: 0.0009, len: 0.0099, coils: 1 } },
+    geometry: { type: "kit", kit: "coilSpring", params: { r: 0.0062, wireR: 0.0009, len: 0.0099, coils: 1 } },
     material: "steel_spring",
     node: "AkRecoil",
     mate: { type: "absolute" },
@@ -584,7 +584,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     },
     material: "steel_worn",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.058, -0.072] },
+    mate: { type: "absolute", position: [0, -0.06, -0.074] },
     source: "阻铁：挂住击锤尾齿；被扳机上缘压下时解脱。单发模式下每次击发后自动重新挂住（半自动），连发模式下被快慢机杠杆抬开（全自动）。",
   },
   {
@@ -597,7 +597,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "box", w: 0.004, h: 0.014, d: 0.01, bevel: 0.0006 },
     material: "steel_worn",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.06, -0.085] },
+    mate: { type: "absolute", position: [0, -0.062, -0.088] },
     source: "单发阻铁：半自动时在扳机回位过程中挂住枪机框带回的击锤，实现「扣一次打一发」。",
   },
   {
@@ -743,7 +743,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "box", w: 0.005, h: 0.008, d: 0.01, bevel: 0.0006 },
     material: "ejector_steel",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0.014, -0.03, -0.062] },
+    mate: { type: "absolute", position: [0.018, -0.03, -0.062] },
     source: "弹匣后卡钩：与机匣卡榫榫舌咬合，前挂后卡的「后卡」一方。",
   },
   {
@@ -756,7 +756,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "kit", kit: "torsionSpring", params: { r: 0.003, wireR: 0.0004, coils: 3 } },
     material: "steel_spring",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0.014, -0.036, -0.06] },
+    mate: { type: "absolute", position: [0.018, -0.036, -0.06] },
     source: "匣上卡榫簧：保持卡钩咬合。",
   },
   // ===================== L2 弹药（7.62×39 六分件 ×30 发） =====================
@@ -1183,6 +1183,7 @@ export function makeAk47Registry(): ModelRegistry {
       { family: "case-loading", a: "ak47.ammo.propellant", b: "ak47.ammo.core_steel", reason: "钢芯尾端与发射药相接", maxDepthMm: 5 },
       { family: "press-fit", a: "ak47.barrel.trunnion", b: "ak47.barrel.barrel", reason: "枪管压配在节套枪管孔内（过盈配合）", maxDepthMm: 10 },
       { family: "press-fit", a: "ak47.barrel.gas_block", b: "ak47.barrel.barrel", reason: "导气箍销接在枪管上（环抱配合）", maxDepthMm: 10 },
+      { family: "press-fit", a: "ak47.barrel.barrel", b: "ak47.barrel.front_sight", reason: "准星座压在枪管上（销接）", maxDepthMm: 4 },
       { family: "guide-slide", a: "ak47.action.carrier", b: "ak47.action.spring_guide", reason: "复进簧导杆在枪机框尾孔内滑动（同心配合）", maxDepthMm: 14 },
       { family: "ejector-mount", a: "ak47.receiver.body", b: "ak47.receiver.ejector", reason: "抛壳挺铆接在机匣左侧壁", maxDepthMm: 2 },
       { family: "pin-press", a: "ak47.receiver.body", b: "ak47.fire.trigger_pin", reason: "扳机轴销压配在机匣两侧壁", maxDepthMm: 2 },
