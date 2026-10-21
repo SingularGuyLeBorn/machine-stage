@@ -35,6 +35,12 @@ import { M2HB_BUILDERS, makeM2hbLayouts, makeM2hbRegistry } from "@/three/parts/
 import { M2HB_MOTION_PARTS, animateM2hb, getM2hbMode } from "@/three/parts/models/m2hb/motion";
 import { M134_BUILDERS, makeM134Layouts, makeM134Registry } from "@/three/parts/models/m134/registry";
 import { M134_MOTION_PARTS, animateM134, getM134Mode } from "@/three/parts/models/m134/motion";
+import {
+  type38Builders,
+  type38Layouts,
+  type38Registry,
+} from "@/three/parts/models/guns7/type38/registry";
+import { T38_MOTION_PARTS, animateType38 } from "@/three/parts/models/guns7/type38/motion";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -421,6 +427,56 @@ export const CATALOG: StageModel[] = [
       "与虎式完全不同的形：大倾角首上（33°）、楔形炮塔前斜板（±24° 后倾 8°）、反应装甲首上 2×5 / 炮塔 2×6 / 侧裙 2×6。",
       "七对负重轮 + 双销耳挂胶履带板（172 块全实例化）；120mm 滑膛炮带热护套与抽气装置，炮口段近代主战坦克布局。",
       "动力包（发动机/传动/双风扇/双油箱/排气）在 L1，拖构建滑杆能从内到外看装配；炮塔/火炮/后坐由 Turret / Gun / GunRecoil 三个节点驱动。",
+    ],
+  },
+  {
+    id: "type38",
+    title: "三八式步枪",
+    subtitle: "手动旋转后拉枪机 · 5 发固定弹仓 · 6.5×50mmSR 有坂弹",
+    milestone: "G-1",
+    status: "ready",
+    registry: type38Registry,
+    layouts: type38Layouts,
+    builders: type38Builders,
+    motionParts: T38_MOTION_PARTS,
+    animate: (assembled, seconds, state) => {
+      animateType38(
+        assembled,
+        seconds,
+        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
+      );
+    },
+    readouts: () => [
+      { label: "自动原理", value: "手动旋转后拉枪机" },
+      { label: "闭锁方式", value: "双闭锁凸榫 + 机匣前环" },
+      { label: "供弹方式", value: "5 发固定弹仓 + 桥夹" },
+      { label: "循环周期", value: "2.6 s/发（手动）" },
+      { label: "弹药", value: "6.5×50mmSR 有坂（六分件）×6" },
+      { label: "零件", value: "81 种定义 / 137 件实例" },
+    ],
+    states: [
+      { id: "idle", label: "装填静止", hint: "满仓待击：膛内 1 发 + 弹仓 5 发，可爆炸视图看枪机与弹仓" },
+      { id: "semi", label: "单发", hint: "手动旋转后拉枪机：击发→开锁→抽壳→推弹→闭锁，只打一发" },
+      { id: "running", label: "连发演示", hint: "连续完成 6 发手动循环，空仓后停在闭锁状态" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "type38-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
+      { id: "type38-auto", group: "射击", label: "连发 6 发", kind: "machine-state", state: "running" },
+      { id: "type38-idle", group: "射击", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "手动旋转后拉枪机：拉机柄上抬 90° 解锁→后拉 100mm 抽壳→复进推弹→下压闭锁；2.6s 一发，是七把枪里唯一的纯手动循环。",
+      "防尘盖随枪机前后滑动，机匣右侧上导轨在拉机柄行程段断开，给手柄上抬/后拉让位。",
+      "5 发固定弹仓：托弹板与弹仓簧逐发上升，桥夹压弹；弹仓口/机匣底板开口从 z=-0.155 起，让托弹板升到空仓高度也不撞机匣。",
+      "弹药六分件（被甲/铅芯/钢芯/弹壳/发射药/底火）全部独立实例；抛壳、枪口焰、硝烟、后坐上跳都按 6 发循环驱动。",
+      "展示台用前后 V 形托架 + 毛毡垫支撑枪身，枪托/护木落座，枪管悬空。",
     ],
   },
   {
