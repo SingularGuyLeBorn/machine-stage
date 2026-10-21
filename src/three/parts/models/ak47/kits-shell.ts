@@ -464,21 +464,42 @@ const boltCarrierKit: GeometryBuilder = (spec) => {
   frontRing.rotateX(Math.PI / 2);
   frontRing.translate(0, 0, 0.0006);
   parts.push(frontRing);
-  // 尾段（复进簧腔）：整圆车削，尾部开口供复进簧穿过
-  const rear = latheGeometry(
+  // 尾段台阶环（整圆：枪机孔 → 簧腔）
+  const step = latheGeometry(
     [
       [boreR, frontLen],
       [boreR, frontLen + 0.0104],
       [springR, frontLen + 0.0104],
-      [springR, len - 0.0004],
-      [r, len - 0.0004],
-      [r, len],
-      [springR, len],
+      [springR, frontLen + 0.0104],
     ],
     20,
   );
-  rear.rotateX(Math.PI / 2);
-  parts.push(rear);
+  step.rotateX(Math.PI / 2);
+  parts.push(step);
+  // 尾段外壁 / 内腔：底部 120° 让位窗（弹匣供弹位 + 击锤伸入打击针）
+  const rearLen = len - frontLen - 0.0104;
+  const slot = (120 * Math.PI) / 180;
+  const rearOuter = new THREE.CylinderGeometry(r, r, rearLen, 20, 1, true, slot / 2, Math.PI * 2 - slot);
+  rearOuter.rotateX(Math.PI / 2);
+  rearOuter.translate(0, 0, frontLen + 0.0104 + rearLen / 2);
+  parts.push(rearOuter);
+  const rearBore = new THREE.CylinderGeometry(springR, springR, rearLen, 18, 1, true, slot / 2, Math.PI * 2 - slot);
+  rearBore.rotateX(Math.PI / 2);
+  rearBore.translate(0, 0, frontLen + 0.0104 + rearLen / 2);
+  parts.push(rearBore);
+  // 尾端面环（弹簧从这里穿出）
+  const rearRing = latheGeometry(
+    [
+      [springR, 0],
+      [r, 0],
+      [r, -0.0012],
+      [springR, -0.0012],
+    ],
+    20,
+  );
+  rearRing.rotateX(Math.PI / 2);
+  rearRing.translate(0, 0, len);
+  parts.push(rearRing);
   // 导转凸榫（枪机回转的导向销，左右各一）
   for (const side of [-1, 1]) {
     const cam = bevelBoxGeometry(0.0035, 0.006, 0.016, 0.0005, 1);
