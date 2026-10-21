@@ -1,0 +1,22 @@
+import { buildModel } from "../src/three/parts/assembler/assembler";
+import { detectStatic, planPairs } from "../src/three/parts/solver/detect";
+import { detectUnsupportedParts } from "../src/three/parts/solver/support";
+import { partitionExpectedContacts } from "../src/three/parts/solver/whitelist";
+import { formatIssues, validateRegistry } from "../src/three/parts/registry/validate";
+import { makeM2hbRegistry, M2HB_BUILDERS, makeM2hbLayouts } from "../src/three/parts/models/m2hb/registry";
+
+const registry = makeM2hbRegistry();
+const issues = validateRegistry(registry);
+console.log(`validate: ${issues.filter((i) => i.level === "error").length} errors, ${issues.filter((i) => i.level === "warn").length} warns`);
+if (issues.length) console.log(formatIssues(issues));
+console.log(`parts: ${registry.parts.length} definitions`);
+const model = buildModel(registry, { builders: M2HB_BUILDERS, instanceLayouts: makeM2hbLayouts(), warnMissingLayout: false });
+console.log(`instances: ${model.parts.reduce((n, p) => n + p.instances.length, 0)}`);
+const reports = detectStatic(model, planPairs(model));
+const split = partitionExpectedContacts(reports, registry.expectedContacts ?? []);
+console.log(`static reports: ${reports.length}; expected: ${split.expected.length}; ACTIVE: ${split.active.length}`);
+const fmt = (r: (typeof reports)[number]) => `${r.depth_mm === null ? "  -  " : r.depth_mm.toFixed(2).padStart(6)}mm [${r.form}] ${r.a} <> ${r.b}`;
+for (const item of split.active.sort((a, b) => (b.report.depth_mm ?? 99) - (a.report.depth_mm ?? 99)).slice(0, 160)) console.log(fmt(item.report));
+const support = detectUnsupportedParts(model);
+console.log(`unsupported: ${support.length}`);
+for (const s of support.slice(0, 160)) console.log(`${s.gap_mm.toFixed(1).padStart(6)}mm  ${s.partId}`);

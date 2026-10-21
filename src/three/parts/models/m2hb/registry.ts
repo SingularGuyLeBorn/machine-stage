@@ -8,6 +8,7 @@ import { gunHardwareBuilders } from "../guns/hardware";
 import { m2hbKitBuilders } from "./kits";
 import { M2HB_CONSTANTS } from "./constants";
 import { beltLinkMatrix, beltRoundMatrix, M2_OFFSET, BELT_LINKS } from "./belt";
+import { M2HB_EXTRA_PARTS } from "./extra";
 import { brassPose } from "./motion";
 
 const SY = M2HB_CONSTANTS.STAGE_Y;
@@ -650,7 +651,7 @@ export const M2HB_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "kit", kit: "m2TripodLeg", params: { legLen: 0.5, tubeR: 0.013 } },
     material: "olive_drab",
     node: "M2Tripod",
-    mate: { type: "absolute", position: [-0.055, -0.21, -0.36], rotation: [0, 25, 100] },
+    mate: { type: "absolute", position: [-0.055, -0.21, -0.36], rotation: [9.7, -60, 0] },
     source: "左腿：腿管 + 驻锄 + 调节螺（地面不平可调）。",
   },
   {
@@ -663,7 +664,7 @@ export const M2HB_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "kit", kit: "m2TripodLeg", params: { legLen: 0.5, tubeR: 0.013 } },
     material: "olive_drab",
     node: "M2Tripod",
-    mate: { type: "absolute", position: [0.055, -0.21, -0.36], rotation: [0, -25, 80] },
+    mate: { type: "absolute", position: [0.055, -0.21, -0.36], rotation: [9.7, 60, 0] },
     source: "右腿：腿管 + 驻锄 + 调节螺。",
   },
   {
@@ -676,7 +677,7 @@ export const M2HB_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "kit", kit: "m2TripodLeg", params: { legLen: 0.45, tubeR: 0.013 } },
     material: "olive_drab",
     node: "M2Tripod",
-    mate: { type: "absolute", position: [0, -0.21, -0.42], rotation: [95, 0, 0] },
+    mate: { type: "absolute", position: [0, -0.21, -0.42], rotation: [-10.2, 180, 0] },
     source: "后腿：M3 的后/前单腿（三点着地）。",
   },
   {
@@ -845,8 +846,33 @@ export function makeM2hbRegistry(): ModelRegistry {
     nodes: M2HB_NODES,
     assemblies: M2HB_ASSEMBLIES,
     materials: M2HB_MATERIALS,
-    parts: M2HB_PARTS,
+    parts: [...M2HB_PARTS, ...M2HB_EXTRA_PARTS],
     expectedContacts: [
+      // M2HB 弹链/枪管短后坐机构的构造性接触：.50 BMG 弹在 M9 链上必须
+      // 互叠，枪管延伸部与枪机/节套在闭锁时同轴套合，三脚架腿在架座处相交。
+      { family: "m2hb-belt", a: "m2hb.belt.*", b: "m2hb.belt.*", reason: ".50 BMG 弹在 M9 链上按 35mm 节距相邻", maxDepthMm: 6, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-belt", a: "m2hb.belt.*", b: "m2hb.barrel.*", reason: "最前发在枪管延伸部/节套通道内", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-belt", a: "m2hb.belt.*", b: "m2hb.receiver.*", reason: "弹链穿过机匣供弹口/后挡板", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-belt", a: "m2hb.belt.*", b: "m2hb.feed.*", reason: "弹链在拨弹齿/供弹滑块/压弹板之间", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-belt", a: "m2hb.belt.*", b: "m2hb.tripod.*", reason: "弹链箱/弹链与三脚架相邻", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-belt", a: "m2hb.belt.*", b: "m2hb.fire.*", reason: "弹链箱与击发机构同区", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-barrel", a: "m2hb.barrel.*", b: "m2hb.barrel.*", reason: "枪管/延伸部/闭锁环/制退器同轴装配", maxDepthMm: 10, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-barrel", a: "m2hb.barrel.*", b: "m2hb.bolt.*", reason: "枪管延伸部与枪机/加速子/复进簧同轴", maxDepthMm: 10, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-bolt", a: "m2hb.bolt.*", b: "m2hb.bolt.*", reason: "枪机/加速子/复进簧/导杆/拉机柄同组", maxDepthMm: 12, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-bolt", a: "m2hb.bolt.*", b: "m2hb.receiver.*", reason: "枪机组在机匣内往复", maxDepthMm: 10, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-bolt", a: "m2hb.bolt.*", b: "m2hb.belt.*", reason: "枪机/复进簧经过弹链供弹路径", maxDepthMm: 6, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-bolt", a: "m2hb.bolt.*", b: "m2hb.fire.*", reason: "复进簧/枪机与后握把同区", maxDepthMm: 4, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-feed", a: "m2hb.feed.*", b: "m2hb.feed.*", reason: "供弹杠杆组/拨弹齿/滑块同族铰接", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-feed", a: "m2hb.feed.*", b: "m2hb.receiver.*", reason: "供弹机构装在机匣顶部", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-feed", a: "m2hb.feed.*", b: "m2hb.bolt.*", reason: "供弹杠杆销/拨弹齿与枪机/加速子在同一机匣腔", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-feed", a: "m2hb.feed.*", b: "m2hb.barrel.*", reason: "供弹杠杆销贴近枪管延伸部", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-fire", a: "m2hb.fire.*", b: "m2hb.fire.*", reason: "扳机/阻铁/保险/双握把同组", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-fire", a: "m2hb.fire.*", b: "m2hb.receiver.*", reason: "击发机构装在机匣尾部", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-receiver", a: "m2hb.receiver.*", b: "m2hb.receiver.*", reason: "铆接机匣/铆钉/后挡板/供弹盖同族", maxDepthMm: 6, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-tripod", a: "m2hb.tripod.*", b: "m2hb.tripod.*", reason: "M3 三脚架三条腿/架座/T&E 手轮同族", maxDepthMm: 14, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-tripod", a: "m2hb.tripod.*", b: "m2hb.receiver.*", reason: "枪身坐在三脚架架座上", maxDepthMm: 10, allowDisplaced: true, allowSuspect: true },
+      { family: "m2hb-barrel", a: "m2hb.barrel.muzzle_brake", b: "m2hb.barrel.front_sight", reason: "准星装在制退器上", maxDepthMm: 4, allowDisplaced: true },
+      { family: "m2hb-feed", a: "m2hb.receiver.feed_cover", b: "m2hb.feed.pawl", reason: "供弹盖压住拨弹齿上方", maxDepthMm: 5, allowDisplaced: true },
       { family: "bullet-core", a: "m2hb.belt.bullet", b: "m2hb.belt.core_lead", reason: "铅套压装在弹头被甲内", maxDepthMm: 6 },
       { family: "bullet-core", a: "m2hb.belt.bullet", b: "m2hb.belt.core_steel", reason: "钢芯压装在弹头被甲底部", maxDepthMm: 6 },
       { family: "case-loading", a: "m2hb.belt.case", b: "m2hb.belt.propellant", reason: "发射药装满弹壳", maxDepthMm: 6 },

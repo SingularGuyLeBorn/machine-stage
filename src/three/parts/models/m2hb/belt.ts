@@ -5,7 +5,7 @@ import * as THREE from "three";
 // 与 m249/belt 同约定：root 空间 = 模型坐标 + STAGE_Y。
 // ============================================================================
 
-export const BELT_LINKS = 14;
+export const BELT_LINKS = 17;
 export const BELT_PITCH = 0.035; // M9 链节距
 export const BELT_PATH_Y = 0.026; // 供弹通道高
 export const BELT_Z0 = 0.005; // 抱弹位（最前一发弹心）
