@@ -16,17 +16,23 @@ MATERIALS = ['kjr_silver', 'kjr_silver_dark', 'kjr_dark', 'kjr_black', 'kjr_cap'
 # [OM-FREEPLAY] 原 GLB 没有分体接口尺寸；沿髋座上沿、胸甲下沿和头肩下沿设置共用平面。
 # 颈部切面高于原上臂内侧接头的最高点 5.221m，保留完整手臂且不在接触面留下孔。
 HIP, WAIST, NECK = 3.55, 3.95, 5.25
-# [OM-FREEPLAY] 按参考图的中央山脊、两侧斜坡和前后退层确定轮廓；照片无尺寸，以下比例为拟合值。
-# 每层依次为：底高、两侧肩高、中央峰高、半宽、峰顶半宽、后沿、前沿。正面为 +Z。
+# [OM-FREEPLAY] 参考图无尺寸：沿原壳截面放样，前后退层比侧向收缩更明显。
+# 每圈为：左右比例、前侧比例、后侧比例、侧边高度、中央脊高；圈间共享顶点连接成一张壳面。
 PELVIS_TOP = [
-    (WAIST-0.01, 4.08, 4.28, 0.55, 0, -0.30, 0.50),
-    (4.04, 4.22, 4.46, 0.39, 0.04, -0.18, 0.29),
-    (4.20, 4.42, 4.52, 0.20, 0.12, -0.08, 0.14),
+    (1.04, 1.04, 1.04, 3.93, 3.93),
+    (0.99, 1.00, 1.00, 4.04, 4.26),
+    (0.94, 0.78, 0.80, 4.04, 4.26),
+    (0.86, 0.68, 0.64, 4.22, 4.45),
+    (0.80, 0.40, 0.42, 4.22, 4.45),
+    (0.28, 0.23, 0.20, 4.48, 4.52),
 ]
-# 下方以向下为正的局部深度描述；也是中央深、两侧浅，前后宽度不对称。
+# 下方按向下的局部深度放样，保持中央深、两侧浅的对应凹凸。
 PELVIS_BOTTOM = [
-    (-0.01, 0.16, 0.34, 0.62, 0, -0.28, 0.54),
-    (0.06, 0.30, 0.47, 0.38, 0.10, -0.12, 0.28),
+    (1.04, 1.04, 1.04, -0.01, -0.01),
+    (0.99, 1.00, 1.00, 0.12, 0.28),
+    (0.90, 0.78, 0.82, 0.12, 0.28),
+    (0.74, 0.59, 0.56, 0.30, 0.47),
+    (0.28, 0.25, 0.22, 0.44, 0.47),
 ]
 NECK_REAR_BOTTOM, NECK_FRONT_TOP = 4.8, 5.48
 
@@ -100,12 +106,51 @@ def interface_prism(low, high, rx, rz, z=0.08):
                  .rotate((-90,0,0)).translate((0,low,z)),4)
 
 
-def ridge_prism(base, shoulder, peak, half_width, ridge_half_width, back, front):
-    """正面是中央隆起的山脊；沿前后方向退层，不使用绕轴生成的同心圆盘。"""
-    profile = [(-half_width,base),(half_width,base),(half_width,shoulder)]
-    profile += [(ridge_half_width,peak),(-ridge_half_width,peak)] if ridge_half_width else [(0,peak)]
-    profile += [(-half_width,shoulder)]
-    return paint(m.CrossSection([profile]).extrude(front-back).translate((0,0,back)),4)
+def shell_contour(body, height):
+    """由原外壳截面取得闭合轮廓，去掉布尔求交的微小共线碎边。"""
+    polygons = body.rotate((90,0,0)).slice(height).to_polygons()
+    points = np.concatenate(polygons) * [1,-1]
+    outline = np.asarray(hull2(np.round(points,5)))
+    # 按射线重采样保持左右脊线固定，退台沿整圈外壳走，不把正面山形挤出成板。
+    ring = []
+    for angle in np.linspace(0,2*np.pi,64,endpoint=False):
+        direction = np.array([np.cos(angle),np.sin(angle)])
+        distances = []
+        for a,b in zip(outline,np.roll(outline,-1,axis=0)):
+            matrix = np.column_stack([direction,a-b])
+            if abs(np.linalg.det(matrix)) < 1e-10:
+                continue
+            distance,t = np.linalg.solve(matrix,a)
+            if distance > 0 and -1e-8 <= t <= 1+1e-8:
+                distances.append(distance)
+        ring.append(direction * min(distances))
+    return np.asarray(ring)
+
+
+def shell_interface(contour, levels):
+    """整圈侧壁、退台、中央脊面共享顶点放样；不再叠加独立棱柱。"""
+    width = max(abs(contour[:,0]))
+    vertices = []
+    for sx,front,back,side,peak in levels:
+        for x,z in contour:
+            ridge = 1-abs(x)/width
+            vertices.append([x*sx,side+(peak-side)*ridge,z*(front if z>=0 else back)])
+    count = len(contour)
+    faces = []
+    for layer in range(len(levels)-1):
+        for i in range(count):
+            a,b = layer*count+i,layer*count+(i+1)%count
+            faces.extend([(a,a+count,b),(b,a+count,b+count)])
+    bottom,top = len(vertices),len(vertices)+1
+    vertices.extend([[0,levels[0][4],0],[0,levels[-1][4],0]])
+    for i in range(count):
+        j=(i+1)%count
+        faces.extend([(bottom,i,j),(top,(len(levels)-1)*count+j,(len(levels)-1)*count+i)])
+    mesh = m.Mesh(np.asarray(vertices,dtype=np.float32),np.asarray(faces,dtype=np.uint32))
+    body = m.Manifold(mesh)
+    assert body.status()==m.Error.NoError and body.volume()>0
+    # 接口是腹盆壳面的延续，采用原银灰材质；法线保留台阶折边、平滑同一圈侧壁。
+    return paint(body).calculate_normals(0,35)
 
 
 def connect(body, name):
@@ -162,8 +207,7 @@ def export(key, body, connections):
         assert np.linalg.norm(face_normal) > 1e-12, (key, p.tolist())
         face_normal /= np.linalg.norm(face_normal)
         levels = [HIP,WAIST,NECK,NECK_REAR_BOTTOM,NECK_FRONT_TOP]
-        levels += [y for tier in PELVIS_TOP for y in tier[:3]]
-        levels += [HIP-y for tier in PELVIS_BOTTOM for y in tier[:3]]
+        # 腹盆接口的弧形壳面保留其原材质与法线，不按水平坐标重涂为深色平板。
         cap = any(np.max(np.abs(p[:,1]-y)) < 2e-6 for y in levels)
         attrs = []
         for vi in tri:
@@ -215,9 +259,9 @@ def main():
     # 双臂完整保留；躯干为原上臂让出空间，不反向削掉手臂内侧。
     below_head = below_head - arms
     middle_space = paint(m.Manifold.cube((20,WAIST-HIP,20)).translate((-10,HIP,-10)),4)
-    top_mold = [ridge_prism(*tier) for tier in PELVIS_TOP]
-    bottom_mold = [ridge_prism(*tier).mirror((0,1,0)).translate((0,HIP,0)) for tier in PELVIS_BOTTOM]
-    pelvis, remainder = below_head.split(union([middle_space,*top_mold,*bottom_mold]))
+    top_mold = shell_interface(shell_contour(trunk,WAIST),PELVIS_TOP)
+    bottom_mold = shell_interface(shell_contour(trunk,HIP),PELVIS_BOTTOM).mirror((0,1,0)).translate((0,HIP,0))
+    pelvis, remainder = below_head.split(union([middle_space,top_mold,bottom_mold]))
     chest, legs = remainder.split_by_plane((0,1,0),(HIP+WAIST)/2)
     result = [('legs',legs,leg_connections),('pelvis',pelvis,[]),('chest',chest,[]),('head_arms',head,head_connections)]
     # 拼回时无重叠体积，也不因凹槽加工丢掉体积。

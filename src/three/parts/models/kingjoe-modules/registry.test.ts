@@ -59,7 +59,8 @@ function contactSurface(geometry: THREE.BufferGeometry, mate: THREE.BufferGeomet
       b!.clone().lerp(c!, 0.5),
       c!.clone().lerp(a!, 0.5),
     ];
-    return samples.every((p) => tree.closestPointToPoint(p)!.distance < 3e-5);
+    // 弧形肩面与外壳在浅角度相交，过宽容差会把邻近外表面误收为接触面。
+    return samples.every((p) => tree.closestPointToPoint(p)!.distance < 1e-6);
   });
   target.dispose();
   expect(connectedCount(faces), `${label} 接触面必须连续`).toBe(1);
@@ -149,12 +150,11 @@ describe("参考图四模块闭合分体", () => {
       // 颈部与肩臂共面区域会跨越整块三角面，完整三角形子集的面积不能代表裁剪后的接口面积。
       // 两对腹盆接口逐面核对面积；颈部另用三维探针直接核对前后错层。
       if (lower !== "chest") expect(a.area, `${lower}/${upper} 面积`).toBeCloseTo(b.area, 4);
-      const horizontal = new Set(
-        a.faces
-          .filter((t) => Math.max(...t.map((v) => v.y)) - Math.min(...t.map((v) => v.y)) < 1e-5)
-          .map((t) => Math.round(t[0]!.y * 1e4)),
+      // 腹盆退台随壳体轮廓起伏，不要求它退化为多个水平平面。
+      const heights = a.faces.flatMap((t) => t.map((v) => v.y));
+      expect(Math.max(...heights) - Math.min(...heights), `${lower}/${upper} 立体接口深度`).toBeGreaterThan(
+        0.4,
       );
-      expect(horizontal.size, `${lower}/${upper} 具有台肩与顶底面`).toBeGreaterThanOrEqual(2);
       for (const [from, to] of [
         [a, b],
         [b, a],
@@ -238,12 +238,21 @@ describe("参考图四模块闭合分体", () => {
         THREE.DoubleSide,
       )!.point.y;
     expect(topAt(0, 0)).toBeCloseTo(4.52, 4);
-    expect(topAt(0, 0) - topAt(-0.3, 0)).toBeGreaterThan(0.2);
-    expect(topAt(0, 0) - topAt(0.3, 0)).toBeGreaterThan(0.2);
+    expect(topAt(0, 0) - topAt(-0.3, 0)).toBeGreaterThan(0.12);
+    expect(topAt(0, 0) - topAt(0.3, 0)).toBeGreaterThan(0.12);
     // 同一层正面轮廓是斜面；前后分层保留台肩，而非把四周按同一半径缩小。
     expect(topAt(0.22, 0.2) - topAt(0.32, 0.2)).toBeGreaterThan(0.05);
-    expect(topAt(0, 0.2) - topAt(0, -0.2)).toBeGreaterThan(0.1);
-    expect(topAt(0, 0.2) - topAt(0, 0.4)).toBeGreaterThan(0.1);
+    expect(topAt(0, 0.4) - topAt(0, -0.4)).toBeGreaterThan(0.1);
+    expect(topAt(0, 0.2) - topAt(0, 0.5)).toBeGreaterThan(0.1);
+    // 退层前沿必须随外壳向两侧回弯；旧山形板的正面是同一 Z 平面，无法通过此检查。
+    const frontAt = (x: number) =>
+      tree.raycastFirst(
+        new THREE.Ray(new THREE.Vector3(x, 4.16, 2), new THREE.Vector3(0, 0, -1)),
+        THREE.DoubleSide,
+      )!.point.z;
+    expect(frontAt(0) - frontAt(0.3)).toBeGreaterThan(0.1);
+    expect(frontAt(0.3) - frontAt(0.45)).toBeGreaterThan(0.08);
+    expect(frontAt(-0.3)).toBeCloseTo(frontAt(0.3), 2);
     geometry.dispose();
     model.dispose();
   });
