@@ -42,6 +42,12 @@ import {
   bisonRegistry,
 } from "@/three/parts/models/guns7/bison/registry";
 import { BISON_MOTION_PARTS, animateBison } from "@/three/parts/models/guns7/bison/motion";
+import {
+  makeRpkRegistry,
+  makeRpkLayouts,
+  RPK_BUILDERS,
+} from "@/three/parts/models/guns7/rpk/registry";
+import { RPK_MOTION_PARTS, animateRpk } from "@/three/parts/models/guns7/rpk/motion";
 import { M249_BUILDERS, makeM249Layouts, makeM249Registry } from "@/three/parts/models/m249/registry";
 import { M249_MOTION_PARTS, animateM249, getM249Mode } from "@/three/parts/models/m249/motion";
 import { M2HB_BUILDERS, makeM2hbLayouts, makeM2hbRegistry } from "@/three/parts/models/m2hb/registry";
@@ -674,6 +680,54 @@ export const CATALOG: StageModel[] = [
       "射击循环（1.8s）：扣扳机→阻铁释放击锤→击针击底火→弹头出膛（枪口焰）→燃气推活塞→枪机框后坐→枪机头回转开锁→抽壳抛壳→复进簧推回→推弹上膛→闭锁待击。",
       "弹药零件化：每发 = 弹头(被甲+铅套+钢芯) + 弹壳 + 发射药 + 底火，30 发实例化堆叠在弧形弹匣内。",
       "导气式核心零件：导气箍（⌀4.4 导气孔）→ 活塞+活塞杆 → 枪机框；闭锁由枪机头双凸笋在节套闭锁窗回转 38° 完成。",
+    ],
+  },
+  {
+    id: "rpk",
+    title: "RPK 轻机枪",
+    subtitle: "590mm 长枪管 + 两脚架 + 固定木托 · 导气式 + 枪机回转闭锁",
+    milestone: "G-3",
+    status: "ready",
+    registry: makeRpkRegistry(),
+    layouts: makeRpkLayouts(),
+    builders: RPK_BUILDERS,
+    motionParts: RPK_MOTION_PARTS,
+    animate: (assembled, seconds, state) => {
+      animateRpk(
+        assembled,
+        seconds,
+        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
+      );
+    },
+    readouts: () => [
+      { label: "自动原理", value: "导气式 + 双凸笋回转闭锁（AK 派生）" },
+      { label: "枪管", value: "590mm，4 条右旋膛线，缠距 240mm" },
+      { label: "供弹", value: "30 发弧形弹匣（7.62×39 六分件）" },
+      { label: "两脚架", value: "260mm 折叠腿 + 独立脚座 + 回位簧" },
+      { label: "零件", value: "69 定义 / 269 实例" },
+    ],
+    states: [
+      { id: "idle", label: "架设静止", hint: "两脚架展开，满弹待击；可爆炸视图看长枪管与导气箍" },
+      { id: "semi", label: "单发", hint: "AK 同源自动机：导气、回转开锁、抽壳、复进闭锁" },
+      { id: "running", label: "连发", hint: "连续射击：弹壳堆积、枪口上跳、弹匣托弹板逐发上顶" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "rpk-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
+      { id: "rpk-auto", group: "射击", label: "连发", kind: "machine-state", state: "running" },
+      { id: "rpk-idle", group: "射击", label: "停火", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "RPK 是 AK-47 的轻机枪化：机匣、枪机、击发机构、弹匣与 AK 同源；枪管延长到 590mm，导气箍/准星/消焰器随之前移。",
+      "两脚架卡箍环抱枪管，两条 260mm 矩形钢管腿可折叠；脚座橡胶/钢爪独立自位，腿内回位簧在展开到位后压紧锁定槽。",
+      "固定木托加钢制托底板，表尺改为 100–1000m 长叶片；全枪 69 个定义 / 269 个实例，两脚架每根销轴和弹簧独立 partId。",
+      "扫掠动画复用 AK 的导气+回转闭锁节点：AkRecoil/AkCarrier/AkBolt 等节点名不变，弹匣/弹药 ID 已改为 rpk.*。",
     ],
   },
   {
