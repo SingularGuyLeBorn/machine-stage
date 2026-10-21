@@ -10,6 +10,7 @@ const BASE = process.env.PREVIEW_URL ?? "http://localhost:4174/?qa=1";
 const MODEL = process.env.PREVIEW_MODEL ?? "kingjoe";
 const ROOT = path.resolve(import.meta.dirname, "..");
 const OUT = path.join(ROOT, "docs", "qa");
+const CROP = { x: 330, y: 110, width: 900, height: 700 };
 const PROFILE = path.join(os.tmpdir(), "kingjoe-preview-profile");
 fs.mkdirSync(OUT, { recursive: true });
 fs.rmSync(PROFILE, { recursive: true, force: true });
@@ -122,12 +123,34 @@ async function main() {
   console.log("loaded", JSON.stringify(stats));
   if (MODEL === "kingjoeskin") {
     await setState("idle");
+    await setCamera([0.6, 4.0, 13.5], [0, 3.5, 0]);
+    await sleep(900);
+    await shot("kingjoe-split-front", CROP);
+    await setCamera([9.2, 6.6, 11.2], [0, 3.7, 0]);
+    await sleep(400);
+    await shot("kingjoe-split-threeq", CROP);
     await setCamera([13.0, 8.5, 16.5], [0, 4.6, 0]);
     await sleep(1200);
     await shot("kingjoe-skin-card-idle");
     await setState("separated");
     await sleep(1500);
     await shot("kingjoe-skin-card-separated");
+    const errors = await evaluate(`(window.__qaErrors ?? []).slice(0, 10)`);
+    console.log("page errors", JSON.stringify(errors));
+    chrome.kill();
+    return;
+  }
+  if (MODEL === "kingjoewhole") {
+    await setState("idle");
+    await setCamera([0.6, 4.0, 13.5], [0, 3.5, 0]);
+    await sleep(1200);
+    await shot("kingjoe-whole-front", CROP);
+    await setCamera([9.2, 6.6, 11.2], [0, 3.7, 0]);
+    await sleep(400);
+    await shot("kingjoe-whole-threeq", CROP);
+    await setCamera([0.4, 8.2, 9.8], [0, 5.3, 0]);
+    await sleep(400);
+    await shot("kingjoe-whole-upper", CROP);
     const errors = await evaluate(`(window.__qaErrors ?? []).slice(0, 10)`);
     console.log("page errors", JSON.stringify(errors));
     chrome.kill();

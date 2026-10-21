@@ -19,6 +19,8 @@ import {
   kingjoeModelBuilders,
 } from "@/three/parts/models/kingjoe/registry";
 import { makeKingJoeSkinRegistry, kingjoeSkinBuilders } from "@/three/parts/models/kingjoe-skin/registry";
+import { makeKingJoeWholeRegistry } from "@/three/parts/models/kingjoe-whole/registry";
+import { kingjoeWholeBuilders } from "@/three/parts/models/kingjoe-whole/kits";
 import { animateKingJoeSkin, type KingJoeSkinState } from "@/three/parts/models/kingjoe-skin/motion";
 import {
   animateTigerSuspension,
@@ -266,6 +268,43 @@ export const CATALOG: StageModel[] = [
       "真实网格 7224 顶点 / 7258 三角 / 459 连通壳，按面级蒙皮主导骨骼切成 578 个独立 partId；四段飞船用模块节点分组。",
       "「四体分件」只把四个模块沿 Y 轴展开，方便逐件检查真实皮；阻尼合体、锥销/锁环、电弧和怪光线在主卡「金古桥 King Joe」。",
       "源网格自身是多片壳体互嵌的游戏低模；源内接触按白名单豁免，新增彩虹胸/眼带无穿模。",
+      "版权：奥特曼 IP，个人参考，不做商用。",
+    ],
+  },
+  {
+    id: "kingjoewhole",
+    title: "金古桥 King Joe · 整体实心（单件）",
+    subtitle: "578 源件 + 细节合并为 1 个 partId · 外观同真实网格分件",
+    milestone: "M-G·R3.1",
+    status: "ready",
+    registry: makeKingJoeWholeRegistry(),
+    builders: kingjoeWholeBuilders,
+    states: [
+      {
+        id: "idle",
+        label: "整体单件",
+        hint: "整个角色是 1 个 partId；原三角形/UV/12 组材质保留，表面与真实网格分件合体态一致",
+      },
+    ],
+    actions: [
+      { id: "kjw-xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "kjw-labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "kjw-grid", group: "展示", label: "网格", kind: "view-toggle", view: "grid" },
+      { id: "kjw-reset", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "kjw-scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "kjw-scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    readouts: (assembled) => [
+      { label: "零件", value: `${assembled.parts.length} 件` },
+      { label: "三角形", value: `${assembled.constants.TRIANGLES} 个` },
+      { label: "合体高度", value: "6.618 m" },
+      { label: "材质组", value: `${assembled.constants.MATERIAL_GROUPS} 组` },
+    ],
+    notes: [
+      "表面来源：真实网格 459 个连通壳。肩筒每侧 66 片层叠装甲、右胸甲片等是源壳本身，不是新增件；单件后不再按装甲片逐个高亮，避免分件边缘看起来像刺。",
+      "整机把 578 源件 + 21 个叠加细节的 15,248 个三角形原样合并为 1 个 partId；保留原 UV 与 12 组材质，不做焊接/布尔/体素重拓扑，所以外观与真实网格分件的合体态一致。",
+      "这是单件外观体，不是水密实体：内部仍是源壳层叠。若要做水密实体/剖切，需要另行重拓扑并接受细节损失。",
+      "分离/合体/怪光线在主卡「金古桥 King Joe」；578 分件查看在「真实网格分件」卡。",
       "版权：奥特曼 IP，个人参考，不做商用。",
     ],
   },

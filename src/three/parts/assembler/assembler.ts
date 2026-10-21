@@ -361,7 +361,14 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
   for (const item of expanded) {
     const matrix = modelMatrixOf(item.id);
     const geometry = geometryFor(item);
-    const material = materialFor(item.def.material);
+    const material = item.def.materialGroups?.length
+      ? item.def.materialGroups.map((name) => materialFor(name))
+      : materialFor(item.def.material);
+    if (item.def.materialGroups?.length && geometry.groups.length !== item.def.materialGroups.length) {
+      throw new Error(
+        `assembler：零件 "${item.id}" 声明了 ${item.def.materialGroups.length} 个材质组，但几何只有 ${geometry.groups.length} 个 group`,
+      );
+    }
     const count = item.def.instances ?? 1;
     const instanceNodes = item.def.instance_nodes ?? null;
     const layout = item.def.instance_layout ? options.instanceLayouts?.[item.def.instance_layout] : undefined;
