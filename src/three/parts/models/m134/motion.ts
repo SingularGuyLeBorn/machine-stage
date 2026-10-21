@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { BELT_PITCH, BELT_LINKS, BELT_X0, BELT_Y, BELT_Z } from "./belt";
 import { M134_CONSTANTS } from "./constants";
+import { M134_BOLT_DETAIL_OFFSETS } from "./extra";
 import type { AssembledModel } from "@/three/parts";
 
 // ============================================================================
@@ -93,6 +94,8 @@ export function animateM134(
   const bolt = assembled.getPart("m134.bolt.bolt");
   const matrix = new THREE.Matrix4();
   const tmp = new THREE.Matrix4();
+  const detailMatrix = new THREE.Matrix4();
+  const detailOffset = new THREE.Matrix4();
   if (bolt) {
     for (let i = 0; i < bolt.instances.length; i++) {
       const theta = angle + (i / COUNT) * Math.PI * 2;
@@ -104,6 +107,14 @@ export function animateM134(
       tmp.makeRotationZ(theta);
       matrix.multiply(tmp.invert());
       bolt.setInstanceMatrix(i, matrix);
+      // 每套枪机的子件跟随同一公转/往复矩阵，只叠加各自的局部偏移。
+      for (const [id, offset] of Object.entries(M134_BOLT_DETAIL_OFFSETS)) {
+        const handle = assembled.getPart(id);
+        if (!handle) continue;
+        detailOffset.makeTranslation(offset[0], offset[1], offset[2]);
+        detailMatrix.copy(matrix).multiply(detailOffset);
+        handle.setInstanceMatrix(i, detailMatrix);
+      }
     }
   }
 
@@ -179,6 +190,15 @@ export function animateM134(
 /** motionParts：由 animate 直接改写实例矩阵的零件。 */
 export const M134_MOTION_PARTS = [
   "m134.bolt.bolt",
+  "m134.bolt.carrier",
+  "m134.bolt.firing_pin",
+  "m134.bolt.extractor",
+  "m134.bolt.cam_pin",
+  "m134.bolt.return_spring",
+  "m134.bolt.locking_lug",
+  "m134.bolt.roller",
+  "m134.bolt.roller_pin",
+  "m134.bolt.extractor_spring",
   "m134.belt.link",
   "m134.feed.case",
   "m134.feed.bullet",

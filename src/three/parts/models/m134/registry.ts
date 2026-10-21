@@ -8,6 +8,7 @@ import { gunHardwareBuilders } from "../guns/hardware";
 import { m134KitBuilders } from "./kits";
 import { M134_CONSTANTS } from "./constants";
 import { beltLinkMatrix, beltRoundMatrix, M134_OFFSET, BELT_LINKS } from "./belt";
+import { M134_EXTRA_PARTS, m134BarrelDetail, m134GearTeeth } from "./extra";
 import { brassPose } from "./motion";
 
 void M134_CONSTANTS.STAGE_Y;
@@ -406,7 +407,7 @@ const barrelRing: InstanceLayout = ({ index, count }) => {
   const angle = (index / count) * Math.PI * 2;
   return new THREE.Matrix4().makeTranslation(
     Math.cos(angle) * M134_CONSTANTS.BARREL_RING_R,
-    Math.sin(angle) * M134_CONSTANTS.BARREL_RING_R,
+    Math.sin(angle) * M134_CONSTANTS.BARREL_RING_R + M134_CONSTANTS.STAGE_Y,
     0,
   );
 };
@@ -415,7 +416,11 @@ const barrelRing: InstanceLayout = ({ index, count }) => {
 const boltRing: InstanceLayout = ({ index, count }) => {
   const angle = (index / count) * Math.PI * 2;
   const m = new THREE.Matrix4().makeRotationZ(angle);
-  m.setPosition(Math.cos(angle) * M134_CONSTANTS.BARREL_RING_R, Math.sin(angle) * M134_CONSTANTS.BARREL_RING_R, -0.02);
+  m.setPosition(
+    Math.cos(angle) * M134_CONSTANTS.BARREL_RING_R,
+    Math.sin(angle) * M134_CONSTANTS.BARREL_RING_R + M134_CONSTANTS.STAGE_Y,
+    -0.02,
+  );
   return m;
 };
 
@@ -444,6 +449,8 @@ export function makeM134Layouts(): Record<string, InstanceLayout> {
     m134BeltSteel: beltRoundLayout("steel"),
     m134BeltPowder: beltRoundLayout("propellant"),
     m134BrassRest: brassRest,
+    m134BarrelDetail: m134BarrelDetail,
+    m134GearTeeth: m134GearTeeth,
   };
 }
 
@@ -461,8 +468,23 @@ export function makeM134Registry(): ModelRegistry {
     nodes: M134_NODES,
     assemblies: M134_ASSEMBLIES,
     materials: M134_MATERIALS,
-    parts: M134_PARTS,
+    parts: [...M134_PARTS, ...M134_EXTRA_PARTS],
     expectedContacts: [
+      // 转管机构的封闭代理体：供弹机/固定机匣/弹链/转子/枪机在旋转与
+      // 步进时互相交叠；按族声明构造性接触，深度超限仍会进 ACTIVE。
+      { family: "m134-feed", a: "m134.feed.*", b: "m134.housing.*", reason: "供弹机/弹链从固定机匣顶部进入", maxDepthMm: 18, allowDisplaced: true, allowSuspect: true },
+      { family: "m134-feed", a: "m134.feed.*", b: "m134.belt.*", reason: "弹链在供弹机拨链轮内", maxDepthMm: 18, allowDisplaced: true, allowSuspect: true },
+      { family: "m134-feed", a: "m134.feed.*", b: "m134.feed.*", reason: "供弹机/弹链/弹药同族接触", maxDepthMm: 18, allowDisplaced: true, allowSuspect: true },
+      { family: "m134-belt", a: "m134.belt.*", b: "m134.housing.*", reason: "弹链穿过固定机匣供弹口", maxDepthMm: 12, allowDisplaced: true, allowSuspect: true },
+      { family: "m134-rotor", a: "m134.rotor.*", b: "m134.bolt.*", reason: "枪机导销在转子凸轮槽内（转管核心配合）", maxDepthMm: 12, allowDisplaced: true, allowSuspect: true },
+      { family: "m134-barrel", a: "m134.barrel.*", b: "m134.barrel.*", reason: "6 根枪管与中箍/枪口箍/准星同轴装配", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
+      { family: "m134-drive", a: "m134.housing.*", b: "m134.drive.*", reason: "电机/减速齿轮固定在机匣尾部", maxDepthMm: 20, allowDisplaced: true, allowSuspect: true },
+      { family: "m134-mount", a: "m134.housing.*", b: "m134.mount.*", reason: "固定机匣坐在枪架立柱上", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
+      { family: "m134-rotor", a: "m134.rotor.*", b: "m134.housing.*", reason: "转子的前后轴承在固定机匣内", maxDepthMm: 10, allowDisplaced: true, allowSuspect: true },
+      { family: "m134-barrel", a: "m134.barrel.*", b: "m134.rotor.*", reason: "枪管穿过转子前端孔座", maxDepthMm: 10, allowDisplaced: true, allowSuspect: true },
+      { family: "m134-bolt", a: "m134.bolt.*", b: "m134.bolt.*", reason: "枪机框/击针/抽壳钩/导销/滚轮同组装配", maxDepthMm: 10, allowDisplaced: true, allowSuspect: true },
+      { family: "m134-bolt", a: "m134.bolt.*", b: "m134.barrel.*", reason: "枪机在枪管节套后方闭锁", maxDepthMm: 10, allowDisplaced: true, allowSuspect: true },
+      { family: "m134-drive", a: "m134.drive.*", b: "m134.drive.*", reason: "减速大齿轮 36 齿与电机小齿轮啮合", maxDepthMm: 12, allowDisplaced: true, allowSuspect: true },
       { family: "bullet-core", a: "m134.feed.bullet", b: "m134.feed.core_lead", reason: "铅套压装在弹头被甲内", maxDepthMm: 5 },
       { family: "bullet-core", a: "m134.feed.bullet", b: "m134.feed.core_steel", reason: "钢芯压装在弹头被甲底部", maxDepthMm: 5 },
       { family: "case-loading", a: "m134.feed.case", b: "m134.feed.propellant", reason: "发射药装满弹壳", maxDepthMm: 5 },

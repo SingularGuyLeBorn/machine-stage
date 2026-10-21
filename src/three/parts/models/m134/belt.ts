@@ -6,7 +6,7 @@ import * as THREE from "three";
 // root 空间 = 模型坐标 + STAGE_Y。
 // ============================================================================
 
-export const BELT_LINKS = 16;
+export const BELT_LINKS = 24;
 export const BELT_PITCH = 0.015;
 export const BELT_Y = 0.078; // 供弹机高度（机匣顶）
 export const BELT_X0 = 0.008; // 最前一节（进弹位）x
