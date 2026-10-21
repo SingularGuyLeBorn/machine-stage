@@ -12,6 +12,7 @@ import {
 } from "@/three/parts";
 import { findModel, type StageModel } from "../catalog";
 import { faultFromError, useStageStore } from "../state/stageStore";
+import { setAk47Mode } from "@/three/parts/models/ak47/motion";
 import { applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
 
 // ============================================================================
@@ -219,11 +220,18 @@ function StageRuntime() {
   }, [modelId, rebuildToken, overrides]);
 
   // ---- 每帧纪律 ----
+  // AK-47 射击模式跟随状态机（单发/连发/停机）
+  const machineState = useStageStore((state) => state.machineState);
+  useEffect(() => {
+    setAk47Mode(machineState === "running" ? "auto" : machineState === "semi" ? "semi" : "idle");
+  }, [machineState]);
+
   useFrame((_state, delta) => {
     if (!assembled) return;
     const store = useStageStore.getState();
     const model = findModel(store.modelId);
-    const running = store.machineState === "running";
+    // running = 机构运转中（连发/单发演示都推进时钟；idle/scanning 传 0 回装配态）
+    const running = store.machineState !== "idle" && store.machineState !== "scanning";
     if (running) {
       clockRef.current += Math.min(delta, 0.05);
     }

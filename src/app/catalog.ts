@@ -14,6 +14,8 @@ import {
   tigerDetachOffset,
   tigerInstanceLabel,
 } from "@/three/parts/models/tiger/motion";
+import { AK47_BUILDERS, makeAk47Layouts, makeAk47Registry } from "@/three/parts/models/ak47/registry";
+import { AK47_MOTION_PARTS, animateAk47, getAk47Mode } from "@/three/parts/models/ak47/motion";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -174,10 +176,46 @@ export const CATALOG: StageModel[] = [
   },
   {
     id: "ak47",
-    title: "AK-47",
-    subtitle: "M-E：导气式自动机",
+    title: "AK-47 突击步枪",
+    subtitle: "导气式 + 枪机回转闭锁 · 30 发弹匣零件化 · 完整射击循环",
     milestone: "M-E",
-    status: "planned",
+    status: "ready",
+    registry: makeAk47Registry(),
+    layouts: makeAk47Layouts(),
+    builders: AK47_BUILDERS,
+    motionParts: AK47_MOTION_PARTS,
+    animate: (assembled, seconds) => {
+      animateAk47(assembled, seconds, getAk47Mode());
+    },
+    readouts: () => [
+      { label: "自动原理", value: "导气式（活塞长行程）" },
+      { label: "闭锁方式", value: "枪机头回转 38°" },
+      { label: "循环周期", value: "1.8 s/发" },
+      { label: "理论射速", value: "600 发/分" },
+      { label: "弹药", value: "7.62×39（六分件）×30" },
+    ],
+    states: [
+      { id: "idle", label: "装填静止", hint: "满弹待击：可爆炸视图看内部机构" },
+      { id: "semi", label: "单发", hint: "打一发完整循环：击发→导气后坐→抛壳→复进供弹" },
+      { id: "running", label: "连发", hint: "连续射击：弹壳抛出堆积、枪口上跳、托弹板逐发上顶" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "ak-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
+      { id: "ak-auto", group: "射击", label: "连发", kind: "machine-state", state: "running" },
+      { id: "ak-idle", group: "射击", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "射击循环（1.8s）：扣扳机→阻铁释放击锤→击针击底火→弹头出膛（枪口焰）→燃气推活塞→枪机框后坐→枪机头回转开锁→抽壳抛壳→复进簧推回→推弹上膛→闭锁待击。",
+      "弹药零件化：每发 = 弹头(被甲+铅套+钢芯) + 弹壳 + 发射药 + 底火，30 发实例化堆叠在弧形弹匣内。",
+      "导气式核心零件：导气箍（⌀4.4 导气孔）→ 活塞+活塞杆 → 枪机框；闭锁由枪机头双凸笋在节套闭锁窗回转 38° 完成。",
+    ],
   },
   {
     id: "j20",
