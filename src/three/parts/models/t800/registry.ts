@@ -134,12 +134,12 @@ const mechCache = new Map<number, ReturnType<typeof buildMechParts>>();
 function mechFor(
   partIndex: number,
   center: [number, number, number],
-  size: [number, number, number],
   recipe: Recipe,
 ): ReturnType<typeof buildMechParts> {
   const hit = mechCache.get(partIndex);
   if (hit) return hit;
-  const parts = buildMechParts({ center, size }, recipe);
+  // 网格本身以包围盒中心为原点 → 原点就是部位中心
+  const parts = buildMechParts(meshPartGeometryByIndex(partIndex), recipe, center);
   mechCache.set(partIndex, parts);
   return parts;
 }
@@ -209,7 +209,7 @@ export function makeT800(options: { decompose?: boolean } = {}): T800Bundle {
         });
       }
       const recipe = recipeOf(name);
-      for (const part of mechFor(index, joint.center, joint.size, recipe)) {
+      for (const part of mechFor(index, joint.center, recipe)) {
         const mech = mechName(part.kind, part.index);
         builder.add({
           id: `t800_mech.${name.system}.${name.slug}_${part.kind}${String(part.index + 1).padStart(2, "0")}`,
@@ -394,7 +394,7 @@ export const t800MeshBuilders: Record<string, GeometryBuilder> = {
     const index = Number(params.index ?? 0);
     const joint = JOINTS[partIndex];
     if (!joint) throw new Error(`t800.mech：没有第 ${partIndex} 个部位`);
-    const parts = mechFor(partIndex, joint.center, joint.size, recipeOf(boneName(joint.name)));
+    const parts = mechFor(partIndex, joint.center, recipeOf(boneName(joint.name)));
     const hit = parts.find((p) => p.kind === kind && p.index === index);
     if (!hit) throw new Error(`t800.mech：${joint.name} 没有 ${kind}#${index}`);
     return hit.geometry;
