@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import type { InstanceLayout } from "../../assembler/assembler";
 import type { GeometryBuilder } from "../../assembler/geometry";
 import type { KitParam } from "../../registry/types";
@@ -7,6 +8,7 @@ import { JOINTS, MISSING_PARENTS, NODE_PIVOTS, nodeNameOf } from "./spec";
 import { MECH_NAMES, boneName, mechName, type BoneName } from "./names";
 import { meshPartGeometryByIndex } from "./mesh/geometry";
 import { splitBoneIntoPlates } from "./mesh/plates";
+import { profileBone } from "./mesh/crossSection";
 import { buildMechParts, type MechKind, type Recipe } from "./mech";
 import {
   HYDRAULICS,
@@ -119,6 +121,19 @@ function mechMaterial(kind: MechKind): string {
   }
 }
 
+/** 节点名 -> 部位下标（紧固件实例布局要用）。 */
+const boneIndexOfNode = new Map(JOINTS.map((j, i) => [nodeNameOf(j.name), i]));
+
+/** 部位下标 -> 真实截面剖面（缓存）。 */
+const profileCache = new Map<number, ReturnType<typeof profileBone>>();
+function profileFor(partIndex: number): ReturnType<typeof profileBone> {
+  const hit = profileCache.get(partIndex);
+  if (hit) return hit;
+  const profile = profileBone(meshPartGeometryByIndex(partIndex));
+  profileCache.set(partIndex, profile);
+  return profile;
+}
+
 /** 护板缓存（一个部位只切一次）。 */
 const plateCache = new Map<number, ReturnType<typeof splitBoneIntoPlates>>();
 function platesFor(partIndex: number): ReturnType<typeof splitBoneIntoPlates> {
@@ -161,6 +176,40 @@ export function makeT800(options: { decompose?: boolean } = {}): T800Bundle {
   const layouts: Record<string, InstanceLayout> = {};
   // 零件 id 前缀必须与模型 id 一致（框架校验）
   const prefix = decompose ? "t800_mech" : "t800";
+
+  // 紧固件实例族的布局：沿骨段端点的一圈均布
+  layouts.t800_fastener = (args) => {
+    const matrix = new THREE.Matrix4();
+    const boneIndex = boneIndexOfNode.get(args.node ?? "");
+    if (boneIndex === undefined) return matrix;
+    const joint = JOINTS[boneIndex];
+    if (!joint) return matrix;
+    const profile = profileFor(boneIndex);
+    const si = args.partId.includes("_nut") ? 0.12 : 0.06;
+    const cores = profile.cores;
+    const radii = profile.radii;
+    const idx = Math.max(0, Math.min(cores.length - 1, Math.round(si * (cores.length - 1))));
+    const core = cores[idx].clone().add(new THREE.Vector3(...joint.center));
+    const r = radii[idx];
+    const e = new THREE.Vector3();
+    e.setComponent(profile.axis, 1);
+    const u = new THREE.Vector3();
+    u.setComponent((profile.axis + 1) % 3, 1);
+    const v = new THREE.Vector3().crossVectors(e, u).normalize();
+    u.crossVectors(v, e).normalize();
+    const ring = Math.min(r * 0.55, 0.028);
+    const a = (args.index / Math.max(1, args.count)) * Math.PI * 2;
+    const p = core.clone().addScaledVector(u, Math.cos(a) * ring).addScaledVector(v, Math.sin(a) * ring);
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), e);
+    // 布局矩阵作用在零件装配位（节点局部）之上
+    const pivot = new THREE.Vector3(...joint.pivot);
+    const at = new THREE.Vector3(
+      ...((args.part.mate as { position?: number[] } | undefined)?.position ?? [0, 0, 0]),
+    );
+    const local = p.clone().sub(pivot).sub(at);
+    matrix.compose(local, q, new THREE.Vector3(1, 1, 1));
+    return matrix;
+  };
 
   // ---- 真实网格切出的骨骼零件（标准机械/解剖命名）----
   for (let index = 0; index < JOINTS.length; index++) {
@@ -409,8 +458,9 @@ export const t800MeshBuilders: Record<string, GeometryBuilder> = {
 /** 兼容旧调用点：全部 builder。 */
 export const t800AllBuilders = t800MeshBuilders;
 
-/** 兼容旧调用点：本模型没有实例布局。 */
-export const makeT800Layouts = () => ({} as Record<string, InstanceLayout>);
+/** 实例布局（紧固件实例族）：按模型取。 */
+export const makeT800Layouts = (options: { decompose?: boolean } = {}) =>
+  makeT800(options).layouts as Record<string, InstanceLayout>;
 
 /** 兼容旧调用点：注册表。 */
 export const makeT800Registry = () => makeT800().registry;

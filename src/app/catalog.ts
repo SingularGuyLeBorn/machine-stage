@@ -97,7 +97,7 @@ export const CATALOG: StageModel[] = [
     milestone: "M-G",
     status: "ready",
     registry: makeT800MechRegistry(),
-    layouts: makeT800Layouts(),
+    layouts: makeT800Layouts({ decompose: true }),
     builders: t800AllBuilders,
     animate: animateT800,
     readouts: t800Readouts,
