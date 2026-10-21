@@ -67,23 +67,24 @@ export function PartTree() {
   const openPartIsolation = useStageStore((state) => state.openPartIsolation);
   const hoverPart = useStageStore((state) => state.hoverPart);
   const tree = useMemo(() => buildTree(modelId), [modelId]);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // 默认全部折叠：只记录“已展开”的总成，切换模型时由外层 key 重建。
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const rowRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const toggle = (groupId: string) =>
-    setCollapsed((previous) => ({ ...previous, [groupId]: !previous[groupId] }));
+    setExpanded((previous) => ({ ...previous, [groupId]: !previous[groupId] }));
 
   // 反向联动：视口点选 / 报告点选 / 飞行到零件后，左树要能看见它——
   // 自动展开所在总成，并把该行滚进视野。
   useEffect(() => {
     if (!selectedPart) return;
     const group = tree.groups.find((item) => item.parts.some((part) => part.id === selectedPart));
-    if (group && collapsed[group.id]) {
-      setCollapsed((previous) => ({ ...previous, [group.id]: false }));
+    if (group && !expanded[group.id]) {
+      setExpanded((previous) => ({ ...previous, [group.id]: true }));
       return; // 展开后重跑一次，再滚动
     }
     rowRefs.current.get(selectedPart)?.scrollIntoView?.({ block: "nearest" });
-  }, [selectedPart, tree, collapsed]);
+  }, [selectedPart, tree, expanded]);
 
   return (
     <section className="panel panel--grow">
@@ -95,7 +96,7 @@ export function PartTree() {
         {tree.groups.length === 0 ? <div className="empty">该模型尚未登记注册表</div> : null}
         <div className="tree">
           {tree.groups.map((group) => {
-            const open = !collapsed[group.id];
+            const open = Boolean(expanded[group.id]);
             return (
               <div key={group.id}>
                 <button
