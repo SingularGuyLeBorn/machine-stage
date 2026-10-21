@@ -225,7 +225,7 @@ describe("stageStore 模型切换", () => {
   beforeEach(resetStore);
 
   it("未交付模型不可选、重复选同一模型为空操作", () => {
-    useStageStore.getState().setModel("m2hb");
+    useStageStore.getState().setModel("j20");
     expect(useStageStore.getState().modelId).toBe("test");
     useStageStore.getState().setParam("GAP", 0.01);
     useStageStore.getState().setModel("test");
