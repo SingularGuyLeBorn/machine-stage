@@ -540,7 +540,8 @@ export const useStageStore = create<StageState>((set, get) => ({
                 filter,
                 applyPose: (t) => {
                   assembled.resetNodes();
-                  model.animate?.(assembled, t);
+                  // 传入当前状态：原来的扫掠没传 state，实际只扫到悬挂默认动画
+                  model.animate?.(assembled, t, previousState);
                 },
               })
             : detectStatic(assembled, { filter });

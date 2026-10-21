@@ -18,7 +18,9 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "sweep": "tsx scripts/diag-sweep.ts",
+    "sweep:fast": "tsx scripts/diag-sweep.ts --fps 6"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

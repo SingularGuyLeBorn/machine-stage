@@ -1,0 +1,1251 @@
+{
+  "fps": 10,
+  "samples": 486,
+  "ms": 42962,
+  "scenarios": [
+    {
+      "id": "suspension",
+      "label": "悬挂演示",
+      "frames": 41,
+      "ms": 2507,
+      "reports": [],
+      "unexcused": 0,
+      "expected": 0
+    },
+    {
+      "id": "driving",
+      "label": "行进演示",
+      "frames": 77,
+      "ms": 24138,
+      "reports": [],
+      "unexcused": 0,
+      "expected": 0
+    },
+    {
+      "id": "aiming",
+      "label": "炮塔瞄准",
+      "frames": 81,
+      "ms": 2210,
+      "reports": [
+        {
+          "t": 1.2,
+          "a": "tiger.turret.mantlet",
+          "b": "tiger.turret.gun_barrel",
+          "depth_mm": 0.702,
+          "form": "displaced",
+          "point": [
+            -3.01015,
+            1.30114,
+            0.56559
+          ]
+        }
+      ],
+      "unexcused": 1,
+      "expected": 0
+    },
+    {
+      "id": "firing",
+      "label": "主炮击发",
+      "frames": 61,
+      "ms": 201,
+      "reports": [],
+      "unexcused": 0,
+      "expected": 0
+    },
+    {
+      "id": "mg",
+      "label": "机枪连射",
+      "frames": 33,
+      "ms": 146,
+      "reports": [],
+      "unexcused": 0,
+      "expected": 0
+    },
+    {
+      "id": "loading",
+      "label": "装填演示",
+      "frames": 53,
+      "ms": 180,
+      "reports": [],
+      "unexcused": 0,
+      "expected": 0
+    },
+    {
+      "id": "engine",
+      "label": "发动机启动",
+      "frames": 61,
+      "ms": 11338,
+      "reports": [
+        {
+          "t": 1.7,
+          "a": "tiger.crankcase.shell",
+          "b": "tiger.piston_rod.connecting_rod[8]",
+          "depth_mm": 10.56,
+          "form": "displaced",
+          "point": [
+            -0.3165,
+            0.05144,
+            -0.14257
+          ]
+        },
+        {
+          "t": 1.8,
+          "a": "tiger.crankcase.shell",
+          "b": "tiger.piston_rod.connecting_rod[6]",
+          "depth_mm": 10.394,
+          "form": "displaced",
+          "point": [
+            -0.13755,
+            0.05468,
+            -0.14271
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.crankcase.shell",
+          "b": "tiger.piston_rod.connecting_rod[5]",
+          "depth_mm": 10.283,
+          "form": "displaced",
+          "point": [
+            0.02759,
+            0.09531,
+            0.14228
+          ]
+        },
+        {
+          "t": 1.8,
+          "a": "tiger.cylinder.block[9]",
+          "b": "tiger.piston_rod.connecting_rod[9]",
+          "depth_mm": 7.079,
+          "form": "displaced",
+          "point": [
+            -0.26608,
+            0.24333,
+            0.0482
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.block[11]",
+          "b": "tiger.piston_rod.connecting_rod[11]",
+          "depth_mm": 7.014,
+          "form": "displaced",
+          "point": [
+            -0.4233,
+            0.26674,
+            0.06207
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.block[2]",
+          "b": "tiger.piston_rod.connecting_rod[2]",
+          "depth_mm": 7.014,
+          "form": "displaced",
+          "point": [
+            0.1573,
+            0.26674,
+            -0.06207
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.block[5]",
+          "b": "tiger.piston_rod.connecting_rod[5]",
+          "depth_mm": 7.014,
+          "form": "displaced",
+          "point": [
+            0.0507,
+            0.18713,
+            0.19996
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.block[8]",
+          "b": "tiger.piston_rod.connecting_rod[8]",
+          "depth_mm": 7.014,
+          "form": "displaced",
+          "point": [
+            -0.3167,
+            0.18713,
+            -0.19996
+          ]
+        },
+        {
+          "t": 2.4,
+          "a": "tiger.piston_rod.piston_ring[17]",
+          "b": "tiger.piston_rod.connecting_rod[5]",
+          "depth_mm": 6.983,
+          "form": "displaced",
+          "point": [
+            0.03575,
+            0.19118,
+            0.18141
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.piston_rod.piston[6]",
+          "b": "tiger.piston_rod.connecting_rod[6]",
+          "depth_mm": 6.948,
+          "form": "displaced",
+          "point": [
+            -0.14369,
+            0.10692,
+            -0.12379
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.piston_rod.piston[9]",
+          "b": "tiger.piston_rod.connecting_rod[9]",
+          "depth_mm": 6.948,
+          "form": "displaced",
+          "point": [
+            -0.28031,
+            0.16067,
+            0.0307
+          ]
+        },
+        {
+          "t": 2.4,
+          "a": "tiger.piston_rod.piston_ring[8]",
+          "b": "tiger.piston_rod.connecting_rod[2]",
+          "depth_mm": 6.923,
+          "form": "displaced",
+          "point": [
+            0.16638,
+            0.25295,
+            -0.07443
+          ]
+        },
+        {
+          "t": 2.1,
+          "a": "tiger.cylinder.block[6]",
+          "b": "tiger.piston_rod.piston[6]",
+          "depth_mm": 6.911,
+          "form": "bearing_overlap",
+          "point": [
+            -0.133,
+            0.37542,
+            -0.21675
+          ]
+        },
+        {
+          "t": 2.1,
+          "a": "tiger.cylinder.block[9]",
+          "b": "tiger.piston_rod.piston[9]",
+          "depth_mm": 6.911,
+          "form": "bearing_overlap",
+          "point": [
+            -0.291,
+            0.37542,
+            0.21675
+          ]
+        },
+        {
+          "t": 2.1,
+          "a": "tiger.piston_rod.piston[3]",
+          "b": "tiger.piston_rod.connecting_rod[2]",
+          "depth_mm": 6.882,
+          "form": "displaced",
+          "point": [
+            0.17075,
+            0.1578,
+            0.01998
+          ]
+        },
+        {
+          "t": 1.8,
+          "a": "tiger.cylinder.block[0]",
+          "b": "tiger.piston_rod.connecting_rod[0]",
+          "depth_mm": 6.833,
+          "form": "displaced",
+          "point": [
+            0.31608,
+            0.33999,
+            -0.10372
+          ]
+        },
+        {
+          "t": 1.8,
+          "a": "tiger.cylinder.liner[0]",
+          "b": "tiger.piston_rod.connecting_rod[0]",
+          "depth_mm": 6.719,
+          "form": "displaced",
+          "point": [
+            0.33155,
+            0.22277,
+            -0.04576
+          ]
+        },
+        {
+          "t": 1.8,
+          "a": "tiger.cylinder.liner[3]",
+          "b": "tiger.piston_rod.connecting_rod[3]",
+          "depth_mm": 6.719,
+          "form": "displaced",
+          "point": [
+            0.19245,
+            0.15101,
+            0.17004
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.piston_rod.piston[11]",
+          "b": "tiger.piston_rod.connecting_rod[11]",
+          "depth_mm": 6.666,
+          "form": "bearing_overlap",
+          "point": [
+            -0.42867,
+            0.23463,
+            0.10032
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.piston_rod.piston[8]",
+          "b": "tiger.piston_rod.connecting_rod[8]",
+          "depth_mm": 6.666,
+          "form": "bearing_overlap",
+          "point": [
+            -0.31133,
+            0.20419,
+            -0.15303
+          ]
+        },
+        {
+          "t": 1.8,
+          "a": "tiger.piston_rod.piston[10]",
+          "b": "tiger.piston_rod.connecting_rod[11]",
+          "depth_mm": 6.591,
+          "form": "displaced",
+          "point": [
+            -0.42991,
+            0.15618,
+            -0.02465
+          ]
+        },
+        {
+          "t": 2.5,
+          "a": "tiger.piston_rod.piston_ring[10]",
+          "b": "tiger.piston_rod.connecting_rod[3]",
+          "depth_mm": 6.512,
+          "form": "displaced",
+          "point": [
+            0.20349,
+            0.20581,
+            0.18387
+          ]
+        },
+        {
+          "t": 2.5,
+          "a": "tiger.piston_rod.piston_ring[0]",
+          "b": "tiger.piston_rod.connecting_rod[0]",
+          "depth_mm": 6.512,
+          "form": "displaced",
+          "point": [
+            0.32051,
+            0.26792,
+            -0.08964
+          ]
+        },
+        {
+          "t": 2.5,
+          "a": "tiger.piston_rod.piston_ring[9]",
+          "b": "tiger.piston_rod.connecting_rod[3]",
+          "depth_mm": 6.512,
+          "form": "displaced",
+          "point": [
+            0.20349,
+            0.21274,
+            0.18787
+          ]
+        },
+        {
+          "t": 2.5,
+          "a": "tiger.piston_rod.piston_ring[1]",
+          "b": "tiger.piston_rod.connecting_rod[0]",
+          "depth_mm": 6.511,
+          "form": "displaced",
+          "point": [
+            0.32051,
+            0.26099,
+            -0.08564
+          ]
+        },
+        {
+          "t": 1.8,
+          "a": "tiger.cylinder.block[3]",
+          "b": "tiger.piston_rod.connecting_rod[3]",
+          "depth_mm": 6.501,
+          "form": "displaced",
+          "point": [
+            0.21,
+            0.1744,
+            0.19364
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.block[1]",
+          "b": "tiger.piston_rod.connecting_rod[1]",
+          "depth_mm": 6.463,
+          "form": "displaced",
+          "point": [
+            0.35602,
+            0.22465,
+            0.0425
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.block[10]",
+          "b": "tiger.piston_rod.connecting_rod[10]",
+          "depth_mm": 6.463,
+          "form": "displaced",
+          "point": [
+            -0.46402,
+            0.14913,
+            -0.1733
+          ]
+        },
+        {
+          "t": 2,
+          "a": "tiger.cylinder.block[1]",
+          "b": "tiger.piston_rod.piston[1]",
+          "depth_mm": 5.977,
+          "form": "bearing_overlap",
+          "point": [
+            0.341,
+            0.37542,
+            0.21675
+          ]
+        },
+        {
+          "t": 2,
+          "a": "tiger.cylinder.block[10]",
+          "b": "tiger.piston_rod.piston[10]",
+          "depth_mm": 5.977,
+          "form": "bearing_overlap",
+          "point": [
+            -0.449,
+            0.37542,
+            -0.21675
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.piston_rod.connecting_rod[7]",
+          "b": "tiger.crankcase.oil_pressure_sender",
+          "depth_mm": 5.856,
+          "form": "bearing_overlap",
+          "point": [
+            -0.12614,
+            0.058,
+            0.128
+          ]
+        },
+        {
+          "t": 1.8,
+          "a": "tiger.cylinder.block[6]",
+          "b": "tiger.piston_rod.connecting_rod[6]",
+          "depth_mm": 5.686,
+          "form": "displaced",
+          "point": [
+            -0.15792,
+            0.15878,
+            -0.18557
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.block[4]",
+          "b": "tiger.piston_rod.connecting_rod[4]",
+          "depth_mm": 5.576,
+          "form": "displaced",
+          "point": [
+            0.00008,
+            0.23247,
+            -0.04019
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.block[7]",
+          "b": "tiger.piston_rod.connecting_rod[7]",
+          "depth_mm": 5.576,
+          "form": "displaced",
+          "point": [
+            -0.10808,
+            0.15104,
+            0.18122
+          ]
+        },
+        {
+          "t": 2.6,
+          "a": "tiger.piston_rod.piston_ring[26]",
+          "b": "tiger.piston_rod.connecting_rod[8]",
+          "depth_mm": 5.459,
+          "form": "displaced",
+          "point": [
+            -0.29931,
+            0.19178,
+            -0.18359
+          ]
+        },
+        {
+          "t": 2.6,
+          "a": "tiger.piston_rod.piston_ring[35]",
+          "b": "tiger.piston_rod.connecting_rod[11]",
+          "depth_mm": 5.459,
+          "form": "displaced",
+          "point": [
+            -0.44069,
+            0.25489,
+            0.07429
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.crankcase.shell",
+          "b": "tiger.piston_rod.connecting_rod[7]",
+          "depth_mm": 5.292,
+          "form": "displaced",
+          "point": [
+            -0.10933,
+            0.0587,
+            0.13729
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.piston_rod.piston[3]",
+          "b": "tiger.piston_rod.connecting_rod[3]",
+          "depth_mm": 5.183,
+          "form": "displaced",
+          "point": [
+            0.19107,
+            0.28026,
+            0.13934
+          ]
+        },
+        {
+          "t": 1.8,
+          "a": "tiger.cylinder.block[4]",
+          "b": "tiger.piston_rod.piston[4]",
+          "depth_mm": 5.141,
+          "form": "bearing_overlap",
+          "point": [
+            0.025,
+            0.37542,
+            -0.21675
+          ]
+        },
+        {
+          "t": 1.8,
+          "a": "tiger.cylinder.block[7]",
+          "b": "tiger.piston_rod.piston[7]",
+          "depth_mm": 5.141,
+          "form": "bearing_overlap",
+          "point": [
+            -0.133,
+            0.37542,
+            0.21675
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.piston_rod.piston[5]",
+          "b": "tiger.piston_rod.connecting_rod[4]",
+          "depth_mm": 5.104,
+          "form": "displaced",
+          "point": [
+            0.01275,
+            0.159,
+            0.02067
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.block[11]",
+          "b": "tiger.piston_rod.piston[11]",
+          "depth_mm": 4.832,
+          "form": "bearing_overlap",
+          "point": [
+            -0.449,
+            0.37542,
+            0.21675
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.block[8]",
+          "b": "tiger.piston_rod.piston[8]",
+          "depth_mm": 4.832,
+          "form": "bearing_overlap",
+          "point": [
+            -0.291,
+            0.37542,
+            -0.21675
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.crankcase.shell",
+          "b": "tiger.piston_rod.connecting_rod[10]",
+          "depth_mm": 4.568,
+          "form": "displaced",
+          "point": [
+            -0.4727,
+            0.14142,
+            -0.17483
+          ]
+        },
+        {
+          "t": 2.2,
+          "a": "tiger.piston_rod.piston[8]",
+          "b": "tiger.piston_rod.connecting_rod[9]",
+          "depth_mm": 4.402,
+          "form": "displaced",
+          "point": [
+            -0.27875,
+            0.16101,
+            -0.02184
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.piston_rod.piston[0]",
+          "b": "tiger.piston_rod.connecting_rod[0]",
+          "depth_mm": 4.341,
+          "form": "displaced",
+          "point": [
+            0.324,
+            0.2549,
+            -0.15528
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.liner[1]",
+          "b": "tiger.piston_rod.connecting_rod[1]",
+          "depth_mm": 4.287,
+          "form": "displaced",
+          "point": [
+            0.35045,
+            0.22277,
+            0.04576
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.liner[10]",
+          "b": "tiger.piston_rod.connecting_rod[10]",
+          "depth_mm": 4.287,
+          "form": "displaced",
+          "point": [
+            -0.45845,
+            0.15101,
+            -0.17004
+          ]
+        },
+        {
+          "t": 1.8,
+          "a": "tiger.crankcase.shell",
+          "b": "tiger.piston_rod.connecting_rod[3]",
+          "depth_mm": 4.133,
+          "form": "displaced",
+          "point": [
+            0.1853,
+            0.14245,
+            0.174
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.cylinder.block[0]",
+          "b": "tiger.piston_rod.piston[0]",
+          "depth_mm": 4.089,
+          "form": "bearing_overlap",
+          "point": [
+            0.341,
+            0.37542,
+            -0.21675
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.cylinder.block[3]",
+          "b": "tiger.piston_rod.piston[3]",
+          "depth_mm": 4.089,
+          "form": "bearing_overlap",
+          "point": [
+            0.183,
+            0.37542,
+            0.21675
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.piston_rod.piston[4]",
+          "b": "tiger.piston_rod.connecting_rod[4]",
+          "depth_mm": 3.976,
+          "form": "displaced",
+          "point": [
+            0.00008,
+            0.16073,
+            -0.15404
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.piston_rod.piston[7]",
+          "b": "tiger.piston_rod.connecting_rod[7]",
+          "depth_mm": 3.976,
+          "form": "displaced",
+          "point": [
+            -0.10808,
+            0.21377,
+            0.06218
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.cylinder.liner[6]",
+          "b": "tiger.piston_rod.connecting_rod[6]",
+          "depth_mm": 3.951,
+          "form": "displaced",
+          "point": [
+            -0.15792,
+            0.17953,
+            -0.17721
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.cylinder.liner[9]",
+          "b": "tiger.piston_rod.connecting_rod[9]",
+          "depth_mm": 3.947,
+          "form": "displaced",
+          "point": [
+            -0.28792,
+            0.25145,
+            0.06595
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.liner[11]",
+          "b": "tiger.piston_rod.connecting_rod[11]",
+          "depth_mm": 3.926,
+          "form": "displaced",
+          "point": [
+            -0.44592,
+            0.28347,
+            0.0845
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.liner[2]",
+          "b": "tiger.piston_rod.connecting_rod[2]",
+          "depth_mm": 3.926,
+          "form": "displaced",
+          "point": [
+            0.17992,
+            0.28347,
+            -0.0845
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.liner[5]",
+          "b": "tiger.piston_rod.connecting_rod[5]",
+          "depth_mm": 3.926,
+          "form": "displaced",
+          "point": [
+            0.02808,
+            0.21492,
+            0.20324
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.cylinder.liner[8]",
+          "b": "tiger.piston_rod.connecting_rod[8]",
+          "depth_mm": 3.926,
+          "form": "displaced",
+          "point": [
+            -0.29408,
+            0.21492,
+            -0.20324
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.piston_rod.piston_ring[30]",
+          "b": "tiger.piston_rod.connecting_rod[10]",
+          "depth_mm": 3.592,
+          "form": "displaced",
+          "point": [
+            -0.46949,
+            0.33153,
+            -0.12636
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.piston_rod.piston[1]",
+          "b": "tiger.piston_rod.connecting_rod[1]",
+          "depth_mm": 3.588,
+          "form": "displaced",
+          "point": [
+            0.34713,
+            0.22589,
+            0.0586
+          ]
+        },
+        {
+          "t": 1.7,
+          "a": "tiger.piston_rod.piston[10]",
+          "b": "tiger.piston_rod.connecting_rod[10]",
+          "depth_mm": 3.588,
+          "form": "displaced",
+          "point": [
+            -0.45513,
+            0.1637,
+            -0.16633
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.piston_rod.piston_ring[31]",
+          "b": "tiger.piston_rod.connecting_rod[10]",
+          "depth_mm": 3.23,
+          "form": "displaced",
+          "point": [
+            -0.46982,
+            0.32752,
+            -0.12264
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.piston_rod.piston_ring[3]",
+          "b": "tiger.piston_rod.connecting_rod[1]",
+          "depth_mm": 3.065,
+          "form": "displaced",
+          "point": [
+            0.36149,
+            0.27635,
+            0.2246
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.piston_rod.piston_ring[4]",
+          "b": "tiger.piston_rod.connecting_rod[1]",
+          "depth_mm": 3.056,
+          "form": "displaced",
+          "point": [
+            0.36149,
+            0.26942,
+            0.2206
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.piston_rod.piston_ring[5]",
+          "b": "tiger.piston_rod.connecting_rod[1]",
+          "depth_mm": 2.817,
+          "form": "displaced",
+          "point": [
+            0.36149,
+            0.26249,
+            0.2166
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.piston_rod.piston_ring[32]",
+          "b": "tiger.piston_rod.connecting_rod[10]",
+          "depth_mm": 2.324,
+          "form": "displaced",
+          "point": [
+            -0.46949,
+            0.31767,
+            -0.11836
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.piston_rod.piston[2]",
+          "b": "tiger.piston_rod.connecting_rod[2]",
+          "depth_mm": 2.03,
+          "form": "displaced",
+          "point": [
+            0.15808,
+            0.27097,
+            -0.09777
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.piston_rod.piston[5]",
+          "b": "tiger.piston_rod.connecting_rod[5]",
+          "depth_mm": 2.03,
+          "form": "displaced",
+          "point": [
+            0.04992,
+            0.22016,
+            0.18579
+          ]
+        },
+        {
+          "t": 2.6,
+          "a": "tiger.piston_rod.piston_ring[25]",
+          "b": "tiger.piston_rod.connecting_rod[8]",
+          "depth_mm": 2.004,
+          "form": "displaced",
+          "point": [
+            -0.31392,
+            0.20433,
+            -0.18186
+          ]
+        },
+        {
+          "t": 2,
+          "a": "tiger.piston_rod.piston_ring[11]",
+          "b": "tiger.piston_rod.connecting_rod[3]",
+          "depth_mm": 1.804,
+          "form": "displaced",
+          "point": [
+            0.20792,
+            0.33047,
+            0.12542
+          ]
+        },
+        {
+          "t": 2,
+          "a": "tiger.piston_rod.piston_ring[2]",
+          "b": "tiger.piston_rod.connecting_rod[0]",
+          "depth_mm": 1.804,
+          "form": "displaced",
+          "point": [
+            0.31608,
+            0.27385,
+            -0.22348
+          ]
+        },
+        {
+          "t": 2.6,
+          "a": "tiger.piston_rod.piston_ring[34]",
+          "b": "tiger.piston_rod.connecting_rod[11]",
+          "depth_mm": 1.696,
+          "form": "displaced",
+          "point": [
+            -0.4257,
+            0.25853,
+            0.08338
+          ]
+        },
+        {
+          "t": 2.6,
+          "a": "tiger.piston_rod.piston_ring[24]",
+          "b": "tiger.piston_rod.connecting_rod[8]",
+          "depth_mm": 1.617,
+          "form": "displaced",
+          "point": [
+            -0.31392,
+            0.2078,
+            -0.18386
+          ]
+        },
+        {
+          "t": 2.6,
+          "a": "tiger.piston_rod.piston_ring[33]",
+          "b": "tiger.piston_rod.connecting_rod[11]",
+          "depth_mm": 1.617,
+          "form": "displaced",
+          "point": [
+            -0.42608,
+            0.26312,
+            0.08803
+          ]
+        },
+        {
+          "t": 2.4,
+          "a": "tiger.piston_rod.piston_ring[7]",
+          "b": "tiger.piston_rod.connecting_rod[2]",
+          "depth_mm": 1.564,
+          "form": "displaced",
+          "point": [
+            0.1569,
+            0.25811,
+            -0.08462
+          ]
+        },
+        {
+          "t": 2.4,
+          "a": "tiger.piston_rod.piston_ring[16]",
+          "b": "tiger.piston_rod.connecting_rod[5]",
+          "depth_mm": 1.478,
+          "form": "displaced",
+          "point": [
+            0.05075,
+            0.20273,
+            0.18142
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.cylinder.liner[4]",
+          "b": "tiger.piston_rod.connecting_rod[4]",
+          "depth_mm": 1.373,
+          "form": "displaced",
+          "point": [
+            0.00008,
+            0.15895,
+            -0.16211
+          ]
+        },
+        {
+          "t": 1.9,
+          "a": "tiger.cylinder.liner[7]",
+          "b": "tiger.piston_rod.connecting_rod[7]",
+          "depth_mm": 1.373,
+          "form": "displaced",
+          "point": [
+            -0.10808,
+            0.21986,
+            0.0566
+          ]
+        },
+        {
+          "t": 2.2,
+          "a": "tiger.cylinder.block[2]",
+          "b": "tiger.piston_rod.piston[2]",
+          "depth_mm": 1.095,
+          "form": "bearing_overlap",
+          "point": [
+            0.183,
+            0.37542,
+            -0.21675
+          ]
+        },
+        {
+          "t": 2.2,
+          "a": "tiger.cylinder.block[5]",
+          "b": "tiger.piston_rod.piston[5]",
+          "depth_mm": 1.095,
+          "form": "bearing_overlap",
+          "point": [
+            0.025,
+            0.37542,
+            0.21675
+          ]
+        },
+        {
+          "t": 0,
+          "a": "tiger.piston_rod.piston_pin[1]",
+          "b": "tiger.piston_rod.connecting_rod[1]",
+          "depth_mm": 0.748,
+          "form": "bearing_overlap",
+          "point": [
+            0.35093,
+            0.29012,
+            0.18868
+          ]
+        },
+        {
+          "t": 0,
+          "a": "tiger.piston_rod.piston_pin[3]",
+          "b": "tiger.piston_rod.connecting_rod[3]",
+          "depth_mm": 0.748,
+          "form": "bearing_overlap",
+          "point": [
+            0.19293,
+            0.29012,
+            0.18868
+          ]
+        },
+        {
+          "t": 0,
+          "a": "tiger.piston_rod.piston_pin[7]",
+          "b": "tiger.piston_rod.connecting_rod[7]",
+          "depth_mm": 0.748,
+          "form": "bearing_overlap",
+          "point": [
+            -0.12307,
+            0.18137,
+            0.1259
+          ]
+        },
+        {
+          "t": 0,
+          "a": "tiger.piston_rod.piston_pin[9]",
+          "b": "tiger.piston_rod.connecting_rod[9]",
+          "depth_mm": 0.748,
+          "form": "bearing_overlap",
+          "point": [
+            -0.28107,
+            0.18137,
+            0.1259
+          ]
+        },
+        {
+          "t": 0,
+          "a": "tiger.piston_rod.piston_pin[0]",
+          "b": "tiger.piston_rod.connecting_rod[0]",
+          "depth_mm": 0.738,
+          "form": "bearing_overlap",
+          "point": [
+            0.31608,
+            0.31652,
+            -0.18808
+          ]
+        },
+        {
+          "t": 0,
+          "a": "tiger.piston_rod.piston_pin[10]",
+          "b": "tiger.piston_rod.connecting_rod[10]",
+          "depth_mm": 0.738,
+          "form": "bearing_overlap",
+          "point": [
+            -0.47392,
+            0.3193,
+            -0.18447
+          ]
+        },
+        {
+          "t": 0,
+          "a": "tiger.piston_rod.piston_pin[4]",
+          "b": "tiger.piston_rod.connecting_rod[4]",
+          "depth_mm": 0.738,
+          "form": "bearing_overlap",
+          "point": [
+            0.00008,
+            0.20777,
+            -0.1253
+          ]
+        },
+        {
+          "t": 0,
+          "a": "tiger.piston_rod.piston_pin[6]",
+          "b": "tiger.piston_rod.connecting_rod[6]",
+          "depth_mm": 0.738,
+          "form": "bearing_overlap",
+          "point": [
+            -0.15792,
+            0.21055,
+            -0.12168
+          ]
+        },
+        {
+          "t": 0,
+          "a": "tiger.piston_rod.piston_pin[11]",
+          "b": "tiger.piston_rod.connecting_rod[11]",
+          "depth_mm": 0.607,
+          "form": "bearing_overlap",
+          "point": [
+            -0.43907,
+            0.22974,
+            0.15382
+          ]
+        },
+        {
+          "t": 0,
+          "a": "tiger.piston_rod.piston_pin[5]",
+          "b": "tiger.piston_rod.connecting_rod[5]",
+          "depth_mm": 0.607,
+          "form": "bearing_overlap",
+          "point": [
+            0.03493,
+            0.22974,
+            0.15382
+          ]
+        },
+        {
+          "t": 0,
+          "a": "tiger.piston_rod.piston_pin[8]",
+          "b": "tiger.piston_rod.connecting_rod[8]",
+          "depth_mm": 0.602,
+          "form": "bearing_overlap",
+          "point": [
+            -0.30083,
+            0.26026,
+            -0.14837
+          ]
+        },
+        {
+          "t": 0,
+          "a": "tiger.piston_rod.piston_pin[2]",
+          "b": "tiger.piston_rod.connecting_rod[2]",
+          "depth_mm": 0.596,
+          "form": "bearing_overlap",
+          "point": [
+            0.15808,
+            0.25441,
+            -0.15477
+          ]
+        },
+        {
+          "t": 2.4,
+          "a": "tiger.piston_rod.piston_ring[15]",
+          "b": "tiger.piston_rod.connecting_rod[5]",
+          "depth_mm": null,
+          "form": "suspect",
+          "point": [
+            0.04873,
+            0.2083,
+            0.18376
+          ]
+        },
+        {
+          "t": 2.4,
+          "a": "tiger.piston_rod.piston_ring[6]",
+          "b": "tiger.piston_rod.connecting_rod[2]",
+          "depth_mm": null,
+          "form": "suspect",
+          "point": [
+            0.15808,
+            0.26304,
+            -0.08894
+          ]
+        }
+      ],
+      "unexcused": 83,
+      "expected": 12
+    },
+    {
+      "id": "hit",
+      "label": "受击（重）",
+      "frames": 21,
+      "ms": 52,
+      "reports": [],
+      "unexcused": 0,
+      "expected": 0
+    },
+    {
+      "id": "detonation",
+      "label": "弹药殉爆",
+      "frames": 47,
+      "ms": 1227,
+      "reports": [],
+      "unexcused": 0,
+      "expected": 0
+    },
+    {
+      "id": "lids",
+      "label": "舱盖全开",
+      "frames": 11,
+      "ms": 961,
+      "reports": [],
+      "unexcused": 0,
+      "expected": 0
+    }
+  ]
+}
