@@ -335,13 +335,21 @@ export function weldBeadGeometry(
   return geometry;
 }
 
-/** X 轴镜像：对位置与法线取反并修正三角形绕序（代替 scale=-1 的错误光照）。 */
-export function mirrorGeometry(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+/** 几何镜像：沿指定轴取反位置与法线并修正三角形绕序（代替 scale=-1 的错误光照）。 */
+export function mirrorGeometry(
+  geometry: THREE.BufferGeometry,
+  axis: "x" | "z" = "x",
+): THREE.BufferGeometry {
   const g = geometry.clone();
+  const idx = axis === "x" ? 0 : 2;
   const pos = g.getAttribute("position") as THREE.BufferAttribute;
-  for (let i = 0; i < pos.count; i++) pos.setX(i, -pos.getX(i));
+  for (let i = 0; i < pos.count; i++) pos.setComponent(i, idx, -pos.getComponent(i, idx));
   const normal = g.getAttribute("normal");
-  if (normal) for (let i = 0; i < normal.count; i++) normal.setX(i, -normal.getX(i));
+  if (normal) {
+    for (let i = 0; i < normal.count; i++) {
+      normal.setComponent(i, idx, -normal.getComponent(i, idx));
+    }
+  }
   if (g.index) {
     const index = g.index;
     for (let i = 0; i < index.count; i += 3) {
@@ -360,23 +368,23 @@ export function mirrorGeometry(geometry: THREE.BufferGeometry): THREE.BufferGeom
     const tmpU = [0, 0];
     for (let i = 0; i < p.count; i += 3) {
       // i+1 ↔ i+2 交换
-      for (let axis = 0; axis < 3; axis++) {
-        tmpP[axis] = p.getComponent(i + 1, axis);
-        p.setComponent(i + 1, axis, p.getComponent(i + 2, axis));
-        p.setComponent(i + 2, axis, tmpP[axis]);
+      for (let ax = 0; ax < 3; ax++) {
+        tmpP[ax] = p.getComponent(i + 1, ax);
+        p.setComponent(i + 1, ax, p.getComponent(i + 2, ax));
+        p.setComponent(i + 2, ax, tmpP[ax]);
       }
       if (n) {
-        for (let axis = 0; axis < 3; axis++) {
-          tmpN[axis] = n.getComponent(i + 1, axis);
-          n.setComponent(i + 1, axis, n.getComponent(i + 2, axis));
-          n.setComponent(i + 2, axis, tmpN[axis]);
+        for (let ax = 0; ax < 3; ax++) {
+          tmpN[ax] = n.getComponent(i + 1, ax);
+          n.setComponent(i + 1, ax, n.getComponent(i + 2, ax));
+          n.setComponent(i + 2, ax, tmpN[ax]);
         }
       }
       if (uv) {
-        for (let axis = 0; axis < 2; axis++) {
-          tmpU[axis] = uv.getComponent(i + 1, axis);
-          uv.setComponent(i + 1, axis, uv.getComponent(i + 2, axis));
-          uv.setComponent(i + 2, axis, tmpU[axis]);
+        for (let ax = 0; ax < 2; ax++) {
+          tmpU[ax] = uv.getComponent(i + 1, ax);
+          uv.setComponent(i + 1, ax, uv.getComponent(i + 2, ax));
+          uv.setComponent(i + 2, ax, tmpU[ax]);
         }
       }
     }

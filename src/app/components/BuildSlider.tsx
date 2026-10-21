@@ -1,7 +1,7 @@
 import { ChevronRight, Crosshair, Layers } from "lucide-react";
 import { useMemo } from "react";
 import { BUILD_LAYER_LABELS } from "@/three/parts";
-import { findModel } from "../catalog";
+import { activeRegistryOf } from "../catalog";
 import { buildOrdersOf, useStageStore } from "../state/stageStore";
 
 // ============================================================================
@@ -13,12 +13,13 @@ import { buildOrdersOf, useStageStore } from "../state/stageStore";
 
 export function BuildSlider() {
   const modelId = useStageStore((state) => state.modelId);
+  const variantId = useStageStore((state) => state.variantId);
   const buildIndex = useStageStore((state) => state.buildIndex);
   const setBuildIndex = useStageStore((state) => state.setBuildIndex);
   const advanceBuild = useStageStore((state) => state.advanceBuild);
 
   const orders = useMemo(() => buildOrdersOf(modelId), [modelId]);
-  const registry = findModel(modelId).registry;
+  const registry = activeRegistryOf(modelId, variantId);
   const selectedPart = useStageStore((state) => state.selectedPart);
 
   // 选中件优先显示：滑杆读数要能回答「我现在选中的这件装到第几件了」，
