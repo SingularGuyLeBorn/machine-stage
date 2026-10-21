@@ -20,6 +20,8 @@ import { M249_BUILDERS, makeM249Layouts, makeM249Registry } from "@/three/parts/
 import { M249_MOTION_PARTS, animateM249, getM249Mode } from "@/three/parts/models/m249/motion";
 import { M2HB_BUILDERS, makeM2hbLayouts, makeM2hbRegistry } from "@/three/parts/models/m2hb/registry";
 import { M2HB_MOTION_PARTS, animateM2hb, getM2hbMode } from "@/three/parts/models/m2hb/motion";
+import { M134_BUILDERS, makeM134Layouts, makeM134Registry } from "@/three/parts/models/m134/registry";
+import { M134_MOTION_PARTS, animateM134, getM134Mode } from "@/three/parts/models/m134/motion";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -301,6 +303,50 @@ export const CATALOG: StageModel[] = [
       "射击循环（1.8s）：扣扳机→阻铁释放击锤→击针击底火→弹头出膛（枪口焰）→燃气推活塞→枪机框后坐→枪机头回转开锁→抽壳抛壳→复进簧推回→推弹上膛→闭锁待击。",
       "弹药零件化：每发 = 弹头(被甲+铅套+钢芯) + 弹壳 + 发射药 + 底火，30 发实例化堆叠在弧形弹匣内。",
       "导气式核心零件：导气箍（⌀4.4 导气孔）→ 活塞+活塞杆 → 枪机框；闭锁由枪机头双凸笋在节套闭锁窗回转 38° 完成。",
+    ],
+  },
+  {
+    id: "m134",
+    title: "M134 加特林",
+    subtitle: "6 管旋转 · 每管独立枪机依次击发 · 外能源电机驱动",
+    milestone: "M-G",
+    status: "ready",
+    registry: makeM134Registry(),
+    layouts: makeM134Layouts(),
+    builders: M134_BUILDERS,
+    motionParts: M134_MOTION_PARTS,
+    animate: (assembled, seconds) => {
+      animateM134(assembled, seconds, getM134Mode());
+    },
+    readouts: () => [
+      { label: "自动原理", value: "转管式（外能源电机）" },
+      { label: "枪管数", value: "6 根（分布半径 32mm）" },
+      { label: "枪机", value: "6 套独立（凸轮槽驱动往复）" },
+      { label: "转子转速", value: "300 rpm（演示）" },
+      { label: "理论射速", value: "1800 发/分（真机 6000）" },
+    ],
+    states: [
+      { id: "idle", label: "停机", hint: "转子静止：可爆炸视图看 6 管 + 6 枪机" },
+      { id: "semi", label: "点射", hint: "短促点射：转子转起，逐管依次击发" },
+      { id: "running", label: "连发", hint: "全速旋转：枪口焰在击发位闪、弹壳瀑布式抛出" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "m134-semi", group: "射击", label: "点射", kind: "machine-state", state: "semi" },
+      { id: "m134-auto", group: "射击", label: "全速连发", kind: "machine-state", state: "running" },
+      { id: "m134-idle", group: "射击", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "转管式（皇冠机构）：6 根枪管 + 6 套独立枪机绕中心轴旋转，枪机导销插在转子尾端凸轮槽里——旋转中每套枪机依次完成 装填→闭锁→击发→抽壳→抛壳。",
+      "外能源：加特林没有导气/后坐自动机，全靠电机经 36:10 减速齿轮组驱动转子；射速 = 6 × 转子转速（真机 1000rpm → 6000 发/分）。",
+      "枪口焰只在击发位（正上方那根枪管）闪——与 AK/M249/M2HB 的「每发必闪」不同。",
+      "弹壳瀑布：6 管轮流抛壳，从左侧抛壳口连续抛出（14 槽弹壳池循环）。",
     ],
   },
   {
