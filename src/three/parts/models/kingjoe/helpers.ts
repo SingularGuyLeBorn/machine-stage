@@ -298,7 +298,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     geometry: { type: "cylinder", r: 0.78, h: 0.18, segments: 40, bevel: 0.012 },
     material: "joint_steel",
     node: dock.upperNode,
-    mate: absMate([0, upperYLocal + 0.13, 0]),
+    mate: absMate([0, upperYLocal - 0.045, 0]),
     hint: "上模块通过 780mm 承力块把对接载荷传入骨架；销/锁环都不直接吃主结构弯矩",
   });
   builder.add({
@@ -310,7 +310,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     geometry: { type: "tube", rOuter: 0.8, rInner: 0.44, h: 0.04, segments: 40 },
     material: "silver_dark",
     node: dock.upperNode,
-    mate: absMate([0, upperYLocal + 0.24, 0]),
+    mate: absMate([0, upperYLocal - 0.015, 0]),
   });
   builder.add({
     id: `${upperPrefix}_guide_pin`,
@@ -321,7 +321,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     geometry: { type: "cylinder", r: 0.03, rTop: KJ.PIN_R, h: KJ.PIN_LEN, segments: 16 },
     material: "silver_bright",
     node: dock.upperNode,
-    mate: absMate([0, upperYLocal - 0.062, 0]),
+    mate: absMate([0, upperYLocal - 0.08, 0]),
     instances: 4,
     indexed: true,
     instance_layout: "kjDockPins",
@@ -336,7 +336,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     geometry: { type: "cylinder", r: KJ.DOWEL_R, h: KJ.DOWEL_LEN, segments: 14 },
     material: "silver",
     node: dock.upperNode,
-    mate: absMate([0, upperYLocal - 0.032, 0]),
+    mate: absMate([0, upperYLocal - 0.05, 0]),
     instances: 2,
     indexed: true,
     instance_layout: "kjDockDowels",
@@ -350,7 +350,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     geometry: { type: "tube", rOuter: 0.48, rInner: 0.44, h: 0.016, segments: 36 },
     material: "rubber",
     node: dock.upperNode,
-    mate: absMate([0, upperYLocal + 0.015, 0]),
+    mate: absMate([0, upperYLocal - 0.005, 0]),
   });
   builder.add({
     id: `${upperPrefix}_lock_ring`,
@@ -405,7 +405,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     geometry: { type: "tube", rOuter: 0.64, rInner: 0.56, h: 0.07, segments: 32 },
     material: "silver_dark",
     node: dock.upperNode,
-    mate: absMate([0, upperYLocal + 0.003, 0]),
+    mate: absMate([0, upperYLocal - 0.015, 0]),
   });
   builder.add({
     id: `${upperPrefix}_align_rail`,
@@ -430,7 +430,7 @@ export function addAxialDock(builder: KingJoeParts, dock: DockSpec): void {
     geometry: { type: "cylinder", r: 0.035, h: 0.03, segments: 12, bevel: 0.003 },
     material: "sensor_red",
     node: dock.upperNode,
-    mate: absMate([0, upperYLocal + 0.025, 0]),
+    mate: absMate([0, upperYLocal - 0.06, 0]),
     instances: 2,
     indexed: true,
     instance_layout: "kjMirrorX07",

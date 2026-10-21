@@ -395,8 +395,8 @@ function poseFormation(assembled: AssembledModel, t: number, formation: Formatio
   }
   setLeg(assembled, "l", 0, 0, 0);
   setLeg(assembled, "r", 0, 0, 0);
-  setArm(assembled, "l", 82, 0, 0, 0, 5);
-  setArm(assembled, "r", 82, 0, 0, 0, 5);
+  setArm(assembled, "l", 20, 12, 0, 0, 5);
+  setArm(assembled, "r", 20, 12, 0, 0, 5);
   setAxialLocks(assembled, 0);
   setShoulderLocks(assembled, 0);
   for (let i = 0; i < 2; i++) {
@@ -493,10 +493,11 @@ function poseCombining(
 
   // 双臂：合体前段收拢，最后 1.6s 展开并锁肩
   const unfold = smoothstep(COMBINE_ARMS_START, COMBINE_ARMS_END, t);
-  const shoulderX = 82 * (1 - unfold);
+  const shoulderX = 20 * (1 - unfold);
+  const shoulderZ = 12 * (1 - unfold);
   const elbowX = 0;
-  setArm(assembled, "l", shoulderX, 0, elbowX, 0, 0);
-  setArm(assembled, "r", shoulderX, 0, elbowX, 0, 0);
+  setArm(assembled, "l", shoulderX, shoulderZ, elbowX, 0, 0);
+  setArm(assembled, "r", shoulderX, shoulderZ, elbowX, 0, 0);
   setShoulderLocks(assembled, 18 * unfold);
   const thruster = 0.75 * (1 - smoothstep(0.0, 1.6, t));
   return { arcs, flashes, thruster };
@@ -509,9 +510,10 @@ function poseSeparation(
 ): { arcs: Record<string, number>; flashes: Record<string, number>; thruster: number } {
   const arcs: Record<string, number> = {};
   const flashes: Record<string, number> = {};
-  const unfoldToFold = smoothstep(1.3, 2.3, t);
-  setArm(assembled, "l", 82 * unfoldToFold, 0, 0, 0, 5 * unfoldToFold);
-  setArm(assembled, "r", 82 * unfoldToFold, 0, 0, 0, 5 * unfoldToFold);
+  // 先抬臂再解锁：真实手臂粗，若在模块横向散开时才折叠会扫进腹部。
+  const fold = smoothstep(0.05, 0.55, t);
+  setArm(assembled, "l", 78 * fold, 8 * fold, 0, 0, 5 * fold);
+  setArm(assembled, "r", 78 * fold, 8 * fold, 0, 0, 5 * fold);
   setShoulderLocks(assembled, 18 * (1 - smoothstep(0.1, 0.6, t)));
   setLeg(assembled, "l", 0, 0, 0);
   setLeg(assembled, "r", 0, 0, 0);
@@ -590,8 +592,8 @@ function poseRobot(assembled: AssembledModel, t: number): { left: number; right:
   const sway = 4 * Math.sin(u * TAU);
   waistTorso(assembled, new THREE.Vector3(0, KJ.STOMACH_Y + bob, 0), [lean, sway, 0]);
   const armSwing = -step * 3;
-  setArm(assembled, "l", armSwing, 0, 5 + 2 * Math.abs(step), 0, 6);
-  setArm(assembled, "r", -armSwing, 0, 5 + 2 * Math.abs(step), 0, 6);
+  setArm(assembled, "l", armSwing, 4, 5 + 2 * Math.abs(step), 0, 6);
+  setArm(assembled, "r", -armSwing, 4, 5 + 2 * Math.abs(step), 0, 6);
   setAxialLocks(assembled, 30);
   setShoulderLocks(assembled, 18);
   return {
@@ -616,8 +618,8 @@ function poseFiring(assembled: AssembledModel, t: number): { beam: number; charg
   setNode(assembled, "legs", new THREE.Vector3(0, 0, -recoil), [0, 0, 0]);
   setLeg(assembled, "l", 0, 0, 0);
   setLeg(assembled, "r", 0, 0, 0);
-  setArm(assembled, "l", -8, 0, 8, 0, 10);
-  setArm(assembled, "r", -8, 0, 8, 0, 10);
+  setArm(assembled, "l", -8, 6, 8, 0, 10);
+  setArm(assembled, "r", -8, 6, 8, 0, 10);
   setAxialLocks(assembled, 30);
   setShoulderLocks(assembled, 18);
   const charge = fire.charge;

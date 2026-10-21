@@ -391,6 +391,10 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
         const local = instanceNodes
           ? delta.clone()
           : new THREE.Matrix4().copy(resolveLocal(item.id)).multiply(delta);
+        if (item.def.scale) {
+          const s = resolveSpec(item.def.scale, constants) as [number, number, number];
+          local.multiply(new THREE.Matrix4().makeScale(s[0], s[1], s[2]));
+        }
         const rest = new THREE.Matrix4().multiplyMatrices(nodeMatrix, local);
         instances.push({ index: i, node, restMatrix: rest, localMatrix: local });
         instanced.setMatrixAt(i, rest);
@@ -429,6 +433,10 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
       const local = new THREE.Matrix4().multiplyMatrices(nodeMatrixInverse, matrix);
       // 分解为 TRS：.position/.quaternion 可读，同时矩阵与装配解一致
       local.decompose(mesh.position, mesh.quaternion, mesh.scale);
+      if (item.def.scale) {
+        const s = resolveSpec(item.def.scale, constants) as [number, number, number];
+        mesh.scale.multiply(new THREE.Vector3(s[0], s[1], s[2]));
+      }
       mesh.updateMatrix();
       mesh.matrixWorldNeedsUpdate = true;
       (parentNode ?? root).add(mesh);

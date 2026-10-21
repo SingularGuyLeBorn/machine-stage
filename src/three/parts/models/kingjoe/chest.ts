@@ -638,7 +638,7 @@ function addChestShell(builder: KingJoeParts): void {
     indexed: true,
     instance_layout: "kjPodSpikes",
   });
-  addAntigravity(builder, "chest", [0, 0.9, -0.91], 0.8);
+  addAntigravity(builder, "chest", [0, 0.45, 0], 0.4);
   addNozzles(builder, "chest");
 }
 

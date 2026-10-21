@@ -629,7 +629,7 @@ export function addLegsParts(builder: KingJoeParts): void {
   addLegsCommon(builder);
   addLegStructure(builder, "l");
   addLegStructure(builder, "r");
-  addAntigravity(builder, "legs", [0, 2.655, -0.1], 0.8);
+  addAntigravity(builder, "legs", [0, 1.9, 0], 0.5);
   addNozzles(builder, "legs");
 }
 

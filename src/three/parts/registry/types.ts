@@ -92,6 +92,11 @@ export interface PartDefinition {
   material: string;
   node?: string;
   mate?: MateSpec;
+  /**
+   * 零件局部缩放（围绕装配原点，装配后乘到实例矩阵上）。
+   * 用于把按旧外形制造的内部机构缩进真实网格薄壳内腔；皮不缩放。
+   */
+  scale?: ExprVec3;
   instances?: number;
   indexed?: boolean;
   /** 可动重复件：实例 → 节点映射（长度 = instances）。 */
@@ -131,6 +136,11 @@ export interface ExpectedContactRule {
   reason: string;
   /** 覆盖深度守门（mm）。省略 = 用 whitelist.ts 的 DEFAULT_MAX_DEPTH_MM。 */
   maxDepthMm?: number;
+  /**
+   * 跳过形态守门（face_mate / bearing_overlap）。仅用于「源资产本身互嵌」这类
+   * 无法按贴面分类、但已确认不是装配错误的历史资产；必须写清 reason 与深度上限。
+   */
+  anyForm?: boolean;
 }
 
 export interface ModelRegistry {

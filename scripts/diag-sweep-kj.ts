@@ -1,4 +1,4 @@
-import { buildModel, detectSweep, detectUnsupportedParts } from "@/three/parts";
+import { buildModel, detectSweep, detectUnsupportedParts, matchExpectedContact } from "@/three/parts";
 import {
   makeKingJoeRegistry,
   makeKingJoeLayouts,
@@ -25,10 +25,11 @@ function sweep(state: KingJoeState, duration: number, fps = 30) {
       animateKingJoe(model, t, state);
     },
   });
+  const active = reports.filter((report) => !matchExpectedContact(report, registry.expectedContacts ?? []));
   console.log(
-    `${state}: sweep ${duration}s@${fps}fps -> ${reports.length} reports in ${Date.now() - t0}ms; unsupported(t0)=${supports.length}`,
+    `${state}: sweep ${duration}s@${fps}fps raw=${reports.length} active=${active.length} in ${Date.now() - t0}ms; unsupported(t0)=${supports.length}`,
   );
-  for (const r of reports.slice(0, 15))
+  for (const r of active.slice(0, 15))
     console.log(`   ${r.a} <-> ${r.b} ${r.depth_mm?.toFixed(1)} form=${r.form} frame=${r.frame}`);
 }
 sweep("combining", 10);

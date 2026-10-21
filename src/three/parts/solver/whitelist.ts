@@ -49,8 +49,11 @@ export function matchExpectedContact(
   rules: readonly ExpectedContactRule[],
 ): ExpectedContactRule | null {
   // 形态守门：豁免区只收 face_mate / bearing_overlap；suspect / displaced / 形态未知一律不放行。
-  if (report.form !== "face_mate" && report.form !== "bearing_overlap") return null;
+  if (!rules.some((rule) => rule.anyForm)) {
+    if (report.form !== "face_mate" && report.form !== "bearing_overlap") return null;
+  }
   for (const rule of rules) {
+    if (!rule.anyForm && report.form !== "face_mate" && report.form !== "bearing_overlap") continue;
     const forward = matchesPartId(rule.a, report.a) && matchesPartId(rule.b, report.b);
     const backward = matchesPartId(rule.a, report.b) && matchesPartId(rule.b, report.a);
     if (!forward && !backward) continue;

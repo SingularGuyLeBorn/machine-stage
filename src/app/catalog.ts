@@ -18,10 +18,7 @@ import {
   makeKingJoeRegistry,
   kingjoeModelBuilders,
 } from "@/three/parts/models/kingjoe/registry";
-import {
-  makeKingJoeSkinRegistry,
-  kingjoeSkinBuilders,
-} from "@/three/parts/models/kingjoe-skin/registry";
+import { makeKingJoeSkinRegistry, kingjoeSkinBuilders } from "@/three/parts/models/kingjoe-skin/registry";
 import {
   animateTigerSuspension,
   TIGER_MOTION_PARTS,
@@ -187,14 +184,13 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoe",
     title: "金古桥 King Joe",
-    subtitle: "四体分离合体 · 锥销/锁环真实对接 · 反重力编队 · 怪光线",
-    milestone: "M-G",
+    subtitle: "真实网格皮 · 四体分离合体 · 锥销/锁环 · 彩虹胸 · 反重力 · 怪光线",
+    milestone: "M-G·R3",
     status: "ready",
     registry: makeKingJoeRegistry(),
     layouts: makeKingJoeLayouts(),
     builders: kingjoeModelBuilders,
     animatedStates: KINGJOE_ANIMATED_STATES,
-    presentationScale: [1.25, 0.78, 1.15],
     animate: (assembled, seconds, state) =>
       animateKingJoe(assembled, seconds, (state as KingJoeState) ?? "idle"),
     states: KINGJOE_STATE_LABELS.map((state) => ({ id: state.id, label: state.label, hint: state.hint })),
@@ -216,17 +212,17 @@ export const CATALOG: StageModel[] = [
       { id: "kj-scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
     ],
     readouts: (assembled) => [
-      { label: "定义零件", value: `${assembled.parts.length} 件` },
-      { label: "合体高度", value: "6.36 m" },
-      { label: "对接面", value: "3 轴向 + 2 肩对接" },
-      { label: "锥销 / 锁环", value: "12 / 5 组" },
+      { label: "同屏零件", value: `${assembled.parts.length} 件` },
+      { label: "合体高度", value: "6.98 m" },
+      { label: "真实网格", value: "7224 顶点 / 7258 三角" },
+      { label: "皮 / 骨", value: "578 片皮 · 四体对接" },
     ],
     notes: [
-      "合体顺序自下而上：腿 → 腹 → 胸 → 头；每段先阻尼减速，再锥销入槽、电弧接通、锁环旋紧。",
-      "双臂属于胸部飞船；合体完成后肩锁环转 18°、肘/腕展开。",
-      "对齐精度：锥销 45mm 入 56mm 承座孔；锁爪与锁钩轴向留 7.5mm，旋转 30° 咬合。",
-      "「分离回避」可重复：解锁 → 电弧拉断 → 四体飞散编队。",
-      "「残缺合体」隐藏腿部飞船，躯干落地，双臂撑地。",
+      "外形：King_Joe.glb 真实网格按蒙皮切成 578 片，再按部位合并成左右大腿/小腿/足、上臂/前臂/手/三指、胸·肩荚、上腹、骨盆、髋裙与头；每件独立 partId。",
+      "四体：King Legs / King Stomach / King Chest / King Ship；三道 120mm 接缝，锥销入槽、锁环咬合、电弧接通与阻尼序列沿用原机构。",
+      "彩虹胸：左右各 7 条独立彩色格栅带 + 银框/黑背板/横栅；额头发射体与颈口发光体保留怪光线发射。",
+      "自检口径：真实网格源资产本身有 459 个互嵌壳，皮-皮、关节、对接内腔按带原因的深度白名单豁免；机构-皮与机构-机构未豁免报告为 0。",
+      "已知边界：真实头部是圆顶单眼结构，未再加参考图的横向眼带；旧肩荚对接件由真实肩荚/手臂关节替代。",
     ],
   },
   {

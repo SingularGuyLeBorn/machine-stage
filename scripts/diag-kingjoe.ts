@@ -1,4 +1,10 @@
-import { buildModel, detectStatic, detectUnsupportedParts, validateRegistry } from "@/three/parts";
+import {
+  buildModel,
+  detectStatic,
+  detectUnsupportedParts,
+  partitionExpectedContacts,
+  validateRegistry,
+} from "@/three/parts";
 import {
   makeKingJoeRegistry,
   makeKingJoeLayouts,
@@ -40,8 +46,11 @@ for (const handle of model.parts) {
 }
 console.log(`built triangles=${Math.round(triangles)}`);
 const staticReports = detectStatic(model, { minDepthM: 0.0005 });
-console.log(`static clipping=${staticReports.length}`);
-for (const r of staticReports.slice(0, 25))
+const split = partitionExpectedContacts(staticReports, registry.expectedContacts ?? []);
+console.log(
+  `static raw=${staticReports.length} expected=${split.expected.length} active=${split.active.length}`,
+);
+for (const { report: r } of split.active.slice(0, 25))
   console.log(
     `  ${r.a} <-> ${r.b} depth=${r.depth_mm} form=${r.form} point=${r.point.map((n) => n.toFixed(2)).join(",")}`,
   );
