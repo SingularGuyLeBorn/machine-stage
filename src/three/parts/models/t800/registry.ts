@@ -422,7 +422,7 @@ export function makeT800(options: { decompose?: boolean } = {}): T800Bundle {
       const jointCn = boneName(def.child).cn;
       builder.add({
         id: `${prefix}.hydraulics.${def.key}_${plan.name}`,
-        cn: `${jointCn}液压${mech.cn}`,
+        cn: `${jointCn}${mech.cn}`,
         en: `${boneName(def.child).en} ${mech.en}`,
         asm: "hydraulics",
         geom: {
