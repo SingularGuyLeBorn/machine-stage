@@ -95,25 +95,36 @@ describe("ModelList", () => {
 });
 
 describe("PartTree", () => {
-  it("按总成折叠渲染零件，点击 → 选中", () => {
+  it("默认全部折叠，点总成才展开", () => {
     render(<PartTree />);
     expect(screen.getByText("测试总成")).toBeDefined();
     expect(screen.getByText("3 个注册零件")).toBeDefined();
-    const pillar = screen.getByText("立柱").closest("button")!;
-    fireEvent.click(pillar);
+    expect(screen.queryByText("立柱")).toBeNull();
+    const head = screen.getByText("测试总成").closest("button")!;
+    expect(head.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(head);
+    expect(screen.getByText("立柱")).toBeDefined();
+    expect(head.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("展开后点击零件 → 选中，重复件标注实例数量", () => {
+    render(<PartTree />);
+    fireEvent.click(screen.getByText("测试总成"));
+    fireEvent.click(screen.getByText("立柱").closest("button")!);
     expect(useStageStore.getState().selectedPart).toBe("test.frame.pillar");
-    // 重复件标注实例数量
     expect(screen.getByText("×2")).toBeDefined();
   });
 
-  it("折叠总成后零件隐藏", () => {
+  it("再次点击总成后零件隐藏", () => {
     render(<PartTree />);
+    fireEvent.click(screen.getByText("测试总成"));
     fireEvent.click(screen.getByText("测试总成"));
     expect(screen.queryByText("立柱")).toBeNull();
   });
 
   it("点零件 → 选中 + 打开单件隔离小视图", () => {
     render(<PartTree />);
+    fireEvent.click(screen.getByText("测试总成"));
     fireEvent.click(screen.getByText("立柱").closest("button")!);
     expect(useStageStore.getState().selectedPart).toBe("test.frame.pillar");
     expect(useStageStore.getState().isolation).toEqual({ kind: "part", partId: "test.frame.pillar" });
@@ -121,7 +132,6 @@ describe("PartTree", () => {
 
   it("外部选中（视口点实体 / 报告点选）会展开所在总成并滚入视野", () => {
     render(<PartTree />);
-    fireEvent.click(screen.getByText("测试总成")); // 手动收起
     expect(screen.queryByText("立柱")).toBeNull();
     // 模拟视口选中：store 变化 → 左树自动展开
     act(() => useStageStore.getState().selectPart("test.frame.pillar"));

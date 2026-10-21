@@ -106,6 +106,7 @@ export function App() {
   const notice = useStageStore((state) => state.notice);
   const setNotice = useStageStore((state) => state.setNotice);
   const layout = useStageStore((state) => state.layout);
+  const modelId = useStageStore((state) => state.modelId);
 
   return (
     <div className="app">
@@ -134,7 +135,7 @@ export function App() {
         >
           <SideColumn side="left" label="零件">
             <ModelList />
-            <PartTree />
+            <PartTree key={modelId} />
           </SideColumn>
 
           <div className="column column--center">
