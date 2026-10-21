@@ -1862,3 +1862,8 @@
     opacity: 1;
   }
 }
+
+/* MBT-90 热像仪视角：白热伪彩（CSS 近似，用于火控演示） */
+.viewport__canvas--thermal {
+  filter: grayscale(1) contrast(1.55) brightness(0.92) sepia(1) hue-rotate(150deg) saturate(2.6);
+}

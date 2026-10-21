@@ -102,7 +102,7 @@ export function Viewport() {
 
   return (
     <div className="viewport">
-      <div className="viewport__canvas">
+      <div className={`viewport__canvas${views.thermal ? " viewport__canvas--thermal" : ""}`}>
         {/* 三维视口单独设边界：WebGL / 渲染层出问题时只有视口被替换，左右面板照常可用 */}
         <ErrorBoundary scope="三维视口">
           <StageCanvas />
@@ -217,6 +217,15 @@ export function Viewport() {
               舱盖
             </button>
           ) : null}
+          <button
+            type="button"
+            className="btn btn--sm"
+            aria-pressed={views.thermal}
+            title="白热热像仪视角（火控演示）"
+            onClick={() => toggleView("thermal")}
+          >
+            热像
+          </button>
           <button
             type="button"
             className="btn btn--sm"

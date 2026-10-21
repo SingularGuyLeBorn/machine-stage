@@ -1,0 +1,13 @@
+npm warn Unknown user config "msvs_version". This will stop working in the next major version of npm.
+npm warn Unknown user config "python". This will stop working in the next major version of npm.
+npm warn Unknown user config "canvas_binary_host_mirror". This will stop working in the next major version of npm.
+npm warn Unknown user config "electron_mirror". This will stop working in the next major version of npm.
+npm warn exec The following package was not found and will be installed: tsx@4.23.15
+MBT-90 门禁
+  零件定义 1266 / 展开 1275 / 实例 3814
+  节点 248 / 总成 36 / 白名单 198 条
+  分层 L1=236 L2=552 L3=308 L4=93 L5=86
+  三角面 1,250,962
+  注册表校验：0 错
+  悬空：0 条
+  静态穿模：7217 报告 / 未豁免 0 / 已豁免 7217（67.6s）
