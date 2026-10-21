@@ -1,0 +1,131 @@
+import type { ExpectedContactRule } from "../../../registry/types";
+
+// ============================================================================
+// models/mbt/engine/expectedContacts.fixes —— 审计后剩余构造性接触
+// 都是「小深度贴合 / 扫掠包络 / 相邻支架」，逐条给出深度上限。
+// ============================================================================
+
+const P = "mbt90.engine.";
+
+export const MBT_ENGINE_CONTACT_FIXES: ExpectedContactRule[] = [
+  {
+    family: "engine-rod-bank-sweep",
+    a: `${P}cyl*`,
+    b: `${P}bank_block*`,
+    reason: "连杆/活塞在缸体水套内腔扫掠（水套内壁即扫掠包络，间隙 1–2mm）",
+    maxDepthMm: 10,
+    allowDisplaced: true,
+    allowSuspect: true,
+  },
+  {
+    family: "engine-wastegate-actuator",
+    a: `${P}wastegate*`,
+    b: `${P}wastegate*`,
+    reason: "旁通阀执行器推杆与阀臂连接（销轴/球头）",
+    maxDepthMm: 25,
+    allowDisplaced: true,
+  },
+  {
+    family: "engine-exhaust-oilcooler",
+    a: `${P}exhaust_manifold*`,
+    b: `${P}oil_cooler*`,
+    reason: "排气总管与机油冷却器在缸体侧面相邻（隔热罩/支架）",
+    maxDepthMm: 15,
+    allowDisplaced: true,
+  },
+  {
+    family: "engine-rear-eye-sender",
+    a: `${P}rear_eye`,
+    b: `${P}oil_pressure_sender*`,
+    reason: "后吊装耳与机油压力传感器共用缸体后端螺孔区",
+    maxDepthMm: 6,
+    allowDisplaced: true,
+  },
+  {
+    family: "engine-liner-dipstick",
+    a: `${P}cyl*`,
+    b: `${P}dipstick`,
+    reason: "机油尺导管贴着缸体/缸套外侧（管夹固定）",
+    maxDepthMm: 6,
+    allowDisplaced: true,
+  },
+  {
+    family: "engine-crankcase-lube-sweep",
+    a: `${P}crankcase`,
+    b: `${P}oil_*`,
+    reason: "机油泵/集滤器/油尺导管在曲轴箱内（浸油安装）",
+    maxDepthMm: 10,
+    allowDisplaced: true,
+    allowSuspect: true,
+  },
+  {
+    family: "engine-bank-lube-sweep",
+    a: `${P}bank_block*`,
+    b: `${P}oil_*`,
+    reason: "机油尺导管/机油冷却器支架沿缸体外侧走",
+    maxDepthMm: 8,
+    allowDisplaced: true,
+    allowSuspect: true,
+  },
+  {
+    family: "engine-bank-fuel-rail-sweep",
+    a: `${P}bank_block*`,
+    b: `${P}fuel_rail`,
+    reason: "共轨油管沿缸体前端外侧走线（管夹固定）",
+    maxDepthMm: 8,
+    allowDisplaced: true,
+    allowSuspect: true,
+  },
+  {
+    family: "engine-camgear-rockershaft-sweep",
+    a: `${P}cam_gear*`,
+    b: `${P}rocker_shaft*`,
+    reason: "正时齿轮与摇臂轴端部相邻（同处正时齿轮室前端）",
+    maxDepthMm: 8,
+    allowDisplaced: true,
+    allowSuspect: true,
+  },
+  {
+    family: "engine-main-damper",
+    a: `${P}main_*`,
+    b: `${P}damper_pulley*`,
+    reason: "曲轴减振皮带轮与前端主轴承座的轴向装配间隙",
+    maxDepthMm: 6,
+    allowDisplaced: true,
+  },
+  {
+    family: "engine-bank-airfilter-bracket",
+    a: `${P}bank_block*`,
+    b: `${P}air_filter_bracket*`,
+    reason: "空气滤清器支架端部坐在缸体后端面上（螺栓固定）",
+    maxDepthMm: 3,
+    allowDisplaced: true,
+  },
+  {
+    family: "engine-liner-oil-sender",
+    a: `${P}cyl*`,
+    b: `${P}oil_*`,
+    reason: "机油压力传感器/油尺导管从缸体侧面接入油道（螺纹座压在缸壁上）",
+    maxDepthMm: 6,
+    allowDisplaced: true,
+    allowSuspect: true,
+  },
+  {
+    family: "engine-bank-dipstick",
+    a: `${P}bank_block*`,
+    b: `${P}dipstick`,
+    reason: "机油尺导管贴着缸体侧面走（管夹固定）",
+    maxDepthMm: 5,
+    allowDisplaced: true,
+    allowSuspect: true,
+  },
+  {
+    family: "engine-case-dipstick",
+    a: `${P}crankcase`,
+    b: `${P}dipstick`,
+    reason: "机油尺导管下端插入曲轴箱油底壳（螺纹座/密封圈）",
+    maxDepthMm: 5,
+    allowDisplaced: true,
+    allowSuspect: true,
+  },
+];

@@ -44,7 +44,7 @@ import { M134_MOTION_PARTS, animateM134, getM134Mode } from "@/three/parts/model
 // planned 卡片是路线图占位（M-B…M-F），没有注册表时不可选中。
 // ============================================================================
 
-export type ViewKey = "explode" | "xray" | "labels" | "grid" | "shadow" | "rain";
+export type ViewKey = "explode" | "xray" | "labels" | "grid" | "shadow" | "rain" | "thermal";
 
 export type StageAction =
   | { id: string; group: string; label: string; kind: "machine-state"; state: string }
@@ -388,7 +388,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "mbt90",
     title: "MBT-90 主战坦克",
-    subtitle: "虚构型号 · 楔形复合装甲 / 反应装甲 / 7 对负重轮 · 从头建模",
+    subtitle: "V12 双涡轮 / 液气悬挂 / 转盘自动装弹机 / 复合装甲 + ERA / 120mm 滑膛炮 · 自内向外零件级",
     milestone: "M-D",
     status: "ready",
     registry: makeMbtRegistry(),
@@ -397,30 +397,46 @@ export const CATALOG: StageModel[] = [
     animate: animateMbt,
     motionParts: MBT_MOTION_PARTS,
     states: [
-      { id: "idle", label: "停机", hint: "动力包 / 行走 / 炮塔全静止，可拖构建滑杆看装配" },
-      { id: "running", label: "原地空转", hint: "负重轮与履带低速滚动，观察悬挂与履带板路径" },
-      { id: "drive", label: "行进演示", hint: "车体前后 0.9m，7 对负重轮/主动轮/诱导轮与履带同步滚动" },
-      { id: "aim", label: "炮塔瞄准", hint: "炮塔 ±23° 回转 + 火炮 ±3.4° 俯仰（4s 循环）" },
-      { id: "fire", label: "主炮击发", hint: "炮身后坐 320mm + 炮口焰，4s 循环" },
+      { id: "idle", label: "停机", hint: "全车静止；可拖构建滑杆自内向外看 V12 动力 → 悬挂 → 战斗室 → 复合装甲" },
+      { id: "engine_start", label: "发动机启动", hint: "起动机拖动曲轴 → 逐缸点火 → 转速爬升到 620r/min 怠速" },
+      { id: "running", label: "怠速运转", hint: "曲轴/12 活塞/12 连杆/48 气门/双凸轮轴/双涡轮/风扇全部在动" },
+      { id: "drive", label: "行进演示", hint: "履带滚动 + 14 轮独立起伏 + 传动齿轮转动；车体前后来回" },
+      { id: "suspension", label: "液气悬挂", hint: "14 站液压缸/活塞杆/蓄能器独立随地形伸缩" },
+      { id: "aim", label: "炮塔瞄准", hint: "炮塔回转 + 火炮俯仰（带阻尼）" },
+      { id: "loading", label: "自动装弹机", hint: "转盘选弹 → 提弹机抬升 → 推弹杆推入炮膛 → 炮闩关闭" },
+      { id: "fire", label: "主炮击发", hint: "后坐 340mm → 炮口焰 → 抽烟装置排烟 → 开闩抛壳" },
+      { id: "era_hit", label: "ERA 被击中", hint: "首上反应装甲单块爆炸，来袭弹被推开" },
+      { id: "blowout", label: "殉爆泄压", hint: "尾舱弹药架中弹：泄压板掀开，火焰/压力向上泄出" },
+      { id: "detonation", label: "泄压失败殉爆", hint: "泄压板未开：炮塔被掀飞，殉爆火球" },
+      { id: "hunter_killer", label: "猎-歼", hint: "车长热像仪扫描发现 → 炮塔转向 → 炮长击发" },
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
     ],
     actions: [
-      { id: "mbt-run", group: "机构", label: "原地空转", kind: "machine-state", state: "running" },
-      { id: "mbt-drive", group: "机构", label: "行进演示", kind: "machine-state", state: "drive" },
+      { id: "mbt-engine-start", group: "动力", label: "发动机启动", kind: "machine-state", state: "engine_start" },
+      { id: "mbt-run", group: "动力", label: "怠速运转", kind: "machine-state", state: "running" },
+      { id: "mbt-drive", group: "机動", label: "行进演示", kind: "machine-state", state: "drive" },
+      { id: "mbt-suspension", group: "机動", label: "液气悬挂", kind: "machine-state", state: "suspension" },
       { id: "mbt-aim", group: "火炮", label: "炮塔瞄准", kind: "machine-state", state: "aim" },
+      { id: "mbt-loading", group: "火力", label: "自动装弹", kind: "machine-state", state: "loading" },
       { id: "mbt-fire", group: "火力", label: "主炮击发", kind: "machine-state", state: "fire" },
+      { id: "mbt-hk", group: "火控", label: "猎-歼演示", kind: "machine-state", state: "hunter_killer" },
+      { id: "mbt-era", group: "防护", label: "ERA 被击中", kind: "machine-state", state: "era_hit" },
+      { id: "mbt-blowout", group: "防护", label: "殉爆泄压", kind: "machine-state", state: "blowout" },
+      { id: "mbt-detonation", group: "防护", label: "泄压失败", kind: "machine-state", state: "detonation" },
       { id: "mbt-stop", group: "机构", label: "停机", kind: "machine-state", state: "idle" },
       { id: "mbt-explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
       { id: "mbt-xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "mbt-thermal", group: "展示", label: "热像仪视角", kind: "view-toggle", view: "thermal" },
       { id: "mbt-labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
       { id: "mbt-reset", group: "展示", label: "重置视角", kind: "reset-view" },
       { id: "mbt-scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
       { id: "mbt-scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
     ],
     notes: [
-      "与虎式完全不同的形：大倾角首上（33°）、楔形炮塔前斜板（±24° 后倾 8°）、反应装甲首上 2×5 / 炮塔 2×6 / 侧裙 2×6。",
-      "七对负重轮 + 双销耳挂胶履带板（172 块全实例化）；120mm 滑膛炮带热护套与抽气装置，炮口段近代主战坦克布局。",
-      "动力包（发动机/传动/双风扇/双油箱/排气）在 L1，拖构建滑杆能从内到外看装配；炮塔/火炮/后坐由 Turret / Gun / GunRecoil 三个节点驱动。",
+      "1266 个零件定义 / 3800+ 实例：L1 V12 双涡轮柴油机（48 气门、12 活塞连杆逐件）→ L1 传动 → L2 履带与 14 站液气悬挂 → L3 三人乘员组/炮塔吊篮/转盘自动装弹机/40 发弹药 → L4 复合装甲车体与楔形炮塔/90 块 ERA/120mm 滑膛炮 → L5 三色迷彩/战术编号/工具/油桶。",
+      "自动装弹机全链：转盘选弹 → 提弹臂 → 推弹杆 → 炮闩关闭；击发后座 + 抽烟装置排烟 + 抛壳。",
+      "ERA 单块爆炸 / 尾舱泄压板掀开 vs 泄压失败炮塔掀飞两个分支；车长独立热像仪 CITV 的猎-歼链路。",
+      "开「透视」看发动机活塞/气门、自动装弹机转盘与弹药；拖构建滑杆按 build_order 自内向外回放。",
     ],
   },
   {
