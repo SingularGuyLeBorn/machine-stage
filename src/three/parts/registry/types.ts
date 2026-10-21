@@ -137,6 +137,15 @@ export interface ExpectedContactRule {
   maxDepthMm?: number;
   /** 允许豁免 displaced 形态（构造性配合的咬合常被判成 displaced）。 */
   allowDisplaced?: boolean;
+  /**
+   * 允许豁免 suspect 形态（成团 / 超长横穿交线）。
+   *
+   * 默认**不开**：suspect 一律进未豁免区人工审（框架纪律）。
+   * 只有当这一族的接触在物理上必然是「长交线」时才显式打开——
+   * 例如真实网格按蒙皮切分后的接缝（两块骨头沿一条长缝贴合），
+   * 或耳环整体嵌进骨头（嵌入面上的交线天然很长）。
+   */
+  allowSuspect?: boolean;
 }
 
 export interface ModelRegistry {

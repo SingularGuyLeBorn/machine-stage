@@ -1,0 +1,29 @@
+npm warn Unknown user config "msvs_version". This will stop working in the next major version of npm.
+npm warn Unknown user config "python". This will stop working in the next major version of npm.
+npm warn Unknown user config "canvas_binary_host_mirror". This will stop working in the next major version of npm.
+npm warn Unknown user config "electron_mirror". This will stop working in the next major version of npm.
+npm warn exec The following package was not found and will be installed: tsx@4.23.15
+注册表校验：0 错 / 0 警
+零件定义 174 / 实例 174
+静态穿模报告 93（未豁免 0 / 已豁免 93）
+扫掠 16 帧穿模报告 1592（未豁免 0 / 已豁免 1592）
+悬空候选（未挂到骨架的部位）：0
+父子骨骼几何间隙 > 120mm 的部位：0
+液压缸行程（几何解）：
+  hip_r  |AB|=94.4mm  露出杆长=49.0mm
+  knee_r  |AB|=118.8mm  露出杆长=52.4mm
+  ankle_r  |AB|=91.3mm  露出杆长=44.8mm
+  shoulder_r  |AB|=119.6mm  露出杆长=59.1mm
+  elbow_r  |AB|=113.5mm  露出杆长=54.3mm
+  wrist_r  |AB|=57.8mm  露出杆长=28.7mm
+  hip_l  |AB|=86.7mm  露出杆长=41.4mm
+  knee_l  |AB|=132.2mm  露出杆长=65.8mm
+  ankle_l  |AB|=93.3mm  露出杆长=46.8mm
+  shoulder_l  |AB|=122.6mm  露出杆长=62.1mm
+  elbow_l  |AB|=103.5mm  露出杆长=44.4mm
+  wrist_l  |AB|=54.7mm  露出杆长=25.5mm
+  lumbar  |AB|=120.8mm  露出杆长=60.2mm
+  neck  |AB|=45.4mm  露出杆长=22.9mm
+液压行程判定：PASS
+
+未豁免穿模 0（静态 0 + 扫掠 0）  悬空 0  液压行程 PASS  零件 174 PASS
