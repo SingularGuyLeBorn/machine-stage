@@ -1,7 +1,7 @@
 import { Gauge, Lock, RotateCcw } from "lucide-react";
 import { useMemo } from "react";
 import { resolveConstants } from "@/three/parts";
-import { findModel } from "../catalog";
+import { activeRegistryOf, findModel  } from "../catalog";
 import { useStageStore } from "../state/stageStore";
 
 // ============================================================================
@@ -15,12 +15,13 @@ const HEURISTIC = { min: 0, max: 1, step: 0.001 };
 
 export function ParamsPanel() {
   const modelId = useStageStore((state) => state.modelId);
+  const variantId = useStageStore((state) => state.variantId);
   const overrides = useStageStore((state) => state.overrides);
   const setParam = useStageStore((state) => state.setParam);
   const resetParams = useStageStore((state) => state.resetParams);
 
   const model = findModel(modelId);
-  const registry = model.registry;
+  const registry = activeRegistryOf(modelId, variantId);
 
   const resolved = useMemo(() => {
     if (!registry) return {};

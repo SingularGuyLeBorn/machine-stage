@@ -149,12 +149,16 @@ function StageRuntime() {
   const assembled = scene?.assembled ?? null;
 
   // ---- 注册表 → 场景 ----
+  const variantId = useStageStore((state) => state.variantId);
   useEffect(() => {
     const model = findModel(modelId);
-    if (!model.registry) return;
-    const registry: typeof model.registry = {
-      ...model.registry,
-      constants: { ...model.registry.constants, ...overrides },
+    // 变体优先：有 variants 时用选中的那个（原型 / 机械拆解版）
+    const variant = model.variants?.find((item) => item.id === variantId) ?? model.variants?.[0];
+    const source = variant?.registry ?? model.registry;
+    if (!source) return;
+    const registry: typeof source = {
+      ...source,
+      constants: { ...source.constants, ...overrides },
     };
     const errors = validateRegistry(registry).filter((issue) => issue.level === "error");
     if (errors.length > 0) {
@@ -174,7 +178,7 @@ function StageRuntime() {
       next = buildModel(registry, {
         builders: model.builders,
         materials: library.materials,
-        instanceLayouts: model.layouts,
+        instanceLayouts: variant?.layouts ?? model.layouts,
         warnMissingLayout: false,
       });
       console.log(
@@ -223,7 +227,7 @@ function StageRuntime() {
       next.dispose();
       library.dispose();
     };
-  }, [modelId, rebuildToken, overrides]);
+  }, [modelId, variantId, rebuildToken, overrides]);
 
   // ---- 每帧纪律 ----
   useFrame((_state, delta) => {

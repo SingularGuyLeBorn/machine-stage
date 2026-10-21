@@ -12,6 +12,7 @@ import { useStageStore } from "../state/stageStore";
 export function ActionPanel() {
   const modelId = useStageStore((state) => state.modelId);
   const machineState = useStageStore((state) => state.machineState);
+  const variantId = useStageStore((state) => state.variantId);
   const views = useStageStore((state) => state.views);
   const scanPhase = useStageStore((state) => state.scanPhase);
 
@@ -48,6 +49,9 @@ export function ActionPanel() {
       case "reset-view":
         store.requestViewReset();
         break;
+      case "variant":
+        store.setVariant(action.variant);
+        break;
       case "planned":
         store.setNotice(action.note);
         break;
@@ -57,6 +61,7 @@ export function ActionPanel() {
   const pressedOf = (action: StageAction): boolean => {
     if (action.kind === "machine-state") return machineState === action.state;
     if (action.kind === "view-toggle") return views[action.view];
+    if (action.kind === "variant") return variantId === action.variant;
     return false;
   };
 

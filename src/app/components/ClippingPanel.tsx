@@ -16,7 +16,7 @@ import {
   resolveConstants,
   type ClippingReport,
 } from "@/three/parts";
-import { findModel } from "../catalog";
+import { activeRegistryOf } from "../catalog";
 import { formatReportMeasure, reportKey, reportPartIds, formLabel, useStageStore } from "../state/stageStore";
 
 // ============================================================================
@@ -79,9 +79,10 @@ function buildFamilies(items: Array<{ report: ClippingReport; index: number }>):
 /** hint 里的常量名 → 「名字 = 值 m」链（只在明细卡片里出现）。 */
 function useConstantChain() {
   const modelId = useStageStore((state) => state.modelId);
+  const variantId = useStageStore((state) => state.variantId);
   const overrides = useStageStore((state) => state.overrides);
   return useMemo(() => {
-    const registry = findModel(modelId).registry;
+    const registry = activeRegistryOf(modelId, variantId);
     if (!registry) return () => [] as Array<{ name: string; value: number | null }>;
     let resolved: Record<string, number> = {};
     try {
@@ -94,17 +95,23 @@ function useConstantChain() {
         name,
         value: resolved[name] ?? null,
       }));
-  }, [modelId, overrides]);
+  }, [modelId, variantId, overrides]);
 }
 
-function partName(modelId: string, partId: string, fallback: string): string {
-  const registry = findModel(modelId).registry;
+function partName(
+  modelId: string,
+  variantId: string,
+  partId: string,
+  fallback: string,
+): string {
+  const registry = activeRegistryOf(modelId, variantId);
   const part = registry?.parts.find((item) => item.id === partId);
   return part ? part.name_cn : fallback;
 }
 
 export function ClippingPanel() {
   const modelId = useStageStore((state) => state.modelId);
+  const variantId = useStageStore((state) => state.variantId);
   const reports = useStageStore((state) => state.reports);
   const partition = useStageStore((state) => state.reportPartition);
   const allCount = useStageStore((state) => state.allReports.length);
@@ -335,7 +342,8 @@ export function ClippingPanel() {
                               <span>{report.depth_mm === null ? "深度未测出" : "深度为估算"}</span>
                             ) : null}
                             <span className="clipcard__names">
-                              {partName(modelId, family.partA, "A")} / {partName(modelId, family.partB, "B")}
+                              {partName(modelId, variantId, family.partA, "A")} /{" "}
+                              {partName(modelId, variantId, family.partB, "B")}
                             </span>
                             <div className="clipcard__actions">
                               <button
