@@ -28,7 +28,10 @@ export type MechKind =
   | "bolts"
   | "hose"
   | "fitting"
-  | "nipple";
+  | "nipple"
+  | "bolt"
+  | "clamp"
+  | "nut";
 
 /** 一件机械零件（几何以自身中心为原点）。 */
 export interface MechPart {
@@ -54,7 +57,9 @@ function planFor(recipe: Recipe): Array<{ kind: MechKind; count: number }> {
         { kind: "bearing_outer", count: 2 },
         { kind: "bearing_inner", count: 2 },
         { kind: "bearing_seal", count: 2 },
-        { kind: "bolts", count: 2 },
+        { kind: "bolt", count: 1 },
+        { kind: "nut", count: 1 },
+        { kind: "clamp", count: 2 },
         { kind: "hose", count: 2 },
         { kind: "fitting", count: 2 },
         { kind: "nipple", count: 1 },
@@ -69,7 +74,9 @@ function planFor(recipe: Recipe): Array<{ kind: MechKind; count: number }> {
         { kind: "bearing_outer", count: 2 },
         { kind: "bearing_inner", count: 2 },
         { kind: "bearing_seal", count: 2 },
-        { kind: "bolts", count: 3 },
+        { kind: "bolt", count: 1 },
+        { kind: "nut", count: 1 },
+        { kind: "clamp", count: 3 },
         { kind: "hose", count: 3 },
         { kind: "fitting", count: 3 },
         { kind: "nipple", count: 2 },
@@ -83,7 +90,8 @@ function planFor(recipe: Recipe): Array<{ kind: MechKind; count: number }> {
         { kind: "bearing_outer", count: 1 },
         { kind: "bearing_inner", count: 1 },
         { kind: "bearing_seal", count: 1 },
-        { kind: "bolts", count: 1 },
+        { kind: "bolt", count: 1 },
+        { kind: "nut", count: 1 },
         { kind: "hose", count: 1 },
         { kind: "fitting", count: 1 },
       ];
@@ -95,7 +103,8 @@ function planFor(recipe: Recipe): Array<{ kind: MechKind; count: number }> {
         { kind: "bearing_outer", count: 1 },
         { kind: "bearing_inner", count: 1 },
         { kind: "bearing_seal", count: 1 },
-        { kind: "bolts", count: 1 },
+        { kind: "bolt", count: 1 },
+        { kind: "nut", count: 1 },
         { kind: "shaft", count: 1 },
       ];
     case "finger":
@@ -338,6 +347,81 @@ export function buildMechParts(
           const rr = Math.max(0.0012, sz(r, 0.07));
           const off = sz(r, 0.4);
           add(kind, tubeBetween(c.clone().addScaledVector(v, off), c.clone().addScaledVector(v, off + rr * 1.4), rr, 6));
+          break;
+        }
+        case "bolt": {
+          // 螺栓：**一颗一个零件**，沿芯线端点铺一圈
+          const si = station(i % 2 === 0 ? 0.06 : 0.94);
+          const r = radii[si];
+          const c = cores[si];
+          const dir = new THREE.Vector3()
+            .subVectors(cores[si + 1] ?? cores[si], cores[si - 1] ?? cores[si])
+            .normalize();
+          const ring = Math.min(r * 0.55, 0.028);
+          const head = Math.max(0.0016, sz(r, 0.06));
+          const shank = head * 0.55;
+          for (let b = 0; b < 10; b++) {
+            const a = (b / 10) * Math.PI * 2;
+            const p = c
+              .clone()
+              .addScaledVector(u, Math.cos(a) * ring)
+              .addScaledVector(v, Math.sin(a) * ring);
+            const hd = cylinderGeometry(head, head * 0.8, head, 6);
+            const sh = cylinderGeometry(shank, head * 1.8, shank, 8);
+            sh.translate(0, -head * 1.3, 0);
+            const merged = mergeGeometries([hd, sh]);
+            hd.dispose();
+            sh.dispose();
+            const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+            merged.applyQuaternion(q);
+            merged.translate(p.x, p.y, p.z);
+            add(kind, merged);
+          }
+          break;
+        }
+        case "nut": {
+          // 螺母：另一端一圈
+          const si = station(i % 2 === 0 ? 0.18 : 0.82);
+          const r = radii[si];
+          const c = cores[si];
+          const dir = new THREE.Vector3()
+            .subVectors(cores[si + 1] ?? cores[si], cores[si - 1] ?? cores[si])
+            .normalize();
+          const ring = Math.min(r * 0.5, 0.024);
+          const rr = Math.max(0.0016, sz(r, 0.05));
+          for (let b = 0; b < 8; b++) {
+            const a = (b / 8) * Math.PI * 2;
+            const p = c
+              .clone()
+              .addScaledVector(u, Math.cos(a) * ring)
+              .addScaledVector(v, Math.sin(a) * ring);
+            const g = cylinderGeometry(rr, rr * 1.1, rr, 6);
+            const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+            g.applyQuaternion(q);
+            g.translate(p.x, p.y, p.z);
+            add(kind, g);
+          }
+          break;
+        }
+        case "clamp": {
+          // 卡箍（抱箍）：套在芯线某处的一段短管
+          const si = station(0.25 + i * 0.22);
+          const r = radii[si];
+          const dir = new THREE.Vector3()
+            .subVectors(cores[si + 1] ?? cores[si], cores[si - 1] ?? cores[si])
+            .normalize();
+          const c = cores[si];
+          const rr = sz(r, 0.3);
+          add(
+            kind,
+            tubeBetween(
+              c.clone().addScaledVector(dir, -0.006),
+              c.clone().addScaledVector(dir, 0.006),
+              rr,
+              14,
+              rr * 0.82,
+            ),
+          );
           break;
         }
       }

@@ -1,0 +1,32 @@
+npm warn Unknown user config "msvs_version". This will stop working in the next major version of npm.
+npm warn Unknown user config "python". This will stop working in the next major version of npm.
+npm warn Unknown user config "canvas_binary_host_mirror". This will stop working in the next major version of npm.
+npm warn Unknown user config "electron_mirror". This will stop working in the next major version of npm.
+注册表校验：0 错 / 0 警
+零件定义 3034 / 实例 3034
+静态穿模报告 16805（未豁免 0 / 已豁免 16805）
+扫掠 16 帧穿模报告 268407（未豁免 0 / 已豁免 268407）
+  （唯一对 0 个）
+悬空候选（未挂到骨架的部位）：0
+父子骨骼几何间隙 > 120mm 的部位：0
+液压缸行程（几何解）：
+  hip_r  |AB|=94.4mm  露出杆长=49.0mm
+  knee_r  |AB|=118.8mm  露出杆长=52.4mm
+  ankle_r  |AB|=63.5mm  露出杆长=17.0mm
+  shoulder_r  |AB|=77.4mm  露出杆长=37.8mm
+  elbow_r  |AB|=111.0mm  露出杆长=52.1mm
+  wrist_r  |AB|=54.3mm  露出杆长=25.3mm
+  hip_l  |AB|=86.7mm  露出杆长=41.4mm
+  knee_l  |AB|=132.2mm  露出杆长=65.8mm
+  ankle_l  |AB|=93.6mm  露出杆长=47.1mm
+  shoulder_l  |AB|=80.6mm  露出杆长=41.1mm
+  elbow_l  |AB|=97.3mm  露出杆长=38.4mm
+  wrist_l  |AB|=59.6mm  露出杆长=30.6mm
+  spine_column  |AB|=536.5mm  露出杆长=266.0mm
+  lumbar  |AB|=120.0mm  露出杆长=59.4mm
+  neck  |AB|=45.4mm  露出杆长=22.9mm
+  erector_r  |AB|=329.4mm  露出杆长=161.7mm
+  erector_l  |AB|=329.1mm  露出杆长=161.3mm
+液压行程判定：PASS
+
+未豁免穿模 0（静态 0 + 扫掠 0）  悬空 0  液压行程 PASS  零件 3034 PASS
