@@ -1446,7 +1446,7 @@ node scripts/capture-kingjoe.mjs          # 截图 + 60fps 录屏（需本机 Ch
 | 彩虹胸 | 左右各 7 条独立彩虹格栅带（14 件）+ 银框/黑背板/横栅/中央脊；额头发射体；怪光线从颈口发光体射出                                                                                                                               |
 | 尺寸   | 合体包围盒 **3.683 × 6.978 × 2.086 m**（真实网格 6.615 + 三道 0.12 接缝 + 头部组件）                                                                                                                                          |
 | 件数   | **149 定义件 / 163 同屏件 / 75,148 三角**                                                                                                                                                                                     |
-| 门禁   | `vitest` **133 passed（15 文件）**；`tsc` / `build` ✓；静态 **active 0 / expected 116 / unsupported 0**；七态 15fps 扫掠 **active 0**；合体/分离 30fps 扫掠 **active 0**；每态 unsupported 0                                  |
+| 门禁   | `vitest` **136 passed（16 文件）**；`tsc` / `build` ✓；静态 **active 0 / expected 116 / unsupported 0**；七态 15fps 扫掠 **active 0**；合体/分离 30fps 扫掠 **active 0**；每态 unsupported 0                                  |
 
 ### 关键口径 / 设计取舍
 
@@ -1476,6 +1476,7 @@ node scripts/capture-kingjoe.mjs          # 截图 + 60fps 录屏（需本机 Ch
 - 截图（`docs/screenshots/`）：`kingjoe-real-front.jpg`、`-side`、`-threeq`、`-upper`、`-formation`、`-formation-wedge`、`-docking`、`-combining`、`-combined-lock`、`-separation`、`-firing`。
 - 与参考图并排：`docs/qa/kingjoe-real-compare.jpg`（左 1968 皮套，右当前真实网格皮+机构）。
 - 静态分件卡：`docs/qa/kingjoe-skin-card-idle.jpg`、`kingjoe-skin-card-separated.jpg`（两态动作非空）。
+- 整机单件对比：`docs/qa/kingjoe-whole-vs-split.jpg`（左 578 分件 615 件，右整机单件 1 个 partId；SSIM 0.9978 / PSNR 44）。
 - 数据/脚本：`scripts/refs/parse-kingjoe-glb.mjs`（骨架/蒙皮/连通壳解析）、`scripts/refs/analyze-kingjoe-mesh.mjs`（部位/切片分析）、`scripts/diag-kingjoe-merge.ts`（静态+分组）、`scripts/diag-sweep-kj-merge.ts`（七态扫掠）、`scripts/capture-preview.mjs`（浏览器截图）。
 
 ### 复现命令（本版）
@@ -1489,3 +1490,19 @@ npx vite-node scripts/diag-sweep-kj.ts           # 七态 30fps（已按白名�
 npm run dev -- --port 4174
 node scripts/capture-preview.mjs                 # 需本机 Chrome；输出到 docs/qa
 ```
+
+### 追加：整机单件外观体（2026-10-21）
+
+- 尝试的“平面切分 + 实心方块盖板”被否：盖板越界、假拼接、穿模；已撤回，不进入模型库。截面要求：相对平整、无刺、允许不规则、不得突破原边界。
+- 恢复「真实网格分件」卡（578 源件，保留装配态/四体分件查看，两态动作非空）。
+- 新增「整机单件」卡：把 578 源件 + 21 叠加细节的 15,248 个三角形原样合并为 **1 个 partId**，保留原 UV/12 组材质；不焊接/布尔/体素重拓扑。浏览器加载：零件 1 / 三角 15,248 / 材质组 12 / 报告 0。
+- 外观对比：同一相机正视图 SSIM **0.9978**、PSNR **44 dB**（差异来自 JPEG/绘制顺序），存 `docs/qa/kingjoe-whole-vs-split.jpg`。
+- 表面描述（源网格）：
+  - 头：圆顶 + 横向眼带 + 双黄眼 + 额头发射体 + 3 根天线；两侧为巨型肩筒。
+  - 胸：宽胸甲、中央 V 形胸骨、左右两块 7 色格栅；肩筒每侧 66 片层叠装甲（源连通壳）。
+  - 腹/髋：腰鼓/裙甲/左右髋鼓；腿：短粗大腿、环形膝、粗小腿、宽靴足；手：三指爪。
+  - 材质：哑光银灰主皮 + 深色接缝/关节 + 金环 + 彩虹胸/眼带发光。
+  - 源资产 459 个连通壳；肩筒/胸甲片是独立源壳。单件合并后不再逐片高亮，避免装甲片边缘看起来像刺；内部仍是源壳层叠，不是水密实体。
+- 框架：`PartDefinition.materialGroups` + 装配器 group 校验；`applyHighlight` 支持材质数组；`applyXray` 已支持数组；单件模型支撑检测豁免（`bodies.length <= 1`）。
+- 门禁：vitest **136**；tsc/build ✓；整机单件 1 件、静态报告 0、支撑 0；578 卡保持原白名单。
+- 阶段 2（合理方向飞散/阻尼+电弧）与阶段 3（内部机械替换）未做，等阶段 1 验收。

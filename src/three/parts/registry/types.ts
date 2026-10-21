@@ -90,6 +90,11 @@ export interface PartDefinition {
   build_order: number;
   geometry: GeometrySpec;
   material: string;
+  /**
+   * 单零件多材质：按 geometry 的 group 顺序给出材质名（与 material 的兜底并存）。
+   * 用于把整机皮合并成一个 partId 时仍保留银灰/暗钢/彩虹等分组观感。
+   */
+  materialGroups?: string[];
   node?: string;
   mate?: MateSpec;
   /**
