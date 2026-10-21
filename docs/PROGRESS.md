@@ -1438,15 +1438,15 @@ node scripts/capture-kingjoe.mjs          # 截图 + 60fps 录屏（需本机 Ch
 
 ### 交付
 
-| 项 | 结果 |
-| --- | --- |
+| 项     | 结果                                                                                                                                                                                                                          |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 真实皮 | `segments.generated.json`（King_Joe.glb / obj：7224 顶点 / 7258 三角 / 459 连通壳）。按蒙皮主导骨 + 部位合并为 **39 件部位皮**（大腿/小腿/足 L/R、上臂/前臂/手/三指 L/R、胸·肩荚、上腹、骨盆、髋裙 L/R、头），每件独立 partId |
-| 四体 | King Legs / King Stomach / King Chest / King Ship；模块切面 3.45 / 4.55 / 5.65，三道 **120mm** 接缝 |
-| 骨 | 原三轴对接（锥销/锁环/锁钩/传感）、合体序列、阻尼、电弧、编队、受击、残缺合体全部保留；膝/踝液压、反重力核心、腰鼓、胸口发射内构缩尺后留在内腔 |
-| 彩虹胸 | 左右各 7 条独立彩虹格栅带（14 件）+ 银框/黑背板/横栅/中央脊；额头发射体；怪光线从颈口发光体射出 |
-| 尺寸 | 合体包围盒 **3.683 × 6.978 × 2.086 m**（真实网格 6.615 + 三道 0.12 接缝 + 头部组件） |
-| 件数 | **149 定义件 / 163 同屏件 / 75,148 三角** |
-| 门禁 | `vitest` **133 passed（15 文件）**；`tsc` / `build` ✓；静态 **active 0 / expected 116 / unsupported 0**；七态 15fps 扫掠 **active 0**；合体/分离 30fps 扫掠 **active 0**；每态 unsupported 0 |
+| 四体   | King Legs / King Stomach / King Chest / King Ship；模块切面 3.45 / 4.55 / 5.65，三道 **120mm** 接缝                                                                                                                           |
+| 骨     | 原三轴对接（锥销/锁环/锁钩/传感）、合体序列、阻尼、电弧、编队、受击、残缺合体全部保留；膝/踝液压、反重力核心、腰鼓、胸口发射内构缩尺后留在内腔                                                                                |
+| 彩虹胸 | 左右各 7 条独立彩虹格栅带（14 件）+ 银框/黑背板/横栅/中央脊；额头发射体；怪光线从颈口发光体射出                                                                                                                               |
+| 尺寸   | 合体包围盒 **3.683 × 6.978 × 2.086 m**（真实网格 6.615 + 三道 0.12 接缝 + 头部组件）                                                                                                                                          |
+| 件数   | **149 定义件 / 163 同屏件 / 75,148 三角**                                                                                                                                                                                     |
+| 门禁   | `vitest` **133 passed（15 文件）**；`tsc` / `build` ✓；静态 **active 0 / expected 116 / unsupported 0**；七态 15fps 扫掠 **active 0**；合体/分离 30fps 扫掠 **active 0**；每态 unsupported 0                                  |
 
 ### 关键口径 / 设计取舍
 
@@ -1475,6 +1475,7 @@ node scripts/capture-kingjoe.mjs          # 截图 + 60fps 录屏（需本机 Ch
 
 - 截图（`docs/screenshots/`）：`kingjoe-real-front.jpg`、`-side`、`-threeq`、`-upper`、`-formation`、`-formation-wedge`、`-docking`、`-combining`、`-combined-lock`、`-separation`、`-firing`。
 - 与参考图并排：`docs/qa/kingjoe-real-compare.jpg`（左 1968 皮套，右当前真实网格皮+机构）。
+- 静态分件卡：`docs/qa/kingjoe-skin-card-idle.jpg`、`kingjoe-skin-card-separated.jpg`（两态动作非空）。
 - 数据/脚本：`scripts/refs/parse-kingjoe-glb.mjs`（骨架/蒙皮/连通壳解析）、`scripts/refs/analyze-kingjoe-mesh.mjs`（部位/切片分析）、`scripts/diag-kingjoe-merge.ts`（静态+分组）、`scripts/diag-sweep-kj-merge.ts`（七态扫掠）、`scripts/capture-preview.mjs`（浏览器截图）。
 
 ### 复现命令（本版）
