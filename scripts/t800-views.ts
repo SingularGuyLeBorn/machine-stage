@@ -158,6 +158,16 @@ const CLOSEUPS: Record<string, ViewDef & { view: View; tag: string; seconds: num
     tag: "closeup-leg",
     seconds: 1.6,
   },
+  torso: {
+    view: "iso",
+    dir: new THREE.Vector3(0.7071, 0, 0.7071),
+    up: new THREE.Vector3(0, 1, 0),
+    label: "躯干特写",
+    target: [0.0, 1.35, 0.0],
+    scale: 1300,
+    tag: "closeup-torso",
+    seconds: 1.2,
+  },
   hand: {
     view: "iso",
     dir: new THREE.Vector3(0.7071, 0, 0.7071),
