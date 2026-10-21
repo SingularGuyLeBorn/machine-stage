@@ -48,8 +48,12 @@ import {
   RPK_BUILDERS,
 } from "@/three/parts/models/guns7/rpk/registry";
 import { RPK_MOTION_PARTS, animateRpk } from "@/three/parts/models/guns7/rpk/motion";
-import { M249_BUILDERS, makeM249Layouts, makeM249Registry } from "@/three/parts/models/m249/registry";
-import { M249_MOTION_PARTS, animateM249, getM249Mode } from "@/three/parts/models/m249/motion";
+import {
+  M60_BUILDERS,
+  makeM60Layouts,
+  makeM60Registry,
+} from "@/three/parts/models/guns7/m60/registry";
+import { M60_MOTION_PARTS, animateM60 } from "@/three/parts/models/guns7/m60/motion";
 import { M2HB_BUILDERS, makeM2hbLayouts, makeM2hbRegistry } from "@/three/parts/models/m2hb/registry";
 import { M2HB_MOTION_PARTS, animateM2hb, getM2hbMode } from "@/three/parts/models/m2hb/motion";
 import { M134_BUILDERS, makeM134Layouts, makeM134Registry } from "@/three/parts/models/m134/registry";
@@ -547,35 +551,40 @@ export const CATALOG: StageModel[] = [
     ],
   },
   {
-    id: "m249",
-    title: "M249 班用自动武器",
-    subtitle: "导气式 + 弹链供弹 · M27 可散链步进 · 快拆枪管",
-    milestone: "M-E",
+    id: "m60",
+    title: "M60 通用机枪",
+    subtitle: "7.62×51 NATO · 导气式 + 回转闭锁 · 100 发可散链 · M60 大机盖",
+    milestone: "G-4",
     status: "ready",
-    registry: makeM249Registry(),
-    layouts: makeM249Layouts(),
-    builders: M249_BUILDERS,
-    motionParts: M249_MOTION_PARTS,
-    animate: (assembled, seconds) => {
-      animateM249(assembled, seconds, getM249Mode());
+    registry: makeM60Registry(),
+    layouts: makeM60Layouts(),
+    builders: M60_BUILDERS,
+    motionParts: M60_MOTION_PARTS,
+    animate: (assembled, seconds, state) => {
+      animateM60(
+        assembled,
+        seconds,
+        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
+      );
     },
     readouts: () => [
-      { label: "自动原理", value: "导气式（短行程活塞）" },
+      { label: "自动原理", value: "导气式（长行程活塞）" },
       { label: "闭锁方式", value: "枪机头回转 30°" },
-      { label: "供弹方式", value: "M27 可散弹链（步进 15mm/发）" },
+      { label: "供弹方式", value: "M13 可散弹链（7.62×51，20mm 节距）" },
       { label: "循环周期", value: "1.4 s/发" },
-      { label: "弹药", value: "5.56×45 M855（六分件）×20 链上" },
+      { label: "弹药", value: "7.62×51 NATO M80（六分件）×20 链上" },
+      { label: "零件", value: "56 定义 / 191 实例" },
     ],
     states: [
-      { id: "idle", label: "装填静止", hint: "满链待击：可爆炸视图看供弹机构" },
+      { id: "idle", label: "架设静止", hint: "两脚架展开，满链待击；可爆炸视图看 M60 大机盖与供弹机构" },
       { id: "semi", label: "单发", hint: "打一发：拨弹齿步进一节，空链脱落" },
-      { id: "running", label: "连发", hint: "连续射击：弹链逐节前移，弹壳下抛" },
+      { id: "running", label: "连发", hint: "连续射击：7.62 弹链逐节前移，弹壳下抛" },
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
     ],
     actions: [
-      { id: "m249-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
-      { id: "m249-auto", group: "射击", label: "连发", kind: "machine-state", state: "running" },
-      { id: "m249-idle", group: "射击", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "m60-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
+      { id: "m60-auto", group: "射击", label: "连发", kind: "machine-state", state: "running" },
+      { id: "m60-idle", group: "射击", label: "停机", kind: "machine-state", state: "idle" },
       { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
       { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
       { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
@@ -584,10 +593,10 @@ export const CATALOG: StageModel[] = [
       { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
     ],
     notes: [
-      "弹链供弹：拨弹齿随枪机往复，每次把 M27 链钩进一个节距（15mm）；空链节从受弹机左侧脱落（可散链）。",
-      "导气式核心零件：导气箍（⌀3.8 导气孔 + 两档调节器）→ 活塞 = 操作杆 → 枪机框。",
-      "快拆枪管：捏提把旋转 1/4 圈即可更换过热枪管（连射发烫要换——班组火力的设计）。",
-      "M249 向下抛壳（车内射击时弹壳不砸人），与 AK-47 的右侧抛壳不同。",
+      "M60 由 M249 基座派生：机匣、导气活塞、回转闭锁枪机、击发机构沿用 Ak* 节点；枪管延长到 560mm，弹链按 7.62×51 重新排布。",
+      "供弹：M13 可散链节距 20mm，拨弹齿随枪机往复，每次把链钩进一节；100 发弹链箱挂机匣左下，空链节从受弹机左侧脱落。",
+      "M60 特征件：整体冲压受弹大盖 + 铰链轴/卡榫、固定枪托 + 橡胶托底板、独立手枪握把、260mm 两脚架双腿/脚座/回位簧。",
+      "弹链/弹药共 20 组可见链节，每组 6 个 partId（链节 + 弹壳 + 弹头 + 铅套 + 钢芯 + 发射药），动画时逐发前移、进膛、抛壳。",
     ],
   },
   {
