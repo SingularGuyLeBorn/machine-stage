@@ -1,1 +1,1 @@
-T-800 right leg - 侧视 - t=0.55s - hip/knee/ankle 14.2/-42.7/15.4 deg - knee_main exposed rod 159.4 mm - 286 part definitions
+T-800 right leg - 侧视 - t=0.55s - hip/knee/ankle 14.2/-42.7/15.4 deg - knee_main exposed rod 159.4 mm - 410 part definitions

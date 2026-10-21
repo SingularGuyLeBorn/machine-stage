@@ -22,7 +22,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "frame",
     layer: 1,
     node: PELVIS_NODE,
-    at: [0, 1.5407, -0.04],
+    at: [0, 1.5407, 0],
     hint: "三关节伺服阀的共用油路块，坐在骨盆顶板上",
   });
   builder.add({
@@ -41,9 +41,9 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     hint: "髋 / 膝 / 踝各一只伺服阀，闭环控制缸的伸缩量",
   });
   layouts["t800.hydraulics.servos"] = instanceLayout(NODES.base, [
-    [-0.03, 1.5317, 0.0323],
+    [-0.026, 1.5317, 0.0323],
     [0, 1.5317, 0.0323],
-    [0.03, 1.5317, 0.0323],
+    [0.026, 1.5317, 0.0323],
   ]);
   builder.add({
     id: "t800.hydraulics.accumulator",
@@ -54,7 +54,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "dark_chrome",
     layer: 2,
     node: NODES.base,
-    at: [-0.02, 1.5992, 0.1],
+    at: [-0.02, 1.5992, 0],
     hint: "吸收屈伸冲击，保证活塞行程平顺（不出现瞬动）；立在阀块顶面",
   });
   builder.add({
@@ -66,7 +66,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "brass",
     layer: 4,
     node: NODES.base,
-    at: [-0.02, 1.67, -0.04],
+    at: [-0.02, 1.67, 0],
     inst: 2,
     layout: "t800.hydraulics.clamps",
     instNodes: repeatNode(NODES.base, 2),
@@ -84,7 +84,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "brass",
     layer: 5,
     node: NODES.base,
-    at: [0.03, 1.5782, 0],
+    at: [0.03, 1.5782, -0.04],
     rot: [90, 0, 0],
     hint: "读缸压（表盘坐在阀块顶面）",
   });
@@ -97,7 +97,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "brass",
     layer: 3,
     node: PELVIS_NODE,
-    at: [-0.03, 1.5457, -0.1105],
+    at: [-0.03, 1.5457, -0.075],
     hint: "供油管向下接骨盆轭，再经大腿/小腿硬管到各缸",
   });
   builder.add({
@@ -109,7 +109,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "brass",
     layer: 3,
     node: PELVIS_NODE,
-    at: [0.03, 1.5457, -0.1105],
+    at: [0.03, 1.5457, -0.075],
   });
   builder.add({
     id: "t800.hydraulics.harness",
@@ -120,7 +120,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "rubber",
     layer: 5,
     node: NODES.base,
-    at: [0.02, 1.5217, 0.1],
+    at: [0.02, 1.5217, -0.02],
     rot: [0, 0, 90],
     hint: "沿骨盆框板前缘走的信号束（外露可见），接角度传感器与伺服阀",
   });
@@ -134,7 +134,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "gunmetal",
     layer: 2,
     node: NODES.base,
-    at: [0.09, 1.5417, 0.04],
+    at: [0.085, 1.5417, 0],
     hint: "腿段液压泵（躯干主泵的分支），驱动六根缸",
   });
   builder.add({
@@ -146,7 +146,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "frame",
     layer: 2,
     node: NODES.base,
-    at: [0.02, 1.5932, 0.04],
+    at: [0.062, 1.5932, -0.1],
     hint: "腿段油箱，给六根缸供油",
   });
   builder.add({
@@ -158,7 +158,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "servo",
     layer: 5,
     node: PELVIS_NODE,
-    at: [0, 1.5812, 0],
+    at: [0, 1.5812, -0.04],
     hint: "监测主缸缸压，配合蓄能器做冲击吸收",
   });
   builder.add({
@@ -170,7 +170,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "gunmetal",
     layer: 2,
     node: NODES.base,
-    at: [0.145, 1.5432, 0.04],
+    at: [0.135, 1.5432, 0],
     hint: "回油路上的滤清器（装在骨盆框板上）",
   });
   builder.add({
@@ -182,7 +182,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "brass",
     layer: 2,
     node: NODES.base,
-    at: [-0.03, 1.5832, 0],
+    at: [-0.03, 1.5832, -0.04],
     hint: "系统限压，防止屈伸末端憋压",
   });
 

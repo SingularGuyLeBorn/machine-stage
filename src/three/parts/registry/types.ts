@@ -135,6 +135,8 @@ export interface ExpectedContactRule {
   reason: string;
   /** 覆盖深度守门（mm）。省略 = 用 whitelist.ts 的 DEFAULT_MAX_DEPTH_MM。 */
   maxDepthMm?: number;
+  /** 允许豁免 displaced 形态（构造性配合的咬合常被判成 displaced）。 */
+  allowDisplaced?: boolean;
 }
 
 export interface ModelRegistry {

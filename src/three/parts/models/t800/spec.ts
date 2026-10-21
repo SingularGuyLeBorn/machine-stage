@@ -18,7 +18,7 @@ import * as THREE from "three";
 
 export type Vec3 = [number, number, number];
 /** 段：base = 骨盆（固定）/ hip = 大腿 / knee = 小腿 / ankle = 足。 */
-export type Segment = "base" | "hip" | "knee" | "ankle";
+export type Segment = "base" | "hip" | "knee" | "ankle" | "shoulder" | "elbow" | "wrist" | "finger";
 
 /** 关节中心高度（模型坐标）。 */
 export const JOINT_Y = {
@@ -517,7 +517,7 @@ export const HYDRAULIC_NODE = (spec: HydraulicSpec, end: "cyl" | "rod") =>
     .join("")}`;
 
 /** 段 → 节点。 */
-export const SEGMENT_NODE: Record<Segment, string> = {
+export const SEGMENT_NODE: Partial<Record<Segment, string>> = {
   base: NODES.base,
   hip: NODES.hip,
   knee: NODES.knee,
@@ -565,14 +565,14 @@ export const T800_STUDS: StudMount[] = T800_HYDRAULICS.flatMap((spec) => [
   {
     key: spec.key,
     end: "A" as const,
-    node: SEGMENT_NODE[spec.parent],
+    node: SEGMENT_NODE[spec.parent] ?? "T800Base",
     ball: spec.A,
     normal: MOUNTS[`${spec.key}_a`].normal,
   },
   {
     key: spec.key,
     end: "B" as const,
-    node: SEGMENT_NODE[spec.child],
+    node: SEGMENT_NODE[spec.child] ?? "T800Base",
     ball: spec.B,
     normal: MOUNTS[`${spec.key}_b`].normal,
   },
@@ -619,14 +619,14 @@ export function legStuds(side: LegSide): StudMount[] {
     {
       key: spec.key,
       end: "A" as const,
-      node: SEGMENT_NODE[spec.parent],
+      node: SEGMENT_NODE[spec.parent] ?? "T800Base",
       ball: spec.A,
       normal: MOUNTS[`${spec.key}_a`].normal,
     },
     {
       key: spec.key,
       end: "B" as const,
-      node: SEGMENT_NODE[spec.child],
+      node: SEGMENT_NODE[spec.child] ?? "T800Base",
       ball: spec.B,
       normal: MOUNTS[`${spec.key}_b`].normal,
     },

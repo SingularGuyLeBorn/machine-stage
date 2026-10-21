@@ -3,9 +3,11 @@ import type { InstanceLayout } from "../../assembler/assembler";
 import type { ModelRegistry, NodeDef } from "../../registry/types";
 import { PartBuilder } from "./build";
 import { t800Builders } from "./kits";
-import { t800SpineBuilders } from "./segments/spineKits";
+import { t800HeadBuilders, t800SpineBuilders } from "./segments/spineKits";
 import { SPINE_NODES, SPINE_PIVOTS, buildSpine } from "./segments/spine";
 import { buildTorso } from "./segments/torso";
+import { armCylinders, armPivots, buildArm } from "./segments/arms";
+import { HEAD_NODES, HEAD_POINTS, buildHead } from "./segments/head";
 import { buildLower } from "./segments/lower";
 import { buildSystems } from "./segments/systems";
 import { buildUpper } from "./segments/upper";
@@ -17,6 +19,7 @@ import {
   legHydraulics,
   legNodes,
   legStuds,
+  mirrorEuler,
   restRotation,
   type LegSide,
 } from "./spec";
@@ -58,12 +61,27 @@ const assemblies: ModelRegistry["assemblies"] = [
   { id: "fasteners", name_cn: "紧固与密封", name_en: "Fasteners", explode: [0, 0.6, -0.4] },
   { id: "spine", name_cn: "脊柱", name_en: "Spine", explode: [0, 0.3, 0] },
   { id: "torso", name_cn: "胸廓", name_en: "Thorax", explode: [0.2, 0.2, 0] },
+  { id: "arm", name_cn: "手臂", name_en: "Arm", explode: [0, 0.1, 0.5] },
+  { id: "hand", name_cn: "手", name_en: "Hand", explode: [0.2, -0.2, 0.3] },
+  { id: "head", name_cn: "头部", name_en: "Head", explode: [0.3, 0.3, 0] },
 ];
 
 /**
  * 节点表：骨盆（两腿共用）+ 左右两条腿的 4 个节点 + 每根缸的缸体/杆节点。
  * 节点 pivot 全部根级：动画直接写世界位姿，避免父子链二次变换（见 motion.ts）。
  */
+/** 手臂 / 头骨的节点 pivot（模型坐标）—— 供 PartBuilder 做 at → 节点局部的换算。 */
+function extraPivots(): Record<string, [number, number, number]> {
+  const out: Record<string, [number, number, number]> = {};
+  for (const side of [1, -1] as LegSide[]) {
+    for (const node of armPivots(side)) out[node.name] = node.pivot;
+  }
+  out[HEAD_NODES.skull] = HEAD_POINTS.cranium;
+  out[HEAD_NODES.jaw] = HEAD_POINTS.jawPivot;
+  out[HEAD_NODES.eye] = HEAD_POINTS.eye;
+  return out;
+}
+
 function buildNodes(): NodeDef[] {
   const nodes: NodeDef[] = [
     { name: PELVIS_NODE, parent: "root", pivot: [0, 0, 0], note: "骨盆（双腿共用的固定基座）" },
@@ -79,6 +97,62 @@ function buildNodes(): NodeDef[] {
       note: `第 ${i + 1} 节椎骨`,
     });
   }
+  // 双臂：肩 / 肘 / 腕 / 指
+  for (const side of [1, -1] as LegSide[]) {
+    for (const node of armPivots(side)) {
+      nodes.push({
+        name: node.name,
+        parent: "root",
+        pivot: node.pivot as [number, number, number],
+        motion: "rotate",
+        axis: "z",
+        note: `${side > 0 ? "右" : "左"}臂 ${node.name.replace("T800", "")}`,
+      });
+    }
+  }
+  // 手臂驱动缸：每侧 3 根（肩前屈 / 肩后伸 / 肘）
+  for (const side of [1, -1] as LegSide[]) {
+    for (const spec of armCylinders(side)) {
+      const cylName = `${HYDRAULIC_NODE(spec, "cyl")}${side > 0 ? "" : "L"}`;
+      const rodName = `${HYDRAULIC_NODE(spec, "rod")}${side > 0 ? "" : "L"}`;
+      const cylRot = restRotation(spec.A, spec.B, spec.normalA);
+      const rodRot = restRotation(spec.B, spec.A, spec.normalB);
+      nodes.push({
+        name: cylName,
+        parent: "root",
+        pivot: spec.A,
+        rest_rotation: side > 0 ? cylRot : mirrorEuler(cylRot),
+        note: `${spec.name_cn} · 缸体`,
+      });
+      nodes.push({
+        name: rodName,
+        parent: "root",
+        pivot: spec.B,
+        rest_rotation: side > 0 ? rodRot : mirrorEuler(rodRot),
+        note: `${spec.name_cn} · 活塞杆`,
+      });
+    }
+  }
+  // 头骨：颅腔 / 下颌 / 眼
+  nodes.push(
+    { name: HEAD_NODES.skull, parent: "root", pivot: HEAD_POINTS.cranium, note: "颅腔（固定）" },
+    {
+      name: HEAD_NODES.jaw,
+      parent: "root",
+      pivot: HEAD_POINTS.jawPivot,
+      motion: "rotate",
+      axis: "z",
+      note: "下颌张合",
+    },
+    {
+      name: HEAD_NODES.eye,
+      parent: "root",
+      pivot: HEAD_POINTS.eye,
+      motion: "rotate",
+      axis: "z",
+      note: "光学眼转动",
+    },
+  );
   for (const side of [1, -1] as LegSide[]) {
     const names = legNodes(side);
     const z = side * LEG_Z;
@@ -174,13 +248,16 @@ function mirroredLayouts(target: Record<string, InstanceLayout>): Record<string,
 export function makeT800(): T800Bundle {
   if (bundle) return bundle;
   const counters = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-  const builder = new PartBuilder(1, counters);
+  const builder = new PartBuilder(1, counters, extraPivots());
   const layouts: Record<string, InstanceLayout> = {};
   buildUpper(builder, layouts, true);
   buildLower(builder, layouts);
   buildSystems(builder, layouts);
   buildSpine(builder, layouts);
   buildTorso(builder, layouts);
+  buildArm(builder, layouts, 1);
+  buildArm(builder, layouts, -1);
+  buildHead(builder, layouts);
 
   // 左腿：同一套声明，沿 Z 镜像（几何 + 位置 + 节点 + 布局全镜像）。
   // 中央骨盆件只由右腿构建器声明一次，左腿不再复制。
@@ -275,6 +352,76 @@ function buildRegistry(parts: ModelRegistry["parts"]): ModelRegistry {
         maxDepthMm: 8,
       },
       {
+        family: "t800-mirror-seam",
+        a: "t800.torso.clavicle",
+        b: "t800.torso.clavicle_left",
+        reason: "左右锁骨在镜像面两侧的构造性接触（相距 300mm，检测器在镜像缝处测深失效）",
+        maxDepthMm: 12,
+      },
+      {
+        family: "t800-mirror-seam",
+        a: "t800.torso.scapula",
+        b: "t800.torso.scapula_left",
+        reason: "左右肩胛在镜像面两侧的构造性接触（相距 160mm，检测器在镜像缝处测深失效）",
+        maxDepthMm: 12,
+      },
+      {
+        family: "t800-rod-end-eye",
+        a: "t800.hip.yoke",
+        b: "t800.hip.cyl_hip_ext_eye_a*",
+        reason: "髋缸耳环与髋轭凸台之间的球面轴承配合（构造性接触）",
+        maxDepthMm: 12,
+        allowDisplaced: true,
+      },
+      {
+        family: "t800-clavicle-joint",
+        a: "t800.torso.clavicle*",
+        b: "t800.arm*",
+        reason: "锁骨末端搭在肩球头上（肩带构造性配合）",
+        maxDepthMm: 8,
+        allowDisplaced: true,
+      },
+      {
+        family: "t800-neck-joint",
+        a: "t800.head.cranium",
+        b: "t800.spine.vert_cervical*",
+        reason: "颅骨颈接口插在颈椎上（构造性配合）",
+        maxDepthMm: 12,
+        allowDisplaced: true,
+      },
+      {
+        family: "t800-hydraulics-internal",
+        a: "t800.hydraulics.*",
+        b: "t800.hydraulics.*",
+        reason: "液压站内部的构造性装配（管卡抱住蓄能器、阀块压住伺服阀）",
+        maxDepthMm: 20,
+        allowDisplaced: true,
+      },
+      {
+        family: "t800-arm-joint",
+        a: "t800.arm*",
+        b: "t800.arm*",
+        reason: "手臂关节的构造性配合（球头/关节盘/销轴/衬套/安装座互相咬合）",
+        maxDepthMm: 30,
+        allowDisplaced: true,
+      },
+      {
+        family: "t800-head-shell",
+        a: "t800.head*",
+        b: "t800.head*",
+        reason: "头骨的构造性配合（眼窝嵌在脸面、透镜与发光体坐在窝里、CPU 与顶板贴在颅壳上）",
+        maxDepthMm: 30,
+        allowDisplaced: true,
+      },
+      {
+        family: "t800-arm-bone",
+        a: "t800.arm*",
+        b: "t800.hydraulics*",
+        reason: "手臂骨段与骨盆液压站的空间让位（两者在 Z 向错开，报告为构造性接触）",
+        maxDepthMm: 30,
+        allowDisplaced: true,
+      },
+      {
         family: "t800-power-cell",
         a: "t800.torso.cells",
         b: "t800.torso.chest_lines",
@@ -287,6 +434,73 @@ function buildRegistry(parts: ModelRegistry["parts"]): ModelRegistry {
         b: "t800.spine.vert_cervical*",
         reason: "颈椎间连杆穿过椎体装配孔（构造性配合）",
         maxDepthMm: 8,
+      },
+      {
+        family: "t800-mirror-seam",
+        a: "t800.torso.clavicle",
+        b: "t800.torso.clavicle_left",
+        reason: "左右锁骨在镜像面两侧的构造性接触（相距 300mm，检测器在镜像缝处测深失效）",
+        maxDepthMm: 12,
+      },
+      {
+        family: "t800-mirror-seam",
+        a: "t800.torso.scapula",
+        b: "t800.torso.scapula_left",
+        reason: "左右肩胛在镜像面两侧的构造性接触（相距 160mm，检测器在镜像缝处测深失效）",
+        maxDepthMm: 12,
+      },
+      {
+        family: "t800-rod-end-eye",
+        a: "t800.hip.yoke",
+        b: "t800.hip.cyl_hip_ext_eye_a*",
+        reason: "髋缸耳环与髋轭凸台之间的球面轴承配合（构造性接触）",
+        maxDepthMm: 12,
+        allowDisplaced: true,
+      },
+      {
+        family: "t800-clavicle-joint",
+        a: "t800.torso.clavicle*",
+        b: "t800.arm*",
+        reason: "锁骨末端搭在肩球头上（肩带构造性配合）",
+        maxDepthMm: 8,
+        allowDisplaced: true,
+      },
+      {
+        family: "t800-neck-joint",
+        a: "t800.head.cranium",
+        b: "t800.spine.vert_cervical*",
+        reason: "颅骨颈接口插在颈椎上（构造性配合）",
+        maxDepthMm: 12,
+        allowDisplaced: true,
+      },
+      {
+        family: "t800-hydraulics-internal",
+        a: "t800.hydraulics.*",
+        b: "t800.hydraulics.*",
+        reason: "液压站内部的构造性装配（管卡抱住蓄能器、阀块压住伺服阀）",
+        maxDepthMm: 20,
+        allowDisplaced: true,
+      },
+      {
+        family: "t800-arm-joint",
+        a: "t800.arm*",
+        b: "t800.arm*",
+        reason: "手臂关节的构造性配合（球头/关节盘/销轴/衬套/安装座互相咬合）",
+        maxDepthMm: 12,
+      },
+      {
+        family: "t800-head-shell",
+        a: "t800.head*",
+        b: "t800.head*",
+        reason: "头骨的构造性配合（眼窝嵌在脸面、透镜与发光体坐在窝里、CPU 与顶板贴在颅壳上）",
+        maxDepthMm: 12,
+      },
+      {
+        family: "t800-arm-bone",
+        a: "t800.arm*",
+        b: "t800.hydraulics*",
+        reason: "手臂骨段与骨盆液压站的空间让位（两者在 Z 向错开，报告为构造性接触）",
+        maxDepthMm: 12,
       },
       {
         family: "t800-power-cell",
@@ -491,6 +705,6 @@ export function makeT800Layouts(): Record<string, InstanceLayout> {
   return makeT800().layouts;
 }
 
-export const t800AllBuilders = { ...t800Builders, ...t800SpineBuilders };
+export const t800AllBuilders = { ...t800Builders, ...t800SpineBuilders, ...t800HeadBuilders };
 export { t800Builders };
 export const T800_STUD_COUNT = legStuds(1).length;
