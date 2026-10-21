@@ -131,6 +131,32 @@ async function main() {
       partition: s.reportPartition ? { active: s.reportPartition.active.length, expected: s.reportPartition.expected.length } : null };
   })()`);
   console.log("loaded", JSON.stringify(stats));
+  if (MODEL === "kingjoemodules") {
+    await setState("idle");
+    await setCamera([9, 8, 19], [0, 2.5, 0]);
+    await sleep(700);
+    await shot("kingjoe-modules-separated");
+    await setCamera([-4, 7, 12], [-3.8, 3.3, 0]);
+    await sleep(400);
+    await shot("kingjoe-modules-arms", CROP);
+    await setCamera([4, 8, 9], [0, 3.3, 1.5]);
+    await sleep(400);
+    await shot("kingjoe-modules-caps", CROP);
+    await setState("closed");
+    await setCamera([9, 6.6, 11], [0, 3.7, 0]);
+    await sleep(400);
+    await shot("kingjoe-modules-closed");
+    const errors = await evaluate(`(window.__qaErrors ?? []).slice(0, 10)`);
+    if (errors.length) throw new Error(JSON.stringify(errors));
+    console.log(
+      "module checks",
+      await evaluate(
+        `JSON.stringify({ state: window.__stage.store.getState().machineState, head: window.__stage.store.getState().assembled.getNode('Module_head_arms').position.toArray() })`,
+      ),
+    );
+    chrome.kill();
+    return;
+  }
   if (MODEL === "kingjoeplane") {
     await setState("idle");
     await setCamera([10, 9, 14], [0, 4.2, 0]);
