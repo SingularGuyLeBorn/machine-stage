@@ -6,7 +6,8 @@ import os from "node:os";
 // 快速预览：加载 kingjoe 并拍正/侧/三视，供皮骨合并迭代。
 const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
 const PORT = 9333;
-const BASE = "http://localhost:4174/?qa=1";
+const BASE = process.env.PREVIEW_URL ?? "http://localhost:4174/?qa=1";
+const MODEL = process.env.PREVIEW_MODEL ?? "kingjoe";
 const ROOT = path.resolve(import.meta.dirname, "..");
 const OUT = path.join(ROOT, "docs", "qa");
 const PROFILE = path.join(os.tmpdir(), "kingjoe-preview-profile");
@@ -106,9 +107,9 @@ async function main() {
   await send("Runtime.enable");
   await send("Page.navigate", { url: BASE });
   await waitFor(`Boolean(window.__stage && window.__stage.store)`, 60000);
-  await evaluate(`window.__stage.store.getState().setModel("kingjoe"); true`);
+  await evaluate(`window.__stage.store.getState().setModel(${JSON.stringify(MODEL)}); true`);
   await waitFor(
-    `window.__stage.store.getState().modelId === "kingjoe" && Boolean(window.__stage.store.getState().assembled)`,
+    `window.__stage.store.getState().modelId === ${JSON.stringify(MODEL)} && Boolean(window.__stage.store.getState().assembled)`,
     90000,
   );
   await sleep(1500);
@@ -119,6 +120,19 @@ async function main() {
     return { parts: a.parts.length, instances, modelId: s.modelId, reports: s.reports?.length ?? null, state: s.machineState };
   })()`);
   console.log("loaded", JSON.stringify(stats));
+  if (MODEL === "kingjoeskin") {
+    await setState("idle");
+    await setCamera([13.0, 8.5, 16.5], [0, 4.6, 0]);
+    await sleep(1200);
+    await shot("kingjoe-skin-card-idle");
+    await setState("separated");
+    await sleep(1500);
+    await shot("kingjoe-skin-card-separated");
+    const errors = await evaluate(`(window.__qaErrors ?? []).slice(0, 10)`);
+    console.log("page errors", JSON.stringify(errors));
+    chrome.kill();
+    return;
+  }
   // 相机：正 / 侧 / 三视（模型高约 6.98）
   await evaluate(`window.__stage.store.getState().setMachineState("idle"); true`);
   await sleep(600);

@@ -8,6 +8,7 @@ import {
   validateRegistry,
 } from "@/three/parts";
 import { makeKingJoeSkinRegistry, kingjoeSkinBuilders } from "./registry";
+import { animateKingJoeSkin } from "./motion";
 
 const registry = makeKingJoeSkinRegistry();
 const model = buildModel(registry, { builders: kingjoeSkinBuilders, warnMissingLayout: false });
@@ -84,4 +85,23 @@ describe("kingjoeskin real-mesh parts", () => {
     // 构造性接触白名单不能退化成空表。
     expect(split.expected.length).toBeGreaterThan(300);
   }, 180_000);
+
+  it("四体分件让四个模块沿 Y 展开，合拢回装配态", () => {
+    const legs = model.getNode("KJLegsModule");
+    const ship = model.getNode("KJShipModule");
+    expect(legs && ship).toBeTruthy();
+    model.resetNodes();
+    animateKingJoeSkin(model, 0, "idle");
+    expect(legs!.position.y).toBeCloseTo(0, 5);
+    expect(ship!.position.y).toBeCloseTo(5.65, 5);
+
+    animateKingJoeSkin(model, 2, "separated");
+    expect(legs!.position.y).toBeCloseTo(-1.4, 1);
+    expect(ship!.position.y).toBeCloseTo(7.85, 1);
+
+    model.resetNodes();
+    animateKingJoeSkin(model, 0, "idle");
+    expect(legs!.position.y).toBeCloseTo(0, 5);
+    expect(ship!.position.y).toBeCloseTo(5.65, 5);
+  });
 });
