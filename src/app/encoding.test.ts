@@ -39,10 +39,10 @@ describe("源码 UTF-8 编码", () => {
   });
 
   it("T-800 模型的中文零件名可正常解码", () => {
-    const file = join(ROOT, "src", "three", "parts", "models", "t800", "segments", "systems.ts");
+    const file = join(ROOT, "src", "three", "parts", "models", "t800", "hydraulics.ts");
     const text = readFileSync(file, "utf8");
-    expect(text).toContain("分配阀块");
-    expect(text).toContain("蓄能器");
-    expect(text).toContain("球头螺栓");
+    expect(text).toContain("缸体");
+    expect(text).toContain("活塞杆");
+    expect(text).toContain("导向套");
   });
 });

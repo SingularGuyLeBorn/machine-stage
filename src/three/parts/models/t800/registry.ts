@@ -12,6 +12,7 @@ import {
   rodNodeName,
   type HydKind,
 } from "./hydraulics";
+import { HARDWARE, hardwareCenter, hardwareGeometry } from "./hardware";
 
 // ============================================================================
 // t800/registry —— T-800 内骨骼（真实网格切分 + 关节液压缸）
@@ -43,6 +44,7 @@ const ASM_LABEL: Record<string, { cn: string; en: string }> = {
   leg: { cn: "腿", en: "Leg" },
   foot: { cn: "足", en: "Foot" },
   hydraulics: { cn: "液压", en: "Hydraulics" },
+  hardware: { cn: "关节硬件", en: "Joint hardware" },
 };
 
 const assemblies: ModelRegistry["assemblies"] = Object.entries(ASM_LABEL).map(([id, v]) => ({
@@ -140,9 +142,29 @@ export function makeT800(): T800Bundle {
     }
   }
 
+  // ---- 关节硬件（球铰）与胸腔动力组 ----
+  for (let hwIndex = 0; hwIndex < HARDWARE.length; hwIndex++) {
+    const hw = HARDWARE[hwIndex];
+    builder.add({
+      id: `t800.hardware.${hw.key}`,
+      cn: `关节硬件 · ${hw.key}`,
+      en: `Hardware ${hw.key}`,
+      asm: "hardware",
+      geom: {
+        type: "kit",
+        kit: "t800Hardware",
+        params: { hwIndex },
+      },
+      mat: hw.material,
+      layer: 3,
+      node: nodeNameOf(hw.joint),
+      at: hardwareCenter(hw),
+      hint: "真实网格各骨为独立对象，关节处补球铰与动力组（参考图里的铬钢骨架）",
+    });
+  }
+
   bundle = {
-    registry: {
-      model: "t800",
+    registry: {      model: "t800",
       title: "T-800 内骨骼 · 真实网格切分",
       subtitle: "76 个蒙皮部位逐件成零件 + 14 根关节液压缸",
       source_notes:
@@ -180,6 +202,15 @@ export function makeT800(): T800Bundle {
           allowDisplaced: true,
           allowSuspect: true,
         },
+        {
+          family: "t800-hardware-fit",
+          a: "t800.hardware.*",
+          b: "t800.*",
+          reason: "球铰/动力组与骨头的装配贴合（构造性接触）",
+          maxDepthMm: 14,
+          allowDisplaced: true,
+          allowSuspect: true,
+        },
       ],
     },
     layouts,
@@ -200,6 +231,11 @@ export const t800MeshBuilders: Record<string, GeometryBuilder> = {
     const params = (spec as { params?: Record<string, KitParam> }).params ?? {};
     const def = HYDRAULICS[Number(params.cylIndex ?? 0)];
     return hydraulicGeometry(def, Number(params.kind ?? 0) as HydKind);
+  },
+  t800Hardware: (spec) => {
+    const params = (spec as { params?: Record<string, KitParam> }).params ?? {};
+    const def = HARDWARE[Number(params.hwIndex ?? 0)];
+    return hardwareGeometry(def);
   },
 };
 

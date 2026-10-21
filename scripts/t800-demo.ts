@@ -1,11 +1,11 @@
-// 屈伸演示：渲染完整动作循环（侧视 + 斜 45°），交给 ffmpeg 编码成 mp4/gif
+// 整机演示：渲染完整步态循环（侧视 + 斜 45°），交给 ffmpeg 编码成 mp4/gif
 // 用法：npx tsx scripts/t800-demo.ts
 import { mkdirSync, writeFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import * as THREE from "three";
 import { buildModel } from "../src/three/parts/assembler/assembler";
 import { makeT800Layouts, makeT800Registry, t800AllBuilders } from "../src/three/parts/models/t800/registry";
-import { animateT800, t800Pose } from "../src/three/parts/models/t800/motion";
+import { animateT800, t800CylinderReadout, t800Pose } from "../src/three/parts/models/t800/motion";
 
 const OUT = "docs/qa/t800/demo";
 mkdirSync(OUT, { recursive: true });
@@ -18,18 +18,21 @@ const model = buildModel(registry, {
 });
 
 const W = 640;
-const H = 1040;
-const SCALE = 540;
-const X_SHIFT = 0.04;
+const H = 1100;
+const SCALE = 470;
+const X_SHIFT = 0.0;
 
 class Canvas {
   data: Uint8Array;
+  /** 深度缓冲（沿视线方向，越小越近） */
+  zbuf: Float32Array;
   constructor(
     public w: number,
     public h: number,
     bg: [number, number, number] = [235, 238, 242],
   ) {
     this.data = new Uint8Array(w * h * 3);
+    this.zbuf = new Float32Array(w * h).fill(Infinity);
     for (let i = 0; i < w * h; i++) {
       this.data[i * 3] = bg[0];
       this.data[i * 3 + 1] = bg[1];
@@ -42,6 +45,14 @@ class Canvas {
     this.data[i] = c[0];
     this.data[i + 1] = c[1];
     this.data[i + 2] = c[2];
+  }
+  /** 写入深度：比缓冲里更近才返回 true。 */
+  putDepth(x: number, y: number, depth: number): boolean {
+    if (x < 0 || y < 0 || x >= this.w || y >= this.h) return false;
+    const i = y * this.w + x;
+    if (depth >= this.zbuf[i]) return false;
+    this.zbuf[i] = depth;
+    return true;
   }
   toPng(): Buffer {
     const raw = Buffer.alloc((this.w * 3 + 1) * this.h);
@@ -119,7 +130,7 @@ function renderAt(seconds: number, view: "side" | "iso"): { png: Buffer; caption
 
   interface Tri {
     pts: [number, number][];
-    depth: number;
+    depth: [number, number, number];
     color: [number, number, number];
   }
   const tris: Tri[] = [];
@@ -158,13 +169,13 @@ function renderAt(seconds: number, view: "side" | "iso"): { png: Buffer; caption
             [bx, by],
             [cx, cy],
           ],
-          depth: (a.z + b.z + c.z) / 3,
+          depth: [a.dot(dir), b.dot(dir), c.dot(dir)],
           color,
         });
       }
     }
   }
-  tris.sort((p, q) => p.depth - q.depth);
+
   for (const t of tris) {
     const [p0, p1, p2] = t.pts;
     const minX = Math.max(0, Math.floor(Math.min(p0[0], p1[0], p2[0])));
@@ -182,6 +193,8 @@ function renderAt(seconds: number, view: "side" | "iso"): { png: Buffer; caption
         const w1 = ((p2[0] - px) * (p0[1] - py) - (p0[0] - px) * (p2[1] - py)) / area;
         const w2 = 1 - w0 - w1;
         if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+        const depth = w0 * t.depth[0] + w1 * t.depth[1] + w2 * t.depth[2];
+        if (!canvas.putDepth(x, y, depth)) continue;
         canvas.set(x, y, t.color);
       }
     }
@@ -191,13 +204,16 @@ function renderAt(seconds: number, view: "side" | "iso"): { png: Buffer; caption
   for (let x = 0; x < W; x += 5) for (let d = 0; d < 2; d++) canvas.set(x, gy + d, [168, 176, 186]);
 
   const pose = t800Pose();
-  const knee = pose.extensions.find((e) => e.key === "knee_main");
-  const caption = `T-800 right leg · ${view === "side" ? "side" : "iso 45°"} · t=${seconds.toFixed(2)}s · hip/knee/ankle ${pose.hipDeg.toFixed(1)}/${pose.kneeDeg.toFixed(1)}/${pose.ankleDeg.toFixed(1)} deg · knee_main rod ${knee?.exposedMm.toFixed(1)} mm`;
+  const knee = t800CylinderReadout(model).find((r) => r.key === "knee_r");
+  const caption =
+    `T-800 endoskeleton · ${view === "side" ? "side" : "iso 45°"} · t=${seconds.toFixed(2)}s · ` +
+    `phase ${(pose.phase * 100).toFixed(0)}% · knee_r |AB|=${knee?.lengthMm.toFixed(1)}mm ` +
+    `rod exposed=${knee?.exposedMm.toFixed(1)}mm · ${registry.parts.length} parts / 120854 verts`;
   return { png: canvas.toPng(), caption };
 }
 
-const CYCLE = 5.4;
-const FRAMES = 60;
+const CYCLE = 6.4;
+const FRAMES = 128;
 for (const view of ["side", "iso"] as const) {
   for (let i = 0; i < FRAMES; i++) {
     const t = (i / FRAMES) * CYCLE;

@@ -237,15 +237,15 @@ function renderAt(seconds: number, view: View): { png: Buffer; caption: string }
 }
 
 const frames: Array<[number, string]> = [
-  [0, "view-00-stand"],
-  [0.55, "view-01-flexing"],
-  [1.1, "view-02-flexing"],
-  [1.65, "view-03-flexing"],
-  [2.2, "view-04-peak"],
-  [2.6, "view-05-hold"],
-  [3.4, "view-06-returning"],
-  [4.3, "view-07-returning"],
-  [5.2, "view-08-rest"],
+  [4.8, "view-00-stand"],
+  [0.0, "view-01-step-right"],
+  [1.6, "view-02-lift-right"],
+  [3.2, "view-03-step-left"],
+  [4.8, "view-04-stand"],
+  [5.6, "view-05-push"],
+  [6.4, "view-06-cycle"],
+  [2.4, "view-07-peak-knee"],
+  [1.2, "view-08-grip"],
 ];
 
 for (const [seconds, name] of frames) {
@@ -258,7 +258,7 @@ for (const [seconds, name] of frames) {
 // 正视 / 斜 45°：站姿 + 屈膝峰值
 for (const view of ["front", "iso"] as View[]) {
   for (const [seconds, tag] of [
-    [0, "stand"],
+    [4.8, "stand"],
     [2.2, "peak"],
   ] as Array<[number, string]>) {
     const { png, caption } = renderAt(seconds, view);
