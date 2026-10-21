@@ -22,11 +22,10 @@ import { makeKingJoeSkinRegistry, kingjoeSkinBuilders } from "@/three/parts/mode
 import { makeKingJoeWholeRegistry } from "@/three/parts/models/kingjoe-whole/registry";
 import { kingjoeWholeBuilders } from "@/three/parts/models/kingjoe-whole/kits";
 import {
-  makeKingJoePlaneRegistry,
-  kingjoePlaneBuilders,
-  poseKingJoePlane,
-  planeStats,
-} from "@/three/parts/models/kingjoe-plane/registry";
+  makeKingJoeModuleRegistry,
+  kingjoeModuleBuilders,
+  poseKingJoeModules,
+} from "@/three/parts/models/kingjoe-modules/registry";
 import { animateKingJoeSkin, type KingJoeSkinState } from "@/three/parts/models/kingjoe-skin/motion";
 import {
   animateTigerSuspension,
@@ -106,32 +105,32 @@ const testKit = makeTestRegistry();
 
 export const CATALOG: StageModel[] = [
   {
-    id: "kingjoeplane",
-    title: "金古桥 · 平面分体验证",
-    subtitle: "第一刀：上下横切 · 平整封口 · 素色内核",
-    milestone: "截面验证",
+    id: "kingjoemodules",
+    title: "金古桥 · 参考图分体",
+    subtitle: "头肩与完整双臂 / 胸甲 / 腹盆 / 腿部 · 原 GLB 细节",
+    milestone: "四模块",
     status: "ready",
-    registry: makeKingJoePlaneRegistry(),
-    builders: kingjoePlaneBuilders,
-    animate: poseKingJoePlane,
+    registry: makeKingJoeModuleRegistry(),
+    builders: kingjoeModuleBuilders,
+    animate: poseKingJoeModules,
     states: [
-      { id: "idle", label: "展开检查", hint: "铜色区域为真实封口三角面" },
-      { id: "closed", label: "合拢检查", hint: "上下两面回到同一切平面" },
+      { id: "idle", label: "分体检查", hint: "双臂整体跟随头肩；四模块静态展开" },
+      { id: "closed", label: "整机检查", hint: "回到原模型装配位置，不播放合体动画" },
     ],
     actions: [
-      { id: "plane-open", group: "截面", label: "展开截面", kind: "machine-state", state: "idle" },
-      { id: "plane-close", group: "截面", label: "合拢检查", kind: "machine-state", state: "closed" },
-      { id: "plane-reset", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "modules-open", group: "分体", label: "分体检查", kind: "machine-state", state: "idle" },
+      { id: "modules-close", group: "分体", label: "整机检查", kind: "machine-state", state: "closed" },
+      { id: "modules-reset", group: "展示", label: "重置视角", kind: "reset-view" },
     ],
     readouts: () => [
-      { label: "切面高度", value: `${planeStats.height} m` },
+      { label: "模块", value: "4 组" },
       { label: "开放边", value: "0" },
-      { label: "截面面积", value: `${planeStats.parts[0]!.cap_area.toFixed(3)} m²` },
+      { label: "双臂", value: "完整保留" },
     ],
     notes: [
-      "本卡先验证平面切割与封口，使用已有闭合内核；原 GLB 外皮、纹理和旧合体效果保留在原卡中。",
-      "上下是两个展示组，共含 9 个闭合连通块；横切也经过垂下的手，不是最终飞船模块分界。",
-      "切面沿实际轮廓三角化；生成时检查所有边恰有两个相反方向的邻面、正体积、切前切后体积守恒及上下截面面积一致。",
+      "按参考图分为头肩与双臂、胸甲、腹盆、腿部；手臂按原骨骼归组，不经过躯干切平面。",
+      "外形来自原 GLB，保留法线与 UV，沿用银灰金属、彩虹胸栅与眼部细节。原 GLB 本身未附带图像贴图。",
+      "每个模块由闭合装甲实体组成；封闭原开口，开放薄甲向内增厚 4mm。原合体动作与电弧不变。",
     ],
   },
   {
