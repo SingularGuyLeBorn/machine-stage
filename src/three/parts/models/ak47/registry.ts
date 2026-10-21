@@ -507,7 +507,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
         // 尾齿（阻铁挂机齿：铰点后下方）
         { type: "box", w: 0.006, h: 0.008, d: 0.008, bevel: 0.0008, at: [0, -0.012, -0.006] },
         // 待击压面（枪机框复进时压过它完成待击）
-        { type: "box", w: 0.007, h: 0.005, d: 0.012, bevel: 0.0008, at: [0, -0.006, -0.016] },
+        { type: "box", w: 0.007, h: 0.005, d: 0.012, bevel: 0.0008, at: [0, -0.011, -0.016] },
       ],
     },
     material: "steel_machined",
@@ -526,7 +526,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "kit", kit: "coilSpring", params: { r: 0.006, wireR: 0.0009, len: 0.045, coils: 7 } },
     material: "steel_spring",
     node: "AkHammer",
-    mate: { type: "absolute", position: [0, -0.022, -0.006] },
+    mate: { type: "absolute", position: [0, -0.038, -0.006] },
     source: "击锤簧：⌀12 × 45 7 圈粗簧，提供击发能量（枪机框复进时压缩蓄能）。",
   },
   {
@@ -584,7 +584,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     },
     material: "steel_worn",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.06, -0.074] },
+    mate: { type: "absolute", position: [0, -0.058, -0.074] },
     source: "阻铁：挂住击锤尾齿；被扳机上缘压下时解脱。单发模式下每次击发后自动重新挂住（半自动），连发模式下被快慢机杠杆抬开（全自动）。",
   },
   {
