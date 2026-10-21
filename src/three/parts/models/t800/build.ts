@@ -71,7 +71,7 @@ export class PartBuilder {
       name_en: spec.en,
       assembly: spec.asm,
       build_layer: layer,
-      build_order: LAYER_BASE[layer] + this.counters[layer]++,
+      build_order: LAYER_BASE[layer] * 10000 + this.counters[layer]++,
       geometry: spec.geom,
       material: spec.mat,
       ...(spec.node ? { node: spec.node } : {}),

@@ -4,13 +4,14 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import * as THREE from "three";
 import { buildModel } from "../src/three/parts/assembler/assembler";
-import { makeT800Layouts, makeT800Registry, t800AllBuilders } from "../src/three/parts/models/t800/registry";
+import { makeT800, makeT800Layouts, makeT800Registry, t800AllBuilders } from "../src/three/parts/models/t800/registry";
 import { animateT800, t800Pose } from "../src/three/parts/models/t800/motion";
 
-const OUT = "docs/qa/t800/views";
+const MECH = process.argv.includes("--mech");
+const OUT = MECH ? "docs/qa/t800/mech-views" : "docs/qa/t800/views";
 mkdirSync(OUT, { recursive: true });
 
-const registry = makeT800Registry();
+const registry = MECH ? makeT800({ decompose: true }).registry : makeT800Registry();
 const model = buildModel(registry, {
   builders: t800AllBuilders,
   instanceLayouts: makeT800Layouts(),

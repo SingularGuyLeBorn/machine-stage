@@ -15,6 +15,7 @@ import {
   tigerInstanceLabel,
 } from "@/three/parts/models/tiger/motion";
 import {
+  makeT800,
   makeT800Layouts,
   makeT800Registry,
   t800AllBuilders,
@@ -85,7 +86,48 @@ export const TEST_ROTOR_OMEGA = 1.2;
 
 const testKit = makeTestRegistry();
 
+/** 机械拆解版注册表（每个光滑块 → 护板 + 内部机械器件）。 */
+const makeT800MechRegistry = () => makeT800({ decompose: true }).registry;
+
 export const CATALOG: StageModel[] = [
+  {
+    id: "t800_mech",
+    title: "T-800 内骨骼 · 机械拆解版",
+    subtitle: "M-G：每个光滑块换成机械器件组合（2073 个零件）",
+    milestone: "M-G",
+    status: "ready",
+    registry: makeT800MechRegistry(),
+    layouts: makeT800Layouts(),
+    builders: t800AllBuilders,
+    animate: animateT800,
+    readouts: t800Readouts,
+    states: [
+      { id: "idle", label: "待机", hint: "整机静止，可拖构建滑杆逐层装配" },
+      {
+        id: "running",
+        label: "步态演示",
+        hint: "髋/膝/踝/肩/肘/腕欠阻尼步态，17 根液压缸随关节角真实伸缩；点零件看实例检查器",
+      },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 屈伸扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "t800-flex", group: "机构", label: "步态演示", kind: "machine-state", state: "running" },
+      { id: "t800-stop", group: "机构", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "扫掠检测", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "机械拆解版：每个 GLB 光滑块换成「护板（外形仍与源网格吻合）+ 内部机械器件」，共 2073 个零件。",
+      "一个部位内部就有十几个件：承力骨架 / 纵梁 / 横撑 / 轴承(外圈+内圈+密封) / 螺栓圈 / 液压软管 / 管接头 / 油嘴 / 卡环 / 衬套。",
+      "护板按「轴向段 × 周向扇区」把原表面切成独立零件，拼起来外形与源网格一致。",
+      "与「GLB 原型」模型同骨架同运动学，可直接对比：外形一致，内部由光滑整块变成机械器件组合。",
+      "验收脚本：npx tsx scripts/diag-t800.ts --write（静态 + 16 帧扫掠穿模、悬空、液压行程核算）。",
+    ],
+  },
   {
     id: "t800",
     title: "T-800 内骨骼 · 整机",
@@ -102,7 +144,7 @@ export const CATALOG: StageModel[] = [
       {
         id: "running",
         label: "步态演示",
-        hint: "髋/膝/踝/肩/肘/腕欠阻尼步态，14 根液压缸随关节角真实伸缩；点零件看实例检查器",
+        hint: "髋/膝/踝/肩/肘/腕欠阻尼步态，17 根液压缸随关节角真实伸缩；点零件看实例检查器",
       },
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 屈伸扫掠检测进行中" },
     ],
@@ -117,7 +159,7 @@ export const CATALOG: StageModel[] = [
       { id: "scan-sweep", group: "自检", label: "扫掠检测", kind: "scan", scanKind: "sweep" },
     ],
     notes: [
-      "零件级：整机 195 个定义件（76 个真实网格蒙皮部位 + 17 根缸 × 7 件）。",
+      "GLB 原型：每个蒙皮部位是一块光滑网格（外形最还原），整机 195 个定义件（76 个蒙皮部位 + 17 根缸 × 7 件）。",
       "几何来源：t800-mesh.obj（120854 顶点 / 130884 面）按 t800-verts-joints.csv 的 76 个蒙皮部位切分，坐标换算为站立姿态（+X 前 / +Y 上 / +Z 右），身高 1.90m。",
       "每根驱动缸 7 件（缸体 / 活塞 / 活塞杆 / 耳环A / 耳环B / 导向套 / 密封），跨在关节两端，缸拉骨头动。",
       "17 根缸：髋/膝/踝/肩/肘/腕 ×2 + 脊柱中央液压柱 + 竖脊肌 ×2 + 腰椎 + 颈。",

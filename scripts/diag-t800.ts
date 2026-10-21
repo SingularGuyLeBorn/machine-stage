@@ -14,13 +14,14 @@ import { validateRegistry, formatIssues } from "../src/three/parts/registry/vali
 import { buildModel } from "../src/three/parts/assembler/assembler";
 import { detectStatic, getBVH } from "../src/three/parts/solver/detect";
 import { partitionExpectedContacts } from "../src/three/parts/solver/whitelist";
-import { makeT800Layouts, makeT800Registry, t800AllBuilders } from "../src/three/parts/models/t800/registry";
+import { makeT800, makeT800Layouts, makeT800Registry, t800AllBuilders } from "../src/three/parts/models/t800/registry";
 import { JOINT_BY_NAME, JOINTS, jointChain } from "../src/three/parts/models/t800/spec";
 import { animateT800, t800CylinderReadout } from "../src/three/parts/models/t800/motion";
 import { writeFileSync } from "node:fs";
 
 // ---------------------------------------------------------------- 注册表
-const registry = makeT800Registry();
+const MECH = process.argv.includes("--mech");
+const registry = MECH ? makeT800({ decompose: true }).registry : makeT800Registry();
 const issues = validateRegistry(registry);
 const errors = issues.filter((i) => i.level === "error");
 const warns = issues.filter((i) => i.level === "warn");
