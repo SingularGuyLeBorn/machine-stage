@@ -4,12 +4,17 @@ import type { GeometryBuilder } from "../../assembler/geometry";
 import type { KitParam } from "../../registry/types";
 import type { ModelRegistry, NodeDef } from "../../registry/types";
 import { PartBuilder } from "./build";
-import { JOINTS, MISSING_PARENTS, NODE_PIVOTS, nodeNameOf } from "./spec";
+
+/** 腱索节点名。 */
+export const tendonNodeName = (key: string) => `T800_tendon_${key}`;
+
+import { JOINTS, JOINT_BY_NAME, MISSING_PARENTS, NODE_PIVOTS, nodeNameOf } from "./spec";
 import { MECH_NAMES, boneName, mechName, type BoneName } from "./names";
 import { meshPartGeometryByIndex } from "./mesh/geometry";
 import { splitBoneIntoPlates } from "./mesh/plates";
 import { profileBone } from "./mesh/crossSection";
 import { buildMechParts, type MechKind, type Recipe } from "./mech";
+import { FINGER_BONES, FINGERS, pulleyGeometry, tendonGeometry } from "./tendon";
 import {
   HYDRAULICS,
   hydraulicGeometry,
@@ -67,6 +72,26 @@ function buildNodes(): NodeDef[] {
       pivot: joint.pivot,
       note: `${joint.name}（${ASM_LABEL[joint.asm].cn}）`,
     });
+  }
+  // 腱索节点：每根手指一根（从掌面锚点拉到中节滑轮）
+  for (const side of ["R", "L"] as const) {
+    const hand = JOINT_BY_NAME.get(side === "R" ? "bip_hand_R_016" : "bip_hand_L_055");
+    if (!hand) continue;
+    for (const finger of FINGERS) {
+      const bones = FINGER_BONES[`${finger}_${side}`];
+      const prox = bones && JOINT_BY_NAME.get(bones.proximal);
+      if (!prox) continue;
+      nodes.push({
+        name: tendonNodeName(`${finger}_${side}`),
+        parent: "root",
+        pivot: [
+          hand.center[0] + (prox.center[0] - hand.center[0]) * 0.18,
+          hand.center[1] + 0.012,
+          hand.center[2] + (prox.center[2] - hand.center[2]) * 0.18,
+        ],
+        note: `${finger} 屈肌腱（随抓握伸缩）`,
+      });
+    }
   }
   for (const def of HYDRAULICS) {
     nodes.push({
@@ -172,6 +197,20 @@ export function makeT800(options: { decompose?: boolean } = {}): T800Bundle {
   if (!decompose && bundle) return bundle;
   const pivots: Record<string, [number, number, number]> = { ...NODE_PIVOTS };
   for (const def of HYDRAULICS) pivots[rodNodeName(def.key)] = def.b;
+  for (const side of ["R", "L"] as const) {
+    const hand = JOINT_BY_NAME.get(side === "R" ? "bip_hand_R_016" : "bip_hand_L_055");
+    if (!hand) continue;
+    for (const finger of FINGERS) {
+      const bones = FINGER_BONES[`${finger}_${side}`];
+      const prox = bones && JOINT_BY_NAME.get(bones.proximal);
+      if (!prox) continue;
+      pivots[tendonNodeName(`${finger}_${side}`)] = [
+        hand.center[0] + (prox.center[0] - hand.center[0]) * 0.18,
+        hand.center[1] + 0.012,
+        hand.center[2] + (prox.center[2] - hand.center[2]) * 0.18,
+      ];
+    }
+  }
   const builder = new PartBuilder(pivots);
   const layouts: Record<string, InstanceLayout> = {};
   // 零件 id 前缀必须与模型 id 一致（框架校验）
@@ -275,6 +314,59 @@ export function makeT800(options: { decompose?: boolean } = {}): T800Bundle {
           node,
           at: part.center,
           hint: `${name.en} 内部机械器件`,
+        });
+      }
+    }
+  }
+
+  // ---- 手指屈肌腱 + 滑轮 ----
+  // 腱索从掌面锚点拉到中节滑轮，长度随抓握变化（运行时按实际距离缩放）
+  for (const side of ["R", "L"] as const) {
+    const hand = JOINT_BY_NAME.get(side === "R" ? "bip_hand_R_016" : "bip_hand_L_055");
+    if (!hand) continue;
+    for (const finger of FINGERS) {
+      const bones = FINGER_BONES[`${finger}_${side}`];
+      if (!bones) continue;
+      const prox = JOINT_BY_NAME.get(bones.proximal);
+      const mid = JOINT_BY_NAME.get(bones.middle);
+      if (!prox || !mid) continue;
+      // 掌面锚点：掌心稍上方一点
+      const anchor: [number, number, number] = [
+        hand.center[0] + (prox.center[0] - hand.center[0]) * 0.18,
+        hand.center[1] + 0.012,
+        hand.center[2] + (prox.center[2] - hand.center[2]) * 0.18,
+      ];
+      const fingerCn: Record<string, string> = {
+        thumb: "拇指",
+        index: "食指",
+        middle: "中指",
+        ring: "无名指",
+        pinky: "小指",
+      };
+      builder.add({
+        id: `${prefix}.tendon.${finger}_${side.toLowerCase()}`,
+        cn: `${side === "R" ? "右" : "左"}${fingerCn[finger]}屈肌腱`,
+        en: `${side === "R" ? "Right" : "Left"} ${finger} Flexor Tendon`,
+        asm: "hand",
+        geom: { type: "kit", kit: "t800Tendon", params: { finger, side } },
+        mat: "dark_chrome",
+        layer: 2,
+        node: tendonNodeName(`${finger}_${side}`),
+        at: anchor,
+        hint: "屈肌腱：近节卷 → 腱索被拉长 → 中节被动跟卷",
+      });
+      for (const [i, j] of [prox, mid].entries()) {
+        builder.add({
+          id: `${prefix}.tendon.pulley_${finger}_${side.toLowerCase()}_${i + 1}`,
+          cn: `${side === "R" ? "右" : "左"}${fingerCn[finger]}滑轮 ${i + 1}`,
+          en: `${side === "R" ? "Right" : "Left"} ${finger} Pulley ${i + 1}`,
+          asm: "hand",
+          geom: { type: "kit", kit: "t800Pulley", params: { finger, side, index: i } },
+          mat: "mirror",
+          layer: 2,
+          node: nodeNameOf(i === 0 ? bones.proximal : bones.middle),
+          at: j.center,
+          hint: "屈肌腱导向滑轮",
         });
       }
     }
@@ -448,6 +540,8 @@ export const t800MeshBuilders: Record<string, GeometryBuilder> = {
     if (!hit) throw new Error(`t800.mech：${joint.name} 没有 ${kind}#${index}`);
     return hit.geometry;
   },
+  t800Tendon: () => tendonGeometry(0.0022),
+  t800Pulley: () => pulleyGeometry(0.0055),
   t800Hydraulic: (spec) => {
     const params = (spec as { params?: Record<string, KitParam> }).params ?? {};
     const def = HYDRAULICS[Number(params.cylIndex ?? 0)];

@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import type { AssembledModel } from "../../assembler/assembler";
 import { JOINT_BY_NAME, JOINTS, jointChain, nodeNameOf } from "./spec";
+import { FINGER_BONES } from "./tendon";
+import { tendonNodeName } from "./registry";
 import { HYDRAULICS, cylinderAxis, rodNodeName, type HydraulicDef } from "./hydraulics";
 
 // ============================================================================
@@ -137,6 +139,15 @@ function jointAngles(seconds: number): Angles {
   const gaze = 14 * Math.sin(2 * Math.PI * p * 0.5);
   y.set("Bip_Eyeball_R_045", gaze);
   y.set("Bip_Eyeball_L_043", gaze);
+
+  // 眨眼：终结者的光学眼是**机械快门**（镜片翻下来挡住光路），
+  // 每 4.2 秒一次，翻下 62° 再翻回来。
+  const BLINK_PERIOD = 4.2;
+  const bt = (seconds % BLINK_PERIOD) / BLINK_PERIOD;
+  const shut = bt < 0.035 ? bt / 0.035 : bt < 0.09 ? 1 - (bt - 0.035) / 0.055 : 0;
+  const eyeShut = 62 * shut;
+  z.set("EXT_LeftEyeCine_02_046", eyeShut);
+  z.set("EXT_RightEyeCine_02_044", eyeShut);
 
   // 五指：抓握 —— **腱索联动**
   // 屈肌腱从掌面跨过近节关节拉到中节：近节卷多少，中节被动跟着卷；
@@ -325,7 +336,65 @@ export function animateT800(
   }
 
   model.syncInstances();
+  updateTendons(model, world);
   model.root.updateMatrixWorld(true);
+}
+
+/**
+ * 屈肌腱：每根手指一根索，从掌面锚点拉到中节滑轮。
+ * 长度 = |锚点 - 滑轮|，抓握卷曲时这个距离变大 → 索被拉长（按实际距离缩放）。
+ */
+function updateTendons(model: AssembledModel, world: Map<string, Pose>): void {
+  const up = new THREE.Vector3(0, 1, 0);
+  const dir = new THREE.Vector3();
+  const quat = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  const matrix = new THREE.Matrix4();
+  for (const side of ["R", "L"] as const) {
+    const hand = JOINT_BY_NAME.get(side === "R" ? "bip_hand_R_016" : "bip_hand_L_055");
+    if (!hand) continue;
+    const handPose = world.get(hand.name);
+    if (!handPose) continue;
+    for (const finger of ["thumb", "index", "middle", "ring", "pinky"]) {
+      const bones = FINGER_BONES[`${finger}_${side}`];
+      if (!bones) continue;
+      const prox = JOINT_BY_NAME.get(bones.proximal);
+      const mid = JOINT_BY_NAME.get(bones.middle);
+      if (!prox || !mid) continue;
+      const node = model.getNode(tendonNodeName(`${finger}_${side}`));
+      if (!node) continue;
+      // 掌面锚点（跟手掌一起动）
+      const anchorRest = new THREE.Vector3(
+        hand.center[0] + (prox.center[0] - hand.center[0]) * 0.18,
+        hand.center[1] + 0.012,
+        hand.center[2] + (prox.center[2] - hand.center[2]) * 0.18,
+      );
+      const anchor = anchorRest
+        .clone()
+        .sub(new THREE.Vector3(...hand.pivot))
+        .applyQuaternion(handPose.quat)
+        .add(handPose.pos);
+      // 中节滑轮的世界位置
+      const midPose = world.get(mid.name);
+      if (!midPose) continue;
+      const pulley = midPose.pos;
+      dir.copy(pulley).sub(anchor);
+      const length = Math.max(dir.length(), 1e-4);
+      dir.divideScalar(length);
+      quat.setFromUnitVectors(up, dir);
+      node.position.copy(anchor);
+      node.quaternion.copy(quat);
+      // 索按实际长度缩放（抓握时可见被拉长）
+      const handle =
+        model.getPart(`t800.tendon.${finger}_${side.toLowerCase()}`) ??
+        model.getPart(`t800_mech.tendon.${finger}_${side.toLowerCase()}`);
+      if (handle) {
+        scale.set(1, length, 1);
+        matrix.compose(new THREE.Vector3(), new THREE.Quaternion(), scale);
+        handle.setInstanceMatrix(0, matrix);
+      }
+    }
+  }
 }
 
 let lastSeconds = 0;
