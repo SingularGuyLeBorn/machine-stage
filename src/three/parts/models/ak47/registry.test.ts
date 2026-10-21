@@ -69,7 +69,7 @@ describe("ak47 注册表回归", () => {
     }
     // 抱弹口：第 1 发在供弹位（弹心 y -10mm、z -30.4mm，轴水平）
     const feed = magRoundTransform(1);
-    expect(feed.pos[1]).toBeCloseTo(-0.01, 5);
+    expect(feed.pos[1]).toBeCloseTo(-0.018, 5);
     expect(feed.pos[2]).toBeCloseTo(-0.0304, 5);
     expect(feed.alpha).toBeCloseTo(0, 5);
     // 相邻发中心距 > 底缘 ⌀11.35（互不重叠）

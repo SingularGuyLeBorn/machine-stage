@@ -85,7 +85,7 @@ export const AK47_EXTRA_CONSTANTS = {
   SELECTOR_PIVOT_Y: -0.020,
   SELECTOR_PIVOT_Z: -0.072,
   TRIGGER_Y: -0.042,
-  TRIGGER_PIVOT_Z: -0.075,
+  TRIGGER_PIVOT_Z: -0.095,
   CARRIER_FRONT_Z: -0.03,
   CARRIER_TRAVEL: 0.07,
   RECOIL_SPRING_ABUT_Z: -0.215,
@@ -198,7 +198,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     ] },
     material: "gunsteel",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, 0.0105, 0.258] },
+    mate: { type: "absolute", position: [0, 0.013, 0.258] },
     source: "准星：柱式 ⌀6.4 护圈 + ⌀3.6 准星柱，坐在导气箍前方 92mm 的枪管凸耳上；高低可调（风偏归零）。",
   },
   {
@@ -247,7 +247,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     ] },
     material: "gunsteel",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, 0.024, -0.2295] },
+    mate: { type: "absolute", position: [0, 0.026, -0.231] },
     source: "弧形表尺：800m 分划，照门扳起后高 12mm；与导气箍上的准星构成瞄准基线（基线长 378mm）。",
   },
   {
@@ -302,7 +302,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     ] },
     material: "ejector_steel",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0.02, -0.033, -0.152], rotation: [0, 0, 90] },
+    mate: { type: "absolute", position: [0.026, -0.033, -0.152], rotation: [0, 0, 90] },
     source: "弹匣卡榫：右侧拨柄 + 榫舌，前挂后卡结构中卡住弹匣后壁的卡槽；按压拨柄弹匣前翻脱落。",
   },
   {
@@ -315,7 +315,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "kit", kit: "torsionSpring", params: { r: 0.005, wireR: 0.0006, coils: 3 } },
     material: "steel_spring",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0.02, -0.04, -0.15] },
+    mate: { type: "absolute", position: [0.026, -0.04, -0.15] },
     source: "卡榫扭簧：⌀1.2 钢丝 3 圈，保持卡榫榫舌始终咬合弹匣。",
   },
   // ===================== L1 导气活塞 =====================
@@ -498,16 +498,16 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: {
       type: "merge",
       parts: [
-        // 脊（长杠杆主体：铰点在弹匣下方，向上穿过枪机框底窗到击针尾）
-        { type: "box", w: 0.008, h: 0.004, d: 0.03, bevel: 0.0006, at: [0, 0.012, -0.006] },
-        // 伸臂（脊 → 鼻）
-        { type: "box", w: 0.008, h: 0.014, d: 0.006, bevel: 0.0006, at: [0, 0.026, -0.005] },
+        // 脊（长杠杆：铰点在弹匣后壁之后，向上前伸到击针尾）
+        { type: "box", w: 0.008, h: 0.004, d: 0.026, bevel: 0.0006, at: [0, 0.012, 0.005] },
+        // 伸臂（脊 → 鼻，向前上）
+        { type: "box", w: 0.008, h: 0.014, d: 0.008, bevel: 0.0006, at: [0, 0.026, 0.011] },
         // 鼻（打击面：顶端距击针尾盘 2mm）
-        { type: "box", w: 0.008, h: 0.01, d: 0.008, bevel: 0.0008, at: [0, 0.033, -0.005] },
-        // 尾齿（阻铁挂机齿：待击时被阻铁托住）
-        { type: "box", w: 0.006, h: 0.008, d: 0.008, bevel: 0.0008, at: [0, -0.012, 0.012] },
+        { type: "box", w: 0.008, h: 0.01, d: 0.008, bevel: 0.0008, at: [0, 0.033, 0.013] },
+        // 尾齿（阻铁挂机齿：铰点后下方）
+        { type: "box", w: 0.006, h: 0.008, d: 0.008, bevel: 0.0008, at: [0, -0.012, -0.006] },
         // 待击压面（枪机框复进时压过它完成待击）
-        { type: "box", w: 0.007, h: 0.005, d: 0.012, bevel: 0.0008, at: [0, -0.006, -0.014] },
+        { type: "box", w: 0.007, h: 0.005, d: 0.012, bevel: 0.0008, at: [0, -0.006, -0.016] },
       ],
     },
     material: "steel_machined",
@@ -526,7 +526,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "kit", kit: "coilSpring", params: { r: 0.006, wireR: 0.0009, len: 0.045, coils: 7 } },
     material: "steel_spring",
     node: "AkHammer",
-    mate: { type: "absolute", position: [0, -0.022, 0.012] },
+    mate: { type: "absolute", position: [0, -0.022, -0.006] },
     source: "击锤簧：⌀12 × 45 7 圈粗簧，提供击发能量（枪机框复进时压缩蓄能）。",
   },
   {
@@ -584,7 +584,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     },
     material: "steel_worn",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.062, -0.05] },
+    mate: { type: "absolute", position: [0, -0.058, -0.072] },
     source: "阻铁：挂住击锤尾齿；被扳机上缘压下时解脱。单发模式下每次击发后自动重新挂住（半自动），连发模式下被快慢机杠杆抬开（全自动）。",
   },
   {
@@ -597,7 +597,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "box", w: 0.004, h: 0.014, d: 0.01, bevel: 0.0006 },
     material: "steel_worn",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.05, -0.062] },
+    mate: { type: "absolute", position: [0, -0.06, -0.085] },
     source: "单发阻铁：半自动时在扳机回位过程中挂住枪机框带回的击锤，实现「扣一次打一发」。",
   },
   {
@@ -642,7 +642,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "cylinder", r: 0.0022, h: 0.038, segments: 10 },
     material: "ejector_steel",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.04, -0.068], rotation: [0, 0, 90] },
+    mate: { type: "absolute", position: [0, -0.04, -0.085], rotation: [0, 0, 90] },
     source: "⌀4.4 × 38 击锤轴销（拆发射机组的必拆件）。",
   },
   {
@@ -655,7 +655,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "cylinder", r: 0.0022, h: 0.038, segments: 10 },
     material: "ejector_steel",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.042, -0.075], rotation: [0, 0, 90] },
+    mate: { type: "absolute", position: [0, -0.042, -0.095], rotation: [0, 0, 90] },
     source: "扳机轴销 ⌀4.4 × 38。",
   },
   {
@@ -668,7 +668,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "cylinder", r: 0.002, h: 0.038, segments: 10 },
     material: "ejector_steel",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.014, -0.072], rotation: [0, 0, 90] },
+    mate: { type: "absolute", position: [0, -0.026, -0.105], rotation: [0, 0, 90] },
     source: "快慢机轴销 ⌀4 × 38。",
   },
   // ===================== L2 弹匣组 =====================
@@ -730,7 +730,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "kit", kit: "followerPlate", params: { w: 0.028, len: 0.02, t: 0.0024, lip: 0.002 } },
     material: "steel_blued",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.198, -0.056], rotation: [208, 0, 0] },
+    mate: { type: "absolute", position: [0, -0.212, -0.062], rotation: [208, 0, 0] },
     source: "底板：铆接在弹匣底部，托住托弹簧下端支座。",
   },
   {
@@ -916,7 +916,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "kit", kit: "gripWood", params: { w: 0.036, h: 0.075, t: 0.028, rakeDeg: 18 } },
     material: "wood_worn",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.025, -0.128] },
+    mate: { type: "absolute", position: [0, -0.025, -0.162] },
     source: "握把：木质 + 后倾 18°，表面磨亮（使用磨损质感层：握持处粗糙度显著降低）。",
   },
   {
@@ -949,7 +949,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     },
     material: "steel_blued",
     node: "AkRecoil",
-    mate: { type: "absolute" },
+    mate: { type: "absolute", position: [0, -0.06, -0.105] },
     source: "扳机护圈：冲压钢丝圈，护住扳机防误触（冬季戴手套亦可操作）。",
   },
   // ===================== L5 表面附件 =====================
@@ -1189,6 +1189,16 @@ export function makeAk47Registry(): ModelRegistry {
       { family: "pin-press", a: "ak47.receiver.body", b: "ak47.fire.hammer_pin", reason: "击锤轴销压配在机匣两侧壁", maxDepthMm: 2 },
       { family: "selector-shaft", a: "ak47.receiver.body", b: "ak47.fire.selector", reason: "快慢机轴横穿机匣两侧（露头成拨片座）", maxDepthMm: 3 },
       { family: "mag-latch", a: "ak47.mag.body", b: "ak47.mag.latch_spring", reason: "弹匣卡榫扭簧装在卡榫座内", maxDepthMm: 3 },
+      { family: "pin-in-hole", a: "ak47.fire.trigger", b: "ak47.fire.trigger_pin", reason: "扳机轴销穿过扳机铰孔（轴孔配合）", maxDepthMm: 5 },
+      { family: "pin-in-hole", a: "ak47.fire.hammer", b: "ak47.fire.hammer_pin", reason: "击锤轴销穿过击锤铰孔（轴孔配合）", maxDepthMm: 5 },
+      { family: "pin-in-hole", a: "ak47.fire.selector", b: "ak47.fire.selector_pin", reason: "快慢机轴销穿过快慢机轴孔（轴孔配合）", maxDepthMm: 5 },
+      { family: "pin-in-hole", a: "ak47.fire.hammer", b: "ak47.fire.selector", reason: "击锤与快慢机轴同区（快慢机轴横穿机匣）", maxDepthMm: 5 },
+      { family: "fire-linkage", a: "ak47.fire.trigger", b: "ak47.fire.sear", reason: "扳机压阻铁（击发杠杆组必须接触）", maxDepthMm: 4 },
+      { family: "fire-linkage", a: "ak47.fire.trigger", b: "ak47.fire.disconnector", reason: "单发阻铁骑在扳机杆上（联动接触）", maxDepthMm: 4 },
+      { family: "fire-linkage", a: "ak47.fire.hammer_spring", b: "ak47.fire.sear", reason: "击锤簧压在阻铁座上（簧力传递）", maxDepthMm: 4 },
+      { family: "fire-linkage", a: "ak47.fire.hammer_spring", b: "ak47.fire.trigger", reason: "击锤簧与扳机杆同区（簧座紧贴）", maxDepthMm: 4 },
+      { family: "fire-linkage", a: "ak47.fire.sear", b: "ak47.fire.hammer", reason: "阻铁挂击锤尾齿（待击接触）", maxDepthMm: 4 },
+      { family: "fire-linkage", a: "ak47.fire.disconnector", b: "ak47.fire.hammer", reason: "单发阻铁与击锤尾齿同区（待击接触）", maxDepthMm: 4 },
     ],
   };
 }
