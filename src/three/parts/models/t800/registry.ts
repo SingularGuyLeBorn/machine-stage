@@ -4,8 +4,10 @@ import type { KitParam } from "../../registry/types";
 import type { ModelRegistry, NodeDef } from "../../registry/types";
 import { PartBuilder } from "./build";
 import { JOINTS, MISSING_PARENTS, NODE_PIVOTS, nodeNameOf } from "./spec";
-import { MECH_NAMES, boneName } from "./names";
+import { MECH_NAMES, boneName, mechName, type BoneName } from "./names";
 import { meshPartGeometryByIndex } from "./mesh/geometry";
+import { splitBoneIntoPlates } from "./mesh/plates";
+import { buildMechParts, type MechKind, type Recipe } from "./mech";
 import {
   HYDRAULICS,
   hydraulicGeometry,
@@ -81,19 +83,91 @@ interface T800Bundle {
 }
 
 let bundle: T800Bundle | null = null;
+let mechBundle: T800Bundle | null = null;
 
-/** 一次构建：注册表与几何同源（每件几何 = 真实网格的一个蒙皮部位 / 一件缸零件）。 */
-export function makeT800(): T800Bundle {
-  if (bundle) return bundle;
+/** 部位该配哪套机械配方。 */
+function recipeOf(name: BoneName): Recipe {
+  if (name.slug.startsWith("eyeball") || name.slug.startsWith("eye_lens")) return "eye";
+  if (name.slug.endsWith("_pin")) return "pin";
+  if (name.system === "hand" && /thumb|index|middle|ring|pinky/.test(name.slug)) return "finger";
+  if (name.slug.startsWith("hand_")) return "hand";
+  if (name.system === "head") return "head";
+  if (name.system === "spine" || name.system === "pelvis" || name.system === "neck") return "torso";
+  return "limb";
+}
+
+/** 机械件的材质。 */
+function mechMaterial(kind: MechKind): string {
+  switch (kind) {
+    case "bearing_seal":
+    case "hose":
+    case "clip":
+      return "rubber";
+    case "bearing_inner":
+    case "bushing":
+    case "fitting":
+      return "gunmetal";
+    case "bolts":
+      return "dark_chrome";
+    case "frame":
+    case "rail":
+    case "brace":
+    case "shaft":
+      return "chrome";
+    default:
+      return "mirror";
+  }
+}
+
+/** 护板缓存（一个部位只切一次）。 */
+const plateCache = new Map<number, ReturnType<typeof splitBoneIntoPlates>>();
+function platesFor(partIndex: number): ReturnType<typeof splitBoneIntoPlates> {
+  const hit = plateCache.get(partIndex);
+  if (hit) return hit;
+  const plates = splitBoneIntoPlates(meshPartGeometryByIndex(partIndex));
+  plateCache.set(partIndex, plates);
+  return plates;
+}
+
+/** 机械件缓存。 */
+const mechCache = new Map<number, ReturnType<typeof buildMechParts>>();
+function mechFor(
+  partIndex: number,
+  center: [number, number, number],
+  size: [number, number, number],
+  recipe: Recipe,
+): ReturnType<typeof buildMechParts> {
+  const hit = mechCache.get(partIndex);
+  if (hit) return hit;
+  const parts = buildMechParts({ center, size }, recipe);
+  mechCache.set(partIndex, parts);
+  return parts;
+}
+
+/**
+ * 构建 T-800 注册表。
+ *
+ * @param options.decompose
+ *   false = **GLB 原型**：每个蒙皮部位就是一块光滑网格（外形最还原）。
+ *   true  = **机械拆解版**：每块光滑网格换成「护板（外形仍吻合）+ 内部机械器件」。
+ */
+export function makeT800(options: { decompose?: boolean } = {}): T800Bundle {
+  const decompose = options.decompose === true;
+  if (decompose && mechBundle) return mechBundle;
+  if (!decompose && bundle) return bundle;
   const pivots: Record<string, [number, number, number]> = { ...NODE_PIVOTS };
   for (const def of HYDRAULICS) pivots[rodNodeName(def.key)] = def.b;
   const builder = new PartBuilder(pivots);
   const layouts: Record<string, InstanceLayout> = {};
+  // 零件 id 前缀必须与模型 id 一致（框架校验）
+  const prefix = decompose ? "t800_mech" : "t800";
 
   // ---- 真实网格切出的骨骼零件（标准机械/解剖命名）----
   for (let index = 0; index < JOINTS.length; index++) {
     const joint = JOINTS[index];
     const name = boneName(joint.name);
+    // 机械拆解版：光滑整块被「护板 + 内部机械器件」取代，不再单独成件
+    if (!decompose)
     builder.add({
       id: `t800.${name.system}.${name.slug}`,
       cn: name.cn,
@@ -110,6 +184,51 @@ export function makeT800(): T800Bundle {
       at: joint.center,
       hint: `${name.en} · ${joint.size.map((v) => (v * 1000).toFixed(0)).join("×")} mm`,
     });
+
+    // ---- 机械拆解版：把光滑块换成「护板 + 内部机械器件」----
+    if (decompose) {
+      const node = nodeNameOf(joint.name);
+      const plates = platesFor(index);
+      for (let p = 0; p < plates.length; p++) {
+        const plate = plates[p];
+        builder.add({
+          id: `t800_mech.${name.system}.${name.slug}_guard${String(p + 1).padStart(2, "0")}`,
+          cn: `${name.cn}护板 ${String(p + 1).padStart(2, "0")}`,
+          en: `${name.en} Guard Plate ${String(p + 1).padStart(2, "0")}`,
+          asm: joint.asm,
+          geom: { type: "kit", kit: "t800Plate", params: { partIndex: index, plate: p } },
+          mat: joint.mat,
+          layer: joint.asm === "hand" ? 2 : 1,
+          node,
+          at: [
+            joint.center[0] + plate.center.x,
+            joint.center[1] + plate.center.y,
+            joint.center[2] + plate.center.z,
+          ],
+          hint: `${name.en} 的外覆护板（拼起来与源网格外形一致）`,
+        });
+      }
+      const recipe = recipeOf(name);
+      for (const part of mechFor(index, joint.center, joint.size, recipe)) {
+        const mech = mechName(part.kind, part.index);
+        builder.add({
+          id: `t800_mech.${name.system}.${name.slug}_${part.kind}${String(part.index + 1).padStart(2, "0")}`,
+          cn: `${name.cn}${mech.cn}`,
+          en: `${name.en} ${mech.en}`,
+          asm: joint.asm,
+          geom: {
+            type: "kit",
+            kit: "t800Mech",
+            params: { partIndex: index, kind: part.kind, index: part.index },
+          },
+          mat: mechMaterial(part.kind),
+          layer: joint.asm === "hand" ? 2 : 1,
+          node,
+          at: part.center,
+          hint: `${name.en} 内部机械器件`,
+        });
+      }
+    }
   }
 
   // ---- 关节驱动液压缸 ----
@@ -126,7 +245,7 @@ export function makeT800(): T800Bundle {
       const mech = MECH_NAMES[plan.name] ?? { cn: plan.name, en: plan.name };
       const jointCn = boneName(def.child).cn;
       builder.add({
-        id: `t800.hydraulics.${def.key}_${plan.name}`,
+        id: `${prefix}.hydraulics.${def.key}_${plan.name}`,
         cn: `${jointCn}液压${mech.cn}`,
         en: `${boneName(def.child).en} ${mech.en}`,
         asm: "hydraulics",
@@ -144,14 +263,20 @@ export function makeT800(): T800Bundle {
     }
   }
 
-  bundle = {
-    registry: {      model: "t800",
-      title: "T-800 内骨骼 · 整机",
-      subtitle: "76 个解剖部位 + 17 根关节液压缸（195 个标准化零件）",
+  const result: T800Bundle = {
+    registry: {
+      model: decompose ? "t800_mech" : "t800",
+      title: decompose ? "T-800 内骨骼 · 机械拆解版" : "T-800 内骨骼 · 整机",
+      subtitle: decompose
+        ? `每个光滑块换成机械器件组合（${builder.parts.length} 个零件）`
+        : `76 个解剖部位 + 17 根关节液压缸（${builder.parts.length} 个标准化零件）`,
       source_notes:
         "几何来自 t800-mesh.obj（120854 顶点 / 130884 面）按 t800-verts-joints.csv 的 76 个蒙皮部位切分；" +
         "坐标已换算为站立姿态（+X 前 / +Y 上 / +Z 右），身高 1.90m，脚底 y=0。" +
-        "液压缸为独立零件（缸体/活塞/活塞杆/耳环×2/导向套/密封），缸拉骨头动，活塞杆露出长度由 |AB| 实时求解。",
+        "液压缸为独立零件（缸体/活塞/活塞杆/耳环A/耳环B/导向套/密封），缸拉骨头动，活塞杆露出长度由 |AB| 实时求解。" +
+        (decompose
+          ? "机械拆解版：每块光滑网格换成「护板（外形与源网格一致）+ 内部机械器件（骨架/纵梁/横撑/轴承/螺栓圈/软管/接头/油嘴）」。"
+          : "GLB 原型：每个蒙皮部位是一块光滑网格，外形最还原。"),
       constants: {
         MODEL_HEIGHT: 1.9,
         JOINT_COUNT: JOINTS.length,
@@ -166,8 +291,8 @@ export function makeT800(): T800Bundle {
       expectedContacts: [
         {
           family: "t800-hydraulic-fit",
-          a: "t800.hydraulics.*",
-          b: "t800.*",
+          a: "t800*hydraulics.*",
+          b: "t800*",
           reason: "液压缸耳环/导向套/缸体嵌进骨头的装配贴合（构造性接触）",
           maxDepthMm: 40,
           allowDisplaced: true,
@@ -175,8 +300,8 @@ export function makeT800(): T800Bundle {
         },
         {
           family: "t800-mesh-seam",
-          a: "t800.*",
-          b: "t800.*",
+          a: "t800*",
+          b: "t800*",
           reason:
             "同一真实网格按蒙皮切分的相邻部位：源网格里各骨本来就在同一原物体上互相穿插" +
             "（躯干壳体与锁骨重叠 60mm 量级），切开后接缝处的重叠是构造性的，不是错位穿透",
@@ -206,6 +331,35 @@ export function makeT800(): T800Bundle {
           allowDisplaced: true,
           allowSuspect: true,
         },
+        {
+          family: "t800-mech-shell",
+          a: "t800_mech.*",
+          b: "t800_mech.*",
+          reason:
+            "护板之间与机械件之间的贴合/穿插：源网格的壳体本身自相交，" +
+            "拆成护板后互相嵌合属于构造性接触（不是错位穿透）",
+          maxDepthMm: 130,
+          allowDisplaced: true,
+          allowSuspect: true,
+        },
+        {
+          family: "t800-source-overlap",
+          a: "t800_mech.spine.vertebra_t3",
+          b: "t800_mech.arm.humerus_distal_l",
+          reason: "源网格自身的骨间穿插：上臂根长在胸廓壳体内部（非装配错位）",
+          maxDepthMm: 95,
+          allowDisplaced: true,
+          allowSuspect: true,
+        },
+        {
+          family: "t800-source-overlap",
+          a: "t800_mech.pelvis.pelvis",
+          b: "t800_mech.leg.hip_joint_l",
+          reason: "源网格自身的骨间穿插：髋球座嵌在骨盆内部（非装配错位）",
+          maxDepthMm: 95,
+          allowDisplaced: true,
+          allowSuspect: true,
+        },
       ],
     },
     layouts,
@@ -213,7 +367,9 @@ export function makeT800(): T800Bundle {
   if (MISSING_PARENTS.length) {
     console.warn("t800：分类表里有找不到的父部位", MISSING_PARENTS);
   }
-  return bundle;
+  if (decompose) mechBundle = result;
+  else bundle = result;
+  return result;
 }
 
 /** 几何 kit：真实网格部件 + 液压缸零件。 */
@@ -221,6 +377,27 @@ export const t800MeshBuilders: Record<string, GeometryBuilder> = {
   t800Mesh: (spec) => {
     const params = (spec as { params?: Record<string, KitParam> }).params ?? {};
     return meshPartGeometryByIndex(Number(params.partIndex ?? 0));
+  },
+  t800Plate: (spec) => {
+    const params = (spec as { params?: Record<string, KitParam> }).params ?? {};
+    const partIndex = Number(params.partIndex ?? 0);
+    const plate = Number(params.plate ?? 0);
+    const plates = platesFor(partIndex);
+    const hit = plates[plate];
+    if (!hit) throw new Error(`t800.plate：第 ${partIndex} 件没有护板 #${plate}`);
+    return hit.geometry;
+  },
+  t800Mech: (spec) => {
+    const params = (spec as { params?: Record<string, KitParam> }).params ?? {};
+    const partIndex = Number(params.partIndex ?? 0);
+    const kind = String(params.kind ?? "") as MechKind;
+    const index = Number(params.index ?? 0);
+    const joint = JOINTS[partIndex];
+    if (!joint) throw new Error(`t800.mech：没有第 ${partIndex} 个部位`);
+    const parts = mechFor(partIndex, joint.center, joint.size, recipeOf(boneName(joint.name)));
+    const hit = parts.find((p) => p.kind === kind && p.index === index);
+    if (!hit) throw new Error(`t800.mech：${joint.name} 没有 ${kind}#${index}`);
+    return hit.geometry;
   },
   t800Hydraulic: (spec) => {
     const params = (spec as { params?: Record<string, KitParam> }).params ?? {};

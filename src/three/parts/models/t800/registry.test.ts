@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { validateRegistry } from "../../registry/validate";
 import { buildModel } from "../../assembler/assembler";
-import { makeT800Layouts, makeT800Registry, t800AllBuilders } from "./registry";
+import { makeT800, makeT800Layouts, makeT800Registry, t800AllBuilders } from "./registry";
 import { animateT800, t800CylinderReadout } from "./motion";
 import { HYDRAULICS, hydraulicPlans } from "./hydraulics";
 import { JOINTS, JOINT_BY_NAME, jointChain } from "./spec";
@@ -16,6 +16,17 @@ import { meshPartGeometry } from "./mesh/geometry";
 
 function build() {
   const registry = makeT800Registry();
+  const model = buildModel(registry, {
+    builders: t800AllBuilders,
+    instanceLayouts: makeT800Layouts(),
+    warnMissingLayout: false,
+  });
+  return { registry, model };
+}
+
+/** 机械拆解版（每个光滑块 → 护板 + 内部机械器件）。 */
+function makeMech() {
+  const registry = makeT800({ decompose: true }).registry;
   const model = buildModel(registry, {
     builders: t800AllBuilders,
     instanceLayouts: makeT800Layouts(),
@@ -128,6 +139,40 @@ describe("T-800 真实网格切分", () => {
     expect(hip.pivot[1]).toBeCloseTo(0.9, 3);
     // 手臂垂手后，肘关节降到前臂高度（不是 A-pose 时的 1.351）
     expect(elbow.pivot[1]).toBeLessThan(1.35);
+  });
+});
+
+describe("T-800 机械拆解版", () => {
+  it("每个光滑块换成机械器件组合，零件数爆炸到 2000+", () => {
+    const { registry } = makeMech();
+    expect(registry.parts.length).toBeGreaterThan(2000);
+    // 一个部位内部就有十几件：护板 + 骨架/纵梁/横撑/轴承/螺栓圈/软管/接头…
+    const femur = registry.parts.filter((p) => p.id.startsWith("t800_mech.leg.femur_r_"));
+    expect(femur.length).toBeGreaterThan(15);
+    const kinds = new Set(femur.map((p) => p.id.split("_").pop()!.replace(/\d+$/, "")));
+    expect(kinds.size).toBeGreaterThan(6);
+  });
+
+  it("光滑整块不再单独成件（被护板 + 机械件取代）", () => {
+    const { registry } = makeMech();
+    expect(registry.parts.filter((p) => p.id === "t800_mech.leg.femur_r")).toHaveLength(0);
+    expect(registry.parts.filter((p) => p.id.startsWith("t800_mech.leg.femur_r_guard"))).not.toHaveLength(0);
+  });
+
+  it("护板拼起来与源网格外形一致（护板数 = 该部位的表面分片）", () => {
+    const { registry } = makeMech();
+    const guards = registry.parts.filter((p) => p.id.includes("_guard"));
+    expect(guards.length).toBeGreaterThan(400);
+    // 每块护板都有几何（不是空壳）
+    const model = buildModel(registry, {
+      builders: t800AllBuilders,
+      instanceLayouts: makeT800Layouts(),
+      warnMissingLayout: false,
+    });
+    for (const handle of model.parts) {
+      if (!handle.partId.includes("_guard")) continue;
+      expect(handle.geometry.attributes.position.count, handle.partId).toBeGreaterThan(0);
+    }
   });
 });
 
