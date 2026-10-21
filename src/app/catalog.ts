@@ -37,6 +37,7 @@ export type StageAction =
   | { id: string; group: string; label: string; kind: "view-toggle"; view: ViewKey }
   | { id: string; group: string; label: string; kind: "param"; param: string; value: number | null }
   | { id: string; group: string; label: string; kind: "scan"; scanKind: "static" | "sweep" }
+  | { id: string; group: string; label: string; kind: "variant"; variant: string }
   | { id: string; group: string; label: string; kind: "reset-view" }
   | { id: string; group: string; label: string; kind: "planned"; note: string };
 
@@ -52,6 +53,16 @@ export interface ParamRange {
   step: number;
 }
 
+/** 同一模型的变体（原型 / 机械拆解版……）：在 UI 里切换，骨架与动画共用。 */
+export interface StageVariant {
+  id: string;
+  label: string;
+  registry: ModelRegistry;
+  layouts?: Record<string, InstanceLayout>;
+  /** 变体专属读数（缺省用模型的 readouts）。 */
+  readouts?: (assembled: AssembledModel) => Array<{ label: string; value: string }>;
+}
+
 export interface StageModel {
   id: string;
   title: string;
@@ -61,6 +72,8 @@ export interface StageModel {
   status: "ready" | "planned";
   registry?: ModelRegistry;
   layouts?: Record<string, InstanceLayout>;
+  /** 变体清单（有它时，UI 用「变体」动作切换，registry 取第一个变体）。 */
+  variants?: StageVariant[];
   /** 模型自定义几何 kit 构造器（如发动机 borePlate/siameseBlock 等）。 */
   builders?: Record<string, GeometryBuilder>;
   /** 动画：只驱动节点，每帧调用前框架已 resetNodes。t 为秒。 */
@@ -89,51 +102,53 @@ const testKit = makeTestRegistry();
 /** 机械拆解版注册表（每个光滑块 → 护板 + 内部机械器件）。 */
 const makeT800MechRegistry = () => makeT800({ decompose: true }).registry;
 
+/** 当前生效的注册表（有变体时取选中变体的）。 */
+export function activeRegistryOf(
+  modelId: string,
+  variantId?: string,
+): ModelRegistry | undefined {
+  const model = findModel(modelId);
+  if (!model) return undefined;
+  if (!model.variants?.length) return model.registry;
+  return (
+    model.variants.find((item) => item.id === variantId)?.registry ?? model.variants[0].registry
+  );
+}
+
+/** 当前生效的实例布局（有变体时取选中变体的）。 */
+export function activeLayoutsOf(
+  modelId: string,
+  variantId?: string,
+): Record<string, InstanceLayout> | undefined {
+  const model = findModel(modelId);
+  if (!model) return undefined;
+  if (!model.variants?.length) return model.layouts;
+  const variant = model.variants.find((item) => item.id === variantId) ?? model.variants[0];
+  return variant.layouts ?? model.layouts;
+}
+
 export const CATALOG: StageModel[] = [
   {
-    id: "t800_mech",
-    title: "T-800 内骨骼 · 机械拆解版",
-    subtitle: "M-G：每个光滑块换成机械器件组合（护板 + 骨架/轴承/螺栓/缸，3080 件）",
-    milestone: "M-G",
-    status: "ready",
-    registry: makeT800MechRegistry(),
-    layouts: makeT800Layouts({ decompose: true }),
-    builders: t800AllBuilders,
-    animate: animateT800,
-    readouts: t800Readouts,
-    states: [
-      { id: "idle", label: "待机", hint: "整机静止，可拖构建滑杆逐层装配" },
-      {
-        id: "running",
-        label: "步态演示",
-        hint: "髋/膝/踝/肩/肘/腕欠阻尼步态，17 根液压缸随关节角真实伸缩；点零件看实例检查器",
-      },
-      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 屈伸扫掠检测进行中" },
-    ],
-    actions: [
-      { id: "t800-flex", group: "机构", label: "步态演示", kind: "machine-state", state: "running" },
-      { id: "t800-stop", group: "机构", label: "停机", kind: "machine-state", state: "idle" },
-      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
-      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
-      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
-      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
-      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
-      { id: "scan-sweep", group: "自检", label: "扫掠检测", kind: "scan", scanKind: "sweep" },
-    ],
-    notes: [
-      "机械拆解版：每个 GLB 光滑块换成「护板（外形仍与源网格吻合）+ 内部机械器件」，共 2073 个零件。",
-      "一个部位内部就有十几个件：承力骨架 / 纵梁 / 横撑 / 轴承(外圈+内圈+密封) / 螺栓圈 / 液压软管 / 管接头 / 油嘴 / 卡环 / 衬套。",
-      "护板按「轴向段 × 周向扇区」把原表面切成独立零件，拼起来外形与源网格一致。",
-      "与「GLB 原型」模型同骨架同运动学，可直接对比：外形一致，内部由光滑整块变成机械器件组合。",
-      "验收脚本：npx tsx scripts/diag-t800.ts --write（静态 + 16 帧扫掠穿模、悬空、液压行程核算）。",
-    ],
-  },
-  {
     id: "t800",
-    title: "T-800 内骨骼 · GLB 原型",
-    subtitle: "M-G：真实网格按蒙皮切分（76 骨骼部位 + 17 根关节液压缸，245 件）",
+    title: "T-800 内骨骼",
+    subtitle: "M-G：真实网格按蒙皮切分（原型 245 件 / 机械拆解版 3067 件）",
     milestone: "M-G",
     status: "ready",
+    // 同一副骨架的两个版本：GLB 原型 vs 机械拆解版（UI 里可切）
+    variants: [
+      {
+        id: "glb",
+        label: "GLB 原型",
+        registry: makeT800Registry(),
+        layouts: makeT800Layouts(),
+      },
+      {
+        id: "mech",
+        label: "机械拆解版",
+        registry: makeT800MechRegistry(),
+        layouts: makeT800Layouts({ decompose: true }),
+      },
+    ],
     registry: makeT800Registry(),
     layouts: makeT800Layouts(),
     builders: t800AllBuilders,
@@ -149,6 +164,8 @@ export const CATALOG: StageModel[] = [
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 屈伸扫掠检测进行中" },
     ],
     actions: [
+      { id: "t800-variant-glb", group: "版本", label: "GLB 原型", kind: "variant", variant: "glb" },
+      { id: "t800-variant-mech", group: "版本", label: "机械拆解版", kind: "variant", variant: "mech" },
       { id: "t800-flex", group: "机构", label: "步态演示", kind: "machine-state", state: "running" },
       { id: "t800-stop", group: "机构", label: "停机", kind: "machine-state", state: "idle" },
       { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
@@ -159,15 +176,11 @@ export const CATALOG: StageModel[] = [
       { id: "scan-sweep", group: "自检", label: "扫掠检测", kind: "scan", scanKind: "sweep" },
     ],
     notes: [
-      "GLB 原型：每个蒙皮部位是一块光滑网格（外形最还原），整机 195 个定义件（76 个蒙皮部位 + 17 根缸 × 7 件）。",
-      "几何来源：t800-mesh.obj（120854 顶点 / 130884 面）按 t800-verts-joints.csv 的 76 个蒙皮部位切分，坐标换算为站立姿态（+X 前 / +Y 上 / +Z 右），身高 1.90m。",
-      "每根驱动缸 7 件（缸体 / 活塞 / 活塞杆 / 耳环A / 耳环B / 导向套 / 密封），跨在关节两端，缸拉骨头动。",
-      "17 根缸：髋/膝/踝/肩/肘/腕 ×2 + 脊柱中央液压柱 + 竖脊肌 ×2 + 腰椎 + 颈。",
-      "活塞杆露出长度 = |AB| - 缸长，由关节角几何实时求解，动画不写死位移。",
-      "运动学：矢状面屈伸绕 Z、水平面扭转绕 Y；髋/膝/踝/肩/肘/腕/脊椎/下颌/五指/眼珠全部驱动，欠阻尼二阶响应。",
-      "源模型 helper 骨的左右前缀是反的（Left* 在 +Z 侧），父子关系按几何实测位置重建，不看名字。",
+      "两个版本可切：「GLB 原型」（每个蒙皮部位一块光滑网格，外形最还原，245 件）与「机械拆解版」（每块光滑网格换成护板 + 内部机械器件，3067 件）。",
+      "一个部位内部就有十几个件：承力骨架 / 纵梁 / 横撑 / 轴承(外圈+内圈+密封) / 螺栓圈 / 液压软管 / 管接头 / 油嘴 / 卡环 / 衬套。",
+      "护板按「轴向段 × 周向扇区」把原表面切成独立零件，拼起来外形与源网格一致。",
+      "两版同骨架同运动学，可直接对比：外形一致，内部由光滑整块变成机械器件组合。",
       "验收脚本：npx tsx scripts/diag-t800.ts --write（静态 + 16 帧扫掠穿模、悬空、液压行程核算）。",
-      "对照存档：docs/qa/t800/views（侧/正/斜 45° 投影）、docs/qa/t800/demo（步态循环）。",
     ],
   },
   {

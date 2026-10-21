@@ -125,6 +125,8 @@ const VIEWS_DEFAULT: Record<ViewKey, boolean> = {
 interface StageState {
   /** 当前模型 id（catalog）。 */
   modelId: string;
+  /** 当前变体 id（模型有 variants 时的选择；空 = 用第一个）。 */
+  variantId: string;
   /** 常量覆盖（参数面板写入；重建时优先于注册表默认值）。 */
   overrides: Record<string, number>;
   /** 每次自增触发重建。 */
@@ -192,6 +194,8 @@ interface StageState {
   closeIsolation(): void;
   stepReport(delta: number): void;
   setMachineState(state: string): void;
+  /** 切换模型变体（同一模型的不同版本：原型 / 机械拆解版）。 */
+  setVariant(variantId: string): void;
   requestFocus(partId: string): void;
   focusPoint(center: [number, number, number], radius?: number, resetAngle?: boolean): void;
   setHome(center: [number, number, number], radius: number): void;
@@ -239,6 +243,7 @@ const initialModel = findModel("test");
 
 export const useStageStore = create<StageState>((set, get) => ({
   modelId: initialModel.id,
+  variantId: initialModel.variants?.[0]?.id ?? "",
   overrides: {},
   rebuildToken: 0,
 
@@ -296,6 +301,7 @@ export const useStageStore = create<StageState>((set, get) => ({
       scanKind: null,
       scanMs: null,
       machineState: model.states?.[0]?.id ?? "idle",
+      variantId: model.variants?.[0]?.id ?? "",
       views: { ...VIEWS_DEFAULT },
       focus: null,
       home: null,
@@ -412,6 +418,12 @@ export const useStageStore = create<StageState>((set, get) => ({
     get().selectPart(parseInstanceRef(report.a).partId);
     get().focusPoint(report.point, 0.3);
     set({ isolation: { kind: "pair", key: reportKey(report) }, activeReport: next });
+  },
+
+  setVariant: (variantId: string) => {
+    const model = findModel(get().modelId);
+    if (!model.variants?.some((item) => item.id === variantId)) return;
+    set({ variantId, selectedPart: null, selectedInstance: null, detached: [] });
   },
 
   setMachineState: (state) => {
