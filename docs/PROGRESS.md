@@ -1446,7 +1446,7 @@ node scripts/capture-kingjoe.mjs          # 截图 + 60fps 录屏（需本机 Ch
 | 彩虹胸 | 左右各 7 条独立彩虹格栅带（14 件）+ 银框/黑背板/横栅/中央脊；额头发射体；怪光线从颈口发光体射出                                                                                                                               |
 | 尺寸   | 合体包围盒 **3.683 × 6.978 × 2.086 m**（真实网格 6.615 + 三道 0.12 接缝 + 头部组件）                                                                                                                                          |
 | 件数   | **149 定义件 / 163 同屏件 / 75,148 三角**                                                                                                                                                                                     |
-| 门禁   | `vitest` **136 passed（16 文件）**；`tsc` / `build` ✓；静态 **active 0 / expected 116 / unsupported 0**；七态 15fps 扫掠 **active 0**；合体/分离 30fps 扫掠 **active 0**；每态 unsupported 0                                  |
+| 门禁   | `vitest` **137 passed（16 文件）**；`tsc` / `build` ✓；静态 **active 0 / expected 116 / unsupported 0**；七态 15fps 扫掠 **active 0**；合体/分离 30fps 扫掠 **active 0**；每态 unsupported 0                                  |
 
 ### 关键口径 / 设计取舍
 
@@ -1500,6 +1500,6 @@ node scripts/capture-preview.mjs                 # 需本机 Chrome；输出到 
 - **证据**：`docs/qa/kingjoe-whole-core.jpg`（内核实体渲染）、`docs/qa/kingjoe-whole-solid-xray.jpg`（x-ray 下的内核）、`docs/qa/kingjoe-whole-card.jpg`（前端卡片 + 模型库限高滚动）。
 - **框架**：`PartDefinition.materialGroups` + 装配器 group 校验；单件模型支撑检测豁免；模型库列表增加 44vh/460px 最大高度和内部滚动条，超出时不再把下方零件树顶出视口。
 - **移除**：两体拆分、三体拆分、实心横切三张卡及对应代码/证据已按用户要求删除；相关历史保留在 git 提交里。
-- **门禁**：`vitest` **136 passed（16 文件）**；`tsc` / `build` ✓；单件 1 件、57,084 三角（15,248 表面 + 41,836 内核）、静态报告 0、支撑 0；内核边界边 0、体积 9.80 m³。
+- **门禁**：`vitest` **137 passed（16 文件）**；`tsc` / `build` ✓；单件 1 件、57,084 三角（15,248 表面 + 41,836 内核）、静态报告 0、支撑 0；内核边界边 0、体积 9.80 m³。
 - **模型库高度**：左上模型库列表 `max-height: min(44vh, 460px)` + 内部滚动条（`overflow-y: auto` + `scrollbar-gutter: stable`，超出时显示），超出时不再把下方零件树顶出视口。
 - **零件树**：默认全部折叠（状态只记「已展开」总成；切换模型用 `key={modelId}` 重建），视口/报告选中时仍自动展开所在总成。
