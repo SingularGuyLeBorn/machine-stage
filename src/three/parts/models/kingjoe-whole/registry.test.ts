@@ -7,8 +7,8 @@ import { kingjoeWholeBuilders } from "./kits";
 const registry = makeKingJoeWholeRegistry();
 const model = buildModel(registry, { builders: kingjoeWholeBuilders, warnMissingLayout: false });
 
-describe("kingjoewhole 整机单件", () => {
-  it("整个角色只有一个 partId，保留原材质分组", () => {
+describe("kingjoewhole 整机单件（内部实心）", () => {
+  it("整个角色只有一个 partId，表面 + 内核共用一个几何", () => {
     expect(validateRegistry(registry).filter((issue) => issue.level === "error")).toEqual([]);
     expect(registry.parts.length).toBe(1);
     expect(model.parts.length).toBe(1);
@@ -16,11 +16,16 @@ describe("kingjoewhole 整机单件", () => {
     expect(handle.partId).toBe("kingjoewhole.whole.body");
     expect(handle.def.materialGroups?.length).toBe(registry.constants.MATERIAL_GROUPS);
     expect(handle.geometry.groups.length).toBe(registry.constants.MATERIAL_GROUPS);
+    expect(handle.geometry.groups.at(-1)!.materialIndex).toBe(Number(registry.constants.MATERIAL_GROUPS) - 1);
+    expect(handle.def.materialGroups?.at(-1)).toBe("kjr_core");
     expect(handle.geometry.index!.count / 3).toBe(registry.constants.TRIANGLES);
-    expect(registry.constants.TRIANGLES).toBe(15248);
+    expect(registry.constants.SHELL_TRIANGLES).toBe(15248);
+    expect(registry.constants.CORE_TRIANGLES).toBeGreaterThan(30000);
+    expect(registry.constants.CORE_BOUNDARY_EDGES).toBe(0);
+    expect(registry.constants.CORE_VOLUME).toBeGreaterThan(9);
   });
 
-  it("合体外形与真实网格一致，单件无穿模/无悬空误报", () => {
+  it("合体外形与真实网格一致，内核藏在原皮内，单件无穿模/无悬空误报", () => {
     model.resetNodes();
     model.syncInstances();
     model.root.updateMatrixWorld(true);
