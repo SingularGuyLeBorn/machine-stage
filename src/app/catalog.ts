@@ -16,6 +16,8 @@ import {
 } from "@/three/parts/models/tiger/motion";
 import { AK47_BUILDERS, makeAk47Layouts, makeAk47Registry } from "@/three/parts/models/ak47/registry";
 import { AK47_MOTION_PARTS, animateAk47, getAk47Mode } from "@/three/parts/models/ak47/motion";
+import { M249_BUILDERS, makeM249Layouts, makeM249Registry } from "@/three/parts/models/m249/registry";
+import { M249_MOTION_PARTS, animateM249, getM249Mode } from "@/three/parts/models/m249/motion";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -165,6 +167,50 @@ export const CATALOG: StageModel[] = [
     notes: [
       "M-B 进行中：当前可见 L1 已写零件（曲轴箱为主）；后续零件随注册表补全自动出现，无需等待全部完成。",
       "机构动画（曲轴/活塞联动）由实现者接入后，此处追加 running 状态与启动/停机动作。",
+    ],
+  },
+  {
+    id: "m249",
+    title: "M249 班用自动武器",
+    subtitle: "导气式 + 弹链供弹 · M27 可散链步进 · 快拆枪管",
+    milestone: "M-E",
+    status: "ready",
+    registry: makeM249Registry(),
+    layouts: makeM249Layouts(),
+    builders: M249_BUILDERS,
+    motionParts: M249_MOTION_PARTS,
+    animate: (assembled, seconds) => {
+      animateM249(assembled, seconds, getM249Mode());
+    },
+    readouts: () => [
+      { label: "自动原理", value: "导气式（短行程活塞）" },
+      { label: "闭锁方式", value: "枪机头回转 30°" },
+      { label: "供弹方式", value: "M27 可散弹链（步进 15mm/发）" },
+      { label: "循环周期", value: "1.4 s/发" },
+      { label: "弹药", value: "5.56×45 M855（六分件）×20 链上" },
+    ],
+    states: [
+      { id: "idle", label: "装填静止", hint: "满链待击：可爆炸视图看供弹机构" },
+      { id: "semi", label: "单发", hint: "打一发：拨弹齿步进一节，空链脱落" },
+      { id: "running", label: "连发", hint: "连续射击：弹链逐节前移，弹壳下抛" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "m249-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
+      { id: "m249-auto", group: "射击", label: "连发", kind: "machine-state", state: "running" },
+      { id: "m249-idle", group: "射击", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "弹链供弹：拨弹齿随枪机往复，每次把 M27 链钩进一个节距（15mm）；空链节从受弹机左侧脱落（可散链）。",
+      "导气式核心零件：导气箍（⌀3.8 导气孔 + 两档调节器）→ 活塞 = 操作杆 → 枪机框。",
+      "快拆枪管：捏提把旋转 1/4 圈即可更换过热枪管（连射发烫要换——班组火力的设计）。",
+      "M249 向下抛壳（车内射击时弹壳不砸人），与 AK-47 的右侧抛壳不同。",
     ],
   },
   {

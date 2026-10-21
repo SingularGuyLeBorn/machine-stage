@@ -13,6 +13,7 @@ import {
 import { findModel, type StageModel } from "../catalog";
 import { faultFromError, useStageStore } from "../state/stageStore";
 import { setAk47Mode } from "@/three/parts/models/ak47/motion";
+import { setM249Mode } from "@/three/parts/models/m249/motion";
 import { applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
 
 // ============================================================================
@@ -220,11 +221,14 @@ function StageRuntime() {
   }, [modelId, rebuildToken, overrides]);
 
   // ---- 每帧纪律 ----
-  // AK-47 射击模式跟随状态机（单发/连发/停机）
+  // AK-47 / M249 射击模式跟随状态机（单发/连发/停机）
   const machineState = useStageStore((state) => state.machineState);
+  const currentModelId = useStageStore((state) => state.modelId);
   useEffect(() => {
-    setAk47Mode(machineState === "running" ? "auto" : machineState === "semi" ? "semi" : "idle");
-  }, [machineState]);
+    const mode = machineState === "running" ? "auto" : machineState === "semi" ? "semi" : "idle";
+    if (currentModelId === "ak47") setAk47Mode(mode);
+    if (currentModelId === "m249") setM249Mode(mode);
+  }, [machineState, currentModelId]);
 
   useFrame((_state, delta) => {
     if (!assembled) return;
