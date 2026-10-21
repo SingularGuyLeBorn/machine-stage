@@ -1,1 +1,1 @@
-T-800 endoskeleton (real mesh) - 侧视 - t=1.20s - phase NaN% - 198 parts / 120854 verts
+T-800 endoskeleton (real mesh) - 侧视 - t=1.20s - phase NaN% - 195 parts / 120854 verts

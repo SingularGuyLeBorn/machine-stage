@@ -74,6 +74,7 @@ console.log(
     seen.add(key);
     console.log(`  ${r.report.a} ↔ ${r.report.b}  ${r.report.depth_mm?.toFixed(2) ?? "?"}mm  ${r.report.form ?? ""}`);
   }
+  console.log(`  （唯一对 ${seen.size} 个）`);
 }
 
 // ---------------------------------------------------------------- 悬空
