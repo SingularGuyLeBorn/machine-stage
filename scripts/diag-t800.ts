@@ -3,7 +3,7 @@
 import { writeFileSync } from "node:fs";
 import * as THREE from "three";
 import { buildModel } from "../src/three/parts/assembler/assembler";
-import { makeT800Layouts, makeT800Registry, t800Builders } from "../src/three/parts/models/t800/registry";
+import { makeT800Layouts, makeT800Registry, t800AllBuilders } from "../src/three/parts/models/t800/registry";
 import { animateT800, t800Pose, t800Stroke } from "../src/three/parts/models/t800/motion";
 import { CYL, T800_HYDRAULICS, cylinderDims, cylinderLayout } from "../src/three/parts/models/t800/spec";
 import { detectStatic, getBVH } from "../src/three/parts/solver/detect";
@@ -19,7 +19,7 @@ console.log(`注册表校验：${errors.length} 错误 / ${issues.length - error
 for (const issue of issues.slice(0, 12)) console.log(`  [${issue.level}] ${issue.code} ${issue.message}`);
 
 const model = buildModel(registry, {
-  builders: t800Builders,
+  builders: t800AllBuilders,
   instanceLayouts: makeT800Layouts(),
   warnMissingLayout: false,
 });
@@ -50,6 +50,23 @@ for (const r of staticPartition.active.slice(0, 25)) {
     `  ${r.report.a} ↔ ${r.report.b}  ${r.report.depth_mm?.toFixed(2) ?? "?"}mm  ${r.report.form ?? ""}  ` +
       `@(${r.report.point.map((v) => (v * 1000).toFixed(0)).join(",")})mm  交线${(r.report.intersection_mm ?? 0).toFixed(1)}mm`,
   );
+  if (process.env.T800_DEBUG_BOX) {
+    const fmt = (box: THREE.Box3) =>
+      `x[${(box.min.x * 1000).toFixed(0)},${(box.max.x * 1000).toFixed(0)}] ` +
+      `y[${(box.min.y * 1000).toFixed(0)},${(box.max.y * 1000).toFixed(0)}] ` +
+      `z[${(box.min.z * 1000).toFixed(0)},${(box.max.z * 1000).toFixed(0)}]`;
+    const boxOf = (ref: string) => {
+      const base = ref.split("[")[0];
+      const handle = model.parts.find((h) => h.partId === base);
+      if (!handle) return "?";
+      if (!handle.geometry.boundingBox) handle.geometry.computeBoundingBox();
+      const m = new THREE.Matrix4();
+      const idx = Number(ref.includes("[") ? ref.split("[")[1].replace("]", "") : 0);
+      model.instanceMatrix(handle, idx, m);
+      return fmt(new THREE.Box3().copy(handle.geometry.boundingBox!).applyMatrix4(m));
+    };
+    console.log(`      A ${boxOf(r.report.a)}   B ${boxOf(r.report.b)}`);
+  }
 }
 
 // ---- 屈伸扫掠 ----

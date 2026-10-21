@@ -4,7 +4,7 @@ import { buildModel } from "../../assembler/assembler";
 import { validateRegistry } from "../../registry/validate";
 import { detectStatic } from "../../solver/detect";
 import { partitionExpectedContacts } from "../../solver/whitelist";
-import { makeT800Layouts, makeT800Registry, t800Builders } from "./registry";
+import { makeT800Layouts, makeT800Registry, t800AllBuilders } from "./registry";
 import { animateT800, t800Pose } from "./motion";
 import { T800_HYDRAULICS, cylinderDims, cylinderLayout } from "./spec";
 
@@ -17,7 +17,7 @@ import { T800_HYDRAULICS, cylinderDims, cylinderLayout } from "./spec";
 function build() {
   const registry = makeT800Registry();
   const model = buildModel(registry, {
-    builders: t800Builders,
+    builders: t800AllBuilders,
     instanceLayouts: makeT800Layouts(),
     warnMissingLayout: false,
   });

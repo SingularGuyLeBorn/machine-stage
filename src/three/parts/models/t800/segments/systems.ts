@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { InstanceLayout } from "../../../assembler/assembler";
 import { instanceLayout, repeatNode, type PartBuilder } from "../build";
-import { NODE_PIVOT, NODES, STUD, T800_STUDS } from "../spec";
+import { NODES, PELVIS_NODE, STUD, legPivot, legStuds } from "../spec";
 
 // ============================================================================
 // t800/segments/systems —— 液压站（阀块 / 伺服阀 / 蓄能器 / 管路）+ 紧固件族
@@ -21,7 +21,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     geom: { type: "box", w: 0.1, h: 0.05, d: 0.12, bevel: 0.005 },
     mat: "frame",
     layer: 1,
-    node: NODES.base,
+    node: PELVIS_NODE,
     at: [0, 1.5407, -0.04],
     hint: "三关节伺服阀的共用油路块，坐在骨盆顶板上",
   });
@@ -33,7 +33,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     geom: { type: "cylinder", r: 0.012, h: 0.032, segments: 18, bevel: 0.0015 },
     mat: "servo",
     layer: 2,
-    node: NODES.base,
+    node: PELVIS_NODE,
     at: [0, 1.5317, 0],
     inst: 3,
     layout: "t800.hydraulics.servos",
@@ -50,11 +50,11 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     cn: "蓄能器",
     en: "Accumulator",
     asm: "hydraulics",
-    geom: { type: "cylinder", r: 0.028, h: 0.12, segments: 24, bevel: 0.004 },
+    geom: { type: "cylinder", r: 0.028, h: 0.07, segments: 24, bevel: 0.004 },
     mat: "dark_chrome",
     layer: 2,
     node: NODES.base,
-    at: [-0.02, 1.6282, -0.04],
+    at: [-0.02, 1.5992, 0.1],
     hint: "吸收屈伸冲击，保证活塞行程平顺（不出现瞬动）；立在阀块顶面",
   });
   builder.add({
@@ -84,7 +84,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     mat: "brass",
     layer: 5,
     node: NODES.base,
-    at: [0.03, 1.5862, 0],
+    at: [0.03, 1.5782, 0],
     rot: [90, 0, 0],
     hint: "读缸压（表盘坐在阀块顶面）",
   });
@@ -96,7 +96,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     geom: { type: "cylinder", r: 0.008, h: 0.06, segments: 16 },
     mat: "brass",
     layer: 3,
-    node: NODES.base,
+    node: PELVIS_NODE,
     at: [-0.03, 1.5457, -0.1105],
     hint: "供油管向下接骨盆轭，再经大腿/小腿硬管到各缸",
   });
@@ -108,7 +108,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     geom: { type: "cylinder", r: 0.008, h: 0.06, segments: 16 },
     mat: "brass",
     layer: 3,
-    node: NODES.base,
+    node: PELVIS_NODE,
     at: [0.03, 1.5457, -0.1105],
   });
   builder.add({
@@ -157,7 +157,7 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     geom: { type: "cylinder", r: 0.009, h: 0.026, segments: 16, bevel: 0.0012 },
     mat: "servo",
     layer: 5,
-    node: NODES.base,
+    node: PELVIS_NODE,
     at: [0, 1.5812, 0],
     hint: "监测主缸缸压，配合蓄能器做冲击吸收",
   });
@@ -210,39 +210,18 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     at: [0, 0, 0],
     inst: 12,
     layout: "t800.fasteners.stud",
-    instNodes: T800_STUDS.map((stud) => stud.node),
+    instNodes: legStuds(builder.side).map((stud) => stud.node),
     hint: "12 个球头螺栓：球心在安装面外 28mm，插入凸台盲孔；耳环孔轴与销轴同轴",
   });
   layouts["t800.fasteners.stud"] = ({ index }: { index: number }) => {
-    const stud = T800_STUDS[index];
-    const pivot = NODE_PIVOT[stud.node] ?? [0, 0, 0];
+    const stud = legStuds(builder.side)[index];
+    const pivot = legPivot(stud.node, builder.side) ?? [0, 0, 0];
     const ball = new THREE.Vector3(...stud.ball);
     const normal = new THREE.Vector3(...stud.normal).normalize();
     const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
     const position = ball.clone().sub(new THREE.Vector3(...pivot));
     return new THREE.Matrix4().compose(position, q, new THREE.Vector3(1, 1, 1));
   };
-  builder.add({
-    id: "t800.fasteners.washers",
-    cn: "密封垫圈族",
-    en: "Seal washer",
-    asm: "fasteners",
-    geom: { type: "tube", rOuter: 0.0055, rInner: 0.0052, h: 0.002, segments: 14 },
-    mat: "rubber",
-    layer: 4,
-    node: NODES.knee,
-    at: [0, 0.38, 0],
-    inst: 4,
-    layout: "t800.fasteners.washers",
-    instNodes: repeatNode(NODES.knee, 4),
-    hint: "硬管接头处的密封垫圈（实例族）",
-  });
-  layouts["t800.fasteners.washers"] = instanceLayout(NODES.knee, [
-    [0.0277, 0.2705, 0.024],
-    [0.0277, 0.4895, 0.024],
-    [0.0277, 0.2705, -0.024],
-    [0.0277, 0.4895, -0.024],
-  ]);
   builder.add({
     id: "t800.hip.tie_rod",
     cn: "骨盆拉杆",
@@ -251,30 +230,9 @@ export function buildSystems(builder: PartBuilder, layouts: Record<string, Insta
     geom: { type: "cylinder", r: 0.005, h: 0.09, segments: 14 },
     mat: "chrome",
     layer: 2,
-    node: NODES.base,
+    node: PELVIS_NODE,
     at: [-0.12, 1.5207, 0.06],
     rot: [0, 0, 90],
     hint: "骨盆顶板上的横向拉杆（与躯干接口的抗扭件）",
   });
-  builder.add({
-    id: "t800.foot.sole_screws",
-    cn: "足底螺钉",
-    en: "Sole screw",
-    asm: "foot",
-    geom: { type: "cylinder", r: 0.004, h: 0.002, segments: 12, bevel: 0.0004 },
-    mat: "dark_chrome",
-    layer: 4,
-    node: NODES.ankle,
-    at: [0, 0, 0],
-    inst: 4,
-    layout: "t800.foot.sole_screws",
-    instNodes: repeatNode(NODES.ankle, 4),
-    hint: "足底板的固定螺钉（实例族）",
-  });
-  layouts["t800.foot.sole_screws"] = instanceLayout(NODES.ankle, [
-    [0.2, 0.0105, 0.03],
-    [0.2, 0.0105, -0.03],
-    [-0.06, 0.0105, 0.03],
-    [-0.06, 0.0105, -0.03],
-  ]);
 }

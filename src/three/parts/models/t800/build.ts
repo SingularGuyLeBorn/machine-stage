@@ -6,7 +6,15 @@ import type {
   GeometrySpec,
   PartDefinition,
 } from "../../registry/types";
-import { NODE_PIVOT } from "./spec";
+import {
+  NODE_NAMES,
+  NODE_PIVOT,
+  PELVIS_NODE,
+  legPivot,
+  mirrorEuler,
+  sideZ,
+  type LegSide,
+} from "./spec";
 
 // ============================================================================
 // t800/build —— 零件声明辅助器
@@ -41,46 +49,97 @@ export interface PartSpec {
   source?: string;
 }
 
-const LAYER_BASE: Record<BuildLayer, number> = { 1: 100, 2: 300, 3: 400, 4: 500, 5: 600 };
+const LAYER_BASE: Record<BuildLayer, number> = { 1: 100, 2: 300, 3: 700, 4: 1100, 5: 1500 };
 
 export class PartBuilder {
   readonly parts: PartDefinition[] = [];
-  private readonly counters: Record<BuildLayer, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  private readonly counters: Record<BuildLayer, number>;
+  /** 侧别：1 = 右腿，-1 = 左腿（-1 时整条腿沿 Z 镜像）。 */
+  readonly side: LegSide;
 
-  /** 声明一个零件。 */
-  add(spec: PartSpec): PartDefinition {
+  constructor(side: LegSide = 1, counters?: Record<BuildLayer, number>) {
+    this.side = side;
+    // 左右腿共用计数器：build_order 全局唯一，但仍按层递增（自内向外）
+    this.counters = counters ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  }
+
+  /** 右腿节点名 → 左腿节点名。 */
+  private nodeName(node: string): string {
+    if (this.side > 0 || node === PELVIS_NODE) return node;
+    const canonical = Object.keys(NODE_NAMES).find((key) => NODE_NAMES[key] === node);
+    return canonical ? `${NODE_NAMES[canonical]}L` : `${node}L`;
+  }
+
+  /** 布局键：左腿加 _L 后缀，避免与右腿共用同一份布局。 */
+  layoutKey(key: string): string {
+    return this.side > 0 ? key : `${key}_L`;
+  }
+
+  /** 声明一个零件（左腿跳过骨盆件：骨盆两腿共用，只建一次）。 */
+  add(spec: PartSpec): PartDefinition | null {
+    if (this.side < 0 && spec.node === PELVIS_NODE) return null;
     const layer = spec.layer ?? 2;
+    const side = this.side;
+    const node = spec.node ? this.nodeName(spec.node) : undefined;
     let at = spec.at;
     // 位置坐标系：
     //   · 单件（挂在关节节点上）→ 声明模型坐标，装配器换算成节点局部；
     //   · 实例件（无 instance_nodes）→ 实例矩阵写在根空间，声明值必须已是模型坐标；
     //   · 实例件（带 instance_nodes）→ 布局函数给节点局部偏移，mate 不参与定位。
-    if (at && spec.node && !spec.local && !spec.inst) {
-      const pivot = NODE_PIVOT[spec.node] ?? [0, 0, 0];
-      at = [Number(at[0]) - pivot[0], Number(at[1]) - pivot[1], Number(at[2]) - pivot[2]];
+    let pos: [number, number, number] | undefined;
+    const isPelvis = node === PELVIS_NODE;
+    if (at) {
+      const z = Number(at[2]);
+      // 腿局部坐标 → 世界坐标（z 走侧别）；节点局部件（local）只做镜像；
+      // 骨盆件本来就是世界坐标（两腿共用），不参与换算。
+      pos = isPelvis
+        ? [Number(at[0]), Number(at[1]), z]
+        : [
+            Number(at[0]),
+            Number(at[1]),
+            spec.local ? (side > 0 ? z : -z) : sideZ(side, z),
+          ];
+      if (node && !spec.local && !spec.inst) {
+        const pivot = legPivot(node, side) ?? [0, 0, 0];
+        pos = [pos[0] - pivot[0], pos[1] - pivot[1], pos[2] - pivot[2]];
+      }
     }
+    const rot: [number, number, number] | undefined = spec.rot
+      ? side > 0
+        ? [Number(spec.rot[0]), Number(spec.rot[1]), Number(spec.rot[2])]
+        : mirrorEuler([
+            Number(spec.rot[0]),
+            Number(spec.rot[1]),
+            Number(spec.rot[2]),
+          ])
+      : undefined;
     const mate =
-      at || spec.rot
+      pos || rot
         ? {
             type: "absolute" as const,
-            ...(at ? { position: at } : {}),
-            ...(spec.rot ? { rotation: spec.rot } : {}),
+            ...(pos ? { position: pos } : {}),
+            ...(rot ? { rotation: rot } : {}),
           }
         : undefined;
+    // 左腿：整块几何沿 Z 镜像（法线与绕序一并修正）
+    const geom: GeometrySpec =
+      side < 0 && !isPelvis && !spec.geom.mirror ? { ...spec.geom, mirror: "z" } : spec.geom;
     const definition: PartDefinition = {
-      id: spec.id,
+      id: side < 0 ? `${spec.id}_left` : spec.id,
       name_cn: spec.cn,
       name_en: spec.en,
       assembly: spec.asm,
       build_layer: layer,
       build_order: LAYER_BASE[layer] + this.counters[layer]++,
-      geometry: spec.geom,
+      geometry: geom,
       material: spec.mat,
-      ...(spec.node ? { node: spec.node } : {}),
+      ...(node ? { node } : {}),
       ...(mate ? { mate } : {}),
       ...(spec.inst ? { instances: spec.inst, indexed: true } : {}),
-      ...(spec.layout ? { instance_layout: spec.layout } : {}),
-      ...(spec.instNodes ? { instance_nodes: spec.instNodes } : {}),
+      ...(spec.layout ? { instance_layout: this.layoutKey(spec.layout) } : {}),
+      ...(spec.instNodes
+        ? { instance_nodes: spec.instNodes.map((name) => this.nodeName(name)) }
+        : {}),
       ...(spec.tags ? { tags: spec.tags } : {}),
       ...(spec.hint ? { hint: spec.hint } : {}),
       ...(spec.source ? { source: spec.source } : {}),

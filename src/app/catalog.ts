@@ -17,7 +17,7 @@ import {
 import {
   makeT800Layouts,
   makeT800Registry,
-  t800Builders,
+  t800AllBuilders,
 } from "@/three/parts/models/t800/registry";
 import { animateT800, t800Readouts } from "@/three/parts/models/t800/motion";
 
@@ -94,7 +94,7 @@ export const CATALOG: StageModel[] = [
     status: "ready",
     registry: makeT800Registry(),
     layouts: makeT800Layouts(),
-    builders: t800Builders,
+    builders: t800AllBuilders,
     animate: animateT800,
     readouts: t800Readouts,
     states: [

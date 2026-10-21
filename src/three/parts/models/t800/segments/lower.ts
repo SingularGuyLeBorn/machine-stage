@@ -7,7 +7,7 @@ import {
   JOINT_Y,
   NODES,
   STUD,
-  T800_HYDRAULICS,
+  legHydraulics,
   mountKitParams,
 } from "../spec";
 import { addCylinder } from "./cylinder";
@@ -762,8 +762,54 @@ export function buildLower(builder: PartBuilder, layouts: Record<string, Instanc
     [0.06, -0.0065, 0.03],
   ]);
 
+  // ---- 密封垫圈族（硬管接头处）----
+  builder.add({
+    id: "t800.fasteners.washers",
+    cn: "密封垫圈族",
+    en: "Seal washer",
+    asm: "fasteners",
+    geom: { type: "tube", rOuter: 0.0055, rInner: 0.0052, h: 0.002, segments: 14 },
+    mat: "rubber",
+    layer: 4,
+    node: NODES.knee,
+    at: [0, 0.38, 0],
+    inst: 4,
+    layout: "t800.fasteners.washers",
+    instNodes: repeatNode(NODES.knee, 4),
+    hint: "硬管接头处的密封垫圈（实例族）",
+  });
+  layouts["t800.fasteners.washers"] = instanceLayout(NODES.knee, [
+    [0.0277, 0.2705, 0.024],
+    [0.0277, 0.4895, 0.024],
+    [0.0277, 0.2705, -0.024],
+    [0.0277, 0.4895, -0.024],
+  ]);
+
+  // ---- 足底螺钉 ----
+  builder.add({
+    id: "t800.foot.sole_screws",
+    cn: "足底螺钉",
+    en: "Sole screw",
+    asm: "foot",
+    geom: { type: "cylinder", r: 0.004, h: 0.002, segments: 12, bevel: 0.0004 },
+    mat: "dark_chrome",
+    layer: 4,
+    node: NODES.ankle,
+    at: [0, 0, 0],
+    inst: 4,
+    layout: "t800.foot.sole_screws",
+    instNodes: repeatNode(NODES.ankle, 4),
+    hint: "足底板的固定螺钉（实例族）",
+  });
+  layouts["t800.foot.sole_screws"] = instanceLayout(NODES.ankle, [
+    [0.2, 0.0105, 0.03],
+    [0.2, 0.0105, -0.03],
+    [-0.06, 0.0105, 0.03],
+    [-0.06, 0.0105, -0.03],
+  ]);
+
   // ===================== 踝部两根驱动缸 =====================
-  for (const spec of T800_HYDRAULICS.filter((item) => item.parent === "knee")) {
+  for (const spec of legHydraulics(builder.side).filter((item) => item.parent === "knee")) {
     addCylinder(builder, spec, { asm: "shin", prefix: "cyl", label: spec.name_cn });
   }
 }
