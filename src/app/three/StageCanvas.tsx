@@ -17,6 +17,7 @@ import { isInternalPart, isXrayShellPart } from "./internal";
 import { Weather } from "./Weather";
 import { setArmourWet } from "@/three/parts/kernel/armourSurface";
 import { TigerVfx } from "./vfx/TigerVfx";
+import { MbtVfx } from "./vfx/MbtVfx";
 import { applyTigerLidPose, effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
 import { firstPersonView, type CameraMode } from "./viewpoints";
 import { setAk47Mode } from "@/three/parts/models/ak47/motion";
@@ -82,6 +83,7 @@ export function StageCanvas() {
       <Studio />
       <StageRuntime />
       <TigerVfx />
+      <MbtVfx />
       <CameraRig />
       <StageEffects />
     </Canvas>

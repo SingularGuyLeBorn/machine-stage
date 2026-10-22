@@ -103,3 +103,5 @@ docs/          设计基线文档（总体设计 / 零件化建模框架 / MACHI
 ## 许可与致谢
 
 MIT © 2026 OasisMind contributors。几何/贴图工具箱衍生自同作者的 `detailKit.ts`，署名见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。三方依赖：three.js、@react-three/*、three-mesh-bvh、Zustand、lucide-react。
+
+MBT-90 爆炸/炮口焰 VFX 使用 **fscopel** 的 *Photo Realistic Explosions* 序列帧（CC-BY 3.0，OpenGameArt）与 **Kenney** 烟环（CC0）；完整署名和修改说明见 [`public/vfx/CREDITS.md`](public/vfx/CREDITS.md)。

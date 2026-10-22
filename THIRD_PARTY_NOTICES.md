@@ -26,3 +26,20 @@
 | react / react-dom                            | MIT  | UI                                  |
 
 许可全文以各包内 `LICENSE` 文件为准。
+
+## VFX 素材
+
+### Photo Realistic Explosions（fscopel，CC-BY 3.0）
+
+- 来源：https://opengameart.org/content/photo-realistic-explosions
+- 许可：Creative Commons Attribution 3.0（https://creativecommons.org/licenses/by/3.0/）
+- 使用：`public/vfx/explosion-red.png`、`explosion-blue.png`、`explosion-fireball.png`
+  （RedUp / Round Up Blue / Lave Blob 序列帧，按数字顺序取帧并打包为黑底图集）。
+- 修改：仅做帧排序、裁切与图集打包；未改变原始画面内容。
+- 授权要求：保留作者署名与许可说明（本文件 + `public/vfx/CREDITS.md` + 应用内模型说明）。
+
+### Particle Pack（Kenney，CC0 1.0）
+
+- 来源：https://opengameart.org/content/particle-pack-80-sprites
+- 使用：`public/vfx/smoke_ring.png`（原 smoke_10.png，用于尘/冲击环）。
+- 许可：CC0 1.0，无强制署名要求。
