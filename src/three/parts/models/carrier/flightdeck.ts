@@ -351,6 +351,169 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     mate: A([0, deckTop + 0.55, -19.2]),
   });
 
+  // ---- 右舷艉部航空吊车：基座/回转齿圈/桅柱/司机室/桁架吊臂/绞车/吊钩 ----
+  {
+    const cx = 3.55;
+    const cz = -15.8;
+    const baseY = deckTop;
+    add({
+      id: `${P}crane_base`,
+      name_cn: "航空吊车基座",
+      name_en: "deck crane base",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.95, 0.08, 0.95, [0, 0, 0], 0.008), B(1.05, 0.05, 1.05, [0, -0.04, 0], 0.006)),
+      material: "cv_steel_dark",
+      mate: A([cx, baseY + 0.04, cz]),
+    });
+    for (let g = 0; g < 4; g++) {
+      const a = (g / 4) * Math.PI * 2;
+      add({
+        id: `${P}crane_gusset_${g + 1}`,
+        name_cn: `吊车基座加强肘板 ${g + 1}`,
+        name_en: `crane base gusset ${g + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(0.16, 0.3, 0.06, [0, 0, 0], 0.004)),
+        material: "cv_steel",
+        mate: A([cx + Math.cos(a) * 0.36, baseY + 0.2, cz + Math.sin(a) * 0.36], [0, -a * 180 / Math.PI, 0]),
+      });
+    }
+    add({
+      id: `${P}crane_slew_ring`,
+      name_cn: "吊车回转齿圈",
+      name_en: "crane slew ring",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(T(0.34, 0.27, 0.12, [0, 0, 0], 24), C(0.3, 0.06, [0, 0.09, 0], 20)),
+      material: "cv_brass",
+      mate: A([cx, baseY + 0.16, cz]),
+    });
+    add({
+      id: `${P}crane_pedestal`,
+      name_cn: "吊车回转台",
+      name_en: "crane pedestal",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(C(0.28, 0.22, [0, 0, 0], 20), B(0.5, 0.08, 0.5, [0, 0.14, 0], 0.006)),
+      material: "cv_steel_dark",
+      mate: A([cx, baseY + 0.33, cz]),
+    });
+    add({
+      id: `${P}crane_post`,
+      name_cn: "吊车桅柱",
+      name_en: "crane post",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(C(0.15, 1.15, [0, 0, 0], 16), T(0.17, 0.12, 0.06, [0, 0.56, 0], 16)),
+      material: "cv_steel",
+      mate: A([cx, baseY + 1.0, cz]),
+    });
+    add({
+      id: `${P}crane_cab`,
+      name_cn: "吊车司机室",
+      name_en: "crane cab",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.46, 0.44, 0.5, [0, 0, 0], 0.012), B(0.34, 0.26, 0.02, [0, 0.06, 0.26], 0.003), B(0.4, 0.04, 0.54, [0, 0.24, 0], 0.006)),
+      material: "cv_hull_dark",
+      mate: A([cx + 0.42, baseY + 0.72, cz + 0.16], [0, -20, 0]),
+    });
+    add({
+      id: `${P}crane_cab_bracket`,
+      name_cn: "吊车司机室托架",
+      name_en: "crane cab bracket",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.26, 0.1, 0.22, [0, 0, 0], 0.004), B(0.06, 0.26, 0.06, [-0.02, -0.16, 0], 0.003)),
+      material: "cv_steel",
+      mate: A([cx + 0.28, baseY + 0.52, cz + 0.1]),
+    });
+    // 桁架吊臂：4 根弦杆 + 8 根斜撑，向港内伸 2.2m。
+    add({
+      id: `${P}crane_boom_root`,
+      name_cn: "吊臂根部铰座",
+      name_en: "crane boom root hinge",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.5, 0.22, 0.26, [0, 0, 0], 0.006), B(0.08, 0.3, 0.08, [0, 0.02, 0], 0.003)),
+      material: "cv_steel",
+      mate: A([cx + 0.1, baseY + 1.55, cz]),
+    });
+    for (const [sy, sz] of [[-0.1, -0.1], [-0.1, 0.1], [0.1, -0.1], [0.1, 0.1]] as const) {
+      add({
+        id: `${P}crane_boom_chord_${sy < 0 ? "b" : "t"}${sz < 0 ? "f" : "a"}`,
+        name_cn: `吊臂弦杆 ${sy < 0 ? "下" : "上"}${sz < 0 ? "前" : "后"}`,
+        name_en: `crane boom chord ${sy < 0 ? "lower" : "upper"}${sz < 0 ? "fwd" : "aft"}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M({ type: "weld", from: [cx + 0.15, baseY + 1.55 + sy, cz + sz], to: [cx - 2.05, baseY + 2.1 + sy * 0.7, cz + sz * 0.6], radius: 0.028, seed: 500 + sy * 10 + sz }),
+        material: "cv_steel",
+        mate: A([0, 0, 0]),
+      });
+    }
+    for (let b = 0; b < 8; b++) {
+      const t0 = 0.12 + b * 0.1;
+      const t1 = t0 + 0.1;
+      const y0 = baseY + 1.55 + t0 * 0.55;
+      const y1 = baseY + 1.55 + t1 * 0.55;
+      const x0 = cx + 0.15 - t0 * 2.2;
+      const x1 = cx + 0.15 - t1 * 2.2;
+      add({
+        id: `${P}crane_boom_brace_${b + 1}`,
+        name_cn: `吊臂斜撑 ${b + 1}`,
+        name_en: `crane boom brace ${b + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M({ type: "weld", from: [x0, y0, cz - 0.1], to: [x1, y1, cz + 0.1], radius: 0.016, seed: 600 + b }),
+        material: "cv_steel_dark",
+        mate: A([0, 0, 0]),
+      });
+    }
+    add({
+      id: `${P}crane_winch_saddle`,
+      name_cn: "吊车绞车支座",
+      name_en: "crane winch saddle",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.3, 0.12, 0.26, [0, 0, 0], 0.004), B(0.05, 0.18, 0.05, [0.12, -0.12, 0], 0.002)),
+      material: "cv_steel",
+      mate: A([cx + 0.05, baseY + 1.72, cz + 0.06]),
+    });
+    add({
+      id: `${P}crane_winch`,
+      name_cn: "吊车绞车",
+      name_en: "crane winch",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(C(0.12, 0.2, [0, 0, 0], 14), C(0.06, 0.24, [0, 0, 0], 12)),
+      material: "cv_brass",
+      mate: A([cx + 0.05, baseY + 1.8, cz + 0.12], [0, 0, 90]),
+    });
+    add({
+      id: `${P}crane_hook_block`,
+      name_cn: "吊车吊钩滑轮组",
+      name_en: "crane hook block",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.16, 0.22, 0.1, [0, 0, 0], 0.006), C(0.025, 0.18, [0, -0.2, 0], 10), { type: "torus", radius: 0.07, tube: 0.018, radialSegments: 8, tubularSegments: 16 }),
+      material: "cv_steel_dark",
+      mate: A([cx - 1.9, baseY + 1.3, cz], [0, 0, 90]),
+    });
+    for (const sz of [-0.04, 0.04] as const) {
+      add({
+        id: `${P}crane_fall_${sz < 0 ? "f" : "a"}`,
+        name_cn: `吊车起升索 ${sz < 0 ? "前" : "后"}`,
+        name_en: `crane hoist fall ${sz < 0 ? "fwd" : "aft"}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M({ type: "weld", from: [cx - 1.9, baseY + 2.0, cz + sz], to: [cx - 1.9, baseY + 1.36, cz + sz], radius: 0.008 }),
+        material: "cv_steel",
+        mate: A([0, 0, 0]),
+      });
+    }
+  }
+
   // ---- 菲涅尔光学助降系统（FLOLS）：透镜箱阵列 + 基准灯 + 平台/机柜 ----
   {
     const fx = -4.15;
