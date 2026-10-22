@@ -20,7 +20,7 @@ npx tsx scripts/diag-edrive.ts
 
 ```
 npx tsc --noEmit            # 0 错
-npx vitest run              # 253 passed / 1 skipped（ED-90 12 项 + 渲染内部件 2 项 + 扫描 3 项 + kit 连通 3 项）
+npx vitest run              # 254 passed / 1 skipped（ED-90 12 项 + 渲染内部件 3 项 + 扫描 3 项 + kit 连通 3 项）
 ```
 
 截图：`docs/qa/ed90-hero.jpeg`、`ed90-rear.jpeg`、`ed90-drive.jpeg`、`ed90-charging.jpeg`、`ed90-battery-hit.jpeg`、`ed90-xray-pack.jpeg`、`ed90-cockpit-xray.jpeg`、`ed90-regen.jpeg`。
@@ -89,6 +89,12 @@ npx vitest run              # 253 passed / 1 skipped（ED-90 12 项 + 渲染内�
 
 实现：`app/three/internal.ts`（内部件判定）、`StageCanvas`（layer/raycast 剔除、透视 predicate、透视关后处理）、`pose.ts#applyXray`（外壳 ghost 材质克隆 + 还原）、`scripts/qa-shot.mjs` 增加 viewport/dsf 供性能测量；`__stage.gl` 暴露渲染器供诊断。统计面板里的“三角面”仍是**模型总面数**（不是当前帧实际渲染面数）。
 
+### 发动机透视（2026-10-22）
+
+用户反馈“主战坦克发动机比虎式差远了”。数据上 MBT 发动机是 **659 定义 / 699 实例 / 745,040 面**，虎式发动机是 89 / 630 / 413,814 面；问题在呈现：MBT 发动机属于内部件，透视时仍保持不透明，机体/缸盖把活塞、连杆、气门全挡住，看起来像一整块铁。
+
+现在 `isXrayShellPart` 在透视时额外幽灵化发动机**包络件**：机体/曲轴箱/缸套/缸盖/喷油器套/涡轮壳；活塞、连杆、气门、摇臂、凸轮轴、涡轮转子保持不透明。证据：`docs/qa/mbt-engine-only-xray.jpeg`（修复前，整块）与 `docs/qa/mbt-engine-xray-closeup.jpeg`（修复后，48 气门/活塞可见）。
+
 ## 已知边界
 
 - 电驱外观复用 MBT 车体（同族底盘）；电池/电机/电控在装甲内部，需透视/爆炸视图查看；外部以充电口、尾部散热器、青色新能源涂装、橙色高压件区分。
@@ -121,7 +127,7 @@ npx tsx scripts/diag-mbt.ts
 
 ```
 npx tsc --noEmit            # 0 错
-npx vitest run              # 253 passed / 1 skipped（MBT 15 项）
+npx vitest run              # 254 passed / 1 skipped（MBT 15 项）
 ```
 
 门禁脚本：`scripts/diag-mbt.ts`（退出码 1 = 有未豁免/悬空/校验错误）。
@@ -149,7 +155,7 @@ npx vitest run              # 253 passed / 1 skipped（MBT 15 项）
 - **烟幕器上排管悬空**：2×2 四管的上排原来只靠短立柱（顶 -0.02m），下排管底 +0.052m，中间有 72mm 真空隙。这是单个合并 kit 内部的断开，件级支撑/孤岛检测看不到；现把立柱延长成贯穿两排（0.12×0.30×0.12m），并在管后加 0.30×0.30m 安装板，四管全部嵌入立柱/背板。
 - **ERA 看起来只有一层板**：原来每块虽有 `casing/explosive/liner` 三部分，但 casing 是实心盒、三层同轴嵌套，爆炸时又跟总成一起平移。现改为真正的盒式夹层：开口壳体框架 + 背板/钝感夹层 + 钝感炸药 + 前飞板 + 可拆前盖 + 前盖螺栓；新增零件级 `explode`，沿各块法线按 0.10/0.14/0.20/0.26/0.32m 分层展开。132 块 → 1282 定义 / 1291 展开 / 4104 实例。
 - **支撑检测增强**：原检测只看「每个实例 20mm 内有没有邻居」，一团互相靠近的悬空件会互相“支撑”。新增 `detectFloatingIslands` 连通性检查：最大连通分量 = 接在整车上，其余整组为悬空孤岛；门禁现在同时报成对悬空与孤岛。
-- 门禁复跑（ERA 改版后）：1282 定义 / 1291 展开 / 4104 实例，7398 报告全部白名单、0 未豁免穿模、0 悬空、0 悬空孤岛、0 kit 内部悬空；ED 7045 报告 / 0 未豁免 / 0 kit 内部悬空；tsc 0；vitest 253 通过。
+- 门禁复跑（ERA 改版后）：1282 定义 / 1291 展开 / 4104 实例，7398 报告全部白名单、0 未豁免穿模、0 悬空、0 悬空孤岛、0 kit 内部悬空；ED 7045 报告 / 0 未豁免 / 0 kit 内部悬空；tsc 0；vitest 254 通过。
 
 ## 各层落地
 

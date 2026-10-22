@@ -13,7 +13,7 @@ import {
 import { findModel, type StageModel } from "../catalog";
 import { buildOrdersOf, faultFromError, useStageStore } from "../state/stageStore";
 import { applyDamage, applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
-import { isInternalPart } from "./internal";
+import { isInternalPart, isXrayShellPart } from "./internal";
 import { Weather } from "./Weather";
 import { setArmourWet } from "@/three/parts/kernel/armourSurface";
 import { TigerVfx } from "./vfx/TigerVfx";
@@ -429,7 +429,11 @@ function StageRuntime() {
     // 选中内部件时自动幽灵化外壳，保证从零件树聚焦内部件时能看见。
     const selectedHandle = selectedPart ? assembled.getPart(selectedPart) : undefined;
     const selectedInternal = selectedHandle ? isInternalPart(modelId, selectedHandle) : false;
-    applyXray(assembled, views.xray || selectedInternal, (handle) => !isInternalPart(modelId, handle));
+    applyXray(
+      assembled,
+      views.xray || selectedInternal,
+      (handle) => !isInternalPart(modelId, handle) || isXrayShellPart(modelId, handle),
+    );
     return () => applyXray(assembled, false);
   }, [assembled, views.xray, modelId, selectedPart]);
 
