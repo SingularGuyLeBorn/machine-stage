@@ -1,11 +1,12 @@
-import type { PartHandle } from "@/three/parts";
+import type { Object3D } from "three";
+import type { AssembledModel, PartHandle } from "@/three/parts";
 
 // ============================================================================
 // internal —— 「装甲内部件」判定
 //
 // 逐件模型默认把电池/电机/发动机/内饰都真实建出来；普通外观视角不需要
 // 渲染它们（会被装甲遮住），但透视/爆炸/构建回放/选中内部件时必须显示。
-// 这里只对自内向外分层的 MBT / ED 生效，其它模型一律不隐藏。
+// 支持 MBT / ED 的分层和金古桥的 internal 标签，其它模型一律不隐藏。
 // ============================================================================
 
 export function isInternalPart(modelId: string, handle: PartHandle): boolean {
@@ -34,3 +35,33 @@ export function isXrayShellPart(modelId: string, handle: PartHandle): boolean {
   if (handle.assembly === "turbo") return /(turbine_housing|compressor_housing)(_[lr])?$/.test(handle.partId);
   return false;
 }
+
+const visibilityRest = new WeakMap<Object3D, { raycast: Object3D["raycast"]; castShadow: boolean }>();
+/**
+ * 相机保留 0 层、禁用 2 层；显示模式只切换渲染层，不改构建回放/损伤拥有的 visible。
+ * 隐藏的表皮不能继续挡住内部点选或投影；每次都从原值恢复，保证反复开关可逆。
+ */
+export function applyInternalVisibility(
+  modelId: string,
+  model: AssembledModel,
+  showInternals: boolean,
+  internalsOnly: boolean,
+): void {
+  const only = modelId === "kingjoemodules" && internalsOnly;
+  for (const handle of model.parts) {
+    const internal = isInternalPart(modelId, handle);
+    const shown = internal ? only || showInternals : !only;
+    for (const object of [handle.object, ...Object.values(handle.damageObjects)]) {
+      if (!object) continue;
+      let rest = visibilityRest.get(object);
+      if (!rest) {
+        rest = { raycast: object.raycast, castShadow: object.castShadow };
+        visibilityRest.set(object, rest);
+      }
+      object.layers.set(shown ? 0 : 2);
+      object.raycast = shown ? rest.raycast : hiddenRaycast;
+      object.castShadow = shown && rest.castShadow;
+    }
+  }
+}
+function hiddenRaycast(): void {}

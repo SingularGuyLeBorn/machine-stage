@@ -13,7 +13,7 @@ import {
 import { findModel, type StageModel } from "../catalog";
 import { buildOrdersOf, faultFromError, useStageStore } from "../state/stageStore";
 import { applyDamage, applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
-import { isInternalPart, isXrayShellPart } from "./internal";
+import { applyInternalVisibility, isInternalPart, isXrayShellPart } from "./internal";
 import { Weather } from "./Weather";
 import { setArmourWet } from "@/three/parts/kernel/armourSurface";
 import { TigerVfx } from "./vfx/TigerVfx";
@@ -47,17 +47,6 @@ function motionPartsOf(model: StageModel): ReadonlySet<string> | undefined {
     motionPartSets.set(model, set);
   }
   return set;
-}
-
-const originalRaycasts = new WeakMap<THREE.Object3D, THREE.Object3D["raycast"]>();
-function setPickable(object: THREE.Object3D, pickable: boolean): void {
-  if (pickable) {
-    const original = originalRaycasts.get(object);
-    if (original) object.raycast = original;
-  } else if (!originalRaycasts.has(object)) {
-    originalRaycasts.set(object, object.raycast);
-    object.raycast = () => {};
-  }
 }
 
 const MODEL_CACHE_LIMIT = 3;
@@ -454,11 +443,11 @@ function StageRuntime() {
     const selectedInternal = selectedHandle ? isInternalPart(modelId, selectedHandle) : false;
     applyXray(
       assembled,
-      views.xray || selectedInternal,
+      !views.internalsOnly && (views.xray || selectedInternal),
       (handle) => !isInternalPart(modelId, handle) || isXrayShellPart(modelId, handle),
     );
     return () => applyXray(assembled, false);
-  }, [assembled, views.xray, modelId, selectedPart]);
+  }, [assembled, views.xray, views.internalsOnly, modelId, selectedPart]);
 
   const damage = useStageStore((state) => state.damage);
   useEffect(() => {
@@ -521,19 +510,9 @@ function StageRuntime() {
     const showInternals =
       views.xray || views.explode || buildIndex < buildOrdersOf(modelId).length || selectedInternal;
     camera.layers.enable(0);
-    if (showInternals) camera.layers.enable(2);
-    else camera.layers.disable(2);
-    for (const handle of assembled.parts) {
-      if (!isInternalPart(modelId, handle)) continue;
-      handle.object.layers.set(2);
-      setPickable(handle.object, showInternals);
-      for (const variant of Object.values(handle.damageObjects)) {
-        if (!variant) continue;
-        variant.layers.set(2);
-        setPickable(variant, showInternals);
-      }
-    }
-  }, [assembled, modelId, camera, views.xray, views.explode, buildIndex, selectedPart]);
+    camera.layers.disable(2);
+    applyInternalVisibility(modelId, assembled, showInternals, views.internalsOnly);
+  }, [assembled, modelId, camera, views.xray, views.internalsOnly, views.explode, buildIndex, selectedPart]);
 
   // QA 钩子：开发模式或 ?qa=1 时暴露只读场景引用，用于自动化截图/录屏/相机机位。
   const three = useThree();

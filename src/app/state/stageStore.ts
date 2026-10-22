@@ -122,6 +122,7 @@ const LAYOUT_DEFAULT: PanelLayout = {
 const VIEWS_DEFAULT: Record<ViewKey, boolean> = {
   explode: false,
   xray: false,
+  internalsOnly: false,
   labels: false,
   grid: false,
   shadow: true,
@@ -619,7 +620,8 @@ export const useStageStore = create<StageState>((set, get) => ({
     // 有 Worker：检测在后台重建 + 跑 BVH；MBT/ED 级模型再按候选对拆给多个 Worker。
     if (typeof Worker !== "undefined" && import.meta.env.MODE !== "test") {
       const cores = typeof navigator !== "undefined" ? (navigator.hardwareConcurrency ?? 4) : 4;
-      const activeRegistry = model.variants?.find((item) => item.id === variantId)?.registry ?? model.registry;
+      const activeRegistry =
+        model.variants?.find((item) => item.id === variantId)?.registry ?? model.registry;
       const definitionCount = activeRegistry?.parts.length ?? 0;
       // 大模型按候选对拆片；每片重建一次模型 + 独立 BVH，8 片在 16 核上摊得开。
       const shardCount =

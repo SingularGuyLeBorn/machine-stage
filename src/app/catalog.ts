@@ -68,7 +68,8 @@ import { M134_MOTION_PARTS, animateM134, getM134Mode } from "@/three/parts/model
 // planned 卡片是路线图占位（M-B…M-F），没有注册表时不可选中。
 // ============================================================================
 
-export type ViewKey = "explode" | "xray" | "labels" | "grid" | "shadow" | "rain" | "thermal";
+export type ViewKey =
+  "explode" | "xray" | "internalsOnly" | "labels" | "grid" | "shadow" | "rain" | "thermal";
 
 export type StageAction =
   | { id: string; group: string; label: string; kind: "machine-state"; state: string }
@@ -292,8 +293,15 @@ export const CATALOG: StageModel[] = [
         state: `ray_${key}`,
       })),
     ],
-    readouts: () => [
+    readouts: (assembled) => [
       { label: "主体", value: "4 分体 · 12 设备舱" },
+      {
+        label: "内部零件",
+        value: assembled.parts
+          .filter((p) => p.def.tags?.includes("internal"))
+          .reduce((sum, p) => sum + p.instances.length, 0)
+          .toLocaleString(),
+      },
       { label: "开放边", value: "0" },
       { label: "双臂", value: "肩肘联动" },
       { label: "接口", value: "阶梯嵌合" },
@@ -303,8 +311,8 @@ export const CATALOG: StageModel[] = [
       "保留原 GLB 的头部、四肢与腹盆细节。胸甲按参考图重塑为上窄下展的圆润双瓣，彩窗改为厚黑边与虹彩云斑玻璃；肩根保留大臂外露空间。",
       "腹盆上下凸起嵌入对应凹槽，原髋鼓完整归腿部。胸甲中央为圆 U 口，两侧双榫嵌入头肩凹槽；双臂根部带圆润护甲。",
       "四体沿连续曲线飞出，天线从本体套筒伸出；合体按腿部、腹盆、胸甲、头肩依次完成，电花由小到大，近距减速后吸合回弹。",
-      "佩丹计算晶核、磁约束能源、悬浮场线圈与电磁执行器为经用户批准的原创结构；承力轨、安装柱、螺旋弹簧和散热件可在零件树逐件查看。",
-      "分体可用双天线发射红色 Z 字电束；整机抬手、前送后由屏幕发射黄色电束。上下两串方形灯点持续流动，胸窗在呼吸亮起与近暗之间交替。",
+      "佩丹计算晶核、磁约束能源、悬浮场线圈与电磁执行器为经用户批准的原创结构；承力轨、安装柱、螺旋弹簧和散热件可在零件树逐件查看。「仅内部零件」隐藏表皮；内部已由 2764 件增至 5528 件，重复附件按实例登记并随机构运动。",
+      "分体可用双天线发射红色 Z 字电束；整机抬手、前送后由屏幕发射黄色电束。头屏固定四排等宽灯块，上下两组三连亮区逐格循环，胸窗在呼吸亮起与近暗之间交替。",
     ],
   },
   {

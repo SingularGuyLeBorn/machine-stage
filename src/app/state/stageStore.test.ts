@@ -57,7 +57,16 @@ const resetStore = () => {
     scanPhase: "idle",
     scanKind: null,
     scanMs: null,
-    views: { explode: false, xray: false, labels: false, grid: false, shadow: true, rain: false, thermal: false },
+    views: {
+      explode: false,
+      xray: false,
+      internalsOnly: false,
+      labels: false,
+      grid: false,
+      shadow: true,
+      rain: false,
+      thermal: false,
+    },
     layout: {
       left: { width: 272, open: true },
       right: { width: 324, open: true },
@@ -279,13 +288,31 @@ describe("stageStore 模型切换", () => {
       overrides: { GAP: 0.01 },
       buildIndex: 0,
       selectedPart: "test.frame.box",
-      views: { explode: true, xray: true, labels: true, grid: true, shadow: false, rain: true, thermal: true },
+      views: {
+        explode: true,
+        xray: true,
+        internalsOnly: true,
+        labels: true,
+        grid: true,
+        shadow: false,
+        rain: true,
+        thermal: true,
+      },
     });
     useStageStore.getState().setModel("test");
     const state = useStageStore.getState();
     expect(state.modelId).toBe("test");
     expect(state.overrides).toEqual({});
-    expect(state.views).toEqual({ explode: false, xray: false, labels: false, grid: false, shadow: true, rain: false, thermal: false });
+    expect(state.views).toEqual({
+      explode: false,
+      xray: false,
+      internalsOnly: false,
+      labels: false,
+      grid: false,
+      shadow: true,
+      rain: false,
+      thermal: false,
+    });
     expect(state.selectedPart).toBeNull();
     expect(state.buildIndex).toBe(buildOrdersOf("test").length);
     expect(state.reports).toEqual([]);

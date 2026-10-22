@@ -1,8 +1,9 @@
+import { Layers } from "three";
 import { describe, expect, it } from "vitest";
 import { buildModel } from "@/three/parts";
 import { edriveBuilders, makeEdriveLayouts, makeEdriveRegistry } from "@/three/parts/models/edrive/registry";
 import { makeMbtLayouts, makeMbtRegistry, mbtBuilders } from "@/three/parts/models/mbt/registry";
-import { isInternalPart, isXrayShellPart } from "./internal";
+import { applyInternalVisibility, isInternalPart, isXrayShellPart } from "./internal";
 import { applyXray } from "./pose";
 import {
   makeKingJoeModuleRegistry,
@@ -26,6 +27,42 @@ function buildMbt() {
 }
 
 describe("内部件剔除 / 幽灵壳透视", () => {
+  it("仅内部模式反复开关恢复表皮和点选，不破坏构建进度，也不影响其他模型", () => {
+    const model = buildModel(makeKingJoeModuleRegistry(), { builders: kingjoeModuleBuilders });
+    try {
+      const cameraLayers = new Layers();
+      const skin = model.getPart("kingjoemodules.head_arms.body")!;
+      const core = model.getPart("kingjoemodules.head_arms.internal_brain_crystal")!;
+      const skinRaycast = skin.object.raycast,
+        coreRaycast = core.object.raycast;
+      const material = skin.object.material;
+      for (let cycle = 0; cycle < 3; cycle++) {
+        applyInternalVisibility("kingjoemodules", model, false, true);
+        for (const part of model.parts)
+          expect(cameraLayers.test(part.object.layers)).toBe(isInternalPart("kingjoemodules", part));
+        expect(skin.object.raycast).not.toBe(skinRaycast);
+        expect(core.object.raycast).toBe(coreRaycast);
+        expect(skin.object.castShadow).toBe(false);
+        model.setBuildThreshold(0);
+        applyInternalVisibility("kingjoemodules", model, true, true);
+        expect(core.object.visible).toBe(false);
+        model.setBuildThreshold(null);
+        applyInternalVisibility("kingjoemodules", model, false, false);
+        expect(cameraLayers.test(skin.object.layers)).toBe(true);
+        expect(cameraLayers.test(core.object.layers)).toBe(false);
+        expect(skin.object.raycast).toBe(skinRaycast);
+        expect(core.object.raycast).not.toBe(coreRaycast);
+        expect(skin.object.material).toBe(material);
+      }
+      applyInternalVisibility("kingjoemodules", model, true, false);
+      expect(cameraLayers.test(core.object.layers)).toBe(true);
+      expect(core.object.raycast).toBe(coreRaycast);
+      applyInternalVisibility("test", model, false, true);
+      expect(cameraLayers.test(skin.object.layers)).toBe(true);
+    } finally {
+      model.dispose();
+    }
+  }, 20000);
   it("金古桥肩肘护套属于外观连接件，普通模式不能按内部设备隐藏", () => {
     const model = buildModel(makeKingJoeModuleRegistry(), { builders: kingjoeModuleBuilders });
     try {
