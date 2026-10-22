@@ -11,7 +11,7 @@ export function ModelList() {
   const setModel = useStageStore((state) => state.setModel);
 
   return (
-    <section className="panel">
+    <section className="panel model-library">
       <header className="panel__head">
         <Boxes size={14} className="muted" aria-hidden />
         <h2 className="panel__title">模型库</h2>

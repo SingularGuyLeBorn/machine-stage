@@ -384,7 +384,14 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
   for (const item of expanded) {
     const matrix = modelMatrixOf(item.id);
     const geometry = geometryFor(item);
-    const material = materialFor(item.def.material);
+    const material = item.def.materialGroups?.length
+      ? item.def.materialGroups.map((name) => materialFor(name))
+      : materialFor(item.def.material);
+    if (item.def.materialGroups?.length && geometry.groups.length !== item.def.materialGroups.length) {
+      throw new Error(
+        `assembler：零件 "${item.id}" 声明了 ${item.def.materialGroups.length} 个材质组，但几何只有 ${geometry.groups.length} 个 group`,
+      );
+    }
     const count = item.def.instances ?? 1;
     const instanceNodes = item.def.instance_nodes ?? null;
     const layout = item.def.instance_layout ? options.instanceLayouts?.[item.def.instance_layout] : undefined;
@@ -409,7 +416,7 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
       instanced.name = item.id;
       instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       for (let i = 0; i < count; i++) {
-        const node = instanceNodes ? instanceNodes[i] : null;
+        const node = instanceNodes ? instanceNodes[i]! : (item.def.node ?? null);
         const nodeMatrix = node ? new THREE.Matrix4().copy(nodeRestMatrix(node)) : new THREE.Matrix4();
         const delta = layout
           ? layout({ part: item.def, partId: item.id, index: i, count, constants, node })
@@ -419,13 +426,17 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
         const local = instanceNodes
           ? delta.clone()
           : new THREE.Matrix4().copy(resolveLocal(item.id)).multiply(delta);
+        if (item.def.scale) {
+          const s = resolveSpec(item.def.scale, constants) as [number, number, number];
+          local.multiply(new THREE.Matrix4().makeScale(s[0], s[1], s[2]));
+        }
         const rest = new THREE.Matrix4().multiplyMatrices(nodeMatrix, local);
         instances.push({ index: i, node, restMatrix: rest, localMatrix: local });
         instanced.setMatrixAt(i, rest);
       }
       instanced.instanceMatrix.needsUpdate = true;
       instanced.computeBoundingSphere();
-      instanced.frustumCulled = !instanceNodes;
+      instanced.frustumCulled = !instanceNodes && !item.def.node;
       instanced.matrixAutoUpdate = true;
       root.add(instanced);
       handle = {
@@ -437,7 +448,7 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
         buildOrder: item.def.build_order,
         object: instanced,
         instanced: true,
-        node: instanceNodes ? null : (item.def.node ?? null),
+        node: item.def.node ?? (instanceNodes ? null : null),
         geometry,
         instances,
         setInstanceMatrix: (index, value) => {
@@ -460,6 +471,10 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
       const local = new THREE.Matrix4().multiplyMatrices(nodeMatrixInverse, matrix);
       // 分解为 TRS：.position/.quaternion 可读，同时矩阵与装配解一致
       local.decompose(mesh.position, mesh.quaternion, mesh.scale);
+      if (item.def.scale) {
+        const s = resolveSpec(item.def.scale, constants) as [number, number, number];
+        mesh.scale.multiply(new THREE.Vector3(s[0], s[1], s[2]));
+      }
       mesh.updateMatrix();
       mesh.matrixWorldNeedsUpdate = true;
       (parentNode ?? root).add(mesh);

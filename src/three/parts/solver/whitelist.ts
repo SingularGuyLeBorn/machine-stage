@@ -50,8 +50,10 @@ export function matchExpectedContact(
 ): ExpectedContactRule | null {
   for (const rule of rules) {
     // 形态守门：默认只收 face_mate / bearing_overlap；
-    // 族里显式声明 allowDisplaced 时才额外收 displaced（构造性配合常被判成 displaced）。
+    // 族里显式声明 allowDisplaced / allowSuspect 时才额外收对应形态；
+    // anyForm 用于源资产本身互嵌的历史资产（必须写清 reason 与深度上限）。
     const formOk =
+      rule.anyForm === true ||
       report.form === "face_mate" ||
       report.form === "bearing_overlap" ||
       (report.form === "displaced" && rule.allowDisplaced === true) ||

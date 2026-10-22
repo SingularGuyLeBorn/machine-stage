@@ -112,8 +112,18 @@ export interface PartDefinition {
   build_order: number;
   geometry: GeometrySpec;
   material: string;
+  /**
+   * 单零件多材质：按 geometry 的 group 顺序给出材质名（与 material 的兜底并存）。
+   * 用于把整机皮合并成一个 partId 时仍保留银灰/暗钢/彩虹等分组观感。
+   */
+  materialGroups?: string[];
   node?: string;
   mate?: MateSpec;
+  /**
+   * 零件局部缩放（围绕装配原点，装配后乘到实例矩阵上）。
+   * 用于把按旧外形制造的内部机构缩进真实网格薄壳内腔；皮不缩放。
+   */
+  scale?: ExprVec3;
   instances?: number;
   indexed?: boolean;
   /** 可动重复件：实例 → 节点映射（长度 = instances）。 */
@@ -171,6 +181,11 @@ export interface ExpectedContactRule {
    * 或耳环整体嵌进骨头（嵌入面上的交线天然很长）。
    */
   allowSuspect?: boolean;
+  /**
+   * 跳过形态守门（face_mate / bearing_overlap）。仅用于「源资产本身互嵌」这类
+   * 无法按贴面分类、但已确认不是装配错误的历史资产；必须写清 reason 与深度上限。
+   */
+  anyForm?: boolean;
 }
 
 export interface ModelRegistry {

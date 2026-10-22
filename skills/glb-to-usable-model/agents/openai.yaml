@@ -1,0 +1,4 @@
+interface:
+  display_name: "GLB 可用模型制作"
+  short_description: "从参考和反馈判断形体、分件与接口问题，保护已确认区域，用针对性验证减少返工"
+  default_prompt: "使用 $glb-to-usable-model，先结合参考判断这个 GLB 的问题和部件关系，再选择适合的修改与验证，保住已经确认的部分，不套用金古桥形状。"

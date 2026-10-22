@@ -375,6 +375,30 @@
 
 /* ---------- 模型列表 ---------- */
 
+.model-library .panel__body {
+  /* 左上角模型库限高：卡片超出时在列表内部滚动，不把下方零件树顶出视口。 */
+  max-height: min(44vh, 460px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #b7c0cb #eef1f5;
+}
+
+.model-library .panel__body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.model-library .panel__body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #b7c0cb;
+  border: 2px solid #eef1f5;
+}
+
+.model-library .panel__body::-webkit-scrollbar-track {
+  background: #eef1f5;
+}
+
 .model-list {
   display: flex;
   flex-direction: column;

@@ -68,25 +68,25 @@ export function PartTree() {
   const hoverPart = useStageStore((state) => state.hoverPart);
   const variantId = useStageStore((state) => state.variantId);
   const tree = useMemo(() => buildTree(modelId, variantId), [modelId, variantId]);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  // 面板默认收起：左栏只留模型库，视口点选零件的详情走左侧中部卡片
+  // 面板默认收起；总成默认全部折叠，只记录「已展开」的总成。
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [open, setOpen] = useState(false);
   const rowRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const toggle = (groupId: string) =>
-    setCollapsed((previous) => ({ ...previous, [groupId]: !previous[groupId] }));
+    setExpanded((previous) => ({ ...previous, [groupId]: !previous[groupId] }));
 
   // 反向联动：视口点选 / 报告点选 / 飞行到零件后，左树要能看见它——
   // 自动展开所在总成，并把该行滚进视野。
   useEffect(() => {
     if (!selectedPart || !open) return;
     const group = tree.groups.find((item) => item.parts.some((part) => part.id === selectedPart));
-    if (group && collapsed[group.id]) {
-      setCollapsed((previous) => ({ ...previous, [group.id]: false }));
+    if (group && !expanded[group.id]) {
+      setExpanded((previous) => ({ ...previous, [group.id]: true }));
       return; // 展开后重跑一次，再滚动
     }
     rowRefs.current.get(selectedPart)?.scrollIntoView?.({ block: "nearest" });
-  }, [selectedPart, tree, collapsed, open]);
+  }, [selectedPart, tree, expanded, open]);
 
   return (
     <section className={`panel${open ? " panel--grow" : ""}`}>
@@ -109,16 +109,16 @@ export function PartTree() {
           {tree.groups.length === 0 ? <div className="empty">该模型尚未登记注册表</div> : null}
           <div className="tree">
             {tree.groups.map((group) => {
-              const open = !collapsed[group.id];
+              const groupOpen = Boolean(expanded[group.id]);
               return (
                 <div key={group.id}>
                   <button
                     type="button"
                     className="tree__group-head"
-                    aria-expanded={open}
+                    aria-expanded={groupOpen}
                     onClick={() => toggle(group.id)}
                   >
-                    <span className="tree__chevron" data-open={open}>
+                    <span className="tree__chevron" data-open={groupOpen}>
                       <ChevronRight size={13} aria-hidden />
                     </span>
                     {group.nameCn}
@@ -126,7 +126,7 @@ export function PartTree() {
                       {group.parts.length} 件 · L{group.layers.join("/")}
                     </span>
                   </button>
-                  {open ? (
+                  {groupOpen ? (
                     <div className="tree__group-body">
                       {group.parts.map((part) => (
                         <button

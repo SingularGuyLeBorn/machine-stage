@@ -701,7 +701,7 @@ export const useStageStore = create<StageState>((set, get) => ({
       try {
         // 静态检测必须在装配态：悬挂动画把负重轮抬起时扫，会凭空多出一堆报告
         assembled.resetNodes();
-        model.animate?.(assembled, 0);
+        model.animate?.(assembled, 0, previousState);
         raw =
           kind === "sweep"
             ? detectSweep(assembled, {

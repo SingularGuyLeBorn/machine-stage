@@ -155,6 +155,8 @@ export function detectUnsupportedParts(
 ): SupportReport[] {
   const maxGapM = options.maxGapM ?? DEFAULT_SUPPORT_GAP_M;
   const bodies = collectBodies(assembled, options);
+  // 单件整机没有“同体邻居”，支撑检测的前提不成立；不把它误报为悬空。
+  if (bodies.length <= 1) return [];
   const reports: SupportReport[] = [];
 
   for (let i = 0; i < bodies.length; i++) {
