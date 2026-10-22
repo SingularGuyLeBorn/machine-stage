@@ -38,16 +38,123 @@ export function addAircraft(ctx: CarrierCtx): void {
   // 机身用回转体放样（latheZ）：真实曲面，不是方块。
   fuselage("radome", "机头雷达罩", M({ type: "latheZ", profile: [[0.145, -0.3], [0.15, -0.08], [0.12, 0.08], [0.06, 0.2], [0.004, 0.3]], segments: 28 }), 0.42, 1.02);
   fuselage("nose", "前机身", M({ type: "latheZ", profile: [[0.115, -0.24], [0.14, -0.1], [0.15, 0.06], [0.13, 0.22]], segments: 28 }), 0.42, 0.78);
-  fuselage("cockpit_tub", "座舱", M({ type: "latheZ", profile: [[0.09, -0.26], [0.12, -0.1], [0.12, 0.1], [0.1, 0.26]], segments: 24 }), 0.46, 0.48);
+  fuselage("cockpit_tub", "座舱", M({ type: "latheZ", profile: [[0.09, -0.26], [0.12, -0.1], [0.12, 0.1], [0.1, 0.26]], segments: 24 }), 0.46, 0.48, "cv_cockpit");
   fuselage("fuselage_mid", "中机身", M({ type: "latheZ", profile: [[0.13, -0.55], [0.18, -0.34], [0.19, 0], [0.18, 0.34], [0.13, 0.55]], segments: 32 }), 0.42, -0.03);
   fuselage("fuselage_rear", "后机身", M({ type: "latheZ", profile: [[0.095, -0.35], [0.15, -0.18], [0.16, 0.05], [0.15, 0.33]], segments: 30 }), 0.43, -0.86);
   fuselage("tail_cone", "尾锥", M({ type: "latheZ", profile: [[0.02, -0.16], [0.08, -0.06], [0.11, 0.08], [0.1, 0.16]], segments: 24 }), 0.47, -1.28);
-  fuselage("canopy", "座舱盖", M({ type: "latheZ", profile: [[0.015, -0.2], [0.1, -0.14], [0.18, -0.04], [0.18, 0.06], [0.1, 0.16], [0.02, 0.2]], segments: 26 }), 0.55, 0.48, "cv_cockpit");
-  fuselage("canopy_frame", "座舱盖框", M(T(0.185, 0.17, 0.03, [0, 0, 0], 24)), 0.55, 0.48, "cv_aircraft_dark");
+  fuselage("canopy", "座舱盖", M({ type: "latheZ", profile: [[0.015, -0.2], [0.1, -0.14], [0.18, -0.04], [0.18, 0.06], [0.1, 0.16], [0.02, 0.2]], segments: 26 }), 0.55, 0.48, "cv_canopy");
   fuselage("cockpit_seat", "弹射座椅", M(B(0.13, 0.08, 0.14, [0, 0, 0], 0.006), B(0.04, 0.24, 0.05, [0, 0.1, -0.04], 0.004)), 0.54, 0.32, "cv_aircraft_dark");
-  fuselage("hud", "平显", M(B(0.1, 0.055, 0.03, [0, 0, 0], 0.003)), 0.61, 0.55, "cv_cockpit");
-  fuselage("mfd_1", "多功能显示器 1", M(B(0.1, 0.08, 0.02, [0, 0, 0], 0.003)), 0.54, 0.47, "cv_cockpit");
-  fuselage("mfd_2", "多功能显示器 2", M(B(0.08, 0.06, 0.02, [0, 0, 0], 0.003)), 0.52, 0.38, "cv_cockpit");
+  fuselage("cockpit_headrest", "弹射座椅头枕", M(B(0.07, 0.05, 0.03, [0, 0, 0], 0.005)), 0.67, 0.27, "cv_upholstery");
+  // 座舱仪表台：遮光罩盖住座舱筒顶部，仪表板立在罩上，三块 MFD 贴板面，平显压板顶。
+  add({
+    id: `${P}cockpit_glare_shield`,
+    name_cn: "座舱遮光罩",
+    name_en: "cockpit glare shield",
+    assembly: "aircraft",
+    build_layer: 5,
+    geometry: M(B(0.26, 0.026, 0.21, [0, 0, 0], 0.004)),
+    material: "cv_cockpit",
+    node: AIRCRAFT_NODE,
+    mate: A([0, 0.593, 0.48]),
+  });
+  add({
+    id: `${P}instrument_panel`,
+    name_cn: "座舱仪表板",
+    name_en: "instrument panel",
+    assembly: "aircraft",
+    build_layer: 5,
+    geometry: M(B(0.18, 0.08, 0.02, [0, 0, 0], 0.003)),
+    material: "cv_gauge_face",
+    node: AIRCRAFT_NODE,
+    mate: A([0, 0.646, 0.54]),
+  });
+  fuselage("hud", "平显", M(B(0.03, 0.024, 0.01, [0, 0, 0], 0.002)), 0.698, 0.54, "cv_mfd");
+  fuselage("mfd_1", "多功能显示器 1", M(B(0.05, 0.035, 0.01, [0, 0, 0], 0.002)), 0.648, 0.525, "cv_mfd");
+  fuselage("mfd_2", "多功能显示器 2", M(B(0.035, 0.028, 0.01, [0, 0, 0], 0.002)), 0.644, 0.525, "cv_mfd");
+  add({
+    id: `${P}mfd_3`,
+    name_cn: "多功能显示器 3",
+    name_en: "mfd 3",
+    assembly: "aircraft",
+    build_layer: 5,
+    geometry: M(B(0.035, 0.028, 0.01, [0, 0, 0], 0.002)),
+    material: "cv_mfd",
+    node: AIRCRAFT_NODE,
+    mate: A([-0.062, 0.644, 0.525]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}hud_frame_${side === -1 ? "l" : "r"}`,
+      name_cn: `平显框 ${side === -1 ? "左" : "右"}`,
+      name_en: `hud frame ${side === -1 ? "l" : "r"}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(B(0.005, 0.022, 0.012, [0, 0, 0], 0.0015)),
+      material: "cv_gauge_face",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.0175, 0.697, 0.54]),
+    });
+  }
+  // 风挡框架（座舱盖玻璃在内部视角隐藏，框架留下座舱空间感）。
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}windscreen_post_${side === -1 ? "l" : "r"}`,
+      name_cn: `风挡立柱 ${side === -1 ? "左" : "右"}`,
+      name_en: `windscreen post ${side === -1 ? "l" : "r"}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(B(0.012, 0.174, 0.012, [0, 0, 0], 0.002)),
+      material: "cv_gauge_face",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.115, 0.693, 0.55]),
+    });
+  }
+  add({
+    id: `${P}windscreen_arch`,
+    name_cn: "风挡上框",
+    name_en: "windscreen arch",
+    assembly: "aircraft",
+    build_layer: 5,
+    geometry: M(B(0.242, 0.012, 0.012, [0, 0, 0], 0.002)),
+    material: "cv_gauge_face",
+    node: AIRCRAFT_NODE,
+    mate: A([0, 0.786, 0.55]),
+  });
+  add({
+    id: `${P}control_stick`,
+    name_cn: "操纵杆",
+    name_en: "control stick",
+    assembly: "aircraft",
+    build_layer: 5,
+    geometry: M(B(0.018, 0.13, 0.018, [0, 0, 0], 0.003), S(0.019, [0, 0.08, 0], 10), B(0.04, 0.02, 0.04, [0, 0.08, 0], 0.003)),
+    material: "cv_aircraft_dark",
+    node: AIRCRAFT_NODE,
+    mate: A([0, 0.5, 0.35]),
+  });
+  add({
+    id: `${P}throttle`,
+    name_cn: "油门杆",
+    name_en: "throttle lever",
+    assembly: "aircraft",
+    build_layer: 5,
+    geometry: M(B(0.025, 0.1, 0.025, [0, 0, 0], 0.003), B(0.05, 0.025, 0.04, [0, 0.06, 0], 0.004)),
+    material: "cv_aircraft_dark",
+    node: AIRCRAFT_NODE,
+    mate: A([0.12, 0.5, 0.33]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}pedal_${side === -1 ? "l" : "r"}`,
+      name_cn: `方向舵踏板 ${side === -1 ? "左" : "右"}`,
+      name_en: `rudder pedal ${side === -1 ? "l" : "r"}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(B(0.05, 0.018, 0.085, [0, 0, 0], 0.003), B(0.03, 0.05, 0.02, [0, 0.03, 0.04], 0.002)),
+      material: "cv_steel",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.06, 0.43, 0.62]),
+    });
+  }
 
   // 机身隔框/桁条。
   for (let f = 0; f < 10; f++) {

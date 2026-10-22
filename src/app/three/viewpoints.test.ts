@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { buildModel } from "@/three/parts";
 import { findModel } from "@/app/catalog";
-import { firstPersonView } from "./viewpoints";
+import { CAMERA_MODE_LABELS, firstPersonView, isCarrierInteriorMode } from "./viewpoints";
 
 // ============================================================================
 // 第一人称视角验收：眼点从零件包围盒派生，并且
@@ -78,5 +78,17 @@ describe("app/three/viewpoints 第一人称", () => {
     expect(firstPersonView("driver", built)!.position.x).toBeCloseTo(driverBefore.x + 1.4, 3);
     expect(firstPersonView("driver", built)!.position.z).toBeCloseTo(driverBefore.z + 0.3, 3);
     expect(firstPersonView("commander", built)!.position.x).toBeCloseTo(commanderBefore.x + 1.4, 3);
+  });
+});
+
+describe("航母内部视角", () => {
+  it("七种内部模式可识别，orbit 不进入内部层", () => {
+    for (const mode of ["bridge", "cic", "engine_room", "reactor_room", "magazine", "hangar", "cockpit"] as const) {
+      expect(isCarrierInteriorMode(mode)).toBe(true);
+      expect(CAMERA_MODE_LABELS[mode].label.length).toBeGreaterThan(0);
+      expect(CAMERA_MODE_LABELS[mode].hint).toContain("环视");
+    }
+    expect(isCarrierInteriorMode("orbit")).toBe(false);
+    expect(isCarrierInteriorMode("driver")).toBe(false);
   });
 });

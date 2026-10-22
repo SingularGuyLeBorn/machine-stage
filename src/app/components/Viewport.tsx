@@ -10,7 +10,7 @@ import { EngineHud } from "./EngineHud";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { IsolationView } from "./IsolationView";
 import { PartInfoCard } from "./PartInfoCard";
-import { CAMERA_MODE_LABELS } from "../three/viewpoints";
+import { CAMERA_MODE_LABELS, isCarrierInteriorMode } from "../three/viewpoints";
 
 // ============================================================================
 // Viewport —— 中栏：3D 视口 + 视口工具条 + 穿模报告抽屉 + 隔离小视图 + 读数图例
@@ -114,18 +114,32 @@ export function Viewport() {
       <PartInfoCard />
 
       {cameraMode !== "orbit" ? (
-        <div className="periscope">
-          <div className="periscope__window" aria-hidden />
-          <div className="periscope__label">{CAMERA_MODE_LABELS[cameraMode].label}</div>
-          <div className="periscope__hint">{CAMERA_MODE_LABELS[cameraMode].hint}</div>
-          <button
-            type="button"
-            className="btn btn--sm periscope__exit"
-            onClick={() => setCameraMode("orbit")}
-          >
-            退出视角
-          </button>
-        </div>
+        isCarrierInteriorMode(cameraMode) ? (
+          <div className="interior-view">
+            <div className="interior-view__label">{CAMERA_MODE_LABELS[cameraMode].label}</div>
+            <div className="interior-view__hint">{CAMERA_MODE_LABELS[cameraMode].hint}</div>
+            <button
+              type="button"
+              className="btn btn--sm interior-view__exit"
+              onClick={() => setCameraMode("orbit")}
+            >
+              退出内部视角
+            </button>
+          </div>
+        ) : (
+          <div className="periscope">
+            <div className="periscope__window" aria-hidden />
+            <div className="periscope__label">{CAMERA_MODE_LABELS[cameraMode].label}</div>
+            <div className="periscope__hint">{CAMERA_MODE_LABELS[cameraMode].hint}</div>
+            <button
+              type="button"
+              className="btn btn--sm periscope__exit"
+              onClick={() => setCameraMode("orbit")}
+            >
+              退出视角
+            </button>
+          </div>
+        )
       ) : null}
 
       {hoverLid ? (

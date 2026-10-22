@@ -598,35 +598,8 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
     });
   }
 
-  // ---------------- L4 舰岛：桥内设备 / 雷达柜 / 近防附件 / 桅杆 ----------------
-  for (let level = 0; level < 3; level++) {
-    const y = CV.DECK_Y + CV.DECK_T + 0.45 + level * 0.78 + 0.17;
-    const z = CV.ISLAND_Z;
-    for (let k = 0; k < 5; k++) {
-      add({
-        id: `carrier.island.detail_bridge_${level + 1}_${k + 1}`,
-        name_cn: `舰桥 ${level + 1} 层设备 ${k + 1}`,
-        name_en: `bridge ${level + 1} equipment ${k + 1}`,
-        assembly: ISLAND,
-        build_layer: 4,
-        geometry: M(B(0.3, 0.28, 0.22, [0, 0, 0], 0.004)),
-        material: k % 2 === 0 ? "cv_steel_dark" : "cv_glass",
-        mate: A([CV.ISLAND_X - 0.6 + k * 0.3, y, z + 1.0]),
-      });
-    }
-  }
-  for (let c = 0; c < 20; c++) {
-    add({
-      id: `carrier.island.detail_radar_cabinet_${pad(c + 1)}`,
-      name_cn: `雷达机柜 ${c + 1}`,
-      name_en: `radar cabinet ${c + 1}`,
-      assembly: ISLAND,
-      build_layer: 4,
-      geometry: M(B(0.4, 0.8, 0.3, [0, 0, 0], 0.006), B(0.3, 0.1, 0.02, [0, 0.2, 0.16], 0.003)),
-      material: "cv_steel_dark",
-      mate: A([CV.ISLAND_X - 0.55 + (c % 4) * 0.35, CV.DECK_Y + CV.DECK_T + 0.55, CV.ISLAND_Z - 1.6 + Math.floor(c / 4) * 0.42]),
-    });
-  }
+  // ---------------- L4 舰岛：雷达柜 / 近防附件 / 桅杆 ----------------
+  // 一层 CIC 与二层航海舰桥均由 cic.ts / bridge.ts 建真实舱室，不再放占位方盒。
   for (let t = 0; t < 2; t++) {
     const base = CIWS_LOCAL(t);
     for (let k = 0; k < 15; k++) {

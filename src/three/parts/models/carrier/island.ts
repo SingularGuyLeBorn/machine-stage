@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { CV } from "./constants";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
+import { addBridgeInterior } from "./bridge";
+import { addCicInterior } from "./cic";
 
 // ============================================================================
 // L4 舰岛 + 相控阵 + 旋转雷达 + 1130 近防炮 + 近程防空/干扰弹
@@ -43,6 +45,8 @@ export function addIsland(ctx: CarrierCtx): void {
       material: "cv_steel_dark",
       mate: A([x, y, z]),
     });
+    // 二层为可进入的航海舰桥：由 bridge.ts 建带真实开口的围壁和全套驾驶室设备。
+    if (level !== 1) {
     for (const side of [-1, 1] as const) {
       add({
         id: `${P}bridge_${level + 1}_wall_${side === -1 ? "p" : "s"}`,
@@ -152,7 +156,8 @@ export function addIsland(ctx: CarrierCtx): void {
         });
       }
     }
-    // 舰桥控制台/座椅/显控。
+    // 一层战斗情报中心由 cic.ts 建全套显控；二层航海舰桥由 bridge.ts 建。
+    if (level !== 0) {
     for (let c = 0; c < 3; c++) {
       add({
         id: `${P}bridge_${level + 1}_console_${c + 1}`,
@@ -165,6 +170,8 @@ export function addIsland(ctx: CarrierCtx): void {
         mate: A([x - 0.45 + c * 0.45, y + 0.17, z + 1.5]),
       });
     }
+    }
+    }
     add({
       id: `${P}bridge_${level + 1}_roof`,
       name_cn: `舰岛 ${level + 1} 层顶板`,
@@ -176,6 +183,9 @@ export function addIsland(ctx: CarrierCtx): void {
       mate: A([x, y + 0.74, z]),
     });
   }
+
+  addCicInterior(ctx);
+  addBridgeInterior(ctx);
 
   // 右舷航行舰桥翼台：外伸格栅平台 + 斜撑 + 双层栏杆（真实可站立结构）。
   {

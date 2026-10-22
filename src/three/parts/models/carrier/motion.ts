@@ -5,6 +5,14 @@ import { AIRCRAFT_NODE, HOOK_NODE, WING_FOLD_L, WING_FOLD_R } from "./aircraft";
 import { SHUTTLE_NODE, JBD_NODES, WIRE_NODES } from "./flightdeck";
 import { RADAR_NODE, CIWS_NODES } from "./island";
 import { AMMO_ELEVATOR_NODE, HANGAR_DOOR_NODES } from "./hangar";
+import {
+  BRIDGE_GAUGE_NODES,
+  BRIDGE_HELM_NODE,
+  BRIDGE_RADAR_SWEEP_NODE,
+  BRIDGE_TELEGRAPH_NODE,
+} from "./bridge";
+import { ENGINE_GAUGE_NODES, MAGAZINE_GAUGE_NODES, REACTOR_GAUGE_NODES } from "./interiors";
+import { CIC_SWEEP_NODE } from "./cic";
 
 // ============================================================================
 // models/carrier/motion —— 状态动画
@@ -93,6 +101,33 @@ function setJbd(assembled: AssembledModel, raised: number): void {
     const jbd = assembled.getNode(node);
     if (jbd) jbd.rotation.x = angle;
   }
+}
+
+function setBridgeMotion(assembled: AssembledModel, t: number): void {
+  BRIDGE_GAUGE_NODES.forEach((name, index) => {
+    const node = assembled.getNode(name);
+    if (node) node.rotation.z = Math.sin(t * 0.35 + index * 0.9) * (0.34 + index * 0.045) + (index % 2 === 0 ? 0.18 : -0.26);
+  });
+  const helm = assembled.getNode(BRIDGE_HELM_NODE);
+  if (helm) helm.rotation.z = Math.sin(t * 0.55) * 0.85;
+  const telegraph = assembled.getNode(BRIDGE_TELEGRAPH_NODE);
+  if (telegraph) telegraph.rotation.z = Math.sin(t * 0.4) * 0.45;
+  const sweep = assembled.getNode(BRIDGE_RADAR_SWEEP_NODE);
+  if (sweep) sweep.rotation.z = (t * 1.05) % (Math.PI * 2);
+  const cicSweep = assembled.getNode(CIC_SWEEP_NODE);
+  if (cicSweep) cicSweep.rotation.z = (t * 0.75) % (Math.PI * 2);
+  ENGINE_GAUGE_NODES.forEach((name, index) => {
+    const node = assembled.getNode(name);
+    if (node) node.rotation.z = Math.sin(t * 0.7 + index * 1.2) * 0.5 + 0.2 * index;
+  });
+  REACTOR_GAUGE_NODES.forEach((name, index) => {
+    const node = assembled.getNode(name);
+    if (node) node.rotation.z = Math.sin(t * 0.28 + index * 1.5) * 0.42 - 0.15 * index;
+  });
+  MAGAZINE_GAUGE_NODES.forEach((name, index) => {
+    const node = assembled.getNode(name);
+    if (node) node.rotation.z = Math.sin(t * 0.45 + index * 0.9) * 0.46;
+  });
 }
 
 function setShuttle(assembled: AssembledModel, z: number): void {
@@ -261,6 +296,7 @@ export function animateCarrier(assembled: AssembledModel, seconds: number, state
   setRadar(assembled, 0);
   setControlRods(assembled, 0);
   setRotors(assembled, 0, 0);
+  setBridgeMotion(assembled, t);
 
   if (state === "engine") {
     setRotors(assembled, t, 6.0);

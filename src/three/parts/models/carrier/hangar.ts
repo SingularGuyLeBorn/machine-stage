@@ -226,6 +226,56 @@ export function addHangar(ctx: CarrierCtx): void {
     mate: A([-1.1, deckY + 0.28, 9.0]),
   });
   add({
+    id: `${P}spare_aircraft_nose`,
+    name_cn: "机库舰载机雷达罩",
+    name_en: "hangar aircraft radome",
+    assembly: ASSEMBLY,
+    build_layer: 5,
+    geometry: M({ type: "latheZ", profile: [[0.12, -0.24], [0.115, -0.08], [0.07, 0.12], [0.004, 0.26]], segments: 24 }),
+    material: "cv_aircraft_belly",
+    mate: A([-1.1, deckY + 0.28, 9.98]),
+  });
+  add({
+    id: `${P}spare_aircraft_canopy`,
+    name_cn: "机库舰载机座舱盖",
+    name_en: "hangar aircraft canopy",
+    assembly: ASSEMBLY,
+    build_layer: 5,
+    geometry: M({ type: "latheZ", profile: [[0.01, -0.14], [0.06, -0.08], [0.09, 0], [0.07, 0.08], [0.01, 0.13]], segments: 22 }),
+    material: "cv_canopy",
+    mate: A([-1.1, deckY + 0.48, 9.3]),
+  });
+  add({
+    id: `${P}spare_aircraft_tail`,
+    name_cn: "机库舰载机尾锥",
+    name_en: "hangar aircraft tail cone",
+    assembly: ASSEMBLY,
+    build_layer: 5,
+    geometry: M({ type: "latheZ", profile: [[0.06, -0.22], [0.055, -0.08], [0.03, 0.1], [0.004, 0.2]], segments: 20 }),
+    material: "cv_aircraft",
+    mate: A([-1.1, deckY + 0.28, 8.02]),
+  });
+  add({
+    id: `${P}spare_aircraft_fin`,
+    name_cn: "机库舰载机垂尾",
+    name_en: "hangar aircraft vertical fin",
+    assembly: ASSEMBLY,
+    build_layer: 5,
+    geometry: { type: "kit", kit: "carrierWing", params: { span: 0.5, rootChord: 0.42, tipChord: 0.2, sweep: 0.16, thickness: 0.045, dihedralDeg: 0, sections: 7 } },
+    material: "cv_aircraft_dark",
+    mate: A([-1.1, deckY + 0.47, 8.16], [0, 0, 90]),
+  });
+  add({
+    id: `${P}spare_aircraft_stabs`,
+    name_cn: "机库舰载机平尾",
+    name_en: "hangar aircraft stabilizers",
+    assembly: ASSEMBLY,
+    build_layer: 5,
+    geometry: { type: "kit", kit: "carrierWing", params: { span: 0.72, rootChord: 0.24, tipChord: 0.14, sweep: 0.08, thickness: 0.035, dihedralDeg: 0, sections: 6 }, mirror: "x" },
+    material: "cv_aircraft_dark",
+    mate: A([-1.1, deckY + 0.3, 8.3]),
+  });
+  add({
     id: `${P}spare_aircraft_wing_folded_l`,
     name_cn: "机库舰载机折叠外翼 左",
     name_en: "hangar aircraft folded wing left",

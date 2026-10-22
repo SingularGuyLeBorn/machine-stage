@@ -11,6 +11,7 @@ import { addIsland } from "./island";
 import { addAircraft } from "./aircraft";
 import { addSurface } from "./surface";
 import { addCarrierDetails } from "./details";
+import { addCarrierInteriors } from "./interiors";
 import {
   carrierBottom,
   carrierFlightDeck,
@@ -40,6 +41,7 @@ function buildCarrierOnce(): { registry: ModelRegistry; layouts: Record<string, 
   addAircraft(ctx);
   addSurface(ctx);
   addCarrierDetails(ctx);
+  addCarrierInteriors(ctx);
 
   const staticOnly = (
     family: string,
@@ -149,6 +151,69 @@ function buildCarrierOnce(): { registry: ModelRegistry; layouts: Record<string, 
       b: "carrier.deck.*",
       reason: "弹射滑梭/滑靴在轨道槽、定子、冷却板与甲板盖板上滑动",
       maxDepthMm: 60,
+      allowDisplaced: true,
+      allowSuspect: true,
+    },
+    {
+      family: "cv-gauge-needle",
+      a: "carrier.island.bridge_gauge_*",
+      b: "carrier.island.bridge_gauge_*",
+      reason: "舰桥仪表指针/表圈/刻度绕表心旋转的机械配合",
+      maxDepthMm: 3,
+      allowDisplaced: true,
+      allowSuspect: true,
+    },
+    {
+      family: "cv-engine-gauge-needle",
+      a: "carrier.power.engine_gauge_*",
+      b: "carrier.power.engine_gauge_*",
+      reason: "机舱仪表指针/表圈/刻度绕表心旋转的机械配合",
+      maxDepthMm: 3,
+      allowDisplaced: true,
+      allowSuspect: true,
+    },
+    {
+      family: "cv-reactor-gauge-needle",
+      a: "carrier.power.reactor_gauge_*",
+      b: "carrier.power.reactor_gauge_*",
+      reason: "反应堆仪表指针/表圈/刻度绕表心旋转的机械配合",
+      maxDepthMm: 3,
+      allowDisplaced: true,
+      allowSuspect: true,
+    },
+    {
+      family: "cv-magazine-gauge-needle",
+      a: "carrier.hangar.magazine_gauge_*",
+      b: "carrier.hangar.magazine_gauge_*",
+      reason: "弹药库仪表指针/表圈/刻度绕表心旋转的机械配合",
+      maxDepthMm: 3,
+      allowDisplaced: true,
+      allowSuspect: true,
+    },
+    {
+      family: "cv-helm-kinematic",
+      a: "carrier.island.bridge_helm_wheel",
+      b: "carrier.island.bridge_helm_shaft",
+      reason: "舵轮绕桅轴转动的轮毂/轴旋转配合",
+      maxDepthMm: 20,
+      allowDisplaced: true,
+      allowSuspect: true,
+    },
+    {
+      family: "cv-helm-pedestal",
+      a: "carrier.island.bridge_helm_wheel",
+      b: "carrier.island.bridge_helm_pedestal",
+      reason: "舵轮轮缘与舵轮柱/轮毂的旋转包络",
+      maxDepthMm: 35,
+      allowDisplaced: true,
+      allowSuspect: true,
+    },
+    {
+      family: "cv-telegraph-pivot",
+      a: "carrier.island.bridge_telegraph_lever",
+      b: "carrier.island.bridge_telegraph_pedestal",
+      reason: "车钟手柄绕底座枢轴摆动的旋转配合",
+      maxDepthMm: 30,
       allowDisplaced: true,
       allowSuspect: true,
     },

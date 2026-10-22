@@ -17,7 +17,31 @@ import type { AssembledModel, PartHandle } from "@/three/parts";
 // 这样行进 / 受击时车体动了，视角也跟着动。
 // ============================================================================
 
-export type CameraMode = "orbit" | "driver" | "commander";
+export type CameraMode =
+  | "orbit"
+  | "driver"
+  | "commander"
+  | "bridge"
+  | "cic"
+  | "engine_room"
+  | "reactor_room"
+  | "magazine"
+  | "hangar"
+  | "cockpit";
+
+export const CARRIER_INTERIOR_MODES = [
+  "bridge",
+  "cic",
+  "engine_room",
+  "reactor_room",
+  "magazine",
+  "hangar",
+  "cockpit",
+] as const;
+
+export function isCarrierInteriorMode(mode: CameraMode): boolean {
+  return (CARRIER_INTERIOR_MODES as readonly string[]).includes(mode);
+}
 
 export interface FirstPersonView {
   /** 眼点（世界空间；已含车体位姿与炮塔回转）。 */
@@ -96,6 +120,41 @@ export function firstPersonView(
     };
   }
 
+  if (mode === "cockpit") {
+    // 座舱空间狭小，零件包围盒容易把眼点推到舱盖/机头上；用机体节点局部坐标
+    // 把眼点放在座椅前方、头枕之前的飞行员眼位，俯看仪表板（座舱盖在进入该视角时隐藏）。
+    const node = assembled.getNode("CV_Aircraft");
+    if (!node) return null;
+    const m = node.matrixWorld;
+    return {
+      position: new THREE.Vector3(0, 0.72, 0.36).applyMatrix4(m),
+      target: new THREE.Vector3(0, 0.648, 0.525).applyMatrix4(m),
+      fov: 66,
+    };
+  }
+
+  if (isCarrierInteriorMode(mode)) {
+    const spec = CARRIER_INTERIOR_VIEWS[mode];
+    if (!spec) return null;
+    const eyeHandle = assembled.getPart(spec.eyePart);
+    const targetHandle = assembled.getPart(spec.targetPart);
+    if (!eyeHandle || !targetHandle) return null;
+    const eyeBox = handleBox(assembled, eyeHandle);
+    const targetBox = handleBox(assembled, targetHandle);
+    if (!eyeBox || !targetBox) return null;
+    const eyeCenter = eyeBox.getCenter(new THREE.Vector3());
+    const eye = new THREE.Vector3(
+      eyeCenter.x + spec.eye[0],
+      eyeBox.max.y + spec.eye[1],
+      eyeCenter.z + spec.eye[2],
+    );
+    return {
+      position: toWorld(eye),
+      target: toWorld(targetBox.getCenter(new THREE.Vector3()).add(new THREE.Vector3(...(spec.targetOffset ?? [0, 0, 0])))),
+      fov: spec.fov,
+    };
+  }
+
   const handle = assembled.getPart(COMMANDER_CUPOLA);
   if (!handle) return null;
   const box = handleBox(assembled, handle);
@@ -109,9 +168,65 @@ export function firstPersonView(
   };
 }
 
+interface CarrierInteriorViewSpec {
+  eyePart: string;
+  eye: [number, number, number];
+  targetPart: string;
+  targetOffset?: [number, number, number];
+  fov: number;
+}
+
+const CARRIER_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec>> = {
+  bridge: {
+    eyePart: "carrier.island.bridge_captain_seat_back",
+    eye: [0, 0.02, 0.055],
+    targetPart: "carrier.island.bridge_front_glass_c",
+    fov: 63,
+  },
+  cic: {
+    eyePart: "carrier.island.cic_watch_seat_back",
+    eye: [0, 0.14, 0.05],
+    targetPart: "carrier.island.cic_main_screen_c",
+    fov: 66,
+  },
+  engine_room: {
+    eyePart: "carrier.power.engine_control_seat_back",
+    eye: [0, 0.12, 0.05],
+    targetPart: "carrier.power.engine_room_walls",
+    fov: 70,
+  },
+  reactor_room: {
+    eyePart: "carrier.power.reactor_control_seat_back",
+    eye: [0, 0.005, -0.04],
+    targetPart: "carrier.power.vessel_head",
+    targetOffset: [0, -0.5, 0],
+    fov: 62,
+  },
+  magazine: {
+    eyePart: "carrier.hangar.magazine_control_seat_back",
+    eye: [0, 0.005, -0.04],
+    targetPart: "carrier.hangar.magazine_rack_1",
+    fov: 62,
+  },
+  hangar: {
+    eyePart: "carrier.hangar.hangar_control_seat_back",
+    // 坐在机库控制席，正对状态板/调度屏；停机位与折叠翼停放机可在舱内环视。
+    eye: [0, 0.02, 0.05],
+    targetPart: "carrier.hangar.hangar_control_board",
+    fov: 66,
+  },
+};
+
 /** 视角模式的界面文案（动作按钮与浮层共用）。 */
 export const CAMERA_MODE_LABELS: Record<CameraMode, { label: string; hint: string }> = {
   orbit: { label: "自由视角", hint: "拖动旋转 / 滚轮缩放" },
   driver: { label: "驾驶席视角", hint: "坐在驾驶席看仪表 / 方向盘 / 踏板；再点一次回到自由视角" },
   commander: { label: "车长指挥塔", hint: "随炮塔回转，向前看；再点一次回到自由视角" },
+  bridge: { label: "航海舰桥", hint: "站在舰桥内，鼠标拖动环视舵轮 / 仪表盘 / 海图桌 / 雷达屏 / 侧窗；再点一次退出" },
+  cic: { label: "战斗情报中心", hint: "在 CIC 内，拖动环视战术显控墙 / 双排显控台 / 海图桌 / 通信机柜；再点一次退出" },
+  engine_room: { label: "机舱", hint: "在蒸汽轮机与减速齿轮箱之间，拖动环视管路 / 阀门 / 机舱仪表；再点一次退出" },
+  reactor_room: { label: "反应堆舱", hint: "在反应堆屏蔽舱内，拖动环视压力容器 / 控制棒 / 一回路仪表；再点一次退出" },
+  magazine: { label: "弹药库", hint: "在弹药库内，拖动环视弹药架 / 扬弹机 / 库存显控；再点一次退出" },
+  hangar: { label: "机库", hint: "在机库内，拖动环视停机位 / 维护区 / 机库控制台；再点一次退出" },
+  cockpit: { label: "舰载机座舱", hint: "舰载机座舱：平显 / 多功能显示器 / 操纵杆，拖动环视；再点一次退出" },
 };

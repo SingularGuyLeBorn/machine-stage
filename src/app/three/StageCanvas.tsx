@@ -20,7 +20,7 @@ import { setArmourWet } from "@/three/parts/kernel/armourSurface";
 import { TigerVfx } from "./vfx/TigerVfx";
 import { MbtVfx } from "./vfx/MbtVfx";
 import { applyTigerLidPose, effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
-import { firstPersonView, type CameraMode } from "./viewpoints";
+import { firstPersonView, type CameraMode, isCarrierInteriorMode } from "./viewpoints";
 import { setAk47Mode } from "@/three/parts/models/ak47/motion";
 import { setM249Mode } from "@/three/parts/models/m249/motion";
 import { setM2hbMode } from "@/three/parts/models/m2hb/motion";
@@ -119,11 +119,36 @@ function HdrEnvironment() {
   return null;
 }
 
+/** 座舱第一人称：隐藏座舱盖玻璃，避免从内部看到一整面反射罩。 */
+function CockpitCanopyVisibility() {
+  const assembled = useStageStore((state) => state.assembled);
+  const cameraMode = useStageStore((state) => state.cameraMode);
+  useEffect(() => {
+    const canopy = assembled?.getPart("carrier.aircraft.canopy");
+    if (!canopy) return;
+    canopy.object.visible = cameraMode !== "cockpit";
+    return () => {
+      canopy.object.visible = true;
+    };
+  }, [assembled, cameraMode]);
+  return null;
+}
+
+function InteriorFillLight() {
+  const cameraMode = useStageStore((state) => state.cameraMode);
+  if (!isCarrierInteriorMode(cameraMode)) return null;
+  // 舱内是封闭空间，主光/HDRI 被围壁遮挡；进入内部视角时补一层柔和环境光，
+  // 不用贴着相机的点光源（会在近距离把仪表和玻璃打成一片白）。
+  return <ambientLight intensity={1.05} color="#eaf5ff" />;
+}
+
 function Studio() {
   return (
     <>
       <ambientLight intensity={0.12} />
       <hemisphereLight args={["#dfe7ef", "#1b2025", 0.2]} />
+      <InteriorFillLight />
+      <CockpitCanopyVisibility />
       <directionalLight
         castShadow
         position={[5.5, 8.5, 4.5]}
@@ -682,6 +707,7 @@ function ContactShadow({ y, scale }: { y: number; scale: number }) {
  *  退出时先记住的自由视角原路飞回，不把人甩到别的方位。 */
 function CameraRig() {
   const camera = useThree((state) => state.camera);
+  const gl = useThree((state) => state.gl);
   const controls = useThree((state) => state.controls) as
     { target: THREE.Vector3; update: () => void; enabled: boolean } | null | undefined;
   const focus = useStageStore((state) => state.focus);
@@ -706,7 +732,50 @@ function CameraRig() {
   const previousMode = useRef<CameraMode>("orbit");
   /** 第一人称视线目标（平滑用）。 */
   const lookTarget = useRef(new THREE.Vector3(0, 0.8, 0));
+  const look = useRef({ yaw: 0, pitch: 0, dragging: false, x: 0, y: 0 });
   const perspective = camera as THREE.PerspectiveCamera;
+
+  useEffect(() => {
+    look.current.yaw = 0;
+    look.current.pitch = 0;
+    look.current.dragging = false;
+    // 进入机库内部视角就切到机库作业状态（防火门打开），从任意视角直接切过来都生效。
+    if (cameraMode === "hangar" && useStageStore.getState().machineState !== "hangar") {
+      useStageStore.getState().setMachineState("hangar");
+    }
+  }, [cameraMode]);
+
+  // 舰船内部第一人称：鼠标拖拽环视（舰桥里能转头看海图桌/座椅/侧窗）。
+  useEffect(() => {
+    if (!isCarrierInteriorMode(cameraMode)) return;
+    const el = gl.domElement;
+    const down = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      look.current.dragging = true;
+      look.current.x = event.clientX;
+      look.current.y = event.clientY;
+    };
+    const move = (event: PointerEvent) => {
+      if (!look.current.dragging) return;
+      const dx = event.clientX - look.current.x;
+      const dy = event.clientY - look.current.y;
+      look.current.x = event.clientX;
+      look.current.y = event.clientY;
+      look.current.yaw -= dx * 0.005;
+      look.current.pitch = THREE.MathUtils.clamp(look.current.pitch - dy * 0.004, -1.15, 1.15);
+    };
+    const up = () => {
+      look.current.dragging = false;
+    };
+    el.addEventListener("pointerdown", down);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [cameraMode, gl]);
 
   // 模式切换：进第一人称存下自由视角并交出控制权；回自由视角把相机交还 OrbitControls。
   useEffect(() => {
@@ -776,7 +845,14 @@ function CameraRig() {
     if (view) {
       const k = 1 - Math.exp(-12 * delta);
       camera.position.lerp(view.position, k);
-      lookTarget.current.lerp(view.target, k);
+      const baseDir = view.target.clone().sub(view.position).normalize();
+      const rotation = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(look.current.pitch, look.current.yaw, 0, "YXZ"),
+      );
+      baseDir.applyQuaternion(rotation);
+      const distance = Math.max(1, view.target.distanceTo(view.position));
+      const desiredTarget = view.position.clone().addScaledVector(baseDir, distance);
+      lookTarget.current.lerp(desiredTarget, k);
       if (Math.abs(perspective.fov - view.fov) > 1e-3) {
         perspective.fov += (view.fov - perspective.fov) * k;
         perspective.updateProjectionMatrix();
