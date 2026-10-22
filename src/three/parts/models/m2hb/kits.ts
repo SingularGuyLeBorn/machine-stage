@@ -18,6 +18,141 @@ function num(params: Params | undefined, key: string, fallback?: number): number
 }
 
 // ---------------------------------------------------------------------------
+// m2ReceiverShroud —— M2HB 外接收器壳：左右侧板 + 底板 + 前后顶板 + 尾板 +
+// 枪管前支撑环 + 铆钉列 + 弹箱挂座。把原来外露的枪机/加速子/供弹机构
+// 全部包在铆接矩管内；供弹口由大供弹盖单独封住。
+// 局部系：origin = 枪膛中心，+Z 枪口方向。
+// ---------------------------------------------------------------------------
+const m2ReceiverShroud: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.078);
+  const h = num(p, "h", 0.092);
+  const z0 = num(p, "z0", -0.365);
+  const z1 = num(p, "z1", 0.07);
+  const t = num(p, "t", 0.003);
+  const len = z1 - z0;
+  const zc = (z0 + z1) / 2;
+  const parts: THREE.BufferGeometry[] = [];
+
+  // 左右侧板 + 纵向压筋 + 上下两排铆钉
+  for (const side of [-1, 1]) {
+    const wall = bevelBoxGeometry(t, h, len, 0.0005, 1);
+    wall.translate(side * (w / 2 - t / 2), 0, zc);
+    parts.push(wall);
+    const rib = bevelBoxGeometry(0.0018, 0.008, len * 0.7, 0.0003, 1);
+    rib.translate(side * (w / 2 + 0.0007), -0.008, zc + 0.015);
+    parts.push(rib);
+    for (const y of [-0.032, 0.032]) {
+      for (let i = 0; i < 7; i++) {
+        const z = z0 + 0.035 + i * 0.058;
+        if (z > z1 - 0.012) continue;
+        const rivet = new THREE.CylinderGeometry(0.0032, 0.0032, 0.0015, 8);
+        rivet.rotateZ(Math.PI / 2);
+        rivet.translate(side * (w / 2 + 0.0008), y, z);
+        parts.push(rivet);
+      }
+    }
+  }
+
+  // 底板 / 尾板
+  const bottom = bevelBoxGeometry(w, t, len, 0.0005, 1);
+  bottom.translate(0, -h / 2 + t / 2, zc);
+  parts.push(bottom);
+  const rear = bevelBoxGeometry(w, h, t, 0.0005, 1);
+  rear.translate(0, 0, z0 + t / 2);
+  parts.push(rear);
+
+  // 顶板：中段留供弹口（-0.31..-0.01），由大供弹盖封闭
+  const feedZ0 = -0.31;
+  const feedZ1 = -0.01;
+  const topRearLen = feedZ0 - z0;
+  const topRear = bevelBoxGeometry(w, t, topRearLen, 0.0005, 1);
+  topRear.translate(0, h / 2 - t / 2, z0 + topRearLen / 2);
+  parts.push(topRear);
+  const topFrontLen = z1 - feedZ1;
+  const topFront = bevelBoxGeometry(w, t, topFrontLen, 0.0005, 1);
+  topFront.translate(0, h / 2 - t / 2, feedZ1 + topFrontLen / 2);
+  parts.push(topFront);
+
+  // 前端枪管支撑环 / 节套法兰（凸出前脸，避免正面变成一块大平板）
+  const collar = tubeGeometry(0.034, 0.016, 0.038, 28);
+  collar.rotateX(Math.PI / 2);
+  collar.translate(0, 0, z1 - 0.004);
+  parts.push(collar);
+  const trunnion = tubeGeometry(0.026, 0.016, 0.012, 24);
+  trunnion.rotateX(Math.PI / 2);
+  trunnion.translate(0, 0, z1 + 0.020);
+  parts.push(trunnion);
+
+  // 侧板检查窗压边（左右各一块，轻微凸起；不切穿板面）
+  for (const side of [-1, 1]) {
+    const panel = bevelBoxGeometry(0.0016, 0.050, 0.150, 0.0005, 1);
+    panel.translate(side * (w / 2 + 0.0006), -0.002, -0.170);
+    parts.push(panel);
+  }
+
+  // 尾端缓冲器座（后板外侧的圆法兰）
+  const buffer = new THREE.CylinderGeometry(0.020, 0.020, 0.014, 20);
+  buffer.rotateX(Math.PI / 2);
+  buffer.translate(0, 0.004, z0 - 0.006);
+  parts.push(buffer);
+
+  // 左侧弹箱挂座
+  const bracket = bevelBoxGeometry(0.020, 0.014, 0.055, 0.0008, 1);
+  bracket.translate(-(w / 2 + 0.009), -0.018, -0.25);
+  parts.push(bracket);
+
+  // 供弹盖铰链耳座
+  for (const side of [-1, 1]) {
+    const ear = bevelBoxGeometry(0.009, 0.012, 0.016, 0.0008, 1);
+    ear.translate(side * (w / 2 - 0.009), h / 2 + 0.006, feedZ0 + 0.006);
+    parts.push(ear);
+  }
+
+  const merged = mergeGeometries(parts);
+  for (const piece of parts) piece.dispose();
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
+// m2FeedCoverShell —— M2HB 大供弹盖：覆盖整个供弹口，带下裙边、铰链和
+// 前端卡榫；正常状态把弹链/供弹滑块完全盖住。
+// 局部系：origin = 枪膛中心，几何按模型坐标布置。
+// ---------------------------------------------------------------------------
+const m2FeedCoverShell: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.074);
+  const len = num(p, "len", 0.300);
+  const zc = num(p, "zc", -0.162);
+  const y = num(p, "y", 0.048);
+  const parts: THREE.BufferGeometry[] = [];
+  const top = bevelBoxGeometry(w, 0.014, len, 0.0012, 1);
+  top.translate(0, y, zc);
+  parts.push(top);
+  const rib = bevelBoxGeometry(w * 0.86, 0.005, len * 0.86, 0.0008, 1);
+  rib.translate(0, y + 0.0095, zc);
+  parts.push(rib);
+  for (const side of [-1, 1]) {
+    const skirt = bevelBoxGeometry(0.004, 0.020, len - 0.010, 0.0008, 1);
+    skirt.translate(side * (w / 2 - 0.002), y - 0.013, zc);
+    parts.push(skirt);
+  }
+  const hinge = new THREE.CylinderGeometry(0.0045, 0.0045, 0.078, 12);
+  hinge.rotateZ(Math.PI / 2);
+  hinge.translate(0, y - 0.002, zc - len / 2 + 0.004);
+  parts.push(hinge);
+  const latch = bevelBoxGeometry(0.020, 0.013, 0.014, 0.0008, 1);
+  latch.translate(0, y - 0.006, zc + len / 2 - 0.004);
+  parts.push(latch);
+  const frontLip = bevelBoxGeometry(w, 0.004, 0.010, 0.0005, 1);
+  frontLip.translate(0, y - 0.004, zc + len / 2 - 0.008);
+  parts.push(frontLip);
+  const merged = mergeGeometries(parts);
+  for (const piece of parts) piece.dispose();
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
 // m2Receiver —— M2HB 接收器：铆接矩形管（左/右侧板 + 顶/底板）+ 供弹口。
 // 局部系：origin = 枪膛中心，+Z 枪口方向。
 // ---------------------------------------------------------------------------
@@ -260,6 +395,8 @@ const m2TEWheel: GeometryBuilder = (spec) => {
 };
 
 export const m2hbKitBuilders: Record<string, GeometryBuilder> = {
+  m2ReceiverShroud,
+  m2FeedCoverShell,
   m2Receiver,
   m2BarrelExtension,
   m2Bolt,
