@@ -20,7 +20,7 @@ npx tsx scripts/diag-edrive.ts
 
 ```
 npx tsc --noEmit            # 0 错
-npx vitest run              # 248 passed / 1 skipped（ED-90 12 项 + 渲染内部件 2 项 + 扫描竞态 1 项）
+npx vitest run              # 250 passed / 1 skipped（ED-90 12 项 + 渲染内部件 2 项 + 扫描竞态/分片/缓存 3 项）
 ```
 
 截图：`docs/qa/ed90-hero.jpeg`、`ed90-rear.jpeg`、`ed90-drive.jpeg`、`ed90-charging.jpeg`、`ed90-battery-hit.jpeg`、`ed90-xray-pack.jpeg`、`ed90-cockpit-xray.jpeg`、`ed90-regen.jpeg`。
@@ -55,9 +55,10 @@ npx vitest run              # 248 passed / 1 skipped（ED-90 12 项 + 渲染内�
 1. 切模型只装配，扫描仍按需触发；
 2. 装配缓存（最多 3 个，键 = model/variant/damageSeed/overrides）：冷装配后来回切只换根节点，不重建几何/材质；仅卸载时 dispose；
 3. 首帧后 `requestIdleCallback` + `gl.compileAsync` 预热隐藏内部件/FX 材质，避免第一次点动作才编译着色器；
-4. 扫描移到 Web Worker（`app/state/scan.worker.ts`）：后台重建无材质装配并跑 `detectStatic`/`detectSweep`；切模型/重扫/卸载会 `terminate` 旧 Worker 并作废旧 token，主线程只接收报告。无 Worker 环境（jsdom/测试）保留同步兜底。
+4. 扫描移到 Web Worker 池（`app/state/scan.worker.ts`）：后台重建无材质装配并跑 `detectStatic`/`detectSweep`；MBT/ED 级（≥500 定义）静态扫描把 AABB 候选对按 `index % count` 拆给最多 8 个 Worker（16 核），各 Worker 只分析自己那份；切模型/重扫/卸载会 `terminate` 全部 Worker 并作废旧 token。无 Worker 环境（jsdom/测试）保留同步兜底。
+5. 检测器内部的三项优化：采样点按几何缓存（不再每对重复遍历顶点）；`pointInsideSolid` 任一方向判在外立即退出（不再硬打满三条射线）；全域采样只保留交线 50mm 内的点，交线退化时直接跳过测深。
 
-浏览器实测（1600×1000 CSS、dpr 1.5、RTX 5070 Ti）：MBT 冷切换 **1.51s**、ED 冷 **0.59s**；缓存命中 MBT **0.19–0.20s**、ED **0.17s**。MBT 全车静态扫描后台运行期间，拖动采样 90 帧/1.5s（**60fps**，p95 17ms，max 33ms，零长任务）；扫描中点「行进演示」0ms 返回；测试模型扫描结果 37ms 回传并正确显示 1 条报告。生产构建（`vite preview`）Worker 同样正常：测试模型重扫 97ms，含首次 Worker 加载约 2s。生产构建（`vite preview`）Worker 同样正常：测试模型重扫 97ms，含首次 Worker 加载约 2s。
+浏览器实测（1600×1000 CSS、dpr 1.5、16 核 / RTX 5070 Ti）：MBT 静态扫描单线程 66–85s → **8 Worker 11.7–13.8s**（headless，scanMs 11.4–13.6s），生产构建 **12.4s**；同一装配再点「重扫」复用结果 **0.2s**（scanMs 0），7196 条报告与单线程完全一致（分片不重不漏），未豁免 0。切换：MBT 冷 **1.51s**、ED 冷 **0.59s**，缓存命中 **0.17–0.20s**。扫描期间主线程零长任务，界面可继续拖动/切动作/切模型；测试模型扫描结果 37ms 回传并正确显示 1 条报告。
 
 ## 渲染性能分析 / 优化（2026-10-22）
 
@@ -81,7 +82,8 @@ npx vitest run              # 248 passed / 1 skipped（ED-90 12 项 + 渲染内�
 
 - 电驱外观复用 MBT 车体（同族底盘）；电池/电机/电控在装甲内部，需透视/爆炸视图查看；外部以充电口、尾部散热器、青色新能源涂装、橙色高压件区分。
 - 电池包/电机为展示级几何，电芯/线圈/磁钢逐件但非 CFD/热仿真；热失控用 FX 表达。
-- 静态扫描 52s 左右（MBT），按需触发；已放到 Worker，切模型/重扫会自动取消；主线程不再冻结。
+- 静态扫描按需触发，MBT 8 Worker 约 **12s**；切模型/重扫会自动取消，主线程不冻结。
+- **悬空/孤岛检测是件级**（零件 × 实例）：单个合并 kit 内部的几何断开看不到。烟幕发射器上排两管悬空就是这种盲区，已在 kit 内补贯穿立柱/背板修复，不能指望件级门禁报出来。
 
 ---
 

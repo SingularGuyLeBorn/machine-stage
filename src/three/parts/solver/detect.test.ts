@@ -68,6 +68,18 @@ describe("solver/detect 静态穿模检测", () => {
     expect(last).toBeGreaterThan(0);
     model.dispose();
   });
+
+  it("pairShard 分片后并集与全量一致（Worker 并行不重不漏）", () => {
+    const model = buildTestModel(0.001);
+    const keyOf = (report: { a: string; b: string; depth_mm: number | null }) =>
+      `${report.a}|${report.b}|${report.depth_mm}`;
+    const full = detectStatic(model).map(keyOf).sort();
+    const merged = [0, 1, 2].flatMap((index) =>
+      detectStatic(model, { pairShard: { index, count: 3 } }).map(keyOf),
+    );
+    expect(merged.sort()).toEqual(full);
+    model.dispose();
+  });
 });
 
 describe("solver/detect 动画扫掠检测", () => {

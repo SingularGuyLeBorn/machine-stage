@@ -177,6 +177,24 @@ describe("stageStore 参数与扫描", () => {
     good.dispose();
   });
 
+  it("同一装配重复静态扫描 → 复用上次结果，不再重跑", () => {
+    vi.useFakeTimers();
+    const model = buildTestModel({ GAP: 0.001 });
+    useStageStore.getState().attach(model);
+    useStageStore.getState().runScan("static");
+    vi.runAllTimers();
+    const first = useStageStore.getState().reports;
+    expect(first).toHaveLength(1);
+
+    useStageStore.getState().runScan("static");
+    const second = useStageStore.getState();
+    expect(second.scanPhase).toBe("ready");
+    expect(second.scanMs).toBe(0);
+    expect(second.reports).toEqual(first);
+    expect(second.notice).toContain("复用");
+    model.dispose();
+  });
+
   it("旧的扫描结果不会污染新模型（重建竞态防护）", () => {
     vi.useFakeTimers();
     const bad = buildTestModel({ GAP: 0.001 });
