@@ -4,6 +4,7 @@ import type { GeometryBuilder } from "../../assembler/geometry";
 import type { ModelRegistry, PartDefinition, GeometrySpec } from "../../registry/types";
 import data from "./pedan.generated.json";
 import { addPedanMachinery, powerMaterial } from "./machinery";
+import { CUFF } from "./joint-covers";
 
 // 用户已批准的原创佩丹技术：磁约束能源、计算晶核、场调制器与悬浮线圈。
 // [OM-FREEPLAY] 尺寸由实际壳内设备舱派生；配色、线圈匝数及支架布局为原创机械解释。
@@ -98,7 +99,7 @@ export const interiorBuilders: Record<string, GeometryBuilder> = {
     // 关节叠层护套沿两端连接面连续弯折；保留肩肘的原护甲，不挖球座。
     // 闭合波纹短套筒：鼓起的圆棱与收口相接，叠成类似腿部的一圈圈弹性护套。
     const profile = [
-      [0.74, -0.026],
+      [p.inner ?? 0.74, -0.026],
       [0.87, -0.026],
       [0.9, -0.018],
       [1.0, -0.01],
@@ -107,8 +108,8 @@ export const interiorBuilders: Record<string, GeometryBuilder> = {
       [1.0, 0.01],
       [0.9, 0.018],
       [0.87, 0.026],
-      [0.74, 0.026],
-      [0.74, -0.026],
+      [p.inner ?? 0.74, 0.026],
+      [p.inner ?? 0.74, -0.026],
     ];
     const geometry = new THREE.LatheGeometry(
       profile.map(([r, y]) => new THREE.Vector2(r!, y!)),
@@ -391,7 +392,7 @@ export function makeInteriors(): Pick<ModelRegistry, "parts" | "nodes" | "consta
   }
   for (const joint of data.joints) {
     const shoulder = joint.key.startsWith("upper");
-    for (let i = 0; i < 13; i++) {
+    for (let i = 0; i < CUFF.layers; i++) {
       const node = `Cuff_${joint.key}_${i}`;
       nodes.push({
         name: node,
@@ -414,7 +415,11 @@ export function makeInteriors(): Pick<ModelRegistry, "parts" | "nodes" | "consta
         geometry: {
           type: "kit",
           kit: "pedanCuff",
-          params: { rx: shoulder ? 0.2 : 0.26, rz: shoulder ? 0.34 : 0.26 },
+          params: {
+            rx: (shoulder ? CUFF.shoulder : CUFF.elbow).rx,
+            rz: (shoulder ? CUFF.shoulder : CUFF.elbow).rz,
+            inner: 0.55,
+          },
         },
         material: "kjr_silver",
         mate: { type: "absolute", position: [0, 0, 0] },

@@ -28,3 +28,9 @@
 - [分体双红束](kingjoe-pedan-red-rays.png)
 
 可复用方法已写入本机 `glb-to-usable-model` skill 的 `references/articulated-interiors-and-energy.md`；新增 `scripts/bellows_layers.py`。脚本自检、13 层样件拓扑检查及 Skill 格式校验通过。细节包括原模型恢复、护套可见性误判、真实内壁约束、空腔负壳、Float32 短边、主相位联动、核心供能与截图验收。
+
+## 肩肘护套端部密封修正
+
+近景暴露出旧护套零转角时多圈叠在同一断面，没有覆盖球座到活动壳的轴向间距。现在使用实际肩/肘切面中心，固定端与活动端分别嵌入各自壳体，中间沿端点约束曲线布置；圈间厚度随圆心距离和转角补偿，避免弯折外弧拉开细缝。
+
+此修正的 32 项相关测试通过，包含 8 个动作采样下、两侧肩肘每对相邻褶皱的周向覆盖检查；修改文件 lint、类型检查与生产构建通过。已在生产预览看过侧后近景和抬臂动作：[肩部侧面](kingjoe-shoulder-seal-side.png)、[抬臂近景](kingjoe-shoulder-seal-action.png)。这些是展示护套的覆盖验证，不代表真实柔性材料仿真。

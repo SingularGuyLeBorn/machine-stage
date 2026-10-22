@@ -1,9 +1,10 @@
 import type { AssembledModel } from "../../assembler/assembler";
-import { Box3, Vector3, Quaternion } from "three";
+import { Box3, Vector3 } from "three";
 import { getModuleEffects, hideModuleEffects } from "./effects";
 import { updateModuleIllumination } from "./illumination";
 import { updatePedanRays } from "./rays";
 import { updatePedanMachinery, type PedanActivity } from "./machinery";
+import { updateJointCovers } from "./joint-covers";
 
 export const MODULE_KEYS = ["legs", "pelvis", "chest", "head_arms"] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -292,28 +293,7 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
       fore.rotation.set(entry.arms[1], 0, 0);
     }
   }
-  // 护套跟随两端的真实关节姿态，逐层转动填满弯曲间隙；不靠挖去外壳让位。
-  for (const side of [-1, 1]) {
-    const suffix = side < 0 ? "l" : "r";
-    const upper = model.getNode(`Joint_upper_${suffix}`)!;
-    const fore = model.getNode(`Joint_fore_${suffix}`)!;
-    upper.updateMatrix();
-    for (const kind of ["upper", "fore"]) {
-      const shoulder = kind === "upper";
-      const target = shoulder ? upper.quaternion : fore.quaternion;
-      const pivot = shoulder ? new Vector3(side * 1.03, 4.96, 0.34) : new Vector3(side * 0.22, -0.94, -0.06);
-      const radius = shoulder ? new Vector3(-side * 0.125, 0, -0.337) : new Vector3(0, 0, -0.254);
-      for (let i = 0; i < 13; i++) {
-        const node = model.getNode(`Cuff_${kind}_${suffix}_${i}`)!;
-        const t = i / 12;
-        const q = new Quaternion().slerp(target, t);
-        node.position.copy(radius).applyQuaternion(q).add(pivot);
-        if (shoulder) node.position.x += side * 0.11 * t;
-        else node.position.applyMatrix4(upper.matrix);
-        node.quaternion.copy(shoulder ? q : upper.quaternion.clone().multiply(q));
-      }
-    }
-  }
+  updateJointCovers(model);
   const activity: PedanActivity = {
     drive:
       Math.abs(entry.arms[0]) +
