@@ -192,7 +192,9 @@ const smokeCluster: GeometryBuilder = (spec) => {
   const parts: THREE.BufferGeometry[] = [];
   parts.push(bevelBoxGeometry(0.34, 0.05, 0.16, 0.004).translate(0, -0.16, 0));
   parts.push(bevelBoxGeometry(0.26, 0.09, 0.14, 0.003).translate(0, -0.225, 0));
-  parts.push(bevelBoxGeometry(0.1, 0.12, 0.1, 0.003).translate(0, -0.08, -0.02));
+  // 立柱贯穿上下两排管，背面再加安装板：上排不再悬空。
+  parts.push(bevelBoxGeometry(0.12, 0.3, 0.12, 0.003).translate(0, -0.01, -0.01));
+  parts.push(bevelBoxGeometry(0.3, 0.3, 0.026, 0.003).translate(0, -0.005, 0.018));
   for (const x of [-0.09, 0.09]) {
     for (const y of [-0.09, 0.09]) {
       const t = tubeGeometry(r, r - 0.012, len, 14);
