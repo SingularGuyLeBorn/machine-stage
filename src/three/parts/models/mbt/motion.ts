@@ -314,17 +314,8 @@ function animateFire(assembled: AssembledModel, t: number): void {
   const kick = u < 0.12 ? u / 0.12 : Math.exp(-6 * (u - 0.12)) * Math.cos(24 * Math.max(0, u - 0.12));
   const recoil = assembled.getNode("GunRecoil");
   if (recoil) recoil.position.z = -0.34 * kick;
-  const flash = assembled.getPart("mbt90.interior.muzzle_flash");
-  if (flash) {
-    const visible = u < 0.09;
-    flash.object.visible = visible;
-    if (visible) flash.object.scale.setScalar(0.9 + u * 8);
-  }
-  const smoke = assembled.getPart("mbt90.interior.evacuator_smoke");
-  if (smoke) {
-    smoke.object.visible = u > 0.12 && u < 2.2;
-    if (smoke.object.visible) smoke.object.scale.setScalar(0.6 + (u - 0.12) * 1.2);
-  }
+  // 炮口焰/抽烟装置排烟由 app/three/vfx/MbtVfx 的照片级粒子负责；
+  // 这里不再显示旧的球体 fx 件。
   const breech = assembled.getNode("MBT_BreechBlock");
   if (breech) breech.position.y = u > 0.8 && u < 2.8 ? -0.16 : 0;
   const ejected = assembled.getNode(EJECTED_CASE_NODE);
@@ -350,11 +341,6 @@ function animateEraHit(assembled: AssembledModel, t: number): void {
       }
     }
   }
-  const fire = assembled.getPart("mbt90.interior.era_fireball");
-  if (fire) {
-    fire.object.visible = t < 2.6;
-    fire.object.scale.setScalar(0.6 + Math.min(1.8, t * 2.2));
-  }
   const debris = assembled.getPart("mbt90.interior.era_debris");
   if (debris) {
     debris.object.visible = t < 2.8;
@@ -376,26 +362,12 @@ function animateBlowout(assembled: AssembledModel, t: number, detonation: boolea
   const right = assembled.getNode(BLOWOUT_R);
   if (left) left.rotation.z = angle;
   if (right) right.rotation.z = -angle;
-  const fire = assembled.getPart("mbt90.interior.blowout_fire");
-  if (fire) {
-    fire.object.visible = t < 4.5;
-    fire.object.scale.setScalar(0.5 + Math.min(2.2, t * 1.6));
-  }
-  const smoke = assembled.getPart("mbt90.interior.blowout_smoke");
-  if (smoke) {
-    smoke.object.visible = t < 5.2;
-    smoke.object.scale.setScalar(0.6 + Math.min(2.4, t * 1.1));
-  }
+  // 泄压/殉爆的火焰、烟柱由 MbtVfx 叠加；这里只保留机械动作。
   if (detonation) {
     const turret = assembled.getNode("Turret");
     if (turret) {
       turret.position.y = Math.min(0.22, t * 0.8);
       turret.rotation.z = Math.sin(t * 8) * 0.01;
-    }
-    const boom = assembled.getPart("mbt90.interior.detonation_fire");
-    if (boom) {
-      boom.object.visible = t < 5;
-      boom.object.scale.setScalar(0.7 + Math.min(2.6, t * 1.4));
     }
   }
 }

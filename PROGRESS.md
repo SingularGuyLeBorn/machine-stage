@@ -72,6 +72,16 @@ npx vitest run              # 255 passed / 1 skipped（ED-90 12 项 + 渲染内�
 - MBT/ED 门禁已接入，当前 **0 处**；顺手修了 MBT 左右排气总管的端部法兰：改为与总管同轴的端法兰（原位置断开 0.42m，补横向短接管会穿摇臂轴/燃油管/缸体，门禁抓出 3 条未豁免后改为同轴端接）；
 - 单测 3 项：断开 200mm → 报；间隙 10mm → 连通；孤岛有外部零件支撑 → 豁免。
 
+### 爆炸/炮口焰 VFX（2026-10-22）
+
+旧 MBT 爆炸是几个球体缩放（`era_fireball` / `blowout_fire` / `detonation_fire`），形态和真实爆炸差距很大。现在换成**照片级序列帧 flipbook + 粒子层**：
+
+- 素材：OpenGameArt “Photo Realistic Explosions”（fscopel，**CC-BY 3.0**）的 RedUp / Round Up Blue / Lave Blob 序列帧，打包为 2.2MB 图集；烟环来自 Kenney Particle Pack（CC0）。署名见 `public/vfx/CREDITS.md` 与 `THIRD_PARTY_NOTICES.md`。
+- 渲染：相机朝向 billboard + 图集 UV 帧动画；主火球用亮度转α（实色烟云），红色/蓝色破片用加色辉光；再叠烟团、火花点、冲击环和点光。
+- 事件：ERA 命中（局部火球 + 金属喷溅）、泄压（向上的火焰/烟柱）、殉爆（大火球 + 烟柱 + 冲击环）、主炮击发（炮口焰 + 烟团，4.5s 循环）、猎-歼 5.2s 的炮口焰。
+- 旧的球体 fx 在 motion 中不再显示（测试改为断言保持隐藏），避免两层叠加。
+- 证据：`docs/qa/mbt-vfx-era.jpeg`、`mbt-vfx-blowout.jpeg`、`mbt-vfx-detonation.jpeg`、`mbt-vfx-muzzle.jpeg`。
+
 ## 渲染性能分析 / 优化（2026-10-22）
 
 实测环境：RTX 5070 Ti（ANGLE D3D11）、1600×1000 CSS + dpr 1.5（canvas 1431×1244），以及 4K（canvas 4791×2984）。

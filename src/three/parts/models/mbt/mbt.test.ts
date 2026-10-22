@@ -215,19 +215,20 @@ describe("MBT-90 主战坦克 · 整机", () => {
     built.resetNodes();
   });
 
-  it("击发：后坐 + 炮口焰 + 抽烟装置排烟 + 抛壳", () => {
+  it("击发：后坐 + 抛壳（炮口焰/排烟由 VFX 负责）", () => {
     built.resetNodes();
     animateMbt(built, 0.06, "fire");
     expect(built.getNode("GunRecoil")!.position.z).toBeLessThan(-0.1);
-    expect(built.getPart("mbt90.interior.muzzle_flash")!.object.visible).toBe(true);
+    // 旧球体 fx 必须保持隐藏，不能和照片级 VFX 叠两层。
+    expect(built.getPart("mbt90.interior.muzzle_flash")!.object.visible).toBe(false);
     animateMbt(built, 0.6, "fire");
-    expect(built.getPart("mbt90.interior.evacuator_smoke")!.object.visible).toBe(true);
+    expect(built.getPart("mbt90.interior.evacuator_smoke")!.object.visible).toBe(false);
     animateMbt(built, 2.2, "fire");
     expect(built.getPart("mbt90.interior.ejected_case")!.object.visible).toBe(true);
     built.resetNodes();
   });
 
-  it("ERA 被击中：单块消失 + 火球/碎片/来袭弹可见", () => {
+  it("ERA 被击中：单块消失 + 碎片/来袭弹可见（火球由 VFX 负责）", () => {
     built.resetNodes();
     const casing = built.getPart("mbt90.hull.era_glacis_casing")!;
     const before = new THREE.Matrix4();
@@ -238,21 +239,22 @@ describe("MBT-90 主战坦克 · 整机", () => {
     const scale = new THREE.Vector3();
     after.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
     expect(Math.max(scale.x, scale.y, scale.z)).toBeLessThan(0.01);
-    expect(built.getPart("mbt90.interior.era_fireball")!.object.visible).toBe(true);
+    expect(built.getPart("mbt90.interior.era_fireball")!.object.visible).toBe(false);
     expect(built.getPart("mbt90.interior.era_debris")!.object.visible).toBe(true);
+    expect(built.getPart("mbt90.interior.incoming_round")!.object.visible).toBe(true);
     built.resetNodes();
   });
 
-  it("殉爆：泄压板掀开；泄压失败：炮塔被掀飞", () => {
+  it("殉爆：泄压板掀开；泄压失败：炮塔被掀飞（火焰由 VFX 负责）", () => {
     built.resetNodes();
     animateMbt(built, 1.4, "blowout");
     expect(Math.abs(built.getNode("MBT_Blowout_L")!.rotation.z)).toBeGreaterThan(0.5);
-    expect(built.getPart("mbt90.interior.blowout_fire")!.object.visible).toBe(true);
+    expect(built.getPart("mbt90.interior.blowout_fire")!.object.visible).toBe(false);
     built.resetNodes();
     animateMbt(built, 1.0, "detonation");
     expect(built.getNode("Turret")!.position.y).toBeGreaterThan(0.05);
     expect(Math.abs(built.getNode("MBT_Blowout_L")!.rotation.z)).toBeLessThan(0.1);
-    expect(built.getPart("mbt90.interior.detonation_fire")!.object.visible).toBe(true);
+    expect(built.getPart("mbt90.interior.detonation_fire")!.object.visible).toBe(false);
     built.resetNodes();
   });
 
