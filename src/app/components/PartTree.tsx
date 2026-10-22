@@ -68,13 +68,16 @@ export function PartTree() {
   const hoverPart = useStageStore((state) => state.hoverPart);
   const variantId = useStageStore((state) => state.variantId);
   const tree = useMemo(() => buildTree(modelId, variantId), [modelId, variantId]);
-  // 面板默认收起；总成默认全部折叠，只记录「已展开」的总成。
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // 面板默认收起；总成（第一层）默认展开，只记录「被折叠」的总成；L 分组（第二层）默认折叠。
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [expandedLayers, setExpandedLayers] = useState<Record<string, boolean>>({});
   const [open, setOpen] = useState(false);
   const rowRefs = useRef(new Map<string, HTMLButtonElement>());
 
-  const toggle = (key: string) =>
-    setExpanded((previous) => ({ ...previous, [key]: !previous[key] }));
+  const toggleGroup = (key: string) =>
+    setCollapsedGroups((previous) => ({ ...previous, [key]: !previous[key] }));
+  const toggleLayer = (key: string) =>
+    setExpandedLayers((previous) => ({ ...previous, [key]: !previous[key] }));
 
   // 反向联动：视口点选 / 报告点选 / 飞行到零件后，左树要能看见它——
   // 自动展开所在总成与层分组，并把该行滚进视野。
@@ -84,13 +87,9 @@ export function PartTree() {
     const group = tree.groups.find((item) => item.parts.some((part) => part.id === selectedPart));
     if (!group) return;
     const part = group.parts.find((item) => item.id === selectedPart);
-    setExpanded((previous) => {
-      let next = previous;
-      if (!previous[group.id]) next = { ...next, [group.id]: true };
-      const layerKey = `${group.id}:${part?.layer ?? 0}`;
-      if (part && !next[layerKey]) next = { ...next, [layerKey]: true };
-      return next;
-    });
+    const layerKey = `${group.id}:${part?.layer ?? 0}`;
+    setCollapsedGroups((previous) => (previous[group.id] ? { ...previous, [group.id]: false } : previous));
+    setExpandedLayers((previous) => (previous[layerKey] ? previous : { ...previous, [layerKey]: true }));
     const frame = requestAnimationFrame(() => {
       rowRefs.current.get(selectedPart)?.scrollIntoView?.({ block: "nearest" });
     });
@@ -118,14 +117,14 @@ export function PartTree() {
           {tree.groups.length === 0 ? <div className="empty">该模型尚未登记注册表</div> : null}
           <div className="tree">
             {tree.groups.map((group) => {
-              const groupOpen = Boolean(expanded[group.id]);
+              const groupOpen = !collapsedGroups[group.id];
               return (
                 <div key={group.id}>
                   <button
                     type="button"
                     className="tree__group-head"
                     aria-expanded={groupOpen}
-                    onClick={() => toggle(group.id)}
+                    onClick={() => toggleGroup(group.id)}
                   >
                     <span className="tree__chevron" data-open={groupOpen}>
                       <ChevronRight size={13} aria-hidden />
@@ -139,7 +138,7 @@ export function PartTree() {
                     <div className="tree__group-body">
                       {group.layers.map((layer) => {
                         const layerKey = `${group.id}:${layer}`;
-                        const layerOpen = Boolean(expanded[layerKey]);
+                        const layerOpen = Boolean(expandedLayers[layerKey]);
                         const layerParts = group.parts.filter((part) => part.layer === layer);
                         return (
                           <div key={layerKey}>
@@ -147,7 +146,7 @@ export function PartTree() {
                               type="button"
                               className="tree__group-head tree__group-head--layer"
                               aria-expanded={layerOpen}
-                              onClick={() => toggle(layerKey)}
+                              onClick={() => toggleLayer(layerKey)}
                             >
                               <span className="tree__chevron" data-open={layerOpen}>
                                 <ChevronRight size={12} aria-hidden />

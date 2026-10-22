@@ -689,77 +689,95 @@ export function addFlightDeck(ctx: CarrierCtx): void {
 
   // ---- 甲板标记与系留点 ----
   const markY = deckTop + 0.052;
-  const runwayX = (z: number) => 1.45 + ((z + 18.4) / 30.9) * -4.4;
+  // 斜角着舰跑道：右舷艉部向舰艏左舷斜置 9.3°（福建舰实测 ~9.5°，落在 6°~14° 区间）。
+  // 所有标线都按跑道坐标系（沿跑道 s / 横跨跑道 d）生成并随跑道同角度旋转，保证平行、前后对齐。
+  const RUNWAY_DEG = 9.3;
+  const RUNWAY_RAD = (RUNWAY_DEG * Math.PI) / 180;
+  const RUNWAY_SIN = Math.sin(RUNWAY_RAD);
+  const RUNWAY_COS = Math.cos(RUNWAY_RAD);
+  const RUNWAY_YAW = -RUNWAY_DEG;
+  const RUNWAY_AFT_X = 1.7;
+  const RUNWAY_AFT_Z = -18.4;
+  const RUNWAY_LEN = 30.75;
+  const runwayAt = (s: number): [number, number] => [RUNWAY_AFT_X - s * RUNWAY_SIN, RUNWAY_AFT_Z + s * RUNWAY_COS];
+  const runwayAcross = (s: number, side: number, distance: number): [number, number] => {
+    const [x, z] = runwayAt(s);
+    return [x + side * distance * RUNWAY_COS, z + side * distance * RUNWAY_SIN];
+  };
   // 斜角跑道底层深灰漆带：给所有白色标线提供连续附着面，同时形成真实跑道底色。
+  const underlay = runwayAt(RUNWAY_LEN / 2);
   add({
     id: `${P}runway_underlay`,
     name_cn: "斜角着舰跑道底色",
     name_en: "angled runway underlay",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(B(3.5, 0.004, 31.4, [0, 0, 0], 0.0015)),
+    geometry: M(B(3.5, 0.004, RUNWAY_LEN + 0.5, [0, 0, 0], 0.0015)),
     material: "cv_deck_plate",
-    mate: A([-0.75, deckTop + 0.041, -2.95], [0, -8.1, 0]),
+    mate: A([underlay[0], deckTop + 0.041, underlay[1]], [0, RUNWAY_YAW, 0]),
   });
-  // 斜角着舰跑道：从右舷艉部向左侧前方倾斜约 8.6°，与直通起飞区分开。
+  // 中线虚线：沿跑道纵向等距 1.22，25 段从头到尾严格一条直线。
   for (let d = 0; d < 25; d++) {
-    const z = -18.4 + d * 1.3;
+    const [x, z] = runwayAt(0.75 + d * 1.22);
     add({
       id: `${P}runway_center_${pad(d + 1)}`,
       name_cn: `斜角跑道中线 ${d + 1}`,
       name_en: `angled runway centerline ${d + 1}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(0.14, 0.006, 0.72, [0, 0, 0], 0.002)),
+      geometry: M(B(0.14, 0.006, 0.7, [0, 0, 0], 0.002)),
       material: "cv_deck_line",
-      mate: A([runwayX(z), markY + 0.004, z]),
+      mate: A([x, markY + 0.004, z], [0, RUNWAY_YAW, 0]),
     });
   }
+  // 跑道两侧边线：10 段实线沿跑道横向 ±1.55，与中线同角度。
   for (const side of [-1, 1] as const) {
-    for (let s = 0; s < 11; s++) {
-      const z = -18.4 + s * 2.9;
+    for (let s = 0; s < 10; s++) {
+      const [x, z] = runwayAcross(2.25 + s * 3.0, side, 1.55);
       add({
         id: `${P}runway_edge_${side === -1 ? "p" : "s"}_${pad(s + 1)}`,
         name_cn: `斜角跑道${side === -1 ? "左" : "右"}边线 ${s + 1}`,
         name_en: `angled runway edge ${side === -1 ? "p" : "s"} ${s + 1}`,
         assembly: ASSEMBLY,
         build_layer: 4,
-        geometry: M(B(0.14, 0.006, 2.9, [0, 0, 0], 0.0015)),
+        geometry: M(B(0.14, 0.006, 2.5, [0, 0, 0], 0.0015)),
         material: "cv_deck_line",
-        mate: A([runwayX(z) + side * 1.55, markY + 0.004, z]),
+        mate: A([x, markY + 0.004, z], [0, RUNWAY_YAW, 0]),
       });
     }
   }
+  // 着舰区“钢琴键”：8 根纵向条带横跨跑道，全部按跑道角度排齐。
   for (let bar = 0; bar < 8; bar++) {
-    const z = -15.4 + Math.floor(bar / 4) * 1.2;
-    const x = runwayX(z);
+    const [x, z] = runwayAcross(2.4, 1, -1.36 + bar * 0.3886);
     add({
       id: `${P}runway_threshold_${pad(bar + 1)}`,
-      name_cn: `着舰区横杠 ${bar + 1}`,
-      name_en: `landing threshold bar ${bar + 1}`,
+      name_cn: `着舰区钢琴键 ${bar + 1}`,
+      name_en: `landing threshold piano key ${bar + 1}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(0.55, 0.006, 0.12, [0, 0, 0], 0.0015)),
+      geometry: M(B(0.16, 0.006, 1.1, [0, 0, 0], 0.0015)),
       material: "cv_deck_line",
-      mate: A([x + (bar % 2 === 0 ? -0.85 : 0.85), markY + 0.005, z]),
+      mate: A([x, markY + 0.005, z], [0, RUNWAY_YAW, 0]),
     });
   }
-  for (let td = 0; td < 6; td++) {
-    const z = -10.5 + td * 0.55;
-    const x = runwayX(z);
-    add({
-      id: `${P}runway_touchdown_${pad(td + 1)}`,
-      name_cn: `着舰接地点标记 ${td + 1}`,
-      name_en: `touchdown mark ${td + 1}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(B(0.5, 0.006, 0.09, [0, 0, 0], 0.0015)),
-      material: "cv_deck_line",
-      mate: A([x + (td % 2 === 0 ? -0.55 : 0.55), markY + 0.005, z]),
-    });
+  // 接地点：两列 × 三排，沿跑道横向 ±0.58。
+  for (let row = 0; row < 3; row++) {
+    for (const side of [-1, 1] as const) {
+      const [x, z] = runwayAcross(8.2 + row * 1.4, side, 0.58);
+      add({
+        id: `${P}runway_touchdown_${pad(row * 2 + (side === -1 ? 1 : 2))}`,
+        name_cn: `着舰接地点标记 ${row * 2 + (side === -1 ? 1 : 2)}`,
+        name_en: `touchdown mark ${row * 2 + (side === -1 ? 1 : 2)}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(0.42, 0.006, 0.16, [0, 0, 0], 0.0015)),
+        material: "cv_deck_line",
+        mate: A([x, markY + 0.005, z], [0, RUNWAY_YAW, 0]),
+      });
+    }
   }
-  for (const [tag, ez] of [["aft", -18.35], ["fwd", 12.35]] as const) {
-    const cx = runwayX(ez);
+  for (const [tag, s] of [["aft", 0.35], ["fwd", RUNWAY_LEN - 0.35]] as const) {
+    const [cx, cz] = runwayAt(s);
     add({
       id: `${P}runway_end_${tag}`,
       name_cn: `斜角跑道端线 ${tag === "aft" ? "艉" : "艏"}`,
@@ -768,7 +786,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       build_layer: 4,
       geometry: M(B(3.25, 0.006, 0.12, [0, 0, 0], 0.0015)),
       material: "cv_deck_line",
-      mate: A([cx, markY + 0.006, ez]),
+      mate: A([cx, markY + 0.006, cz], [0, RUNWAY_YAW, 0]),
     });
   }
   // 直通起飞区：中线 + 两侧边线（黄色）。
@@ -781,7 +799,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       build_layer: 4,
       geometry: M(B(0.06, 0.006, 0.6, [0, 0, 0], 0.0015)),
       material: "cv_deck_yellow",
-      mate: A([0, markY + 0.004, 4.5 + d * 1.35]),
+      mate: A([0, markY + 0.004, 4.0 + d * 1.2]),
     });
   }
   for (const side of [-1, 1] as const) {
@@ -791,15 +809,15 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       name_en: `takeoff edge ${side === -1 ? "p" : "s"}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(0.06, 0.006, 12.6, [0, 0, 0], 0.0015)),
+      geometry: M(B(0.06, 0.006, 10.8, [0, 0, 0], 0.0015)),
       material: "cv_deck_yellow",
-      mate: A([side * 3.35, markY + 0.004, 10.5]),
+      mate: A([side * 3.35, markY + 0.004, 9.6]),
     });
   }
-  // 停机位框线 + 编号（七段数字），全部贴在甲板上。
+  // 停机位框线 + 编号（七段数字），全部贴在甲板上；避开斜角着舰跑道。
   const parkingSpots: Array<[number, number, number]> = [
-    [3.5, 10.0, 1], [3.5, 14.2, 2], [-2.4, -14.4, 3], [-2.4, -18.0, 4],
-    [-1.2, 6.7, 5], [0.8, 1.6, 6], [2.9, -17.2, 7], [-3.5, -8.7, 8],
+    [3.95, 10.0, 1], [3.95, 14.2, 2], [-2.4, -14.4, 3], [-2.4, -18.0, 4],
+    [3.95, 5.6, 5], [3.95, 8.0, 6], [-4.4, -10.5, 7], [-4.2, -8.7, 8],
   ];
   const digitSegments: Record<string, string[]> = {
     "1": ["b", "c"], "2": ["a", "b", "g", "e", "d"], "3": ["a", "b", "g", "c", "d"],
@@ -830,19 +848,19 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     }
   };
   parkingSpots.forEach(([sx, sz, n], index) => {
-    const w = 2.5;
-    const d = 2.0;
+    const w = 1.2;
+    const d = 1.7;
     add({
       id: `${P}parking_box_${pad(index + 1)}`,
       name_cn: `停机位框线 ${n}`,
       name_en: `parking spot box ${n}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(w, 0.006, 0.06, [0, 0, 0], 0.0015), B(w, 0.006, 0.06, [0, 0, -d], 0.0015), B(0.06, 0.006, d, [-w / 2, 0, -d / 2], 0.0015), B(0.06, 0.006, d, [w / 2, 0, -d / 2], 0.0015)),
+      geometry: M(B(w, 0.006, 0.05, [0, 0, 0], 0.0015), B(w, 0.006, 0.05, [0, 0, -d], 0.0015), B(0.05, 0.006, d, [-w / 2, 0, -d / 2], 0.0015), B(0.05, 0.006, d, [w / 2, 0, -d / 2], 0.0015)),
       material: "cv_deck_yellow",
       mate: A([sx, markY + 0.003, sz + d / 2]),
     });
-    drawDigit(String(n), `parking_num_${n}`, sx + w / 2 - 0.25, sz + 0.55, 0.5);
+    drawDigit(String(n), `parking_num_${n}`, sx + w / 2 - 0.16, sz + 0.52, 0.36);
   });
   // 甲板外缘线：把斜角甲板的折线轮廓勾出来（俯视一眼能看出不是长方形）。
   const portEdge: Array<[number, number]> = [
@@ -884,9 +902,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     name_en: "helipad circle",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M({ type: "torus", radius: 0.78, tube: 0.035, radialSegments: 8, tubularSegments: 32 }),
+    geometry: M({ type: "torus", radius: 0.58, tube: 0.032, radialSegments: 8, tubularSegments: 32 }),
     material: "cv_deck_line",
-    mate: A([2.75, markY + 0.006, 6.4], [90, 0, 0]),
+    mate: A([-3.95, markY + 0.006, 13.2], [90, 0, 0]),
   });
   add({
     id: `${P}helipad_h`,
@@ -894,9 +912,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     name_en: "helipad H",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(B(0.12, 0.006, 0.78, [0, 0, 0], 0.0015), B(0.12, 0.006, 0.78, [-0.48, 0, 0], 0.0015), B(0.6, 0.006, 0.12, [-0.24, 0, 0], 0.0015)),
+    geometry: M(B(0.1, 0.006, 0.66, [0, 0, 0], 0.0015), B(0.1, 0.006, 0.66, [-0.38, 0, 0], 0.0015), B(0.48, 0.006, 0.1, [-0.19, 0, 0], 0.0015)),
     material: "cv_deck_line",
-    mate: A([2.75, markY + 0.007, 6.4]),
+    mate: A([-3.95, markY + 0.007, 13.2]),
   });
   // 舷号 18（舰艏甲板）。
   drawDigit("1", "hull_number_1", -0.95, 17.0, 1.5);

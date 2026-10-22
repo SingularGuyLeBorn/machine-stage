@@ -106,34 +106,34 @@ describe("PartTree", () => {
     expect(screen.getByText("测试总成")).toBeDefined();
   });
 
-  it("总成默认折叠，点总成才展开；点击零件 → 选中", () => {
+  it("总成默认展开第一层；点 L 分组展开零件；点击零件 → 选中", () => {
     render(<PartTree />);
     openTree();
     expect(screen.getByText("3 个注册零件")).toBeDefined();
-    expect(screen.queryByText("立柱")).toBeNull();
     const head = screen.getByText("测试总成").closest("button")!;
-    expect(head.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(head);
+    expect(head.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.queryByText("立柱")).toBeNull();
     document.querySelectorAll(".tree__group-head--layer").forEach((element) => fireEvent.click(element));
     expect(screen.getByText("立柱")).toBeDefined();
-    expect(head.getAttribute("aria-expanded")).toBe("true");
     fireEvent.click(screen.getByText("立柱").closest("button")!);
     expect(useStageStore.getState().selectedPart).toBe("test.frame.pillar");
     expect(screen.getByText("×2")).toBeDefined();
   });
 
-  it("再次点击总成后零件隐藏", () => {
+  it("点总成折叠后零件隐藏，再点恢复展开", () => {
     render(<PartTree />);
     openTree();
-    fireEvent.click(screen.getByText("测试总成"));
-    fireEvent.click(screen.getByText("测试总成"));
+    const head = screen.getByText("测试总成").closest("button")!;
+    fireEvent.click(head);
+    expect(head.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByText("立柱")).toBeNull();
+    fireEvent.click(head);
+    expect(head.getAttribute("aria-expanded")).toBe("true");
   });
 
   it("点零件 → 选中 + 打开单件隔离小视图", () => {
     render(<PartTree />);
     openTree();
-    fireEvent.click(screen.getByText("测试总成"));
     document.querySelectorAll(".tree__group-head--layer").forEach((element) => fireEvent.click(element));
     fireEvent.click(screen.getByText("立柱").closest("button")!);
     expect(useStageStore.getState().selectedPart).toBe("test.frame.pillar");

@@ -16,8 +16,8 @@ export const AIRCRAFT_SCALE_Z = 22 / 24.06;
 
 // 甲板斜列停机位：避开舰岛、升降机与拦阻索；机翼展开，贴近真实甲板停机照。
 export const PARKED_SPOTS = [
-  { x: 3.5, z: 10.0, yaw: 30 },
-  { x: 3.5, z: 14.2, yaw: 30 },
+  { x: 3.95, z: 10.0, yaw: 30 },
+  { x: 3.95, z: 14.2, yaw: 30 },
   { x: -2.4, z: -14.4, yaw: -30 },
   { x: -2.4, z: -18.0, yaw: -30 },
 ] as const;
