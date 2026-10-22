@@ -150,9 +150,9 @@ export function addSurface(ctx: CarrierCtx): void {
       name_en: `life ring ${l + 1}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(T(0.18, 0.12, 0.07, [0, 0, 0], 18)),
+      geometry: M({ type: "torus", radius: 0.16, tube: 0.034, radialSegments: 10, tubularSegments: 28 }),
       material: "cv_warning",
-      mate: A([(l % 2 === 0 ? -1 : 1) * 4.64, deckTop + 0.55, -12 + Math.floor(l / 2) * 3.2], [90, 0, 0]),
+      mate: A([(l % 2 === 0 ? -1 : 1) * 4.64, deckTop + 0.55, -12 + Math.floor(l / 2) * 3.2], [0, 90, 0]),
     });
   }
   add({
@@ -169,6 +169,135 @@ export function addSurface(ctx: CarrierCtx): void {
     instance_layout: "carrier.surface.raft",
   });
   ctx.layout("carrier.surface.raft", ({ index }) => new THREE.Matrix4().makeTranslation((index % 2) * 0.55 - 0.25, 0, -index * 0.75));
+
+  // 左舷艉部救生艇 + 吊艇架（艇体放样、充气舷管、挂机、操控台、吊臂/绞车）。
+  const boatX = -4.2;
+  const boatY = 3.0;
+  const boatZ = -15.5;
+  add({
+    id: `${P}boat_sponson`,
+    name_cn: "救生艇平台",
+    name_en: "boat sponson",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.82, 0.07, 2.0, [0, 0, 0], 0.006), B(0.5, 0.1, 0.12, [0.34, -0.08, -0.8], 0.004), B(0.5, 0.1, 0.12, [0.34, -0.08, 0.8], 0.004)),
+    material: "cv_grate",
+    mate: A([boatX, boatY, boatZ]),
+  });
+  add({
+    id: `${P}boat_hull`,
+    name_cn: "救生艇艇体",
+    name_en: "RHIB hull",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M({ type: "latheZ", profile: [[0.02, -0.68], [0.1, -0.55], [0.17, -0.2], [0.18, 0.15], [0.13, 0.48], [0.03, 0.64]], segments: 26 }),
+    material: "cv_canvas",
+    mate: A([boatX, boatY + 0.22, boatZ]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}boat_collar_${side === -1 ? "p" : "s"}`,
+      name_cn: `救生艇充气舷管 ${side === -1 ? "外" : "内"}`,
+      name_en: `RHIB collar ${side === -1 ? "outboard" : "inboard"}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(C(0.055, 1.1, [0, 0, 0], 12)),
+      material: "cv_warning",
+      mate: A([boatX + side * 0.17, boatY + 0.28, boatZ], [90, 0, 0]),
+    });
+  }
+  add({
+    id: `${P}boat_bow_tube`,
+    name_cn: "救生艇艏部舷管",
+    name_en: "RHIB bow tube",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(C(0.055, 0.36, [0, 0, 0], 12)),
+    material: "cv_warning",
+    mate: A([boatX, boatY + 0.28, boatZ + 0.56], [0, 0, 90]),
+  });
+  add({
+    id: `${P}boat_console`,
+    name_cn: "救生艇操控台",
+    name_en: "RHIB console",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.22, 0.28, 0.2, [0, 0, 0], 0.006), B(0.18, 0.04, 0.02, [0, 0.1, 0.1], 0.003), C(0.018, 0.3, [0, 0.22, -0.04], 8)),
+    material: "cv_steel_dark",
+    mate: A([boatX, boatY + 0.36, boatZ - 0.12]),
+  });
+  add({
+    id: `${P}boat_seat`,
+    name_cn: "救生艇座椅",
+    name_en: "RHIB seat",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.34, 0.1, 0.2, [0, 0, 0], 0.004)),
+    material: "cv_canvas",
+    mate: A([boatX, boatY + 0.33, boatZ - 0.38]),
+  });
+  add({
+    id: `${P}boat_motor`,
+    name_cn: "救生艇挂机",
+    name_en: "RHIB outboard motor",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.18, 0.26, 0.2, [0, 0.04, 0], 0.008), C(0.05, 0.42, [0, -0.2, 0], 10), B(0.05, 0.08, 0.2, [0, 0.2, 0], 0.003)),
+    material: "cv_steel_dark",
+    mate: A([boatX, boatY + 0.3, boatZ - 0.68]),
+  });
+  add({
+    id: `${P}boat_fuel_tank`,
+    name_cn: "救生艇燃油箱",
+    name_en: "RHIB fuel tank",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.22, 0.16, 0.16, [0, 0, 0], 0.004), C(0.02, 0.08, [0, 0.1, 0], 8)),
+    material: "cv_steel",
+    mate: A([boatX, boatY + 0.32, boatZ - 0.56]),
+  });
+  add({
+    id: `${P}boat_davit_post`,
+    name_cn: "吊艇架立柱",
+    name_en: "boat davit post",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(C(0.075, 1.05, [0, 0, 0], 12), B(0.24, 0.1, 0.24, [0, -0.52, 0], 0.006)),
+    material: "cv_steel",
+    mate: A([boatX - 0.28, boatY + 0.56, boatZ - 0.92]),
+  });
+  add({
+    id: `${P}boat_davit_arm`,
+    name_cn: "吊艇架吊臂",
+    name_en: "boat davit arm",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.09, 0.09, 1.15, [0, 0, 0], 0.006), B(0.06, 0.06, 0.2, [0, -0.15, 0.58], 0.004)),
+    material: "cv_steel",
+    mate: A([boatX - 0.28, boatY + 1.05, boatZ - 0.38]),
+  });
+  add({
+    id: `${P}boat_winch`,
+    name_cn: "吊艇架绞车",
+    name_en: "boat davit winch",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(C(0.11, 0.16, [0, 0, 0], 14), C(0.06, 0.2, [0, 0, 0], 10)),
+    material: "cv_brass",
+    mate: A([boatX - 0.28, boatY + 1.12, boatZ - 0.72], [0, 0, 90]),
+  });
+  for (const [dz, tag] of [[0.3, "bow"], [-0.5, "stern"]] as const) {
+    add({
+      id: `${P}boat_fall_${tag}`,
+      name_cn: `吊艇索 ${tag === "bow" ? "艏" : "艉"}`,
+      name_en: `boat fall ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M({ type: "weld", from: [boatX - 0.28, boatY + 1.1, boatZ + dz], to: [boatX, boatY + 0.32, boatZ + dz], radius: 0.008 }),
+      material: "cv_steel",
+      mate: A([0, 0, 0]),
+    });
+  }
 
   // 甲板车辆与人员：本版不放置程序化积木件（宁可留空，不用方块/圆柱堆小人与小车）。
   // 后续接入真实网格资产后再恢复甲板作业编组。

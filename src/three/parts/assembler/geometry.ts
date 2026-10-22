@@ -73,6 +73,10 @@ const BUILTIN: Record<string, GeometryBuilder> = {
     const s = spec as { r: number; segments?: number };
     return sphereGeometry(s.r, s.segments ?? 16);
   },
+  torus: (spec) => {
+    const s = spec as { radius: number; tube: number; radialSegments?: number; tubularSegments?: number };
+    return new THREE.TorusGeometry(s.radius, s.tube, s.radialSegments ?? 10, s.tubularSegments ?? 24);
+  },
   lathe: (spec) => {
     const s = spec as { profile: [number, number][]; segments?: number };
     return latheGeometry(s.profile, s.segments ?? 32);

@@ -35,6 +35,7 @@ export type GeometrySpec = (
   | { type: "cylinder"; r: Expr; h: Expr; rTop?: Expr; segments?: number; bevel?: Expr }
   | { type: "tube"; rOuter: Expr; rInner: Expr; h: Expr; segments?: number }
   | { type: "sphere"; r: Expr; segments?: number }
+  | { type: "torus"; radius: Expr; tube: Expr; radialSegments?: number; tubularSegments?: number }
   | { type: "lathe"; profile: [Expr, Expr][]; segments?: number }
   | { type: "latheZ"; profile: [Expr, Expr][]; segments?: number }
   | { type: "polygon"; points: [Expr, Expr][]; depth: Expr; bevel?: Expr }
