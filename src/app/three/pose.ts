@@ -147,58 +147,63 @@ export function clearExplode(
   if (touched) assembled.root.updateMatrixWorld(true);
 }
 
-interface XrayBackup {
-  transparent: boolean;
-  opacity: number;
-  depthWrite: boolean;
-  side: THREE.Side;
-  roughness: number;
+interface XrayState {
+  /** 被透视件 → 原始材质（一件可能是多材质数组） */
+  originals: Map<THREE.Object3D, THREE.Material | THREE.Material[]>;
+  clones: THREE.Material[];
 }
 
-const xrayBackups = new WeakMap<AssembledModel, Map<THREE.Material, XrayBackup>>();
+const xrayStates = new WeakMap<AssembledModel, XrayState>();
 
-/** 透视（X 光）：让外壳可看穿，方便检查内部机构。 */
-export function applyXray(assembled: AssembledModel, enabled: boolean): void {
-  let backups = xrayBackups.get(assembled);
-  if (!backups) {
-    backups = new Map();
-    xrayBackups.set(assembled, backups);
-  }
-  for (const handle of assembled.parts) {
-    const materials = Array.isArray(handle.object.material)
-      ? handle.object.material
-      : [handle.object.material];
-    for (const material of materials) {
-      if (!(material instanceof THREE.MeshStandardMaterial)) continue;
-      if (enabled) {
-        if (!backups.has(material)) {
-          backups.set(material, {
-            transparent: material.transparent,
-            opacity: material.opacity,
-            depthWrite: material.depthWrite,
-            side: material.side,
-            roughness: material.roughness,
-          });
-        }
-        material.transparent = true;
-        material.opacity = 0.24;
-        material.depthWrite = false;
-        material.side = THREE.DoubleSide;
-        material.roughness = Math.min(1, material.roughness + 0.15);
-        material.needsUpdate = true;
-      } else {
-        const backup = backups.get(material);
-        if (!backup) continue;
-        material.transparent = backup.transparent;
-        material.opacity = backup.opacity;
-        material.depthWrite = backup.depthWrite;
-        material.side = backup.side;
-        material.roughness = backup.roughness;
-        material.needsUpdate = true;
-        backups.delete(material);
-      }
+/**
+ * 透视（X 光）：只把「外壳」换成半透明幽灵壳，内部件保持不透明。
+ *
+ * 旧实现把所有零件的共享材质改成透明：MBT/ED 近千个零件、数百万三角面
+ * 全部进入透明排序 + 混合，实测 1600 宽只剩 22fps。现在给外壳克隆独立材质，
+ * 内部件的原材质完全不动，透明层数量降到外壳级。
+ */
+export function applyXray(
+  assembled: AssembledModel,
+  enabled: boolean,
+  ghostPart: (handle: PartHandle) => boolean = () => true,
+): void {
+  const existing = xrayStates.get(assembled);
+  if (!enabled) {
+    if (!existing) return;
+    for (const [object, original] of existing.originals) {
+      (object as THREE.Mesh).material = original;
     }
+    for (const clone of existing.clones) clone.dispose();
+    xrayStates.delete(assembled);
+    return;
   }
+  if (existing) return;
+
+  const state: XrayState = { originals: new Map(), clones: [] };
+  const cloneOf = new Map<THREE.Material, THREE.Material>();
+  for (const handle of assembled.parts) {
+    if (!ghostPart(handle)) continue;
+    const object = handle.object;
+    const original = object.material;
+    const source = Array.isArray(original) ? original : [original];
+    const ghosted = source.map((material) => {
+      if (!(material instanceof THREE.MeshStandardMaterial)) return material;
+      const cached = cloneOf.get(material);
+      if (cached) return cached;
+      const clone = material.clone();
+      clone.transparent = true;
+      clone.opacity = 0.16;
+      clone.depthWrite = false;
+      clone.side = THREE.DoubleSide;
+      clone.needsUpdate = true;
+      cloneOf.set(material, clone);
+      state.clones.push(clone);
+      return clone;
+    });
+    state.originals.set(object, original);
+    object.material = Array.isArray(original) ? ghosted : ghosted[0]!;
+  }
+  xrayStates.set(assembled, state);
 }
 
 /** 选中/悬停高亮：part 级换材质克隆；给了实例序号时只染那一个实例（instanceColor）。 */
