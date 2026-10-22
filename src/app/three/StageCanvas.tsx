@@ -121,6 +121,7 @@ function StageEffects() {
 function StageRuntime() {
   const modelId = useStageStore((state) => state.modelId);
   const rebuildToken = useStageStore((state) => state.rebuildToken);
+  const worn = useStageStore((state) => state.worn);
   const overrides = useStageStore((state) => state.overrides);
   const views = useStageStore((state) => state.views);
   const [scene, setScene] = useState<{ assembled: AssembledModel; seq: number } | null>(null);
@@ -163,6 +164,13 @@ function StageRuntime() {
     const tMat = performance.now();
     try {
       library = createMaterialLibrary(registry.materials);
+      if (worn) {
+        for (const material of Object.values(library.materials)) {
+          material.color.multiplyScalar(0.55);
+          material.roughness = Math.min(1, material.roughness + 0.18);
+          material.envMapIntensity = Math.max(0.4, material.envMapIntensity - 0.6);
+        }
+      }
       const tBuild = performance.now();
       next = buildModel(registry, {
         builders: model.builders,
@@ -228,7 +236,7 @@ function StageRuntime() {
       next.dispose();
       library.dispose();
     };
-  }, [modelId, variantId, rebuildToken, overrides]);
+  }, [modelId, variantId, rebuildToken, overrides, worn]);
 
   // ---- 每帧纪律 ----
   // AK-47 / M249 射击模式跟随状态机（单发/连发/停机）

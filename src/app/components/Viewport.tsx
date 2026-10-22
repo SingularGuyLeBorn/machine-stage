@@ -58,6 +58,8 @@ export function Viewport() {
   const modelId = useStageStore((state) => state.modelId);
   const views = useStageStore((state) => state.views);
   const toggleView = useStageStore((state) => state.toggleView);
+  const worn = useStageStore((state) => state.worn);
+  const toggleWorn = useStageStore((state) => state.toggleWorn);
   const requestViewReset = useStageStore((state) => state.requestViewReset);
   const stats = useStageStore((state) => state.stats);
   const assembled = useStageStore((state) => state.assembled);
@@ -236,6 +238,15 @@ export function Viewport() {
           >
             <Grid3x3 size={13} aria-hidden />
             网格
+          </button>
+          <button
+            type="button"
+            className="btn btn--sm"
+            aria-pressed={worn}
+            title="做旧：金属/木件更暗更粗糙，模拟使用磨损"
+            onClick={() => toggleWorn()}
+          >
+            做旧
           </button>
           <button
             type="button"
