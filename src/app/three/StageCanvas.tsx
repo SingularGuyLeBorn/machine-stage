@@ -860,7 +860,14 @@ function CameraRig() {
       : new THREE.Vector3().subVectors(camera.position, currentTarget);
     if (direction.lengthSq() < 1e-8) direction.copy(HOME_DIRECTION);
     direction.normalize();
-    const fov = (camera as THREE.PerspectiveCamera).fov ?? 34;
+    // 航母这类百米级包围球若沿用 34° 视场，复位距离会拉到 ~700m，首帧容易落在背景穹顶之外。
+    // 大模型重置时切到 48° 取景，把复位距离压到 430m 级别，既装得下全舰也不会黑屏。
+    const baseFov = (camera as THREE.PerspectiveCamera).fov ?? 34;
+    const fov = focus.radius > 60 ? Math.max(baseFov, 48) : baseFov;
+    if ((camera as THREE.PerspectiveCamera).fov !== fov) {
+      (camera as THREE.PerspectiveCamera).fov = fov;
+      (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
+    }
     // 1.15 ≈ 让包围球填满 ~85% 视锥（1.65 会把整机拉得又小又远，像展示柜角落里的玩具）
     const distance = Math.max(0.35, (focus.radius * 1.15) / Math.tan(THREE.MathUtils.degToRad(fov / 2)));
     const toPosition = target.clone().addScaledVector(direction, distance);

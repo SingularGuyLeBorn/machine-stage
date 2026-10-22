@@ -26,8 +26,9 @@
 - **甲板使用痕迹**：着舰轮胎擦痕 22 段、油污 8 处、挡焰板烧蚀 3 处（贴甲板薄片，非贴图伪造）。
 - **舰载机**：按 j20.ts 的气动布局重做——三角翼（内翼根弦 0.76 / 外翼后掠 0.34）、全动**外倾**垂尾（无平尾/无独立方向舵）、前置鸭翼、DSI 鼓包/唇口、12 片锯齿喷口调节片、EOTS 下颌窗、6 处 EODAS、腹部弹舱门/铰链、背脊整流、放气百叶、侧操纵台、机身棱线、铆钉列/蒙皮对缝；涂装改为低金属度哑光隐身灰。折叠外翼、尾钩、加强起落架、牵引杆保留。**说明：不是把 4875 行 j20.ts 逐行搬进来**，是按其结构清单和尺寸关系重构的舰载型；内部框段/口盖密度仍低于原文件。
 - **零件树**：总成第一层默认展开，L 分组默认折叠；反向联动选中仍会自动展开。
-- **证据**：`docs/qa/carrier-bow-quarter.jpeg`、`carrier-stern-quarter.jpeg`、`carrier-sea-water.jpeg`、`carrier-aircraft-j20.jpeg`、`carrier-ciws-support.jpeg`、`carrier-deck-wear.jpeg`、`carrier-underwater.jpeg`、`carrier-island-radar.jpeg`、`carrier-runway-marking.jpeg`、`carrier-tree-default.jpeg`、`carrier-hull-loft-side.jpeg`、`carrier-hull-close.jpeg`。
-- **已知差距（如实）**：海面是程序化涌浪网格 + 法线/粗糙度 + 泡沫带，不是 FFT/体渲染级海况；舰载机已按 J-20 布局重构，但零件密度仍低于 j20.ts 原文件；首帧全舰远视角在低端 GPU 上编译/绘制期间可能短暂黑屏（工程机复现，非持续黑屏）；这些不当作“已完成”。
+- **首帧/复位取景**：大模型（包围球半径 >60）复位时视场提到 48°+，相机距离压到 430m 级别，避免复位落到背景穹顶之外造成黑屏；首页即为 3/4 全舰视角（`carrier-home.jpeg`）。
+- **证据**：`docs/qa/carrier-home.jpeg`、`carrier-profile.jpeg`、`carrier-bow-quarter.jpeg`、`carrier-stern-quarter.jpeg`、`carrier-sea-water.jpeg`、`carrier-aircraft-j20.jpeg`、`carrier-ciws-support.jpeg`、`carrier-satcom-support.jpeg`、`carrier-deck-wear.jpeg`、`carrier-underwater.jpeg`、`carrier-island-radar.jpeg`、`carrier-runway-marking.jpeg`、`carrier-tree-default.jpeg`、`carrier-hull-loft-side.jpeg`、`carrier-hull-close.jpeg`。
+- **已知差距（如实）**：海面是程序化涌浪网格 + 法线/粗糙度 + 泡沫带，不是 FFT/体渲染级海况；舰载机已按 J-20 布局重构，但零件密度仍低于 j20.ts 原文件；超重舰体在低端 GPU 上首帧编译仍可能停顿（复位/取景黑屏已通过 48° 大模型取景修复）；这些不当作“已完成”。
 
 ## 外形返工（第一批）
 - [x] **斜角甲板**：飞行甲板改成不对称轮廓，左舷斜角外飘/艉部最宽、向艏收窄；着舰跑道中线从左舷艉向右舷前倾斜约 9.3°（在 6°~14° 内），带连续边线/中线/端线/接地点横杠。
