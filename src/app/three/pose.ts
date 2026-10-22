@@ -276,30 +276,34 @@ export function applyHighlight(
             ? 0.16
             : 0;
     const object = handle.object;
-    const current = object.material as THREE.Material;
+    const current = object.material as THREE.Material | THREE.Material[];
     const isClone = object.userData.__highlight === true;
     if (wanted === 0) {
       if (isClone) {
-        const original = object.userData.__originalMaterial as THREE.Material;
-        current.dispose();
+        const original = object.userData.__originalMaterial as THREE.Material | THREE.Material[];
+        const clones = Array.isArray(current) ? current : [current];
+        for (const clone of clones) clone.dispose();
         object.material = original;
         object.userData.__highlight = false;
         delete object.userData.__originalMaterial;
       }
       continue;
     }
-    let material: THREE.MeshStandardMaterial;
+    const originals = Array.isArray(current) ? current : [current];
+    let materials: THREE.Material[];
     if (!isClone) {
-      const original = current as THREE.MeshStandardMaterial;
-      object.userData.__originalMaterial = original;
-      material = original.clone();
+      object.userData.__originalMaterial = current;
+      materials = originals.map((material) => material.clone());
       object.userData.__highlight = true;
-      object.material = material;
+      object.material = Array.isArray(current) ? materials : materials[0]!;
     } else {
-      material = current as THREE.MeshStandardMaterial;
+      materials = Array.isArray(current) ? current : [current];
     }
-    material.emissive = accent;
-    material.emissiveIntensity = wanted;
+    for (const material of materials) {
+      if (!(material instanceof THREE.MeshStandardMaterial)) continue;
+      material.emissive = accent;
+      material.emissiveIntensity = wanted;
+    }
   }
 
   // 实例级染色：悬停淡、选中亮；同一实例时选中优先

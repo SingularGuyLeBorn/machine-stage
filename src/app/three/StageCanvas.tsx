@@ -99,8 +99,8 @@ function Studio() {
       <directionalLight
         castShadow
         position={[5.5, 8.5, 4.5]}
-        intensity={1.7}
-        shadow-mapSize={[1024, 1024]}
+        intensity={1.9}
+        shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0006}
         shadow-normalBias={0.012}
       >
@@ -141,7 +141,7 @@ function Studio() {
           scale={[16, 12, 1]}
         />
       </Environment>
-      <SceneEnvIntensity value={1.15} />
+      <SceneEnvIntensity value={1.4} />
     </>
   );
 }
@@ -304,6 +304,7 @@ function StageRuntime() {
       useStageStore.getState().reportFault(faultFromError(`装配 ${model.title}`, error));
       return;
     }
+    if (model.presentationScale) next.root.scale.set(...model.presentationScale);
     next.root.traverse((object) => {
       if ((object as THREE.Mesh).isMesh) {
         object.castShadow = true;
@@ -329,9 +330,14 @@ function StageRuntime() {
     let home: CachedBuild["home"] = null;
     let floor: CachedBuild["floor"] = null;
     if (!bounds.isEmpty()) {
-      const center = bounds.getCenter(new THREE.Vector3());
+      const frame = model.framingBounds?.(next) ?? bounds;
+      const center = frame.getCenter(new THREE.Vector3());
+      const frameSize = frame.getSize(new THREE.Vector3());
       const size = bounds.getSize(new THREE.Vector3());
-      home = { center: [center.x, center.y, center.z], radius: Math.max(size.length() * 0.5, 0.5) };
+      home = {
+        center: [center.x, center.y, center.z],
+        radius: Math.max(frameSize.length() * 0.5, 0.5),
+      };
       floor = { y: bounds.min.y, footprint: Math.max(size.x, size.z) };
     }
     const stats = { parts: next.parts.length, triangles: Math.round(triangles) };
@@ -392,8 +398,11 @@ function StageRuntime() {
     const store = useStageStore.getState();
     const model = findModel(store.modelId);
     const state = store.machineState;
-    // running = 机构运转中（连发/单发演示都推进时钟；idle/scanning 传 0 回装配态）
-    const running = state !== "idle" && state !== "scanning";
+    // King Joe 等多形态模型用 animatedStates 显式声明时钟推进状态；
+    // 其余模型沿用主线的规则：除 idle/scanning 外都推进（悬挂/击发/受损等）。
+    const running = model.animatedStates
+      ? model.animatedStates.includes(state)
+      : state !== "idle" && state !== "scanning";
     // 切换机器状态时重置动画时钟：击发必须从 0s 开始，悬挂演示也应从头起步。
     if (state !== lastStateRef.current) {
       lastStateRef.current = state;
@@ -517,10 +526,11 @@ function StageRuntime() {
     }
   }, [assembled, modelId, camera, views.xray, views.explode, buildIndex, selectedPart]);
 
-  // 开发期自检钩子（QA 截图 / 控制台调试；生产构建不写）
+  // QA 钩子：开发模式或 ?qa=1 时暴露只读场景引用，用于自动化截图/录屏/相机机位。
   const three = useThree();
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
+    const qa = import.meta.env.DEV || new URLSearchParams(window.location.search).has("qa");
+    if (!qa) return;
     (window as unknown as { __stage?: unknown }).__stage = {
       store: useStageStore,
       assembled,
@@ -528,6 +538,13 @@ function StageRuntime() {
       camera: three.camera,
       controls: three.controls,
       gl: three.gl,
+      setCamera: (position: [number, number, number], target: [number, number, number]) => {
+        three.camera.position.set(...position);
+        const controls = three.controls as { target?: THREE.Vector3; update?: () => void } | null;
+        if (controls?.target) controls.target.set(...target);
+        controls?.update?.();
+        three.camera.lookAt(new THREE.Vector3(...target));
+      },
     };
   }, [assembled, three]);
 
