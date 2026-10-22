@@ -49,6 +49,9 @@ export function matchExpectedContact(
   rules: readonly ExpectedContactRule[],
 ): ExpectedContactRule | null {
   for (const rule of rules) {
+    // 静态安装贴合规则不覆盖相对运动：只有全程刚性同行的零件仍可按构造接触豁免。
+    // 炮盾扫舱盖、炮塔扫甲板件这类相对运动必须重新判定。
+    if (rule.staticOnly && report.frame !== null && report.relativeMotion !== false) continue;
     // 形态守门：默认只收 face_mate / bearing_overlap；
     // 族里显式声明 allowDisplaced / allowSuspect 时才额外收对应形态；
     // anyForm 用于源资产本身互嵌的历史资产（必须写清 reason 与深度上限）。

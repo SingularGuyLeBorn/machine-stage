@@ -90,6 +90,65 @@ const DOWN = new THREE.Vector3(0, -1, 0);
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 const scratchQuat = new THREE.Quaternion();
 
+const DRIVER_HATCH_NODE = "MBT_DriverHatch";
+const AIM_PERIOD = 3;
+
+/** 时间轴关键帧：段内 smoothstep，端点外保持首/末值。 */
+function keyframes(t: number, keys: ReadonlyArray<readonly [number, number]>): number {
+  if (t <= keys[0]![0]) return keys[0]![1];
+  for (let i = 1; i < keys.length; i++) {
+    const [t1, v1] = keys[i]!;
+    if (t <= t1) {
+      const [t0, v0] = keys[i - 1]!;
+      const u = (t - t0) / (t1 - t0);
+      return v0 + (v1 - v0) * u * u * (3 - 2 * u);
+    }
+  }
+  return keys[keys.length - 1]![1];
+}
+
+/**
+ * 瞄准循环（3s，正好覆盖一次动画扫掠）：
+ * 炮塔先右后左回转 + 火炮 ±5.7° 俯仰，均绕真实耳轴；
+ * 炮塔回正时驾驶员舱盖先垂直弹起 60mm，再绕后铰链开到 55°，随后闭合下沉。
+ * 舱盖与潜望镜静止高度压在炮塔前甲下缘以下，全向回转不扫舱盖。
+ */
+function aimPose(t: number): { yaw: number; pitch: number; hatchLift: number; hatchOpen: number } {
+  const u = t % AIM_PERIOD;
+  const yaw = keyframes(u, [
+    [0, 0],
+    [0.55, 0.55],
+    [1.1, 0],
+    [1.9, 0],
+    [2.5, -0.35],
+    [3, 0],
+  ]);
+  const pitch = keyframes(u, [
+    [0, 0],
+    [0.45, -0.1],
+    [1.0, 0],
+    [2.1, 0.1],
+    [3, 0],
+  ]);
+  const hatchLift = keyframes(u, [
+    [0, 0],
+    [1.15, 0],
+    [1.3, 0.06],
+    [1.62, 0.06],
+    [1.8, 0],
+    [3, 0],
+  ]);
+  const hatchOpen = keyframes(u, [
+    [0, 0],
+    [1.35, 0],
+    [1.55, 55],
+    [1.62, 55],
+    [1.78, 0],
+    [3, 0],
+  ]);
+  return { yaw, pitch, hatchLift, hatchOpen: (hatchOpen * Math.PI) / 180 };
+}
+
 function setPartVisible(assembled: AssembledModel, id: string, visible: boolean): void {
   const handle = assembled.getPart(id);
   if (handle) handle.object.visible = visible;
@@ -296,13 +355,14 @@ function animateLoading(assembled: AssembledModel, t: number): void {
   const push = THREE.MathUtils.smoothstep(cycle, 2.4, 3.4);
   if (arm) arm.rotation.x = -lift * 1.15;
   if (round) {
-    const y = 1.0 + lift * 0.98;
-    const z = 0.45 + push * 0.75;
+    // 提弹终点跟随耳轴高度：炮尾抬高后，弹必须仍与炮膛同轴。
+    const y = 1.0 + lift * (MBT.GUN_Y - 1.0);
+    const z = 0.45 + push * 0.75 - MBT.TURRET_Z;
     round.position.set(0, y, z);
     round.quaternion.setFromEuler(new THREE.Euler(lift * Math.PI * 0.5, 0, 0));
   }
-  if (rammer) rammer.position.z = 0.48 + push * 0.62;
-  if (breech) breech.position.y = -0.14 * THREE.MathUtils.smoothstep(cycle, 3.4, 3.9);
+  if (rammer) rammer.position.z = 0.38 + push * 0.62;
+  if (breech) breech.position.y = -0.1 * THREE.MathUtils.smoothstep(cycle, 3.4, 3.9);
   const show = cycle > 0.7 && cycle < 4.2;
   for (const id of ["mbt90.interior.demo_penetrator", "mbt90.interior.demo_sabot", "mbt90.interior.demo_case"]) {
     setPartVisible(assembled, id, show);
@@ -317,14 +377,14 @@ function animateFire(assembled: AssembledModel, t: number): void {
   // 炮口焰/抽烟装置排烟由 app/three/vfx/MbtVfx 的照片级粒子负责；
   // 这里不再显示旧的球体 fx 件。
   const breech = assembled.getNode("MBT_BreechBlock");
-  if (breech) breech.position.y = u > 0.8 && u < 2.8 ? -0.16 : 0;
+  if (breech) breech.position.y = u > 0.8 && u < 2.8 ? -0.1 : 0;
   const ejected = assembled.getNode(EJECTED_CASE_NODE);
   if (ejected) {
     const show = u > 1.2 && u < 4.3;
     setPartVisible(assembled, "mbt90.interior.ejected_case", show);
     if (show) {
       const k = u - 1.2;
-      ejected.position.set(0.15 + k * 0.25, 1.98 - 2.2 * k * k, 0.9 + k * 0.6);
+      ejected.position.set(0.15 + k * 0.25, MBT.GUN_Y - 2.2 * k * k, 0.8 + k * 0.6);
       ejected.rotation.set(k * 4, k * 2, 0);
     }
   }
@@ -404,10 +464,10 @@ export function animateMbt(assembled: AssembledModel, seconds: number, state?: s
   const breech = assembled.getNode("MBT_BreechBlock");
   if (breech) breech.position.y = 0;
   const rammer = assembled.getNode(RAMMER_NODE);
-  if (rammer) rammer.position.z = 0.48;
+  if (rammer) rammer.position.z = 0.38;
   const loadRound = assembled.getNode(LOAD_ROUND_NODE);
   if (loadRound) {
-    loadRound.position.set(0, 1.0, 0.45);
+    loadRound.position.set(0, 1.0, 0.35);
     loadRound.quaternion.identity();
   }
   const carousel = assembled.getNode(CAROUSEL_NODE);
@@ -431,9 +491,15 @@ export function animateMbt(assembled: AssembledModel, seconds: number, state?: s
     suspend(assembled, t, 0.045);
     assembled.root.position.y = Math.sin(t * 1.8) * 0.01;
   } else if (current === "aim") {
-    if (turret) turret.rotation.y = Math.sin(t * 0.45) * 0.4;
+    const aim = aimPose(t);
+    if (turret) turret.rotation.y = aim.yaw;
     const gun = assembled.getNode("Gun");
-    if (gun) gun.rotation.x = Math.sin(t * 0.8) * 0.06;
+    if (gun) gun.rotation.x = aim.pitch;
+    const hatch = assembled.getNode(DRIVER_HATCH_NODE);
+    if (hatch) {
+      hatch.position.y = restPos(assembled, DRIVER_HATCH_NODE).y + aim.hatchLift;
+      hatch.rotation.x = -aim.hatchOpen;
+    }
   } else if (current === "loading") {
     animateLoading(assembled, t);
   } else if (current === "fire") {

@@ -182,6 +182,14 @@ export interface ExpectedContactRule {
    */
   allowSuspect?: boolean;
   /**
+   * 只在静态装配态豁免；动画扫掠（frame != null）不适用。
+   *
+   * 安装贴合类宽规则（如「所有外壳件互相贴合」）在动画里会顺手藏掉运动穿模——
+   * 炮管扫过驾驶员舱盖、耳轴扫过炮塔都曾被这类规则吞掉。声明 staticOnly 后，
+   * 动起来的零件必须另配窄规则（真实的回转/滑动配合面）或直接修结构。
+   */
+  staticOnly?: boolean;
+  /**
    * 跳过形态守门（face_mate / bearing_overlap）。仅用于「源资产本身互嵌」这类
    * 无法按贴面分类、但已确认不是装配错误的历史资产；必须写清 reason 与深度上限。
    */

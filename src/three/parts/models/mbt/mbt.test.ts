@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { buildModel } from "@/three/parts";
+import { buildModel, detectSweep, partitionExpectedContacts } from "@/three/parts";
 import { findModel } from "@/app/catalog";
 import { detectUnsupportedParts } from "@/three/parts/solver/support";
 import { animateMbt } from "./motion";
@@ -200,6 +200,108 @@ describe("MBT-90 主战坦克 · 整机", () => {
     expect(Math.abs(cam.rotation.x)).toBeGreaterThan(0.05);
     built.resetNodes();
   });
+
+  it("瞄准：炮塔回转 + 火炮绕耳轴俯仰 + 驾驶员舱盖弹起开合", () => {
+    const poseAt = (t: number) => {
+      built.resetNodes();
+      animateMbt(built, t, "aim");
+      built.root.updateMatrixWorld(true);
+      const turret = built.getNode("Turret")!;
+      const gun = built.getNode("Gun")!;
+      const hatch = built.getNode("MBT_DriverHatch")!;
+      const muzzle = gun.localToWorld(new THREE.Vector3(0, 0, MBT.BARREL_LEN));
+      return {
+        yaw: turret.rotation.y,
+        pitch: gun.rotation.x,
+        hatchY: hatch.position.y,
+        hatchRot: hatch.rotation.x,
+        muzzle,
+      };
+    };
+    const right = poseAt(0.55);
+    // 左耳轴挂在 Gun 节点上：随炮塔回转，绕耳轴俯仰
+    const trunnion = built.getPart("mbt90.hull.trunnion_l")!;
+    const trunnionMatrix = built.instanceMatrix(trunnion, 0, new THREE.Matrix4());
+    const trunnionPos = new THREE.Vector3().setFromMatrixPosition(trunnionMatrix);
+    const down = poseAt(1.9);
+    expect(Math.abs(right.yaw)).toBeGreaterThan(0.5);
+    expect(right.pitch).toBeLessThan(-0.08);
+    expect(down.pitch).toBeGreaterThan(0.08);
+    // 炮口高度随俯仰真的上下走（不是只在平面里转）
+    expect(Math.abs(right.muzzle.y - down.muzzle.y)).toBeGreaterThan(0.8);
+    expect(trunnion.def.node).toBe("Gun");
+    expect(trunnionPos.y).toBeCloseTo(MBT.GUN_Y, 2);
+    expect(Math.hypot(trunnionPos.x, trunnionPos.z - MBT.TURRET_Z)).toBeGreaterThan(0.5);
+    // 舱盖只在炮塔回正窗口弹起 60mm 并掀开 55°，随后回落闭合
+    const hatchRest = restPos("MBT_DriverHatch").y;
+    expect(right.hatchY).toBeCloseTo(hatchRest, 3);
+    expect(right.hatchRot).toBeCloseTo(0, 5);
+    const open = poseAt(1.55);
+    expect(open.hatchY - hatchRest).toBeGreaterThan(0.05);
+    expect(open.hatchRot).toBeLessThan(-0.9);
+    const closed = poseAt(2.2);
+    expect(closed.hatchY).toBeCloseTo(hatchRest, 3);
+    expect(closed.hatchRot).toBeCloseTo(0, 2);
+    built.resetNodes();
+  });
+
+  it("瞄准全周期：舱盖/耳轴/炮管与炮塔前甲零穿插", () => {
+    const focus = new Set([
+      "mbt90.hull.driver_hatch",
+      "mbt90.hull.driver_periscope_1",
+      "mbt90.hull.driver_periscope_2",
+      "mbt90.hull.driver_periscope_3",
+      "mbt90.hull.front_deck",
+      "mbt90.hull.turret_mantlet",
+      "mbt90.hull.turret_mantlet_layer",
+      "mbt90.hull.gun_barrel",
+      "mbt90.hull.thermal_sleeve_front",
+      "mbt90.hull.thermal_sleeve_rear",
+      "mbt90.hull.evacuator",
+      "mbt90.hull.muzzle",
+      "mbt90.hull.breech_block",
+      "mbt90.hull.breech_ring",
+      "mbt90.hull.recoil_cylinder_l",
+      "mbt90.hull.recoil_cylinder_r",
+      "mbt90.hull.recoil_rod_l",
+      "mbt90.hull.recoil_rod_r",
+      "mbt90.hull.recuperator",
+      "mbt90.hull.cradle",
+      "mbt90.hull.trunnion_l",
+      "mbt90.hull.trunnion_r",
+      "mbt90.hull.coax_body",
+      "mbt90.hull.turret_cheek_outer_l",
+      "mbt90.hull.turret_cheek_outer_r",
+      "mbt90.hull.turret_cheek_ceramic_l",
+      "mbt90.hull.turret_cheek_ceramic_r",
+      "mbt90.hull.turret_cheek_backing_l",
+      "mbt90.hull.turret_cheek_backing_r",
+      "mbt90.hull.turret_side_l",
+      "mbt90.hull.turret_side_r",
+      "mbt90.hull.era_cheek_l_casing",
+      "mbt90.hull.era_cheek_l_cover",
+      "mbt90.hull.era_cheek_l_bolt",
+      "mbt90.hull.turret_ring",
+      "mbt90.hull.turret_floor",
+      "mbt90.hull.armor_roof",
+    ]);
+    const reports = detectSweep(built, {
+      duration: 3,
+      fps: 4,
+      filter: (handle) => focus.has(handle.partId),
+      applyPose: (t) => {
+        built.resetNodes();
+        animateMbt(built, t, "aim");
+      },
+    });
+    const split = partitionExpectedContacts(reports, model.registry!.expectedContacts ?? []);
+    expect(
+      split.active.map(
+        ({ report }) => `${report.a} <-> ${report.b} ${report.depth_mm?.toFixed(1)}mm [${report.form}]`,
+      ),
+    ).toEqual([]);
+    built.resetNodes();
+  }, 120_000);
 
   it("自动装弹机：转盘/提弹臂/推弹杆/演示弹按节拍运动", () => {
     built.resetNodes();

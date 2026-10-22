@@ -439,11 +439,31 @@ function poseCombining(
       DOCK_TIMES[name === "stomach" ? "stomach_legs" : name === "chest" ? "chest_stomach" : "neck"]!;
     const descent = clamp01((t - timing.start) / (timing.lock - timing.start - 0.2));
     const finalY = targetY[name]!;
-    let y = start.y;
-    let x = 0;
-    let z = 0;
+
+    // 还没轮到的模块不能钉死在预对接柱上：持续上下浮动，并以很慢的速度向最终位蠕近。
+    const hoverPhase = name === "chest" ? 1.7 : name === "ship" ? 4.4 : 0.9;
+    const hoverAmp = name === "ship" ? 0.08 : name === "chest" ? 0.065 : 0.04;
+    const hoverFade = 1 - smoothstep(timing.start - 0.45, timing.start, t);
+    const unDocked = t < timing.lock ? 1 : 0;
+    const creep = name === "stomach" ? 0 : smoothstep(1.4, timing.start, t) * 0.16;
+    const approachY = (finalY - pre.y) * creep;
+    const bob =
+      (Math.sin(t * 1.35 + hoverPhase) * hoverAmp +
+        Math.sin(t * 0.53 + hoverPhase * 2.3) * hoverAmp * 0.35) *
+      hoverFade *
+      unDocked;
+    const driftX = Math.sin(t * 0.71 + hoverPhase * 1.4) * 0.028 * hoverFade * unDocked;
+    const driftZ = Math.cos(t * 0.63 + hoverPhase) * 0.022 * hoverFade * unDocked;
+    const hoverRot =
+      (Math.sin(t * 0.9 + hoverPhase) * 0.012 + Math.sin(t * 0.41 + hoverPhase * 1.7) * 0.006) *
+      hoverFade *
+      unDocked;
+
+    let y = start.y + approachY + bob;
+    let x = driftX;
+    let z = driftZ;
     if (t >= timing.start) {
-      const yFrom = pre.y;
+      const yFrom = pre.y + approachY;
       const yTo = finalY;
       const p = damped(descent);
       const stickSlip = t < timing.lock ? Math.sin(descent * 92) * 0.0015 * smoothstep(0.7, 1, descent) : 0;
@@ -459,9 +479,10 @@ function poseCombining(
     const wobble = (1 - converge) * 1.2;
     setNode(assembled, name, new THREE.Vector3(x, y, z), [
       Math.sin(t * 2.3 + (name === "ship" ? 0.8 : 0)) * wobble +
-        (t < timing.start ? 0 : Math.sin(t * 28) * 0.25 * (1 - descent)),
+        (t < timing.start ? 0 : Math.sin(t * 28) * 0.25 * (1 - descent)) +
+        hoverRot,
       (1 - converge) * startFormation.blend * FORMATION_YAW[name],
-      Math.cos(t * 1.9 + (name === "stomach" ? 1.4 : 0)) * wobble,
+      Math.cos(t * 1.9 + (name === "stomach" ? 1.4 : 0)) * wobble + hoverRot * 0.7,
     ]);
     const timeSinceLock = t - timing.lock;
     const lock = lockAngle(timeSinceLock);
