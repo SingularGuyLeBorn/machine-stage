@@ -1258,6 +1258,7 @@ export function makeAk47Registry(): ModelRegistry {
       { family: "ak-internal", a: "rpk.receiver.body", b: "rpk.ammo.*", reason: "弹匣第一发弹从机匣弹匣井进入（含 AABB 相切）", maxDepthMm: 3, allowDisplaced: true, allowSuspect: true },
       { family: "ak-fire", a: "rpk.fire.hammer_spring", b: "rpk.mag.body", reason: "击锤簧与弹匣体上缘相邻（机匣内腔）", maxDepthMm: 2, allowDisplaced: true },
       { family: "ak-fire", a: "rpk.fire.hammer", b: "rpk.ammo.*", reason: "击锤与供弹口第一发弹相邻（机匣内腔）", maxDepthMm: 2, allowDisplaced: true },
+      { family: "ak-fire", a: "rpk.fire.hammer_spring", b: "rpk.ammo.*", reason: "击锤簧在弹匣口后上方，供弹上移时与上排弹壳/发射药 AABB 近似接触（细钢丝，深度≤4mm）", maxDepthMm: 4, allowDisplaced: true },
       // 弹匣/弹膛/复进簧是封闭代理体：弹在弹匣内、弹头在膛内、簧圈套在导杆上。
       { family: "ak-internal", a: "rpk.mag.body", b: "rpk.ammo.*", reason: "弹药在弹匣壳体内沿弧形弹匣排列（弹匣为封闭代理体）", maxDepthMm: 6, allowDisplaced: true },
       { family: "ak-internal", a: "rpk.ammo.*", b: "rpk.ammo.*", reason: "弹匣内相邻弹药互相接触（弹与弹的排列接触）", maxDepthMm: 6, allowDisplaced: true },
