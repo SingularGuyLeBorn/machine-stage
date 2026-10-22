@@ -36,7 +36,7 @@ const m2ReceiverShroud: GeometryBuilder = (spec) => {
 
   // 左右侧板 + 纵向压筋 + 上下两排铆钉
   for (const side of [-1, 1]) {
-    const wall = bevelBoxGeometry(t, h, len, 0.0005, 1);
+    const wall = bevelBoxGeometry(t, h, len, 0.0025, 1);
     wall.translate(side * (w / 2 - t / 2), 0, zc);
     parts.push(wall);
     const rib = bevelBoxGeometry(0.0018, 0.008, len * 0.7, 0.0003, 1);
@@ -55,10 +55,10 @@ const m2ReceiverShroud: GeometryBuilder = (spec) => {
   }
 
   // 底板 / 尾板
-  const bottom = bevelBoxGeometry(w, t, len, 0.0005, 1);
+  const bottom = bevelBoxGeometry(w, t, len, 0.0025, 1);
   bottom.translate(0, -h / 2 + t / 2, zc);
   parts.push(bottom);
-  const rear = bevelBoxGeometry(w, h, t, 0.0005, 1);
+  const rear = bevelBoxGeometry(w, h, t, 0.0025, 1);
   rear.translate(0, 0, z0 + t / 2);
   parts.push(rear);
 
@@ -66,11 +66,11 @@ const m2ReceiverShroud: GeometryBuilder = (spec) => {
   const feedZ0 = -0.31;
   const feedZ1 = -0.01;
   const topRearLen = feedZ0 - z0;
-  const topRear = bevelBoxGeometry(w, t, topRearLen, 0.0005, 1);
+  const topRear = bevelBoxGeometry(w, t, topRearLen, 0.0025, 1);
   topRear.translate(0, h / 2 - t / 2, z0 + topRearLen / 2);
   parts.push(topRear);
   const topFrontLen = z1 - feedZ1;
-  const topFront = bevelBoxGeometry(w, t, topFrontLen, 0.0005, 1);
+  const topFront = bevelBoxGeometry(w, t, topFrontLen, 0.0025, 1);
   topFront.translate(0, h / 2 - t / 2, feedZ1 + topFrontLen / 2);
   parts.push(topFront);
 
@@ -144,7 +144,7 @@ const m2FeedCoverShell: GeometryBuilder = (spec) => {
   const latch = bevelBoxGeometry(0.020, 0.013, 0.014, 0.0008, 1);
   latch.translate(0, y - 0.006, zc + len / 2 - 0.004);
   parts.push(latch);
-  const frontLip = bevelBoxGeometry(w, 0.004, 0.010, 0.0005, 1);
+  const frontLip = bevelBoxGeometry(w, 0.004, 0.010, 0.002, 1);
   frontLip.translate(0, y - 0.004, zc + len / 2 - 0.008);
   parts.push(frontLip);
   const merged = mergeGeometries(parts);
