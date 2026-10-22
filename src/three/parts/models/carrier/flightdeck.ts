@@ -351,6 +351,105 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     mate: A([0, deckTop + 0.55, -19.2]),
   });
 
+  // ---- 菲涅尔光学助降系统（FLOLS）：透镜箱阵列 + 基准灯 + 平台/机柜 ----
+  {
+    const fx = -4.15;
+    const fz = -2.2;
+    add({
+      id: `${P}flols_platform`,
+      name_cn: "光学助降平台",
+      name_en: "FLOLS platform",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.55, 0.06, 0.85, [0, 0, 0], 0.006)),
+      material: "cv_grate",
+      mate: A([fx, deckTop + 0.03, fz]),
+    });
+    for (let l = 0; l < 4; l++) {
+      add({
+        id: `${P}flols_leg_${l + 1}`,
+        name_cn: `光学助降平台支腿 ${l + 1}`,
+        name_en: `FLOLS platform leg ${l + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(C(0.025, 0.3, [0, 0, 0], 8)),
+        material: "cv_steel",
+        mate: A([fx + (l % 2 === 0 ? -0.2 : 0.2), deckTop - 0.12, fz + (l < 2 ? -0.3 : 0.3)]),
+      });
+    }
+    add({
+      id: `${P}flols_cabinet`,
+      name_cn: "光学助降机柜",
+      name_en: "FLOLS cabinet",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.34, 0.42, 0.5, [0, 0, 0], 0.006), B(0.26, 0.06, 0.02, [0, 0.12, 0.26], 0.003)),
+      material: "cv_steel_dark",
+      mate: A([fx + 0.05, deckTop + 0.27, fz + 0.18]),
+    });
+    add({
+      id: `${P}flols_column`,
+      name_cn: "光学助降透镜立柱",
+      name_en: "FLOLS lens column",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.1, 1.05, 0.1, [0, 0, 0], 0.004)),
+      material: "cv_steel",
+      mate: A([fx, deckTop + 0.55, fz - 0.18]),
+    });
+    for (let c = 0; c < 5; c++) {
+      add({
+        id: `${P}flols_lens_${c + 1}`,
+        name_cn: `菲涅尔透镜箱 ${c + 1}`,
+        name_en: `FLOLS lens cell ${c + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(0.26, 0.12, 0.1, [0, 0, 0], 0.006), B(0.2, 0.075, 0.02, [0, 0, 0.06], 0.003)),
+        material: c === 2 ? "cv_warning" : "cv_glow",
+        mate: A([fx, deckTop + 0.48 + c * 0.15, fz - 0.26], [-8, 0, 0]),
+      });
+    }
+    for (const side of [-1, 1] as const) {
+      add({
+        id: `${P}flols_datum_${side === -1 ? "l" : "r"}`,
+        name_cn: `光学助降基准灯 ${side === -1 ? "左" : "右"}`,
+        name_en: `FLOLS datum light ${side === -1 ? "l" : "r"}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(C(0.045, 0.16, [0, 0, 0], 10), B(0.05, 0.12, 0.06, [0, 0.1, 0], 0.003)),
+        material: side === -1 ? "cv_deck_red" : "cv_deck_line",
+        mate: A([fx + side * 0.26, deckTop + 0.03, fz - 0.18]),
+      });
+    }
+  }
+
+  // ---- 着舰区舷侧安全网：实体网格 + 外伸撑杆（6 段） ----
+  for (let n = 0; n < 6; n++) {
+    const nz = -12.6 + n * 1.15;
+    const netParts: Parameters<typeof M>[0][] = [];
+    for (let v = 0; v < 6; v++) {
+      const x = -0.75 + v * 0.15;
+      netParts.push({ type: "weld", from: [x, -0.18, -0.5], to: [x, -0.22, 0.5], radius: 0.008, seed: 200 + n * 10 + v });
+    }
+    for (let h = 0; h < 5; h++) {
+      const z = -0.5 + h * 0.25;
+      netParts.push({ type: "weld", from: [-0.75, -0.18, z], to: [-0.02, -0.23, z], radius: 0.008, seed: 300 + n * 10 + h });
+    }
+    for (const side of [-1, 1] as const) {
+      netParts.push({ type: "weld", from: [-0.78, -0.18, side * 0.46], to: [-0.16, 0.02, side * 0.46], radius: 0.018, seed: 400 + n * 2 + (side === -1 ? 0 : 1) });
+    }
+    add({
+      id: `${P}safety_net_${pad(n + 1)}`,
+      name_cn: `着舰区安全网 ${n + 1}`,
+      name_en: `deck safety net ${n + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(...netParts),
+      material: "cv_steel",
+      mate: A([-4.55, deckTop, nz]),
+    });
+  }
+
   // ---- 舷侧升降机 ×2 ----
   CV.ELEVATOR_Z.forEach((z, index) => {
     const node = ELEVATOR_NODES[index]!;
