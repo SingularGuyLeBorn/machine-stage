@@ -98,6 +98,34 @@ function contactSurface(geometry: THREE.BufferGeometry, mate: THREE.BufferGeomet
 describe("参考图四模块闭合分体", () => {
   const registry = makeKingJoeModuleRegistry();
 
+  it("剧照眼带沿头壳后倾，金属框背面贴壳，玻璃保留纵向透光而没有横向百叶", () => {
+    const model = buildModel(registry, { builders: kingjoeModuleBuilders });
+    const head = model.getPart("kingjoemodules.head_arms.body")!.geometry.clone();
+    const tree = new MeshBVH(head);
+    const frame = model.getPart("kingjoemodules.ship.visor_housing")!;
+    const glass = model.getPart("kingjoemodules.ship.visor_glass")!;
+    expect(model.getPart("kingjoemodules.ship.visor_louvers")).toBeUndefined();
+    expect(glass.def.node).toBe("Module_head_arms");
+    const p = frame.geometry.getAttribute("position");
+    const half = p.count / 2;
+    for (let i = half; i < p.count; i += 23) {
+      const ray = new THREE.Ray(new THREE.Vector3(p.getX(i), p.getY(i), 2), new THREE.Vector3(0, 0, -1));
+      const hit = tree.raycastFirst(ray, THREE.DoubleSide)!;
+      expect(hit.point.z - p.getZ(i)).toBeCloseTo(0.008, 5);
+      expect(p.getZ(i - half)).toBeGreaterThan(hit.point.z);
+    }
+    glass.geometry.computeBoundingBox();
+    const size = glass.geometry.boundingBox!.getSize(new THREE.Vector3());
+    expect(size.y).toBeGreaterThan(0.19);
+    expect(size.z).toBeGreaterThan(0.11);
+    const colors = glass.geometry.getAttribute("color");
+    const green = Array.from({ length: colors.count }, (_, i) => colors.getY(i));
+    expect(Math.max(...green) - Math.min(...green)).toBeGreaterThan(0.2);
+    expect(registry.materials.kjm_visor_glass.emissiveIntensity ?? 0).toBe(0);
+    head.dispose();
+    model.dispose();
+  });
+
   it("实际渲染几何逐边闭合且绕序一致，包含所有附加细节", () => {
     expect(validateRegistry(registry).filter((e) => e.level === "error")).toEqual([]);
     const model = buildModel(registry, { builders: kingjoeModuleBuilders });

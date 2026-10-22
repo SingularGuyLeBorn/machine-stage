@@ -8,6 +8,7 @@ import { KINGJOE_SKIN_MATERIALS } from "../kingjoe-skin/materials";
 import { makeKingJoeSkinDetails } from "../kingjoe-skin/details";
 import data from "./modules.generated.json";
 import { chestWindowBuilders, chestWindowParts } from "./chest-windows";
+import { makeVisorBuilders, visorParts } from "./visor";
 
 // 原装甲与内部连接结构布尔融合；每个主体单独连通，阶梯凹凸接口由同一模具切出。
 function decode(value: string): ArrayBuffer {
@@ -66,6 +67,7 @@ for (const detail of makeKingJoeSkinDetails().filter((p) => p.assembly === "ship
   };
 }
 Object.assign(kingjoeModuleBuilders, chestWindowBuilders);
+Object.assign(kingjoeModuleBuilders, makeVisorBuilders(kingjoeModuleBuilders.kjModule_head_arms!));
 
 const NAMES: Record<string, string> = {
   legs: "腿部模块",
@@ -228,7 +230,7 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
     source: "原 GLB 表面与法线、UV；内部补实并融合为单实体，共用模具切出阶梯嵌合接口",
   }));
   const details: PartDefinition[] = makeKingJoeSkinDetails()
-    .filter((p) => p.assembly === "ship")
+    .filter((p) => p.assembly === "ship" && !p.id.includes(".visor_"))
     .map((part, i) => ({
       ...part,
       geometry: { type: "kit", kit: `kjDetail_${part.id}` },
@@ -289,11 +291,39 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
         clearcoatRoughness: 0.2,
       },
       kjm_window_rim: { base: "#13191a", metalness: 0.12, roughness: 0.46 },
+      kjm_visor_seal: { base: "#34443e", metalness: 0.12, roughness: 0.5 },
+      kjm_visor_glass: {
+        base: "#ffffff",
+        metalness: 0.08,
+        roughness: 0.3,
+        vertexColors: true,
+        clearcoat: 0.8,
+        clearcoatRoughness: 0.19,
+      },
       // [OM-FREEPLAY] 新封口以低反光深银区分，保留原表面的银灰外观。
       kjr_cap: { base: "#606a73", metalness: 0.45, roughness: 0.65 },
     },
-    parts: [...bodies, ...details, ...chestWindowParts, ...antennaParts],
+    parts: [...bodies, ...details, ...visorParts, ...chestWindowParts, ...antennaParts],
     expectedContacts: [
+      ...[
+        ["housing", "seal"],
+        ["seal", "glass"],
+      ].map(([a, b]) => ({
+        family: "visor_lamination",
+        a: `kingjoemodules.ship.visor_${a}`,
+        b: `kingjoemodules.ship.visor_${b}`,
+        reason: "同一拟合曲面的层叠贴合面，离散网格允许亚毫米级交叠",
+        maxDepthMm: 1,
+        anyForm: true,
+      })),
+      {
+        family: "visor_mount",
+        a: "kingjoemodules.head_arms.body",
+        b: "kingjoemodules.ship.visor_housing",
+        reason: "薄金属框逐点贴合头壳，背面嵌入 8 毫米固定",
+        maxDepthMm: 9,
+        anyForm: true,
+      },
       {
         family: "hip_hinge",
         a: "kingjoemodules.legs.body",
