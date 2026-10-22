@@ -18,3 +18,17 @@ export function isInternalPart(modelId: string, handle: PartHandle): boolean {
   if (handle.assembly === "composite_armor") return true;
   return handle.buildLayer === 1 || handle.buildLayer === 3;
 }
+
+/**
+ * 透视时即使属于内部件也要幽灵化的「包络件」：
+ * 发动机机体/曲轴箱/缸套/缸盖/涡轮壳不透明时，内部活塞、连杆、气门全被挡住，
+ * 整台发动机看起来就只剩一块铁。把这些包络壳半透明，机构件保持不透明。
+ */
+export function isXrayShellPart(modelId: string, handle: PartHandle): boolean {
+  if (modelId !== "mbt90" && modelId !== "ed90") return false;
+  if (!handle.partId.startsWith(`${modelId}.engine.`)) return false;
+  if (handle.assembly === "engine_block" || handle.assembly === "crankcase") return true;
+  if (handle.assembly === "cylinder") return /(_liner|_head|_head_gasket|_injector_sleeve)$/.test(handle.partId);
+  if (handle.assembly === "turbo") return /(turbine_housing|compressor_housing)(_[lr])?$/.test(handle.partId);
+  return false;
+}

@@ -1,13 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { buildModel } from "@/three/parts";
 import { edriveBuilders, makeEdriveLayouts, makeEdriveRegistry } from "@/three/parts/models/edrive/registry";
-import { isInternalPart } from "./internal";
+import { makeMbtLayouts, makeMbtRegistry, mbtBuilders } from "@/three/parts/models/mbt/registry";
+import { isInternalPart, isXrayShellPart } from "./internal";
 import { applyXray } from "./pose";
 
 function build() {
   return buildModel(makeEdriveRegistry(), {
     builders: edriveBuilders,
     instanceLayouts: makeEdriveLayouts(),
+    warnMissingLayout: false,
+  });
+}
+
+function buildMbt() {
+  return buildModel(makeMbtRegistry(), {
+    builders: mbtBuilders,
+    instanceLayouts: makeMbtLayouts(),
     warnMissingLayout: false,
   });
 }
@@ -44,6 +53,39 @@ describe("内部件剔除 / 幽灵壳透视", () => {
       applyXray(built, false);
       expect(shell.object.material).toBe(shellMaterial);
       expect(battery.object.material).toBe(batteryMaterial);
+    } finally {
+      built.dispose();
+    }
+  });
+
+  it("MBT 发动机透视：机体/曲轴箱/缸套/缸盖/涡轮壳幽灵化，活塞/气门保持不透明", () => {
+    const built = buildMbt();
+    try {
+      const block = built.getPart("mbt90.engine.bank_block_r")!;
+      const crankcase = built.getPart("mbt90.engine.bearing_rail_r")!;
+      const liner = built.getPart("mbt90.engine.cyl01_liner")!;
+      const head = built.getPart("mbt90.engine.cyl01_head")!;
+      const turbo = built.getPart("mbt90.engine.turbine_housing_r")!;
+      const piston = built.getPart("mbt90.engine.cyl01_piston")!;
+      const valve = built.getPart("mbt90.engine.cyl01_valve_i1")!;
+
+      for (const shell of [block, crankcase, liner, head, turbo]) {
+        expect(isXrayShellPart("mbt90", shell), shell.partId).toBe(true);
+      }
+      expect(isXrayShellPart("mbt90", piston)).toBe(false);
+      expect(isXrayShellPart("mbt90", valve)).toBe(false);
+      expect(isXrayShellPart("tiger", block)).toBe(false);
+
+      const pistonMaterial = piston.object.material;
+      applyXray(
+        built,
+        true,
+        (handle) => !isInternalPart("mbt90", handle) || isXrayShellPart("mbt90", handle),
+      );
+      expect((block.object.material as { transparent?: boolean }).transparent).toBe(true);
+      expect(piston.object.material).toBe(pistonMaterial);
+      expect((piston.object.material as { transparent?: boolean }).transparent).toBe(false);
+      applyXray(built, false);
     } finally {
       built.dispose();
     }
