@@ -44,6 +44,7 @@ export const MBT_ENGINE_EXPECTED_CONTACTS: ExpectedContactRule[] = [
     reason: "连杆大头轴瓦套在曲柄销上（配合间隙按油膜 1mm 级）",
     maxDepthMm: 60,
     allowDisplaced: true,
+    allowSuspect: true,
   },
   {
     family: "engine-rod-on-main",

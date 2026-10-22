@@ -48,8 +48,8 @@ export const MBT = {
   TURRET_Z_REAR: -1.62,
   TURRET_RING_R: 1.06,
 
-  // 主炮
-  GUN_Y: 1.98,
+  // 主炮（耳轴抬高到 2.10m：炮盾下缘越过驾驶员舱盖/潜望镜，炮塔全向回转不扫甲板件）
+  GUN_Y: 2.10,
   GUN_ROOT_Z: 1.62,
   BARREL_LEN: 5.6,
   GUN_BORE_R: 0.0625,

@@ -34,8 +34,8 @@ function plus(a: [number, number, number], b: [number, number, number]): [number
 type EraGroup = { key: string; cols: number; rows: number; base: [number, number, number]; rot: [number, number, number]; stepX: number; stepY: number; size: [number, number, number]; normal?: number; node?: string };
 const ERA_GROUPS: EraGroup[] = [
   { key: "glacis", cols: 5, rows: 4, base: [0, 1.36, 2.54], rot: [MBT.GLACIS_PITCH_DEG, 0, 0], stepX: 0.5, stepY: 0.26, size: [0.44, 0.21, 0.13], normal: 0.105 },
-  { key: "cheek_r", cols: 4, rows: 4, base: [0.831, 2.08, 1.147], rot: [-8, 26, 0], stepX: 0.23, stepY: 0.14, size: [0.2, 0.13, 0.12], normal: 0.12, node: "Turret" },
-  { key: "cheek_l", cols: 4, rows: 4, base: [-0.831, 2.08, 1.147], rot: [-8, -26, 0], stepX: 0.23, stepY: 0.14, size: [0.2, 0.13, 0.12], normal: 0.12, node: "Turret" },
+  { key: "cheek_r", cols: 4, rows: 4, base: [0.831, 2.14, 1.147], rot: [-8, 26, 0], stepX: 0.23, stepY: 0.11, size: [0.2, 0.13, 0.12], normal: 0.12, node: "Turret" },
+  { key: "cheek_l", cols: 4, rows: 4, base: [-0.831, 2.14, 1.147], rot: [-8, -26, 0], stepX: 0.23, stepY: 0.11, size: [0.2, 0.13, 0.12], normal: 0.12, node: "Turret" },
   { key: "side_r", cols: 8, rows: 2, base: [1.3, 2.12, -0.35], rot: [0, 90, 0], stepX: 0.3, stepY: 0.16, size: [0.3, 0.14, 0.12], node: "Turret" },
   { key: "side_l", cols: 8, rows: 2, base: [-1.3, 2.12, -0.35], rot: [0, -90, 0], stepX: 0.3, stepY: 0.16, size: [0.3, 0.14, 0.12], node: "Turret" },
   { key: "skirt_r", cols: 12, rows: 2, base: [1.84, 1.04, -0.2], rot: [0, 90, 0], stepX: 0.44, stepY: 0.28, size: [0.4, 0.26, 0.1] },
@@ -72,8 +72,8 @@ const SURFACE_LAYOUTS: Record<string, InstanceLayout> = {
     new THREE.Matrix4().makeTranslation(index === 0 ? -0.92 : 0.92, 0.78, 3.18),
   "mbt.hull.liftingEyes": ({ index }) => {
     const spots: [number, number, number][] = [
-      [-1.1, 1.79, 1.8], [1.1, 1.79, 1.8], [-1.1, 1.79, -0.7],
-      [1.1, 1.79, -0.7], [-0.95, 1.5, -3.15], [0.95, 1.5, -3.15],
+      [-1.2, 1.79, 1.78], [1.2, 1.79, 1.78], [-1.2, 1.79, -2.0],
+      [1.2, 1.79, -2.0], [-0.95, 1.5, -3.15], [0.95, 1.5, -3.15],
     ];
     const [x, y, z] = spots[index] ?? spots[0]!;
     return new THREE.Matrix4().makeTranslation(x, y, z);
@@ -89,10 +89,17 @@ const SURFACE_LAYOUTS: Record<string, InstanceLayout> = {
     const spots: [number, number, number, number][] = [
       [-1.28, 1.45, 2.2, 55], [1.28, 1.45, 2.2, 55], [-1.28, 1.45, -0.6, 0],
       [1.28, 1.45, -0.6, 0], [-1.1, 1.72, 1.1, 90], [1.1, 1.72, 1.1, 90],
-      [-1.07, 2.3, 0.4, 90], [1.07, 2.3, 0.4, 90], [-1.07, 2.3, -1.2, 90],
-      [1.07, 2.3, -1.2, 90], [0, 2.46, 0.7, 0], [0, 2.46, -0.8, 0],
       [-0.9, 1.72, -2.4, 0], [0.9, 1.72, -2.4, 0], [0, 1.72, -3.0, 90],
-      [-0.6, 1.75, 1.8, 90], [0.6, 1.75, 1.8, 90], [0, 1.8, -2.9, 0],
+      [-1.25, 1.75, 2.05, 90], [1.25, 1.75, 2.05, 90], [0, 1.8, -2.9, 0],
+    ];
+    const [x, y, z, yaw] = spots[index] ?? spots[0]!;
+    return new THREE.Matrix4().makeRotationY((yaw * Math.PI) / 180).setPosition(x, y, z);
+  },
+  "mbt.hull.weldsTurret": ({ index }) => {
+    const spots: [number, number, number, number][] = [
+      [-1.315, 2.3, 0.3, 90], [1.315, 2.3, 0.3, 90],
+      [-1.315, 2.3, -1.3, 90], [1.315, 2.3, -1.3, 90],
+      [0, 2.505, 0.6, 0], [0, 2.505, -0.9, 0],
     ];
     const [x, y, z, yaw] = spots[index] ?? spots[0]!;
     return new THREE.Matrix4().makeRotationY((yaw * Math.PI) / 180).setPosition(x, y, z);
@@ -106,8 +113,12 @@ const SURFACE_LAYOUTS: Record<string, InstanceLayout> = {
   },
   "mbt.hull.eraRail": ({ index }) =>
     new THREE.Matrix4().makeTranslation(index === 0 ? -1.35 : 1.35, 2.12, -0.45),
-  "mbt.hull.insignia": ({ index }) =>
-    new THREE.Matrix4().makeRotationY(index === 0 ? Math.PI / 2 : -Math.PI / 2).setPosition(index === 0 ? 1.29 : -1.29, 2.2, 0.4),
+  "mbt.hull.insignia": ({ index }) => {
+    const side = index === 0 ? 1 : -1;
+    const m = new THREE.Matrix4().makeRotationZ(side * -Math.PI / 2);
+    m.setPosition(side * 1.315, 2.2, 0.3);
+    return m;
+  },
   "mbt.hull.mud": ({ index }) => {
     const a = (index / 18) * Math.PI * 2;
     return new THREE.Matrix4().makeTranslation(
@@ -120,15 +131,11 @@ const SURFACE_LAYOUTS: Record<string, InstanceLayout> = {
     const side = index < 6 ? 1 : -1;
     return new THREE.Matrix4().makeRotationY(side * Math.PI / 2).setPosition(side * 1.35, 1.05 + (index % 3) * 0.16, 2.2 - (index % 6) * 0.9);
   },
-  "mbt.hull.antislip": ({ index }) => {
-    const side = index % 2 === 0 ? 1 : -1;
-    return new THREE.Matrix4().makeTranslation(side * 0.7, 1.76 + (index % 3) * 0.002, 1.5 - Math.floor(index / 2) * 0.35);
-  },
   "mbt.hull.handles": ({ index }) => {
     const spots: [number, number, number][] = [
       [-1.36, 1.45, 1.0], [1.36, 1.45, 1.0], [-1.36, 1.45, -0.2], [1.36, 1.45, -0.2],
-      [-0.9, 1.8, 1.3], [0.9, 1.8, 1.3], [-0.9, 1.8, -1.0], [0.9, 1.8, -1.0],
-      [-1.1, 1.6, -2.6], [1.1, 1.6, -2.6],
+      [-1.36, 1.45, -1.4], [1.36, 1.45, -1.4], [-1.36, 1.45, 2.4], [1.36, 1.45, 2.4],
+      [-1.36, 1.45, -2.6], [1.36, 1.45, -2.6],
     ];
     const [x, y, z] = spots[index] ?? spots[0]!;
     return new THREE.Matrix4().makeTranslation(x, y, z);
@@ -146,9 +153,17 @@ Object.assign(HULL_LAYOUTS, SURFACE_LAYOUTS);
 
 const HULL_NODES: NodeDef[] = [
   { name: "Turret", parent: "root", pivot: [0, 0, MBT.TURRET_Z], motion: "rotate", axis: "y", note: "炮塔回转（座圈中心 z=0.1）" },
-  { name: "Gun", parent: "Turret", pivot: [0, MBT.GUN_Y, MBT.GUN_ROOT_Z - MBT.TURRET_Z], motion: "rotate", axis: "x", note: "火炮俯仰（耳轴 y=1.98,z=1.62）" },
+  { name: "Gun", parent: "Turret", pivot: [0, MBT.GUN_Y, MBT.GUN_ROOT_Z - MBT.TURRET_Z], motion: "rotate", axis: "x", note: "火炮俯仰（耳轴 y=2.10,z=1.62）" },
   { name: "GunRecoil", parent: "Gun", pivot: [0, 0, 0], motion: "translate", axis: "z", note: "后坐（-Z）" },
   { name: "MBT_BreechBlock", parent: "GunRecoil", pivot: [0, 0, -0.92], motion: "translate", axis: "y", note: "炮闩开闭（向下）" },
+  {
+    name: "MBT_DriverHatch",
+    parent: "root",
+    pivot: [-0.68, 1.792, 1.55],
+    motion: "rotate",
+    axis: "x",
+    note: "驾驶员舱盖后铰链（0=闭合；负角前缘抬起）",
+  },
 ];
 
 function buildParts(): PartDefinition[] {
@@ -226,14 +241,23 @@ function buildParts(): PartDefinition[] {
   });
   add({
     id: `${P}rear_plate`,
-    name_cn: "尾甲板",
+    name_cn: "尾甲板（全高封闭）",
     name_en: "rear plate",
     assembly: "hull_structure",
     build_layer: 4,
     build_order: 406,
-    geometry: MERGE(B(2.6, 1.16, 0.08, [0, 0, 0], 0.01), B(0.7, 0.4, 0.05, [0.5, 0.1, -0.07], 0.006), B(0.7, 0.4, 0.05, [-0.5, 0.1, -0.07], 0.006)),
+    geometry: MERGE(
+      B(2.66, 1.36, 0.08, [0, 0, 0], 0.01),
+      // 顶封板：接到动力舱甲板后缘，封住倾斜尾板上方的楔形开口。
+      B(2.6, 0.04, 0.22, [0, 0.64, 0.1], 0.006),
+      // 两侧回折板：封住尾板与侧甲之间的角隙。
+      B(0.06, 1.36, 0.22, [-1.3, 0, 0.1], 0.006),
+      B(0.06, 1.36, 0.22, [1.3, 0, 0.1], 0.006),
+      B(0.7, 0.4, 0.05, [0.5, 0.1, -0.07], 0.006),
+      B(0.7, 0.4, 0.05, [-0.5, 0.1, -0.07], 0.006),
+    ),
     material: "mbt_paint",
-    mate: A([0, 1.16, MBT.HULL_Z_REAR], [-8, 0, 0]),
+    mate: A([0, 1.15, MBT.HULL_Z_REAR]),
   });
   add({
     id: `${P}front_deck`,
@@ -242,7 +266,7 @@ function buildParts(): PartDefinition[] {
     assembly: "hull_structure",
     build_layer: 4,
     build_order: 407,
-    geometry: MERGE(B(2.66, 0.08, 2.0, [0, 0, 0], 0.01), B(2.5, 0.03, 1.82, [0, 0.055, 0.04], 0.006)),
+    geometry: MERGE(B(2.66, 0.08, 2.2, [0, 0, 0.1], 0.01), B(2.5, 0.03, 2.04, [0, 0.055, 0.15], 0.006)),
     material: "mbt_paint",
     mate: A([0, MBT.HULL_DECK, 1.0]),
   });
@@ -291,9 +315,10 @@ function buildParts(): PartDefinition[] {
     assembly: "hull_structure",
     build_layer: 4,
     build_order: 411,
-    geometry: MERGE(C(0.29, 0.06, [0, 0, 0], 24, 0.29), T(0.31, 0.28, 0.05, [0, 0, 0], 24), C(0.07, 0.03, [0, 0.05, 0], 16)),
+    geometry: MERGE(C(0.29, 0.02, [0, 0, 0], 24, 0.29), T(0.31, 0.28, 0.015, [0, 0, 0], 24), C(0.06, 0.008, [0, 0.016, 0], 16)),
     material: "mbt_paint",
-    mate: A([-0.55, 1.83, 1.7]),
+    node: "MBT_DriverHatch",
+    mate: A([0, 0.01, 0.31]),
   });
   for (let p = 0; p < 3; p++) {
     add({
@@ -303,9 +328,10 @@ function buildParts(): PartDefinition[] {
       assembly: "hull_structure",
       build_layer: 4,
       build_order: 412,
-      geometry: MERGE(B(0.15, 0.1, 0.08, [0, 0, 0], 0.008), B(0.12, 0.06, 0.02, [0, 0.01, 0.05], 0.003), B(0.11, 0.05, 0.06, [0, -0.07, 0], 0.004)),
+      geometry: MERGE(B(0.15, 0.02, 0.08, [0, 0, 0], 0.003), B(0.12, 0.008, 0.01, [0, 0.004, 0.045], 0.002), B(0.1, 0.012, 0.03, [0, 0, -0.05], 0.002)),
       material: "mbt_glass",
-      mate: A([-0.72 + p * 0.17, 1.91, 1.86]),
+      node: "MBT_DriverHatch",
+      mate: A([-0.2 + p * 0.17, 0.02, 0.47]),
     });
   }
   add({
@@ -402,7 +428,7 @@ function buildParts(): PartDefinition[] {
   });
   add({
     id: `${P}weld_seam`,
-    name_cn: "焊缝 ×18",
+    name_cn: "焊缝 ×12",
     name_en: "weld seam",
     assembly: "hull_structure",
     build_layer: 5,
@@ -410,9 +436,25 @@ function buildParts(): PartDefinition[] {
     geometry: { type: "kit", kit: "weldSeam", params: { len: 1.2, r: 0.012 } },
     material: "mbt_steel_dark",
     mate: A([0, 0, 0]),
-    instances: 18,
+    instances: 12,
     indexed: true,
     instance_layout: "mbt.hull.welds",
+  });
+  add({
+    id: `${P}weld_seam_turret`,
+    name_cn: "炮塔焊缝 ×6",
+    name_en: "turret weld seam",
+    assembly: "turret",
+    build_layer: 5,
+    build_order: 600,
+    geometry: { type: "kit", kit: "weldSeam", params: { len: 1.2, r: 0.012 } },
+    material: "mbt_steel_dark",
+    node: "Turret",
+    mate: A([0, 0, 0]),
+    instances: 6,
+    indexed: true,
+    instance_layout: "mbt.hull.weldsTurret",
+    instance_nodes: Array.from({ length: 6 }, () => "Turret"),
   });
   add({
     id: `${P}step`,
@@ -498,11 +540,11 @@ function buildParts(): PartDefinition[] {
     assembly: "turret",
     build_layer: 4,
     build_order: 450,
-    geometry: MERGE(B(1.42, 0.58, 0.045, [0, 0, 0], 0.01)),
+    geometry: MERGE(B(1.0, 0.5, 0.045, [0, 0, 0], 0.01)),
     material: "mbt_paint",
     dual: true,
     node: "Turret",
-    mate: A(TL(0.62, 2.08, 1.25), [-8, 26, 0]),
+    mate: A(TL(0.88, 2.12, 1.25), [-8, 26, 0]),
   });
   add({
     id: `${P}turret_cheek_ceramic`,
@@ -511,11 +553,11 @@ function buildParts(): PartDefinition[] {
     assembly: "turret",
     build_layer: 4,
     build_order: 451,
-    geometry: MERGE(B(1.36, 0.54, 0.08, [0, 0, 0], 0.008)),
+    geometry: MERGE(B(0.96, 0.46, 0.08, [0, 0, 0], 0.008)),
     material: "mbt_ceramic",
     dual: true,
     node: "Turret",
-    mate: A(TL(...plus([0.62, 2.08, 1.25], rotated([-8, 26, 0], [0, 0, -0.075])) as [number, number, number]), [-8, 26, 0]),
+    mate: A(TL(...plus([0.88, 2.12, 1.25], rotated([-8, 26, 0], [0, 0, -0.075])) as [number, number, number]), [-8, 26, 0]),
   });
   add({
     id: `${P}turret_cheek_backing`,
@@ -524,11 +566,11 @@ function buildParts(): PartDefinition[] {
     assembly: "turret",
     build_layer: 4,
     build_order: 452,
-    geometry: MERGE(B(1.38, 0.56, 0.04, [0, 0, 0], 0.008)),
+    geometry: MERGE(B(0.98, 0.48, 0.04, [0, 0, 0], 0.008)),
     material: "mbt_steel_dark",
     dual: true,
     node: "Turret",
-    mate: A(TL(...plus([0.62, 2.08, 1.25], rotated([-8, 26, 0], [0, 0, -0.14])) as [number, number, number]), [-8, 26, 0]),
+    mate: A(TL(...plus([0.88, 2.12, 1.25], rotated([-8, 26, 0], [0, 0, -0.14])) as [number, number, number]), [-8, 26, 0]),
   });
   add({
     id: `${P}turret_side`,
@@ -636,16 +678,16 @@ function buildParts(): PartDefinition[] {
     build_layer: 4,
     build_order: 461,
     geometry: MERGE(
-      B(2.4, 0.03, 1.0, [0, 0.36, 0], 0.006),
-      B(2.4, 0.03, 1.0, [0, -0.36, 0], 0.006),
-      B(0.03, 0.72, 1.0, [-1.18, 0, 0], 0.006),
-      B(0.03, 0.72, 1.0, [1.18, 0, 0], 0.006),
-      B(2.4, 0.72, 0.03, [0, 0, -0.48], 0.006),
-      B(2.2, 0.05, 0.8, [0, 0.36, 0], 0.008),
+      B(2.4, 0.03, 1.0, [0, 0.27, 0], 0.006),
+      B(2.4, 0.03, 1.0, [0, -0.27, 0], 0.006),
+      B(0.03, 0.54, 1.0, [-1.18, 0, 0], 0.006),
+      B(0.03, 0.54, 1.0, [1.18, 0, 0], 0.006),
+      B(2.4, 0.54, 0.03, [0, 0, -0.48], 0.006),
+      B(2.2, 0.05, 0.8, [0, 0.27, 0], 0.008),
     ),
     material: "mbt_paint",
     node: "Turret",
-    mate: A(TL(0, 2.1, -1.97)),
+    mate: A(TL(0, 2.19, -1.97)),
   });
   add({
     id: `${P}bustle_roof`,
@@ -669,7 +711,7 @@ function buildParts(): PartDefinition[] {
     geometry: { type: "kit", kit: "bustleRack", params: { w: 2.3, h: 0.55, d: 0.85 } },
     material: "mbt_steel",
     node: "Turret",
-    mate: A(TL(0, 2.12, -2.6)),
+    mate: A(TL(0, 2.16, -2.6)),
   });
   add({
     id: `${P}turret_mantlet`,
@@ -988,7 +1030,7 @@ function buildParts(): PartDefinition[] {
     assembly: "armament",
     build_layer: 4,
     build_order: 483,
-    geometry: MERGE(T(MBT.GUN_BORE_R + 0.06, MBT.GUN_BORE_R + 0.005, 0.42, [0, 0, 0], 28), T(MBT.GUN_BORE_R + 0.05, MBT.GUN_BORE_R + 0.005, 0.03, [0, 0, 0.21], 28)),
+    geometry: MERGE(T(MBT.GUN_BORE_R + 0.06, MBT.GUN_BORE_R + 0.005, 0.42, [0, 0, 0], 28), T(MBT.GUN_BORE_R + 0.05, MBT.GUN_BORE_R + 0.005, 0.03, [0, 0.21, 0], 28)),
     material: "mbt_steel_dark",
     node: "GunRecoil",
     mate: A([0, 0, 2.55], [90, 0, 0]),
@@ -1000,7 +1042,7 @@ function buildParts(): PartDefinition[] {
     assembly: "armament",
     build_layer: 4,
     build_order: 484,
-    geometry: MERGE(C(MBT.GUN_BORE_R + 0.015, 0.28, [0, 0, 0], 24), C(MBT.GUN_BORE_R + 0.01, 0.04, [0, 0, 0.14], 24)),
+    geometry: MERGE(C(MBT.GUN_BORE_R + 0.015, 0.28, [0, 0, 0], 24), C(MBT.GUN_BORE_R + 0.01, 0.04, [0, 0.14, 0], 24)),
     material: "mbt_steel_dark",
     node: "GunRecoil",
     mate: A([0, 0, MBT.BARREL_LEN - 0.14], [90, 0, 0]),
@@ -1012,7 +1054,7 @@ function buildParts(): PartDefinition[] {
     assembly: "armament",
     build_layer: 4,
     build_order: 485,
-    geometry: MERGE(B(0.34, 0.34, 0.16, [0, 0, 0], 0.012), C(0.05, 0.1, [0, 0.19, 0], 14), B(0.18, 0.06, 0.06, [0, 0, 0.11], 0.004)),
+    geometry: MERGE(B(0.34, 0.34, 0.16, [0, 0, 0], 0.012), C(0.05, 0.05, [0, 0.16, 0], 14), B(0.18, 0.06, 0.06, [0, 0, 0.11], 0.004)),
     material: "mbt_steel",
     node: "MBT_BreechBlock",
     mate: A([0, 0, 0]),
@@ -1024,7 +1066,7 @@ function buildParts(): PartDefinition[] {
     assembly: "armament",
     build_layer: 4,
     build_order: 486,
-    geometry: MERGE(T(0.2, 0.085, 0.3, [0, 0, 0], 28)),
+    geometry: MERGE(T(0.18, 0.085, 0.3, [0, 0, 0], 28)),
     material: "mbt_steel_dark",
     node: "GunRecoil",
     mate: A([0, 0, -0.9], [90, 0, 0]),
@@ -1037,10 +1079,10 @@ function buildParts(): PartDefinition[] {
       assembly: "armament",
       build_layer: 4,
       build_order: 487,
-      geometry: MERGE(C(0.055, 0.62, [0, 0, 0], 20), C(0.035, 0.18, [0, 0, -0.38], 14), T(0.06, 0.045, 0.04, [0, 0, 0.3], 20)),
+      geometry: MERGE(C(0.055, 0.62, [0, 0, 0], 20), C(0.035, 0.18, [0, -0.38, 0], 14), T(0.06, 0.045, 0.04, [0, 0.3, 0], 20)),
       material: "mbt_steel_dark",
       node: "Gun",
-      mate: A([side * 0.20, -0.18, -0.55], [90, 0, 0]),
+      mate: A([side * 0.20, -0.08, -0.55], [90, 0, 0]),
     });
     add({
       id: `${P}recoil_rod_${side === 1 ? "r" : "l"}`,
@@ -1049,10 +1091,10 @@ function buildParts(): PartDefinition[] {
       assembly: "armament",
       build_layer: 4,
       build_order: 488,
-      geometry: MERGE(C(0.018, 0.55, [0, 0, 0], 14), C(0.03, 0.03, [0, 0, 0.27], 12)),
+      geometry: MERGE(C(0.018, 0.55, [0, 0, 0], 14), C(0.03, 0.03, [0, 0.27, 0], 12)),
       material: "mbt_steel",
       node: "Gun",
-      mate: A([side * 0.2, -0.18, -0.5], [90, 0, 0]),
+      mate: A([side * 0.2, -0.08, -0.5], [90, 0, 0]),
     });
   }
   add({
@@ -1062,10 +1104,10 @@ function buildParts(): PartDefinition[] {
     assembly: "armament",
     build_layer: 4,
     build_order: 489,
-    geometry: MERGE(C(0.06, 0.5, [0, 0, 0], 20), T(0.065, 0.05, 0.04, [0, 0, 0.24], 20)),
+    geometry: MERGE(C(0.06, 0.5, [0, 0, 0], 20), T(0.065, 0.05, 0.04, [0, 0.24, 0], 20)),
     material: "mbt_steel_dark",
     node: "Gun",
-    mate: A([0, 0.22, -0.5], [90, 0, 0]),
+    mate: A([0, 0.14, -0.5], [90, 0, 0]),
   });
   add({
     id: `${P}cradle`,
@@ -1074,10 +1116,10 @@ function buildParts(): PartDefinition[] {
     assembly: "armament",
     build_layer: 4,
     build_order: 490,
-    geometry: MERGE(B(0.5, 0.1, 0.9, [0, 0, 0], 0.008), B(0.1, 0.36, 0.3, [0.25, -0.15, 0], 0.006), B(0.1, 0.36, 0.3, [-0.25, -0.15, 0], 0.006)),
+    geometry: MERGE(B(0.5, 0.08, 0.9, [0, -0.02, 0], 0.008), B(0.1, 0.24, 0.3, [0.25, 0, 0], 0.006), B(0.1, 0.24, 0.3, [-0.25, 0, 0], 0.006)),
     material: "mbt_steel_dark",
     node: "Gun",
-    mate: A([0, -0.2, -0.3]),
+    mate: A([0, -0.11, -0.3]),
   });
   for (const side of [-1, 1] as const) {
     add({
@@ -1089,7 +1131,8 @@ function buildParts(): PartDefinition[] {
       build_order: 491,
       geometry: MERGE(C(0.05, 0.18, [0, 0, 0], 18, 0.05)),
       material: "mbt_steel",
-      mate: A([side * 0.3, MBT.GUN_Y, MBT.GUN_ROOT_Z]),
+      node: "Gun",
+      mate: A([side * 0.3, 0, 0]),
     });
   }
   add({
@@ -1268,7 +1311,8 @@ function buildParts(): PartDefinition[] {
     build_order: 635,
     geometry: MERGE(B(0.42, 0.22, 0.01, [0, 0, 0], 0.002)),
     material: "mbt_mark",
-    mate: A([1.27, 2.15, 0.55], [0, 90, 0]),
+    node: "Turret",
+    mate: A(TL(1.31, 2.15, 0.55), [0, 90, 0]),
   });
   add({
     id: `${P}surface_insignia`,
@@ -1279,10 +1323,12 @@ function buildParts(): PartDefinition[] {
     build_order: 636,
     geometry: MERGE(C(0.12, 0.01, [0, 0, 0], 24), C(0.08, 0.012, [0, 0, 0], 20)),
     material: "mbt_mark_red",
+    node: "Turret",
     mate: A([0, 0, 0]),
     instances: 2,
     indexed: true,
     instance_layout: "mbt.hull.insignia",
+    instance_nodes: ["Turret", "Turret"],
   });
   add({
     id: `${P}surface_mud`,
@@ -1311,20 +1357,6 @@ function buildParts(): PartDefinition[] {
     instances: 12,
     indexed: true,
     instance_layout: "mbt.hull.wear",
-  });
-  add({
-    id: `${P}surface_antislip`,
-    name_cn: "防滑条 ×16",
-    name_en: "anti-slip strip",
-    assembly: "surface",
-    build_layer: 5,
-    build_order: 639,
-    geometry: MERGE(B(0.5, 0.008, 0.05, [0, 0, 0], 0.002)),
-    material: "mbt_steel_dark",
-    mate: A([0, 0, 0]),
-    instances: 16,
-    indexed: true,
-    instance_layout: "mbt.hull.antislip",
   });
   add({
     id: `${P}surface_handle`,
@@ -1365,10 +1397,178 @@ const CONTACTS: ExpectedContactRule[] = [
     family: "hull-armor",
     a: `${P}*`,
     b: `${P}*`,
-    reason: "车体/炮塔/复合装甲/ERA/表面件互相贴合与叠层（钢板叠焊、ERA 压条、附件螺栓固定）",
+    reason: "静态装配：车体/炮塔/复合装甲/ERA/表面件互相贴合与叠层（钢板叠焊、ERA 压条、附件螺栓固定）",
     maxDepthMm: 90,
     allowDisplaced: true,
     allowSuspect: true,
+    // 瞄准/装填等动画里，火炮、舱盖、耳轴会相对车体运动；这层静态安装白名单
+    // 曾把「炮盾扫过驾驶员舱盖」一并豁免。动画必须走独立的窄规则。
+    staticOnly: true,
+  },
+  // 炮塔座圈/地板压在车体甲板座圈孔上回转：相对运动会持续产生座圈承压接触，
+  // 属于真实回转配合面，单独豁免（限深 45mm，仍能兜住错位下坐）。
+  {
+    family: "turret-bearing",
+    a: `${P}turret_ring`,
+    b: `${P}front_deck`,
+    reason: "炮塔座圈在前甲板座圈孔上回转（承压贴合 + 旋转配合面）",
+    maxDepthMm: 45,
+    allowDisplaced: true,
+  },
+  {
+    family: "turret-bearing",
+    a: `${P}turret_ring`,
+    b: `${P}engine_deck`,
+    reason: "炮塔座圈在动力舱甲板座圈孔上回转（承压贴合 + 旋转配合面）",
+    maxDepthMm: 45,
+    allowDisplaced: true,
+  },
+  {
+    family: "turret-bearing",
+    a: `${P}turret_floor`,
+    b: `${P}front_deck`,
+    reason: "炮塔地板与前甲板在座圈内侧的静态层叠（随炮塔回转）",
+    maxDepthMm: 45,
+    allowDisplaced: true,
+  },
+  {
+    family: "turret-bearing",
+    a: `${P}turret_floor`,
+    b: `${P}engine_deck`,
+    reason: "炮塔地板与动力舱甲板在座圈内侧的静态层叠（随炮塔回转）",
+    maxDepthMm: 45,
+    allowDisplaced: true,
+  },
+  {
+    family: "turret-bearing",
+    a: `${P}turret_floor`,
+    b: `${P}armor_roof`,
+    reason: "炮塔地板与车体顶甲复合层在座圈内侧的静态层叠（随炮塔回转）",
+    maxDepthMm: 45,
+    allowDisplaced: true,
+  },
+  {
+    family: "turret-bearing",
+    a: `${P}turret_rear`,
+    b: `${P}engine_deck`,
+    reason: "炮塔尾板下缘与动力舱甲板的回转避让间隙（静态贴合）",
+    maxDepthMm: 45,
+    allowDisplaced: true,
+  },
+  // 火炮总成内部配合：炮闩在炮尾环内上下滑动、身管坐在摇架里、
+  // 制退机/复进机随炮尾后坐穿过摇架导槽。这些是设计行程，不是运动穿模。
+  {
+    family: "gun-breech-guide",
+    a: `${P}breech_block`,
+    b: `${P}breech_ring`,
+    reason: "炮闩体在炮尾环内上下滑动（开闩/闭锁行程）",
+    maxDepthMm: 65,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-breech-guide",
+    a: `${P}breech_block`,
+    b: `${P}recoil_cylinder_l`,
+    reason: "炮闩体与制退机之间的安装贴合（炮尾组件）",
+    maxDepthMm: 25,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-breech-guide",
+    a: `${P}breech_block`,
+    b: `${P}recoil_cylinder_r`,
+    reason: "炮闩体与制退机之间的安装贴合（炮尾组件）",
+    maxDepthMm: 25,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-recoil-guide",
+    a: `${P}breech_ring`,
+    b: `${P}cradle`,
+    reason: "炮尾环随火炮后坐在摇架导槽内滑动",
+    maxDepthMm: 60,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-recoil-guide",
+    a: `${P}breech_ring`,
+    b: `${P}recuperator`,
+    reason: "炮尾环与复进机的同轴安装配合（后坐行程）",
+    maxDepthMm: 60,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-recoil-guide",
+    a: `${P}breech_ring`,
+    b: `${P}recoil_cylinder_l`,
+    reason: "炮尾环与制退机的同轴安装配合（后坐行程）",
+    maxDepthMm: 25,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-recoil-guide",
+    a: `${P}breech_ring`,
+    b: `${P}recoil_cylinder_r`,
+    reason: "炮尾环与制退机的同轴安装配合（后坐行程）",
+    maxDepthMm: 25,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-cradle-fit",
+    a: `${P}gun_barrel`,
+    b: `${P}cradle`,
+    reason: "身管坐在摇架托座上（俯仰支承面）",
+    maxDepthMm: 15,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-recoil-guide",
+    a: `${P}breech_block`,
+    b: `${P}cradle`,
+    reason: "炮闩体随炮尾后坐滑入摇架尾部（后坐导向面）",
+    maxDepthMm: 70,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-recoil-guide",
+    a: `${P}breech_block`,
+    b: `${P}recuperator`,
+    reason: "炮闩体/炮尾在后坐行程内与复进机壳体相邻（同总成安装）",
+    maxDepthMm: 60,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-recoil-guide",
+    a: `${P}gun_barrel`,
+    b: `${P}recuperator`,
+    reason: "身管后坐下沉时与复进机的同总成间隙",
+    maxDepthMm: 30,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-recoil-guide",
+    a: `${P}turret_mantlet*`,
+    b: `${P}gun_barrel`,
+    reason: "身管在后坐行程内穿过炮盾孔（炮盾孔与身管的滑动间隙）",
+    maxDepthMm: 15,
+    allowDisplaced: true,
+  },
+  {
+    family: "detonation-turret-lift",
+    a: "mbt90.interior.basket_footrest_1",
+    b: "mbt90.interior.carousel_ring",
+    reason: "脚本化殉爆：炮塔被掀飞 0.22m 时吊篮脚蹬扫过固定转盘座圈（非机构运动）",
+    maxDepthMm: 45,
+    allowDisplaced: true,
+    allowSuspect: true,
+  },
+  {
+    family: "engine-alt-belt-fit",
+    a: "mbt90.engine.alternator_pulley",
+    b: "mbt90.engine.drive_belt",
+    reason: "附件皮带嵌在发电机皮带轮槽内（轮槽深度内的包角配合）",
+    maxDepthMm: 10,
+    allowDisplaced: true,
   },
 ];
 

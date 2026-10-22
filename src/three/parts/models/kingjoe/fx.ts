@@ -48,6 +48,9 @@ interface BeamRig {
   glowMaterial: THREE.MeshBasicMaterial;
   node: string;
   local: THREE.Vector3;
+  kind: "screen" | "chest" | "antenna";
+  yaw: number;
+  reach: number;
 }
 
 interface ThrusterRig {
@@ -146,21 +149,34 @@ export class KingJoeFx {
       this.arcs.push({ dock, chains, ring, light });
     }
 
-    const makeBeam = (node: string, local: [number, number, number]): BeamRig => {
+    const makeBeam = (
+      node: string,
+      local: [number, number, number],
+      options: {
+        kind: "screen" | "chest" | "antenna";
+        yaw?: number;
+        reach?: number;
+        size?: number;
+        core?: number;
+        glow?: number;
+        tip?: number;
+      },
+    ): BeamRig => {
       const group = new THREE.Group();
-      const coreGeometry = new THREE.CylinderGeometry(0.026, 0.038, 1, 16, 1, true);
-      const glowGeometry = new THREE.CylinderGeometry(0.06, 0.16, 1, 20, 1, true);
+      const size = options.size ?? 1;
+      const coreGeometry = new THREE.CylinderGeometry(0.026 * size, 0.038 * size, 1, 16, 1, true);
+      const glowGeometry = new THREE.CylinderGeometry(0.06 * size, 0.16 * size, 1, 20, 1, true);
       this.ownedGeometries.add(coreGeometry);
       this.ownedGeometries.add(glowGeometry);
       const coreMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
+        color: options.core ?? 0xffffff,
         transparent: true,
         opacity: 0,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
       const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x59c9ff,
+        color: options.glow ?? 0x59c9ff,
         transparent: true,
         opacity: 0,
         blending: THREE.AdditiveBlending,
@@ -176,10 +192,10 @@ export class KingJoeFx {
         mesh.visible = false;
         group.add(mesh);
       }
-      const muzzleGeometry = new THREE.SphereGeometry(0.09, 16, 12);
+      const muzzleGeometry = new THREE.SphereGeometry(0.09 * size, 16, 12);
       this.ownedGeometries.add(muzzleGeometry);
       const muzzleMaterial = new THREE.MeshBasicMaterial({
-        color: 0xd9f6ff,
+        color: options.tip ?? 0xd9f6ff,
         transparent: true,
         opacity: 0,
         blending: THREE.AdditiveBlending,
@@ -199,10 +215,55 @@ export class KingJoeFx {
         glowMaterial,
         node,
         local: new THREE.Vector3(...local),
+        kind: options.kind,
+        yaw: options.yaw ?? 0,
+        reach: options.reach ?? 10.5,
       };
     };
-    this.beams.push(makeBeam("ship", [0, 0.81, 0.66]));
-    this.beams.push(makeBeam("chest", [0, 1.28, 0.71]));
+    // 头部屏幕：三束扇形绿光（中间主束 + 左右侧束）。
+    const screen = { core: 0xeafff0, glow: 0x5dff9a, tip: 0xc8ffd8 } as const;
+    this.beams.push(
+      makeBeam("ship", [0, 0.81, 0.66], { kind: "screen", reach: 11, size: 1.25, ...screen }),
+    );
+    this.beams.push(
+      makeBeam("ship", [-0.3, 0.81, 0.66], {
+        kind: "screen",
+        yaw: -0.06,
+        reach: 9.5,
+        size: 0.9,
+        ...screen,
+      }),
+    );
+    this.beams.push(
+      makeBeam("ship", [0.3, 0.81, 0.66], {
+        kind: "screen",
+        yaw: 0.06,
+        reach: 9.5,
+        size: 0.9,
+        ...screen,
+      }),
+    );
+    // 耳荚两侧长天线：两束青色侧向激光，与屏幕同时充能/发射。
+    const antenna = { core: 0xffffff, glow: 0x59c9ff, tip: 0xbfefff } as const;
+    this.beams.push(
+      makeBeam("ship", [-2.06, 0.68, 0.02], {
+        kind: "antenna",
+        yaw: -0.14,
+        reach: 8.5,
+        size: 0.65,
+        ...antenna,
+      }),
+    );
+    this.beams.push(
+      makeBeam("ship", [2.06, 0.68, 0.02], {
+        kind: "antenna",
+        yaw: 0.14,
+        reach: 8.5,
+        size: 0.65,
+        ...antenna,
+      }),
+    );
+    this.beams.push(makeBeam("chest", [0, 1.28, 0.71], { kind: "chest", reach: 10.5, size: 1 }));
 
     const flameGeometry = new THREE.ConeGeometry(0.11, 0.9, 12, 1, true);
     this.ownedGeometries.add(flameGeometry);
@@ -394,22 +455,30 @@ export class KingJoeFx {
       }
     }
 
+    const beamYaw = new THREE.Quaternion();
+    const beamAxis = new THREE.Vector3(0, 1, 0);
     for (const beam of this.beams) {
-      const strength = beam.node === "ship" ? frame.beamShip : frame.beamChest;
-      const visible = strength > 0.01 || frame.charge > 0.3;
+      const strength = beam.kind === "chest" ? frame.beamChest : frame.beamShip;
+      const charging = frame.charge > 0.3;
+      const visible = strength > 0.01 || charging;
       beam.group.visible = visible;
       beam.group.position.copy(nodeWorld(beam.node, beam.local));
       beam.group.quaternion.copy(nodeQuat(beam.node));
-      const length = 0.4 + strength * 10.5;
+      if (beam.yaw !== 0) {
+        beamYaw.setFromAxisAngle(beamAxis, beam.yaw);
+        beam.group.quaternion.multiply(beamYaw);
+      }
+      const length = 0.35 + strength * beam.reach;
       beam.core.visible = strength > 0.01;
       beam.glow.visible = strength > 0.01;
-      beam.muzzle.visible = strength > 0.01;
+      beam.muzzle.visible = strength > 0.01 || charging;
       beam.core.scale.set(0.7, length, 0.7);
       beam.glow.scale.set(0.8, length, 0.8);
       beam.coreMaterial.opacity = strength * 0.95;
       beam.glowMaterial.opacity = strength * 0.45;
-      beam.muzzle.scale.setScalar(0.5 + strength * 0.9);
-      (beam.muzzle.material as THREE.MeshBasicMaterial).opacity = strength * 0.8;
+      beam.muzzle.scale.setScalar(0.5 + strength * 0.9 + (charging ? frame.charge * 0.25 : 0));
+      (beam.muzzle.material as THREE.MeshBasicMaterial).opacity =
+        strength * 0.8 + (charging ? frame.charge * 0.3 : 0);
       if (visible) anyVisible = true;
     }
 

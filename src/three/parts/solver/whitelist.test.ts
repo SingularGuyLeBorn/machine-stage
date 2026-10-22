@@ -100,6 +100,22 @@ describe("solver/whitelist 命中与分层", () => {
     expect(matchExpectedContact(report("x.wide.a", "x.wide.b", null, "suspect"), rules)).toBeNull();
   });
 
+  it("staticOnly：静态安装贴合只在无相对运动时豁免", () => {
+    const installRules: ExpectedContactRule[] = [
+      { family: "install", a: "x.hull.*", b: "x.hull.*", reason: "安装贴合", staticOnly: true },
+    ];
+    const staticReport = report("x.hull.deck", "x.hull.fitting");
+    expect(matchExpectedContact(staticReport, installRules)?.family).toBe("install");
+    const animation: ClippingReport = { ...staticReport, phase: "animation", frame: 3 };
+    // 扫掠里发生相对运动：静态安装白名单不得覆盖（炮管扫舱盖曾被吞掉）。
+    expect(matchExpectedContact(animation, installRules)).toBeNull();
+    expect(matchExpectedContact({ ...animation, relativeMotion: true }, installRules)).toBeNull();
+    // 同刚体同行：构造接触仍然成立。
+    expect(matchExpectedContact({ ...animation, relativeMotion: false }, installRules)?.family).toBe(
+      "install",
+    );
+  });
+
   it("分层保留原始下标，且总数守恒", () => {
     const reports = [
       report("x.rod", "x.piston_rod.cap", 3), // 真缺陷（深度超守门）

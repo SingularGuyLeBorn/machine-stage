@@ -66,13 +66,13 @@ export const INTERIOR_LAYOUTS: Record<string, InstanceLayout> = {
 function buildNodes() {
   return [
     { name: CAROUSEL_NODE, parent: "root", pivot: [0, 0.8, 0.15] as [number, number, number], motion: "rotate" as const, axis: "y" as const, note: "自动装弹机转盘" },
-    { name: LOAD_ARM_NODE, parent: "root", pivot: [0, 1.0, 0.45] as [number, number, number], motion: "rotate" as const, axis: "x" as const, note: "提弹机/装填臂" },
-    { name: RAMMER_NODE, parent: "root", pivot: [0, 1.98, 0.48] as [number, number, number], motion: "translate" as const, axis: "z" as const, note: "推弹杆" },
-    { name: LOAD_ROUND_NODE, parent: "root", pivot: [0, 1.0, 0.45] as [number, number, number], motion: "translate" as const, axis: "z" as const, note: "装填演示弹（fx）" },
-    { name: EJECTED_CASE_NODE, parent: "root", pivot: [0, 1.98, 0.7] as [number, number, number], motion: "translate" as const, axis: "z" as const, note: "抛壳（fx）" },
+    { name: LOAD_ARM_NODE, parent: "Turret", pivot: [0, 1.0, 0.35] as [number, number, number], motion: "rotate" as const, axis: "x" as const, note: "提弹机/装填臂（随炮塔回转）" },
+    { name: RAMMER_NODE, parent: "Turret", pivot: [0, MBT.GUN_Y, 0.38] as [number, number, number], motion: "translate" as const, axis: "z" as const, note: "推弹杆（随炮塔回转）" },
+    { name: LOAD_ROUND_NODE, parent: "Turret", pivot: [0, 1.0, 0.35] as [number, number, number], motion: "translate" as const, axis: "z" as const, note: "装填演示弹（fx，随炮塔回转）" },
+    { name: EJECTED_CASE_NODE, parent: "Turret", pivot: [0, MBT.GUN_Y, 0.6] as [number, number, number], motion: "translate" as const, axis: "z" as const, note: "抛壳（fx，随炮塔回转）" },
     { name: BLOWOUT_L, parent: "Turret", pivot: TL(-1.02, 2.47, -1.62), motion: "rotate" as const, axis: "z" as const, note: "左泄压板铰链" },
     { name: BLOWOUT_R, parent: "Turret", pivot: TL(1.02, 2.47, -1.62), motion: "rotate" as const, axis: "z" as const, note: "右泄压板铰链" },
-    { name: CITV_NODE, parent: "Turret", pivot: TL(1.08, 2.7, -0.25), motion: "rotate" as const, axis: "y" as const, note: "车长独立热像仪（猎-歼）" },
+    { name: CITV_NODE, parent: "Turret", pivot: TL(1.25, 2.74, -0.25), motion: "rotate" as const, axis: "y" as const, note: "车长独立热像仪（猎-歼）" },
   ];
 }
 
@@ -718,7 +718,7 @@ function buildParts(): PartDefinition[] {
     build_order: 789,
     geometry: MERGE(B(0.6, 0.5, 0.05, [0, 0, 0], 0.008), B(0.08, 0.08, 0.08, [0, 0, 0.05], 0.004)),
     material: "mbt_steel_dark",
-    mate: A([0, 1.25, 1.15]),
+    mate: A([0, 1.25, 1.30]),
   });
   add({
     id: `${P}autoloader_control_box`,

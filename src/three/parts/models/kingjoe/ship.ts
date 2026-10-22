@@ -270,6 +270,45 @@ export function addShipParts(builder: KingJoeParts): void {
     indexed: true,
     instance_layout: "kjShipAntennae",
   });
+  // 耳荚两侧的长天线（剧照里左右各一根，前向/外张）；同时作为侧向激光发射器。
+  for (const [suffix, sx] of [
+    ["l", -1],
+    ["r", 1],
+  ] as const) {
+    builder.add({
+      id: pid(A, `side_antenna_${suffix}`),
+      name_cn: "侧天线杆",
+      name_en: "side antenna mast",
+      assembly: A,
+      layer: 4,
+      geometry: { type: "cylinder", r: 0.013, h: 0.98, segments: 10 },
+      material: "silver_bright",
+      node: A,
+      mate: mateAt(A, [sx * 1.58, headY(0.68), 0.02], [0, 0, sx * 90]),
+    });
+    builder.add({
+      id: pid(A, `side_antenna_tip_${suffix}`),
+      name_cn: "侧天线端",
+      name_en: "side antenna tip",
+      assembly: A,
+      layer: 5,
+      geometry: { type: "sphere", r: 0.032, segments: 12 },
+      material: "sensor_red",
+      node: A,
+      mate: mateAt(A, [sx * 2.08, headY(0.68), 0.02]),
+    });
+    builder.add({
+      id: pid(A, `side_antenna_collar_${suffix}`),
+      name_cn: "侧天线基环",
+      name_en: "side antenna collar",
+      assembly: A,
+      layer: 5,
+      geometry: { type: "tube", rOuter: 0.055, rInner: 0.02, h: 0.06, segments: 16 },
+      material: "gold",
+      node: A,
+      mate: mateAt(A, [sx * 1.08, headY(0.68), 0.02], [0, 0, 90]),
+    });
+  }
   // —— 后部姿态舵面 ×4 + 作动器；控制板 / 线束 ——
   for (const [rudder, name, x] of [
     ["shipRudder0", "左水平舵面", -0.16],

@@ -623,6 +623,11 @@ export interface SweepOptions extends ClippingOptions {
 
 /** 运动扫掠检测：逐帧检查「至少一方在动」的候选对，报告带帧号。 */
 export function detectSweep(assembled: AssembledModel, options: SweepOptions): ClippingReport[] {
+  // 与静态检测同一口径：共面三角形告警在精检窗口内静音，避免刷屏。
+  return withCoplanarWarningsSilenced(() => detectSweepInner(assembled, options));
+}
+
+function detectSweepInner(assembled: AssembledModel, options: SweepOptions): ClippingReport[] {
   const fps = options.fps ?? 30;
   const minDepthM = options.minDepthM ?? 0.0005;
   const frameCount = Math.max(2, Math.round(options.duration * fps) + 1);
@@ -637,14 +642,26 @@ export function detectSweep(assembled: AssembledModel, options: SweepOptions): C
     return collectInstances(assembled, options.filter);
   };
 
-  // ---- 第 1 遍：扫掠包围盒 + 运动标记 ----
+  // ---- 第 1 遍：扫掠包围盒 + 运动标记 + 抽样矩阵（判相对运动）----
+  // 相对运动判定只需要少量时间片；碰撞检测仍在第 2 遍逐帧进行。
+  const matrixStride = Math.max(1, Math.ceil(frameCount / 31));
+  const sampledFrames = new Set<number>();
+  for (let frame = 0; frame < frameCount; frame += matrixStride) sampledFrames.add(frame);
+  sampledFrames.add(frameCount - 1);
   const sweptBox = new Map<string, THREE.Box3>();
   const previousBox = new Map<string, THREE.Box3>();
+  const matrices = new Map<string, THREE.Matrix4[]>();
   const moved = new Set<string>();
   const partOf = new Map<string, PartHandle>();
   for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+    const storeMatrix = sampledFrames.has(frameIndex);
     for (const body of sampleFrame(frameIndex)) {
       partOf.set(body.ref, body.handle);
+      if (storeMatrix) {
+        const frames = matrices.get(body.ref);
+        if (frames) frames.push(body.matrix.clone());
+        else matrices.set(body.ref, [body.matrix.clone()]);
+      }
       const swept = sweptBox.get(body.ref);
       if (swept) swept.union(body.box);
       else sweptBox.set(body.ref, body.box.clone());
@@ -664,10 +681,37 @@ export function detectSweep(assembled: AssembledModel, options: SweepOptions): C
     options.onProgress?.(frameIndex + 1, frameCount * 2);
   }
 
-  // ---- 候选对：扫掠盒相交 且 至少一方在动 ----
+  /**
+   * 两件是否发生过相对运动。
+   * 同节点/父子刚体（炮塔上的舱盖、焊线、贴花）相对矩阵不变，
+   * 它们之间的构造接触不应因扫掠被误报；相反，炮管/舱盖/甲板件之间
+   * 相对矩阵会变，静态白名单不得覆盖。
+   */
+  const hasRelativeMotion = (leftRef: string, rightRef: string): boolean => {
+    const leftFrames = matrices.get(leftRef);
+    const rightFrames = matrices.get(rightRef);
+    if (!leftFrames || !rightFrames) return true;
+    if (leftFrames.length !== rightFrames.length) return true;
+    const leftInverse = new THREE.Matrix4();
+    const relative = new THREE.Matrix4();
+    const base = new THREE.Matrix4();
+    leftInverse.copy(leftFrames[0]!).invert();
+    base.copy(leftInverse).multiply(rightFrames[0]!);
+    for (let sample = 1; sample < leftFrames.length; sample++) {
+      leftInverse.copy(leftFrames[sample]!).invert();
+      relative.copy(leftInverse).multiply(rightFrames[sample]!);
+      for (let element = 0; element < 16; element++) {
+        if (Math.abs(relative.elements[element]! - base.elements[element]!) > 1e-5) return true;
+      }
+    }
+    return false;
+  };
+
+  // ---- 候选对：扫掠盒相交 + 至少一方在动 + 两者确有相对运动 ----
   interface Candidate {
     leftRef: string;
     rightRef: string;
+    relativeMotion: boolean;
   }
   const candidates: Candidate[] = [];
   const refs = [...sweptBox.keys()];
@@ -677,7 +721,10 @@ export function detectSweep(assembled: AssembledModel, options: SweepOptions): C
       const rightRef = refs[j];
       if (!moved.has(leftRef) && !moved.has(rightRef)) continue;
       if (!sweptBox.get(leftRef)!.intersectsBox(sweptBox.get(rightRef)!)) continue;
-      candidates.push({ leftRef, rightRef });
+      // 全程刚性同行 = 相对位姿不变：接触只可能是静态安装接触，交给静态扫描。
+      // 跳过它们能砍掉炮塔/火炮总成内部绝大部分候选对，且不会漏掉运动穿模。
+      if (!hasRelativeMotion(leftRef, rightRef)) continue;
+      candidates.push({ leftRef, rightRef, relativeMotion: true });
     }
   }
 
@@ -701,7 +748,9 @@ export function detectSweep(assembled: AssembledModel, options: SweepOptions): C
       if (contact && isReportableContact(contact, minDepthM)) {
         if (!seen.has(key)) {
           seen.add(key);
-          reports.push(makeReport(assembled, left, right, contact, "animation", frameIndex));
+          const report = makeReport(assembled, left, right, contact, "animation", frameIndex);
+          report.relativeMotion = candidate.relativeMotion;
+          reports.push(report);
         }
       }
     }

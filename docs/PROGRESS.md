@@ -2134,3 +2134,35 @@ node scripts/capture-preview.mjs                 # 需本机 Chrome；输出到 
 - **门禁**：`vitest` **137 passed（16 文件）**；`tsc` / `build` ✓；单件 1 件、71,273 三角（15,248 表面 + 41,836 内核 + 14,189 补缝）、静态报告 0、支撑 0；内核边界边 0、体积 9.80 m³。
 - **模型库高度**：左上模型库列表 `max-height: min(44vh, 460px)` + 内部滚动条（`overflow-y: auto` + `scrollbar-gutter: stable`，超出时显示），超出时不再把下方零件树顶出视口。
 - **零件树**：默认全部折叠（状态只记「已展开」总成；切换模型用 `key={modelId}` 重建），视口/报告选中时仍自动展开所在总成。
+
+### 追加：MBT 瞄准俯仰 + 金古桥合体悬浮/头部光线（2026-10-22）
+
+**MBT-90 瞄准**
+- `aim` 改为 3s 完整循环（与扫掠时长一致）：炮塔 +31°/−20° 回转，火炮绕耳轴 ±5.7° 俯仰；炮口高度变化 >0.8m。
+- 左/右耳轴挂到 `Gun` 节点，随炮塔回转、随炮口俯仰；驾驶员舱盖改为「弹起 60mm → 后铰链掀开 55° → 回落」，只在炮塔回正窗口动作。
+- 几何修正：耳轴抬到 2.10m；前斜板缩窄到 1.0m 留出炮盾开口；驾驶员舱盖/潜望镜压到甲板上缘；尾舱装甲盒底部抬到 1.92m；制退机/复进杆端件从错误的 Z 向偏移改回轴向 Y（此前向下扎穿前甲板 40mm）。
+- 检测器：`ExpectedContactRule.staticOnly` + 扫掠逐对相对运动判定；同刚体同行的安装接触仍豁免，炮管扫舱盖/炮塔扫甲板这类相对运动重新报出。`detectSweep` 增加相对运动候选裁剪与矩阵抽样，MBT 全周期 aim 扫掠 86s→5.3s。
+- 白名单窄化：炮塔座圈/地板回转配合、炮闩/炮尾环/摇架后坐导向按真实装配语义单独登记；不再用 `hull.* ↔ hull.*` 一条大规则吞掉运动穿模。
+- 门禁：`aim` 3s 未豁免 0；`loading` 6s 0；`fire` 4.5s 0；支撑/孤岛/kit 内部 0；`mbt.test.ts` 18/18。
+- 浏览器：`docs/qa/mbt-aim-right.jpg`、`mbt-aim-hatch-open.jpg`、`mbt-aim-elevation.jpg`、`mbt-aim-depression.jpg`；动画扫掠 327 报告 / 0 未豁免，18s。
+
+**金古桥**
+- 合体等待模块持续双频浮动 + 横向漂移，并以 16% 幅度缓慢蠕近最终位；`motion.test.ts` 用去趋势残差/斜率锁住「边浮边降」。
+- 头部屏幕三束绿色扇形光束（中间主束 + 左右侧束），耳荚两侧长天线两束青色激光，与屏幕同步充能/发射。
+- 证据：`docs/qa/kingjoe-combine-hover.jpg`（下体已对接、上体悬空分离）、`kingjoe-firing-beams.jpg`。
+
+**复现**
+```bash
+npx vitest run src/three/parts/models/mbt/mbt.test.ts src/three/parts/solver/whitelist.test.ts
+npm test        # 302 passed / 1 skipped
+npm run build
+```
+
+### P0 补丁：尾舱封闭 + 发动机干涉 + 合体真正的三维飞行（2026-10-22 晚）
+
+- **MBT 尾舱**：尾甲板改为全高板（0.47–1.83m），补顶封板接到动力舱甲板后缘、两侧回折板；从车后不再能直接看进发动机舱。
+- **发动机 P0**：发电机皮带轮改挂独立节点 `MBT_AlternatorPulley`，只绕自身轴转，不再随曲轴公转扫穿高压泵/水分离器/滤清器；机油尺移到曲轴箱外侧（避开 10 号缸活塞）；机脚移到曲轴箱外侧（避开连杆）；后吊耳移到飞轮壳外侧；涡轮进油管改为短管，避免横穿缸内。
+- **全状态门禁**：新增 `scripts/diag-mbt-sweep.ts`。aim / loading / fire / drive / suspension / engine_start / running / era_hit / blowout / detonation / hunter_killer 全部扫掠 **未豁免 0**；静态 7497 报告 / 未豁免 0；悬空 / 孤岛 / kit 断开 0。
+- **金古桥合体**：等待模块改为真正三维靠拢——横向/纵深插值持续到本轮对接前 0.25s；中途有 0.8–1.6m 飞行弧线抬升；双频浮动 0.12–0.24m；飞行倾斜（俯仰/滚转/偏航约 ±5°/±2.6°）。不是只上下动，也不再在 1.4s 内全部钉到轴上。
+- **证据**：`docs/qa/mbt-rear-closed.jpg`、`kingjoe-combine-approach.jpg`（四体分散飞行）、`kingjoe-combine-hover.jpg`（下体已对接、胸/头悬空倾斜）。
+- **验证**：`npm test` 302 passed / 1 skipped；`npm run build` ✓；`diag-mbt.ts` 静态 0、支撑 0。

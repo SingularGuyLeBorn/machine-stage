@@ -433,17 +433,47 @@ function poseCombining(
     const formation = new THREE.Vector3().copy(REST[name]).add(startFormation.offsets[name]);
     formation.y += Math.sin(t * 1.15 + (name === "stomach" ? 1.7 : name === "chest" ? 3.1 : 4.4)) * 0.06;
     const pre = prePositions[name];
-    const start = new THREE.Vector3().lerpVectors(formation, pre, converge);
-    start.y += arcLift;
     const timing =
       DOCK_TIMES[name === "stomach" ? "stomach_legs" : name === "chest" ? "chest_stomach" : "neck"]!;
+    const start = new THREE.Vector3().lerpVectors(formation, pre, converge);
+    start.y += arcLift;
+    // 横向/纵深靠拢持续到本轮对接前 0.25s：等待中的模块一路缓慢平移，
+    // 而不是在 1.4s 内就全部钉到对接轴正上方。飞行弧线在中途抬高，
+    // 避免手臂/头部扫过下方尚未对接的模块。
+    const horizontalProgress = smoothstep(0, Math.max(0.7, timing.start - 0.25), t);
+    const horizontal = new THREE.Vector3().lerpVectors(formation, pre, horizontalProgress);
+    const cruiseLift =
+      (name === "chest" ? 1.6 : name === "ship" ? 0.8 : 0) * Math.sin(Math.PI * horizontalProgress);
     const descent = clamp01((t - timing.start) / (timing.lock - timing.start - 0.2));
     const finalY = targetY[name]!;
-    let y = start.y;
-    let x = 0;
-    let z = 0;
+
+    // 还没轮到的模块不能钉死在预对接柱上：持续上下浮动 + 飞行姿态倾斜，
+    // 并沿横向/纵向缓慢向对接轴靠拢（对齐量在轮到前衰减到 0）。
+    const hoverPhase = name === "chest" ? 1.7 : name === "ship" ? 4.4 : 0.9;
+    const hoverAmp = name === "ship" ? 0.24 : name === "chest" ? 0.2 : 0.12;
+    const hoverFade = 1 - smoothstep(timing.start - 0.55, timing.start, t);
+    const unDocked = t < timing.lock ? 1 : 0;
+    const flight = hoverFade * unDocked;
+    const creep = name === "stomach" ? 0 : smoothstep(0.9, timing.start, t) * 0.24;
+    const approachY = (finalY - pre.y) * creep;
+    const bob =
+      (Math.sin(t * 1.35 + hoverPhase) * hoverAmp +
+        Math.sin(t * 0.53 + hoverPhase * 2.3) * hoverAmp * 0.4 +
+        Math.sin(t * 0.27 + hoverPhase * 3.1) * hoverAmp * 0.22) *
+      flight;
+    const driftX = Math.sin(t * 0.71 + hoverPhase * 1.4) * 0.09 * flight;
+    const driftZ = Math.cos(t * 0.63 + hoverPhase) * 0.07 * flight;
+    const flightPitch =
+      (Math.sin(t * 0.85 + hoverPhase) * 3.2 + Math.sin(t * 0.37 + hoverPhase * 1.7) * 1.4) * flight;
+    const flightRoll =
+      (Math.cos(t * 0.68 + hoverPhase) * 4.3 + Math.sin(t * 1.12 + hoverPhase * 0.8) * 1.7) * flight;
+    const flightYaw = Math.sin(t * 0.55 + hoverPhase * 1.3) * 2.6 * flight;
+
+    let y = start.y + approachY + bob + cruiseLift;
+    let x = horizontal.x + driftX;
+    let z = horizontal.z + driftZ;
     if (t >= timing.start) {
-      const yFrom = pre.y;
+      const yFrom = pre.y + approachY;
       const yTo = finalY;
       const p = damped(descent);
       const stickSlip = t < timing.lock ? Math.sin(descent * 92) * 0.0015 * smoothstep(0.7, 1, descent) : 0;
@@ -459,9 +489,10 @@ function poseCombining(
     const wobble = (1 - converge) * 1.2;
     setNode(assembled, name, new THREE.Vector3(x, y, z), [
       Math.sin(t * 2.3 + (name === "ship" ? 0.8 : 0)) * wobble +
-        (t < timing.start ? 0 : Math.sin(t * 28) * 0.25 * (1 - descent)),
-      (1 - converge) * startFormation.blend * FORMATION_YAW[name],
-      Math.cos(t * 1.9 + (name === "stomach" ? 1.4 : 0)) * wobble,
+        (t < timing.start ? 0 : Math.sin(t * 28) * 0.25 * (1 - descent)) +
+        flightPitch,
+      (1 - converge) * startFormation.blend * FORMATION_YAW[name] + flightYaw,
+      Math.cos(t * 1.9 + (name === "stomach" ? 1.4 : 0)) * wobble + flightRoll,
     ]);
     const timeSinceLock = t - timing.lock;
     const lock = lockAngle(timeSinceLock);

@@ -57,6 +57,12 @@ export interface ClippingReport {
   estimated?: boolean;
   aLayer?: BuildLayer;
   bLayer?: BuildLayer;
+  /**
+   * 扫掠期两件是否存在相对运动：
+   * false = 全程刚性同行（同节点/父子且无相对转动），静态构造接触仍可豁免；
+   * true/缺省 = 相对运动，staticOnly 白名单不得覆盖。
+   */
+  relativeMotion?: boolean;
 }
 
 const IDENTIFIER = /[A-Za-z_][A-Za-z0-9_]*/g;

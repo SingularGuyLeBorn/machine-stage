@@ -479,7 +479,7 @@ export const CATALOG: StageModel[] = [
       { id: "running", label: "怠速运转", hint: "曲轴/12 活塞/12 连杆/48 气门/双凸轮轴/双涡轮/风扇全部在动" },
       { id: "drive", label: "行进演示", hint: "履带滚动 + 14 轮独立起伏 + 传动齿轮转动；车体前后来回" },
       { id: "suspension", label: "液气悬挂", hint: "14 站液压缸/活塞杆/蓄能器独立随地形伸缩" },
-      { id: "aim", label: "炮塔瞄准", hint: "炮塔回转 + 火炮俯仰（带阻尼）" },
+      { id: "aim", label: "炮塔瞄准", hint: "炮塔 +31°/−20° 回转 + 火炮 ±5.7° 俯仰；炮塔回正时驾驶员舱盖弹起并掀开再闭合" },
       { id: "loading", label: "自动装弹机", hint: "转盘选弹 → 提弹机抬升 → 推弹杆推入炮膛 → 炮闩关闭" },
       { id: "fire", label: "主炮击发", hint: "后坐 340mm → 炮口焰 → 抽烟装置排烟 → 开闩抛壳" },
       { id: "era_hit", label: "ERA 被击中", hint: "首上反应装甲单块爆炸，来袭弹被推开" },
