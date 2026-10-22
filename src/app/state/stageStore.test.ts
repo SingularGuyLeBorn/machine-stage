@@ -159,6 +159,24 @@ describe("stageStore 参数与扫描", () => {
     good.dispose();
   });
 
+  it("扫描中重建装配 → 旧扫描作废，状态机不卡在 scanning", () => {
+    vi.useFakeTimers();
+    const bad = buildTestModel({ GAP: 0.001 });
+    useStageStore.getState().attach(bad);
+    useStageStore.getState().runScan("static");
+    expect(useStageStore.getState().machineState).toBe("scanning");
+
+    const good = buildTestModel({ GAP: -0.002 });
+    useStageStore.getState().attach(good);
+    vi.runAllTimers();
+    const state = useStageStore.getState();
+    expect(state.scanPhase).toBe("idle");
+    expect(state.machineState).toBe("idle");
+    expect(state.reports).toEqual([]);
+    bad.dispose();
+    good.dispose();
+  });
+
   it("旧的扫描结果不会污染新模型（重建竞态防护）", () => {
     vi.useFakeTimers();
     const bad = buildTestModel({ GAP: 0.001 });

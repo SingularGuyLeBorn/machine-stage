@@ -59,6 +59,17 @@ function setPickable(object: THREE.Object3D, pickable: boolean): void {
   }
 }
 
+const MODEL_CACHE_LIMIT = 3;
+interface CachedBuild {
+  assembled: AssembledModel;
+  library: ReturnType<typeof createMaterialLibrary>;
+  stats: { parts: number; triangles: number };
+  home: { center: [number, number, number]; radius: number } | null;
+  floor: { y: number; footprint: number } | null;
+  lastUsed: number;
+  warmed: boolean;
+}
+
 export function StageCanvas() {
   return (
     <Canvas
@@ -162,7 +173,10 @@ function StageRuntime() {
   const views = useStageStore((state) => state.views);
   const buildIndex = useStageStore((state) => state.buildIndex);
   const selectedPart = useStageStore((state) => state.selectedPart);
+  const damageSeed = useStageStore((state) => state.damageSeed);
   const camera = useThree((state) => state.camera);
+  const gl = useThree((state) => state.gl);
+  const rootScene = useThree((state) => state.scene);
   const [scene, setScene] = useState<{ assembled: AssembledModel; seq: number } | null>(null);
   const seqRef = useRef(0);
   const [labelPoints, setLabelPoints] = useState<
@@ -175,6 +189,8 @@ function StageRuntime() {
   const clockRef = useRef(0);
   const realTimeRef = useRef(0);
   const lastStateRef = useRef<string | null>(null);
+  const cacheRef = useRef(new Map<string, CachedBuild>());
+  const currentKeyRef = useRef<string | null>(null);
   const assembled = scene?.assembled ?? null;
 
   // ---- 注册表 → 场景 ----
@@ -185,6 +201,76 @@ function StageRuntime() {
     const variant = model.variants?.find((item) => item.id === variantId) ?? model.variants?.[0];
     const source = variant?.registry ?? model.registry;
     if (!source) return;
+    const store = useStageStore.getState();
+    const key = `${modelId}|${variantId}|${damageSeed}|${JSON.stringify(overrides)}`;
+    const previousKey = currentKeyRef.current;
+    const cache = cacheRef.current;
+    setBuildError(null);
+
+    const warmShaders = (target: AssembledModel) => {
+      const warm = () => {
+        if (useStageStore.getState().assembled !== target) return;
+        void gl.compileAsync(rootScene, camera).catch(() => {});
+        const cached = cache.get(key);
+        if (cached) cached.warmed = true;
+      };
+      // 在首帧/交互之后再异步预热隐藏的 FX/内部件材质，避免点动作时才编译着色器。
+      if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(warm, { timeout: 1500 });
+      } else {
+        window.setTimeout(warm, 160);
+      }
+    };
+
+    const mount = (
+      target: AssembledModel,
+      stats: { parts: number; triangles: number },
+      home: { center: [number, number, number]; radius: number } | null,
+      floor: { y: number; footprint: number } | null,
+    ) => {
+      seqRef.current += 1;
+      setScene({ assembled: target, seq: seqRef.current });
+      store.setStats(stats);
+      // 重建/复用都保留当前构建进度（改参数不该把玩家从 L2 拉回整车）
+      store.setBuildIndex(store.buildIndex);
+      store.attach(target);
+      if (home) {
+        store.setHome(home.center, home.radius);
+        setStageFloor(floor);
+        if (store.preserveViewOnRebuild) {
+          useStageStore.setState({ preserveViewOnRebuild: false });
+        } else {
+          store.requestViewReset();
+        }
+      }
+      clockRef.current = 0;
+      lastStateRef.current = null;
+      currentKeyRef.current = key;
+      warmShaders(target);
+    };
+
+    const cleanupFor = (target: AssembledModel) => () => {
+      store.detach();
+      applyXray(target, false);
+      clearPose(target);
+    };
+
+    const cached = cache.get(key);
+    if (cached) {
+      cached.lastUsed = performance.now();
+      // 复用前把上一次的姿态层清干净；cache 内保留装配几何和材质库。
+      applyXray(cached.assembled, false);
+      clearPose(cached.assembled);
+      cached.assembled.resetNodes();
+      model.animate?.(cached.assembled, 0, "idle");
+      cached.assembled.root.position.set(0, 0, 0);
+      cached.assembled.root.rotation.set(0, 0, 0);
+      cached.assembled.root.updateMatrixWorld(true);
+      mount(cached.assembled, cached.stats, cached.home, cached.floor);
+      console.log(`[perf] 缓存命中 ${model.title}（${cache.size} 个模型）`);
+      return cleanupFor(cached.assembled);
+    }
+
     const registry: typeof source = {
       ...source,
       constants: { ...source.constants, ...overrides },
@@ -195,7 +281,6 @@ function StageRuntime() {
       useStageStore.getState().setNotice(`注册表校验未通过：${errors.length} 个错误`);
       return;
     }
-    setBuildError(null);
     // 装配可能抛（常量拼写、kit 参数、几何自检……）。这里必须捕获：
     // effect 里抛出的异常会冒泡到 React，没有边界就是整页白屏。
     let library: ReturnType<typeof createMaterialLibrary>;
@@ -233,43 +318,59 @@ function StageRuntime() {
       const count = geometry.index ? geometry.index.count / 3 : geometry.getAttribute("position").count / 3;
       triangles += count * (handle.instanced ? handle.instances.length : 1);
     }
-    const store = useStageStore.getState();
-    seqRef.current += 1;
-    setScene({ assembled: next, seq: seqRef.current });
-    store.setStats({ parts: next.parts.length, triangles: Math.round(triangles) });
-    // 重建时保留当前构建进度（改参数不该把玩家从 L2 拉回整车）
-    store.setBuildIndex(store.buildIndex);
-    store.attach(next);
     // 全车体包围盒 → 复位视角基准 + 地面锚点（排除 fx 特效件，避免炮口焰把取景拉远）
     const bounds = new THREE.Box3();
     for (const handle of next.parts) {
       if (handle.def.tags?.includes("fx")) continue;
       bounds.union(next.partBounds(handle, new THREE.Box3()));
     }
+    let home: CachedBuild["home"] = null;
+    let floor: CachedBuild["floor"] = null;
     if (!bounds.isEmpty()) {
       const center = bounds.getCenter(new THREE.Vector3());
       const size = bounds.getSize(new THREE.Vector3());
-      store.setHome([center.x, center.y, center.z], Math.max(size.length() * 0.5, 0.5));
-      setStageFloor({ y: bounds.min.y, footprint: Math.max(size.x, size.z) });
-      if (store.preserveViewOnRebuild) {
-        useStageStore.setState({ preserveViewOnRebuild: false });
-      } else {
-        store.requestViewReset();
-      }
+      home = { center: [center.x, center.y, center.z], radius: Math.max(size.length() * 0.5, 0.5) };
+      floor = { y: bounds.min.y, footprint: Math.max(size.x, size.z) };
     }
-    clockRef.current = 0;
+    const stats = { parts: next.parts.length, triangles: Math.round(triangles) };
+    cache.set(key, { assembled: next, library, stats, home, floor, lastUsed: performance.now(), warmed: false });
+    // 只淘汰既不是正在显示、也不是刚装配的缓存项。
+    while (cache.size > MODEL_CACHE_LIMIT) {
+      let victimKey: string | null = null;
+      let oldest = Infinity;
+      for (const [candidateKey, entry] of cache) {
+        if (candidateKey === key || candidateKey === previousKey) continue;
+        if (entry.lastUsed < oldest) {
+          oldest = entry.lastUsed;
+          victimKey = candidateKey;
+        }
+      }
+      if (!victimKey) break;
+      const victim = cache.get(victimKey)!;
+      cache.delete(victimKey);
+      applyXray(victim.assembled, false);
+      clearPose(victim.assembled);
+      victim.assembled.dispose();
+      victim.library.dispose();
+      console.log(`[perf] 缓存淘汰 ${victimKey}`);
+    }
+    mount(next, stats, home, floor);
+    return cleanupFor(next);
+  }, [modelId, variantId, rebuildToken, overrides, damageSeed, gl, rootScene, camera]);
 
+  // 组件卸载时释放所有缓存模型；模型切换时只是缓存/复用，不立即销毁。
+  useEffect(() => {
     return () => {
-      // React 会先卸载子节点（<primitive>）再执行本清理，所以这里释放是安全的。
-      // 注意：释放必须放在「构建 effect」而不是子组件的 effect 里 —— StrictMode 会
-      // 双调用子组件 effect，那样会把正在使用的模型误释放（场景里只剩空 Group）。
-      store.detach();
-      applyXray(next, false);
-      clearPose(next);
-      next.dispose();
-      library.dispose();
+      for (const entry of cacheRef.current.values()) {
+        applyXray(entry.assembled, false);
+        clearPose(entry.assembled);
+        entry.assembled.dispose();
+        entry.library.dispose();
+      }
+      cacheRef.current.clear();
+      currentKeyRef.current = null;
     };
-  }, [modelId, variantId, rebuildToken, overrides]);
+  }, []);
 
   // ---- 每帧纪律 ----
   // AK-47 / M249 射击模式跟随状态机（单发/连发/停机）
