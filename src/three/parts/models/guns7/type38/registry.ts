@@ -1145,6 +1145,7 @@ const C = (
 const contacts: ExpectedContactRule[] = [
   ...ammoExpectedContacts("type38"),
   C("type38-ammo-in-gun", "type38.ammo.*", "type38.barrel.barrel", "膛内弹：弹壳坐在弹膛、弹头挤进膛线，属于真实闭锁/导向配合", 6),
+  C("type38-ammo-in-gun", "type38.ammo.*", "type38.barrel.muzzle_carbon", "弹头出膛瞬间穿过枪口积碳环", 5),
   C("type38-ammo-in-gun", "type38.ammo.*", "type38.magazine.body", "弹仓内 5 发弹由仓壁约束，弹壳/弹头与仓壁是导向配合", 6),
   C("type38-ammo-in-gun", "type38.ammo.*", "type38.magazine.front_lip", "抱弹口前唇约束弹头", 6),
   C("type38-ammo-in-gun", "type38.ammo.*", "type38.magazine.follower", "托弹板顶住最下一发弹，属于供弹接触", 6),
