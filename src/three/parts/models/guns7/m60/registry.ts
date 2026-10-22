@@ -36,6 +36,7 @@ export const M249_NODES: ModelRegistry["nodes"] = [
 
 export const M249_ASSEMBLIES: ModelRegistry["assemblies"] = [
   { id: "barrel", name_cn: "枪管组", name_en: "Barrel group", explode: [0, 0.1, 1.0] },
+  { id: "receiver", name_cn: "机匣组", name_en: "Receiver group", explode: [0, 0.35, -0.35] },
   { id: "gas", name_cn: "导气系统", name_en: "Gas system", explode: [0, 1.1, 0.2] },
   { id: "action", name_cn: "枪机组", name_en: "Bolt carrier group", explode: [0, 1.2, -0.5] },
   { id: "fire", name_cn: "发射机组", name_en: "Fire control group", explode: [0, -1.1, -0.4] },
@@ -170,13 +171,7 @@ export const M249_PARTS: ModelRegistry["parts"] = [
     assembly: "gas",
     build_layer: 1,
     build_order: 120,
-    geometry: {
-      type: "merge",
-      parts: [
-        { type: "cylinder", r: 0.004, h: 0.23, segments: 12, at: [0, 0, 0.115] },
-        { type: "cylinder", r: 0.0044, h: 0.03, segments: 12, at: [0, 0, 0.245] },
-      ],
-    },
+    geometry: { type: "kit", kit: "m60GasPiston", params: { rodLen: 0.23, rodR: 0.004, headLen: 0.03, headR: 0.0044 } },
     material: "steel_machined",
     node: "AkPiston",
     mate: { type: "absolute", position: [0, 0.014, -0.07] },
@@ -647,11 +642,11 @@ export const M249_PARTS: ModelRegistry["parts"] = [
     assembly: "furniture",
     build_layer: 4,
     build_order: 171,
-    geometry: { type: "kit", kit: "handguardShell", params: { r: 0.024, len: 0.14, slotDeg: 120 } },
+    geometry: { type: "kit", kit: "handguardShell", params: { r: 0.024, len: 0.14, slotDeg: 0 } },
     material: "polymer",
     node: "AkRecoil",
     mate: { type: "absolute", position: [0, 0, C.HANDGUARD_Z] },
-    source: "护木：聚合塑料壳，罩住枪管前段（快拆枪管时随提把取下）。",
+    source: "护木：闭合聚合塑料筒壳，罩住枪管前段；前后钢箍加强，快拆枪管时随提把取下。",
   },
   {
     id: "m60.furniture.stock",
@@ -880,7 +875,10 @@ export function makeM249Registry(): ModelRegistry {
       { family: "m60-bipod", a: "m60.bipod.foot_l", b: "m60.bipod.leg_l", reason: "左脚座压入腿管下端", maxDepthMm: 5, allowDisplaced: true },
       { family: "m60-bipod", a: "m60.bipod.foot_r", b: "m60.bipod.leg_r", reason: "右脚座压入腿管下端", maxDepthMm: 5, allowDisplaced: true },
       { family: "m60-bipod", a: "m60.bipod.spring", b: "m60.furniture.bipod", reason: "回位簧装在卡箍下方", maxDepthMm: 6, allowDisplaced: true },
-      { family: "m60-fire", a: "m60.receiver.trigger_guard", b: "m60.receiver.body", reason: "扳机护圈固定在机匣底面", maxDepthMm: 6, allowDisplaced: true, allowSuspect: true },
+      { family: "m60-fire", a: "m60.receiver.trigger_guard", b: "m60.receiver.body", reason: "扳机护圈固定在机匣底面", maxDepthMm: 10, allowDisplaced: true, allowSuspect: true },
+      { family: "m60-receiver", a: "m60.gas.*", b: "m60.receiver.*", reason: "活塞杆/导气管从机匣前部进入", maxDepthMm: 12, allowDisplaced: true, allowSuspect: true },
+      { family: "m60-receiver", a: "m60.barrel.*", b: "m60.receiver.*", reason: "枪管/导气管穿过机匣前节套环", maxDepthMm: 12, allowDisplaced: true, allowSuspect: true },
+      { family: "m60-receiver", a: "m60.furniture.handguard", b: "m60.furniture.handguard_cap_*", reason: "护木前后钢箍包住护木筒两端", maxDepthMm: 3, allowDisplaced: true, allowSuspect: true },
       { family: "m60-fire", a: "m60.fire.hammer_pin", b: "m60.receiver.body", reason: "击锤轴销压配在机匣侧壁", maxDepthMm: 4, allowDisplaced: true },
       { family: "m60-fire", a: "m60.fire.hammer_pin", b: "m60.fire.hammer", reason: "击锤绕轴销回转", maxDepthMm: 4, allowDisplaced: true },
       { family: "m60-fire", a: "m60.fire.trigger_pin", b: "m60.receiver.body", reason: "扳机轴销压配在机匣侧壁", maxDepthMm: 4, allowDisplaced: true },

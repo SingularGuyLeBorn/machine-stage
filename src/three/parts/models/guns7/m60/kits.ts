@@ -62,6 +62,126 @@ const sawReceiver: GeometryBuilder = (spec) => {
 };
 
 // ---------------------------------------------------------------------------
+// m60GasPiston —— M60 长行程导气活塞：杆沿 +Z，头部在前端导气缸内。
+// 局部系：origin = 杆后端（与枪机框结合面），+Z 枪口方向。
+// ---------------------------------------------------------------------------
+const m60GasPiston: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const rodLen = num(p, "rodLen", 0.23);
+  const rodR = num(p, "rodR", 0.004);
+  const headLen = num(p, "headLen", 0.03);
+  const headR = num(p, "headR", 0.0044);
+  const parts: THREE.BufferGeometry[] = [];
+  const rod = cylinderGeometry(rodR, rodLen, rodR, 12);
+  rod.rotateX(Math.PI / 2);
+  rod.translate(0, 0, rodLen / 2);
+  parts.push(rod);
+  const head = cylinderGeometry(headR, headLen, headR, 12);
+  head.rotateX(Math.PI / 2);
+  head.translate(0, 0, rodLen + headLen / 2);
+  parts.push(head);
+  const merged = mergeGeometries(parts);
+  for (const piece of parts) piece.dispose();
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
+// m60ReceiverShell —— M60 全包机匣外壳：两侧板 + 底板 + 前后顶板 + 尾板 +
+// 枪管节套环 + 下发射机座 + 左侧弹链导槽。正常状态完全遮住自动机；爆炸/
+// 透视时脱开，内部枪机框、枪机、击锤、供弹滑板仍完整保留。
+// 局部系：origin = 枪膛中心，+Z 枪口方向。
+// ---------------------------------------------------------------------------
+const m60ReceiverShell: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.060);
+  const h = num(p, "h", 0.094);
+  const z0 = num(p, "z0", -0.25);
+  const z1 = num(p, "z1", 0.06);
+  const t = num(p, "t", 0.0024);
+  const len = z1 - z0;
+  const zc = (z0 + z1) / 2;
+  const parts: THREE.BufferGeometry[] = [];
+
+  // 左右侧板（M60 冲压机匣，外表面带一道纵向压筋）
+  for (const side of [-1, 1]) {
+    const wall = bevelBoxGeometry(t, h, len, 0.0004, 1);
+    wall.translate(side * (w / 2 - t / 2), 0, zc);
+    parts.push(wall);
+    const rib = bevelBoxGeometry(0.0018, 0.007, len * 0.62, 0.0003, 1);
+    rib.translate(side * (w / 2 + 0.0006), -0.006, zc + 0.012);
+    parts.push(rib);
+  }
+
+  // 底板 / 后板
+  const bottom = bevelBoxGeometry(w, t, len, 0.0004, 1);
+  bottom.translate(0, -h / 2 + t / 2, zc);
+  parts.push(bottom);
+  const rear = bevelBoxGeometry(w, h, t, 0.0004, 1);
+  rear.translate(0, 0, z0 + t / 2);
+  parts.push(rear);
+
+  // 顶板：留出中段受弹口，由 M60 大机盖封盖
+  const feedZ0 = -0.132;
+  const feedZ1 = 0.022;
+  const topRearLen = feedZ0 - z0;
+  const topRear = bevelBoxGeometry(w, t, topRearLen, 0.0004, 1);
+  topRear.translate(0, h / 2 - t / 2, z0 + topRearLen / 2);
+  parts.push(topRear);
+  const topFrontLen = z1 - feedZ1;
+  const topFront = bevelBoxGeometry(w, t, topFrontLen, 0.0004, 1);
+  topFront.translate(0, h / 2 - t / 2, feedZ1 + topFrontLen / 2);
+  parts.push(topFront);
+
+  // 前节套环：枪管从中心孔穿出，环体把机匣前脸封住
+  const collar = tubeGeometry(0.023, 0.011, 0.022, 24);
+  collar.rotateX(Math.PI / 2);
+  collar.translate(0, 0, z1 - 0.004);
+  parts.push(collar);
+
+  // 下发射机座：承接扳机护圈和手枪握把，填住机匣底与握把之间的空档
+  const triggerHousing = bevelBoxGeometry(0.048, 0.022, 0.120, 0.0012, 1);
+  triggerHousing.translate(0, -h / 2 - 0.009, -0.132);
+  parts.push(triggerHousing);
+
+  // 左侧弹链导槽：弹箱的链从导槽进入受弹口，避免链条悬空
+  const chute = bevelBoxGeometry(0.022, 0.030, 0.058, 0.0010, 1);
+  chute.translate(-(w / 2 + 0.010), 0.012, -0.070);
+  parts.push(chute);
+  const chuteLip = bevelBoxGeometry(0.024, 0.005, 0.006, 0.0005, 1);
+  chuteLip.translate(-(w / 2 + 0.010), 0.026, -0.041);
+  parts.push(chuteLip);
+
+  // 尾端枪托连接座：把管状枪托与机匣后板接上
+  const stockLug = bevelBoxGeometry(0.030, 0.016, 0.028, 0.0008, 1);
+  stockLug.translate(0, 0.020, z0 - 0.012);
+  parts.push(stockLug);
+
+  // 右侧抛壳口外框（闭合状态下的压边，不切断板面）
+  const portFrameTop = bevelBoxGeometry(0.0012, 0.003, 0.078, 0.0003, 1);
+  portFrameTop.translate(w / 2 + 0.0004, 0.008, -0.085);
+  parts.push(portFrameTop);
+  const portFrameBottom = portFrameTop.clone();
+  portFrameBottom.translate(0, -0.016, 0);
+  parts.push(portFrameBottom);
+  for (const dz of [-0.040, 0.040]) {
+    const edge = bevelBoxGeometry(0.0012, 0.019, 0.003, 0.0003, 1);
+    edge.translate(w / 2 + 0.0004, -0.001, -0.085 + dz);
+    parts.push(edge);
+  }
+
+  // 顶盖铰链耳座
+  for (const side of [-1, 1]) {
+    const ear = bevelBoxGeometry(0.008, 0.010, 0.014, 0.0007, 1);
+    ear.translate(side * (w / 2 - 0.007), h / 2 + 0.005, feedZ0 + 0.008);
+    parts.push(ear);
+  }
+
+  const merged = mergeGeometries(parts);
+  for (const piece of parts) piece.dispose();
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
 // sawStock —— M249 管状枪托（钢管 + 肩托板 + 背带环）。
 // 局部系：origin = 枪托前端面中心。
 // ---------------------------------------------------------------------------
@@ -257,6 +377,8 @@ const sawGasRegulator: GeometryBuilder = (spec) => {
 };
 
 export const m249KitBuilders: Record<string, GeometryBuilder> = {
+  m60GasPiston,
+  m60ReceiverShell,
   sawReceiver,
   sawStock,
   sawCarryHandle,
