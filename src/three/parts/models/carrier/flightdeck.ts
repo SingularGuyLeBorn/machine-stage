@@ -789,6 +789,52 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       mate: A([cx, markY + 0.006, cz], [0, RUNWAY_YAW, 0]),
     });
   }
+  // 甲板使用痕迹：着舰轮胎擦痕（两列）、停机位油污、挡焰板烧蚀。
+  for (const side of [-1, 1] as const) {
+    for (let t = 0; t < 11; t++) {
+      const [x, z] = runwayAcross(4.4 + t * 0.85, side, 0.62);
+      add({
+        id: `${P}tire_streak_${side === -1 ? "l" : "r"}_${pad(t + 1)}`,
+        name_cn: `着舰轮胎擦痕 ${side === -1 ? "左" : "右"} ${t + 1}`,
+        name_en: `landing tire streak ${side === -1 ? "l" : "r"} ${t + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(0.085, 0.003, 0.5 + (t % 3) * 0.12, [0, 0, 0], 0.001)),
+        material: "cv_deck_wear",
+        mate: A([x, markY + 0.002, z], [0, RUNWAY_YAW, 0]),
+      });
+    }
+  }
+  const oilSpots: Array<[number, number, number]> = [
+    [3.95, 10.0, 0.26], [3.95, 14.2, 0.3], [-2.4, -14.4, 0.24],
+    [-2.4, -18.0, 0.28], [3.95, 5.6, 0.22], [3.95, 8.0, 0.24],
+    [2.75, 2.0, 0.2], [0.4, 6.2, 0.18],
+  ];
+  oilSpots.forEach(([x, z, r], index) => {
+    add({
+      id: `${P}oil_stain_${pad(index + 1)}`,
+      name_cn: `甲板油污 ${index + 1}`,
+      name_en: `deck oil stain ${index + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(C(r, 0.002, [0, 0, 0], 20), C(r * 0.45, 0.002, [r * 0.5, 0, r * 0.35], 14)),
+      material: "cv_deck_wear",
+      mate: A([x, markY + 0.001, z]),
+    });
+  });
+  CAT_TRACKS.forEach((track, index) => {
+    add({
+      id: `${P}jbd_scorch_${index + 1}`,
+      name_cn: `挡焰板烧蚀区 ${index + 1}`,
+      name_en: `JBD scorch mark ${index + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(1.35, 0.003, 0.95, [0, 0, 0], 0.002)),
+      material: "cv_deck_wear",
+      mate: A([track.x, markY + 0.001, track.z0 - 4.55]),
+    });
+  });
+
   // 直通起飞区：中线 + 两侧边线（黄色）。
   for (let d = 0; d < 10; d++) {
     add({

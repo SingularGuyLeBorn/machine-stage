@@ -413,9 +413,11 @@ export const useStageStore = create<StageState>((set, get) => ({
       if (clamped <= 0) assembled.setBuildThreshold(-1);
       else if (clamped >= orders.length) assembled.setBuildThreshold(null);
       else assembled.setBuildThreshold(orders[clamped - 1]);
-      // 特效件（tags: fx）不跟构建滑杆显示，只由动画在击发窗口内点亮
+      // 特效件（tags: fx）不跟构建滑杆显示，只由动画在击发窗口内点亮；海面/尾流常显
       for (const handle of assembled.parts) {
-        if (handle.def.tags?.includes("fx")) handle.object.visible = false;
+        if (handle.def.tags?.includes("fx") && !handle.def.id.startsWith("carrier.sea.")) {
+          handle.object.visible = false;
+        }
       }
     }
     set((state) => {

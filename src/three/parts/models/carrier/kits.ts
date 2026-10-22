@@ -75,23 +75,160 @@ function deckPlan(): Array<[number, number]> {
   return points;
 }
 
-/** 舰体外壳（带内腔的环形挤出）+ 上部外飘环带（克令克以上向甲板底收口）。 */
-export const carrierHullShell: GeometryBuilder = () => {
-  const outer = planShape(hullPlan(0));
-  // 内腔艏端截短到 17.3，避免 0.02m 宽的病态薄片孔洞导致外壳三角化开洞。
-  const inner = planShape(hullPlan(0.16), 0, 1.2);
-  outer.holes.push(new THREE.Path(inner.getPoints(200)));
-  const height = CV.HULL_TOP - CV.HULL_BOTTOM;
-  const geometry = new THREE.ExtrudeGeometry(outer, {
-    depth: height,
-    bevelEnabled: false,
-    curveSegments: 1,
-    steps: 1,
+// ---- 舰体型线放样 ----------------------------------------------------------
+// 56 站理论型线：圆舭（舭部椭圆过渡）、舷侧外飘、艏部前倾、艉部巡洋舰艉。
+// 水线以下单独放样（防污红漆），水上部分灰色外板，两段在水线处共边。
+const HULL_STATIONS = 56;
+const HULL_WL = 1.8;
+const HULL_DECK_BOTTOM = CV.DECK_Y + 0.02;
+
+type HullStation = { z: number; base: number; bottom: number; bow: number };
+
+function hullStationAt(z: number): HullStation {
+  const base = hullHalfBeamAt(z);
+  const bow = Math.min(1, Math.max(0, (z - 9) / (CV.HULL_Z_BOW - 9)));
+  const stern = Math.min(1, Math.max(0, (-14.5 - z) / 4));
+  const bottom = CV.HULL_BOTTOM + stern * stern * (3 - 2 * stern) * 0.62 + bow * bow * (3 - 2 * bow) * 0.52;
+  return { z, base, bottom, bow };
+}
+
+/** 给定高度处的半宽（水线以下为椭圆舭部，以上为外飘直线）。 */
+function hullHalfAt(st: HullStation, y: number): number {
+  if (y <= HULL_WL) {
+    const u = Math.min(1, Math.max(0, (y - st.bottom) / Math.max(0.05, HULL_WL - st.bottom)));
+    return st.base * 0.88 * Math.sqrt(Math.max(0, 2 * u - u * u));
+  }
+  const t = Math.min(1, (y - HULL_WL) / (HULL_DECK_BOTTOM - HULL_WL));
+  const flare = 0.1 + 0.07 * t;
+  return st.base * (0.88 + (1.0 - 0.88) * Math.min(1, t / 0.42)) * (1 + flare * Math.max(0, t - 0.42)) + (t > 0.55 ? (0.22 + 0.42 * st.bow * st.bow) * ((t - 0.55) / 0.45) : 0);
+}
+
+/** 艏部前倾：越靠近甲板，环线越向艏前伸。 */
+function hullRakeShift(st: HullStation, y: number): number {
+  if (y <= HULL_WL) return 0;
+  const t = Math.min(1, (y - HULL_WL) / (HULL_DECK_BOTTOM - HULL_WL));
+  return st.bow * st.bow * Math.pow(t, 1.55) * 2.08;
+}
+
+function hullRing(st: HullStation, ys: number[]): THREE.Vector3[] {
+  const side = (sign: number) =>
+    ys.map((y) => new THREE.Vector3(sign * hullHalfAt(st, y), y, st.z + hullRakeShift(st, y)));
+  const port = side(-1).reverse();
+  const starboard = side(1);
+  return [...port, ...starboard];
+}
+
+/** 由站点环线生成舰体曲面，法线按“离开舰体中线”朝外修正。 */
+function loftHull(ys: (st: HullStation) => number[], cap: boolean): THREE.BufferGeometry {
+  const stations = Array.from({ length: HULL_STATIONS }, (_, i) => {
+    const z = CV.HULL_Z_STERN + (i * (CV.HULL_Z_BOW - CV.HULL_Z_STERN)) / (HULL_STATIONS - 1);
+    return hullStationAt(z);
   });
-  geometry.rotateX(Math.PI / 2);
-  geometry.translate(0, CV.HULL_TOP, 0);
+  const rings = stations.map((st) => hullRing(st, ys(st)));
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  const n = rings[0]!.length;
+  for (const ring of rings) {
+    for (const p of ring) {
+      positions.push(p.x, p.y, p.z);
+      uvs.push(p.z * 0.34, p.y * 0.34);
+    }
+  }
+  for (let i = 0; i < rings.length - 1; i++) {
+    for (let j = 0; j < n - 1; j++) {
+      const a = i * n + j;
+      const b = i * n + j + 1;
+      const c = (i + 1) * n + j + 1;
+      const d = (i + 1) * n + j;
+      indices.push(a, b, c, a, c, d);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
   geometry.computeVertexNormals();
-  return mergeWithUv([geometry, hullUpperBand()]);
+  // 统一朝外：用站点中线方向判断，避免左右舷绕序不一致导致半船透明。
+  const pos = geometry.getAttribute("position");
+  const nor = geometry.getAttribute("normal");
+  const index = geometry.getIndex()!;
+  for (let t = 0; t < index.count; t += 3) {
+    const ia = index.getX(t);
+    const ib = index.getX(t + 1);
+    const ic = index.getX(t + 2);
+    const cx = (pos.getX(ia) + pos.getX(ib) + pos.getX(ic)) / 3;
+    const cy = (pos.getY(ia) + pos.getY(ib) + pos.getY(ic)) / 3;
+    const cz = (pos.getZ(ia) + pos.getZ(ib) + pos.getZ(ic)) / 3;
+    const nx = nor.getX(ia) + nor.getX(ib) + nor.getX(ic);
+    const ny = nor.getY(ia) + nor.getY(ib) + nor.getY(ic);
+    const nz = nor.getZ(ia) + nor.getZ(ib) + nor.getZ(ic);
+    const ox = cx;
+    const oz = cz - hullStationAt(cz).z;
+    if (nx * ox + ny * cy * 0.15 + nz * oz < 0) {
+      indices[t] = ia;
+      indices[t + 1] = ic;
+      indices[t + 2] = ib;
+    }
+  }
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  if (cap) {
+    // 艉封板与艏柱封口
+    const addCap = (ringIndex: number, forward: boolean) => {
+      const ring = rings[ringIndex]!;
+      const base = ringIndex * n;
+      let cx = 0;
+      let cy = 0;
+      let cz = 0;
+      for (const p of ring) {
+        cx += p.x;
+        cy += p.y;
+        cz += p.z;
+      }
+      const center = new THREE.Vector3(cx / ring.length, cy / ring.length, cz / ring.length);
+      const centerIndex = positions.length / 3;
+      positions.push(center.x, center.y, center.z);
+      uvs.push(center.z * 0.34, center.y * 0.34);
+      for (let j = 0; j < ring.length - 1; j++) {
+        const a = base + j;
+        const b = base + j + 1;
+        if (forward) indices.push(centerIndex, b, a);
+        else indices.push(centerIndex, a, b);
+      }
+    };
+    addCap(0, false);
+    addCap(rings.length - 1, true);
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+  }
+  return geometry;
+}
+
+/** 供表面件定位：某站位/高度的外板半宽。 */
+export function hullSurfaceHalfAt(z: number, y: number): number {
+  return hullHalfAt(hullStationAt(z), y);
+}
+
+/** 水线以上舰体外板：舭部以上到甲板底，含舷侧外飘与艏部前倾。 */
+export const carrierHullShell: GeometryBuilder = () =>
+  loftHull((st) => [HULL_WL, 2.12, 2.6, 3.45, HULL_DECK_BOTTOM].filter((y) => y >= st.bottom), true);
+
+/** 水线以下舰体外板：防污红漆，圆舭过渡，含球鼻艏安装面。 */
+export const carrierHullUnderwater: GeometryBuilder = () =>
+  loftHull((st) => {
+    const ys = [st.bottom];
+    for (const f of [0.12, 0.3, 0.52, 0.76, 0.93]) ys.push(st.bottom + (HULL_WL - st.bottom) * f);
+    ys.push(HULL_WL);
+    return ys;
+  }, true);
+
+/** 水线漆带：水线处外贴 0.012 的黑色 boot topping。 */
+export const carrierBootStripe: GeometryBuilder = () => {
+  const geometry = loftHull((st) => [HULL_WL - 0.16, HULL_WL + 0.2].filter((y) => y >= st.bottom), false);
+  geometry.scale(1.003, 1, 1);
+  return geometry;
 };
 
 /** 舰岛一体化隐身塔：八折角内倾体，承接相控阵/桅杆，不再叠方形楼层。 */
@@ -164,48 +301,6 @@ export const carrierBowRake: GeometryBuilder = () => {
   return geometry;
 };
 
-/** 克令克（y=3.05）到飞行甲板底（y=4.42）的外飘舷侧环带：收口甲板与舰体之间的透空缝。 */
-function hullUpperBand(): THREE.BufferGeometry {
-  const knuckle = 2.4;
-  const top = CV.DECK_Y + 0.02;
-  const heights = [knuckle, 3.4, 3.72, 4.05, top];
-  const base = hullPlan(0);
-  const rings = heights.map((y) => {
-    const t = Math.min(1, Math.max(0, (y - knuckle) / (top - knuckle)));
-    const ease = t * t * (3 - 2 * t);
-    return base.map(([x, z]) => {
-      const bow = Math.min(1, Math.max(0, (z - 5) / 12));
-      const flare = (0.48 + 0.38 * bow * bow) * ease;
-      return new THREE.Vector3(x + Math.sign(x) * flare, y, z);
-    });
-  });
-  const positions: number[] = [];
-  const uvs: number[] = [];
-  const tri = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3) => {
-    for (const p of [a, b, c]) {
-      positions.push(p.x, p.y, p.z);
-      uvs.push(p.x, p.z);
-    }
-  };
-  for (let h = 0; h < rings.length - 1; h++) {
-    const lo = rings[h]!;
-    const hi = rings[h + 1]!;
-    for (let i = 0; i < lo.length - 1; i++) {
-      const a = lo[i]!;
-      const b = lo[i + 1]!;
-      const c = hi[i + 1]!;
-      const d = hi[i]!;
-      tri(a, d, c);
-      tri(a, c, b);
-    }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
 /** 保留 UV 的合并（外壳贴图依赖 UV，不能走只保留位置/法线的 merge）。 */
 function mergeWithUv(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
   const positions: number[] = [];
@@ -231,9 +326,9 @@ function mergeWithUv(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
   return geometry;
 }
 
-/** 舰体底板（双层底的上层）。 */
+/** 舰体底板（双层底的上层，随舭部收窄）。 */
 export const carrierBottom: GeometryBuilder = () =>
-  extrudedPlan(hullPlan(0.08), 0.14, CV.HULL_BOTTOM + 0.14);
+  extrudedPlan(hullPlan(0.08).map(([x, z]) => [x * 0.42, z] as [number, number]), 0.14, CV.HULL_BOTTOM + 0.14);
 
 /** 飞行甲板（装甲板 + 外飘轮廓 + 外飘段底面封板）。 */
 export const carrierFlightDeck: GeometryBuilder = () => {
@@ -259,6 +354,139 @@ export const carrierHangarDeck: GeometryBuilder = () =>
 /** 下层甲板。 */
 export const carrierLowerDeck: GeometryBuilder = () =>
   extrudedPlan(hullPlan(0.3), 0.08, CV.LOWER_DECK_Y + 0.08);
+
+/** DSI 无附面层隔道进气道鼓包：沿机身轴放样的椭圆隆起。 */
+export const carrierDsiBump: GeometryBuilder = () => {
+  const rings = [
+    { z: 0.55, r: 0.012, y: -0.01 },
+    { z: 0.64, r: 0.055, y: 0.0 },
+    { z: 0.74, r: 0.088, y: 0.005 },
+    { z: 0.84, r: 0.1, y: 0.008 },
+    { z: 0.94, r: 0.085, y: 0.004 },
+    { z: 1.02, r: 0.05, y: -0.002 },
+    { z: 1.06, r: 0.012, y: -0.01 },
+  ];
+  const segments = 18;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (const ring of rings) {
+    for (let i = 0; i < segments; i++) {
+      const a = (i / segments) * Math.PI * 2;
+      positions.push(Math.cos(a) * ring.r, ring.y + Math.sin(a) * ring.r * 0.62, ring.z);
+    }
+  }
+  for (let h = 0; h < rings.length - 1; h++) {
+    for (let i = 0; i < segments; i++) {
+      const a = h * segments + i;
+      const b = h * segments + ((i + 1) % segments);
+      const c = (h + 1) * segments + ((i + 1) % segments);
+      const d = (h + 1) * segments + i;
+      indices.push(a, d, c, a, c, b);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+// ---- 海面与尾流（fx） ------------------------------------------------------
+const SEA_LEVEL = 1.8;
+
+/** 透明海面：真实起伏的低幅涌浪，透出下方红色舰底与桨舵。 */
+export const carrierSeaSurface: GeometryBuilder = () => {
+  const width = 44;
+  const zStern = -52;
+  const zBow = 30;
+  const nx = 44;
+  const nz = 88;
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  for (let iz = 0; iz <= nz; iz++) {
+    const z = zStern + ((zBow - zStern) * iz) / nz;
+    for (let ix = 0; ix <= nx; ix++) {
+      const x = -width / 2 + (width * ix) / nx;
+      const y = SEA_LEVEL + 0.055 * Math.sin(x * 0.85 + z * 0.33) + 0.03 * Math.cos(z * 1.15 - x * 0.5);
+      positions.push(x, y, z);
+      uvs.push(x * 0.12, z * 0.12);
+    }
+  }
+  for (let iz = 0; iz < nz; iz++) {
+    for (let ix = 0; ix < nx; ix++) {
+      const a = iz * (nx + 1) + ix;
+      const b = a + 1;
+      const c = a + nx + 2;
+      const d = a + nx + 1;
+      indices.push(a, d, c, a, c, b);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+/** 艏浪：沿艏柱向外张开的 V 形白色浪脊。 */
+export const carrierBowWave: GeometryBuilder = () => {
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const segments = 24;
+  for (const side of [-1, 1] as const) {
+    const start = positions.length / 3;
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const z = 19.4 - 17.6 * t;
+      const xCenter = side * (hullSurfaceHalfAt(z, SEA_LEVEL) + 0.35 + 1.9 * Math.pow(t, 1.45));
+      const half = 0.16 + 0.62 * (1 - t);
+      const y = SEA_LEVEL + 0.075 + 0.035 * Math.sin(t * 10);
+      positions.push(xCenter - half, y, z, xCenter + half, y, z);
+    }
+    for (let i = 0; i < segments; i++) {
+      const a = start + i * 2;
+      indices.push(a, a + 2, a + 3, a, a + 3, a + 1);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+/** 艉流：从舰艉向后扩散的湍流带 + 两条开尔文尾迹。 */
+export const carrierSternWake: GeometryBuilder = () => {
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const segments = 22;
+  const strip = (center: (t: number) => number, halfAt: (t: number) => number, baseY: number) => {
+    const start = positions.length / 3;
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const z = -18.4 - 17.5 * t;
+      const half = halfAt(t);
+      const y = baseY + 0.02 * Math.sin(t * 16 + center(t));
+      const cx = center(t);
+      positions.push(cx - half, y, z, cx + half, y, z);
+    }
+    for (let i = 0; i < segments; i++) {
+      const a = start + i * 2;
+      indices.push(a, a + 2, a + 3, a, a + 3, a + 1);
+    }
+  };
+  strip(() => 0, (t) => 1.2 + 3.3 * t + 0.18 * Math.sin(t * 19), SEA_LEVEL + 0.06);
+  for (const side of [-1, 1] as const) {
+    strip((t) => side * (2.6 + 4.6 * t), (t) => 0.18 + 0.14 * t, SEA_LEVEL + 0.045);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
 
 /** 相控阵阵面（平板 + 边框），T/R 单元另行实例化。 */
 export const carrierRadarPanel: GeometryBuilder = (spec) => {

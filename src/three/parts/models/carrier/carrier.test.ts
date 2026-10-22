@@ -133,7 +133,7 @@ describe("福建舰 · 整机", () => {
     }
   });
 
-  it("L4 舰岛：两层舱室 + 一体化隐身塔 + 4 面固定相控阵（4×64 TR）+ 旋转雷达 + 2 座 1130（各 11 管）", () => {
+  it("L4 舰岛：两层舱室 + 一体化隐身塔 + 4 面固定相控阵（4×100 TR）+ 旋转雷达 + 2 座 1130（各 11 管）", () => {
     for (let level = 1; level <= 2; level++) {
       expect(staticIds.has(`carrier.island.bridge_${level}_floor`), `bridge ${level}`).toBe(true);
     }
@@ -141,7 +141,7 @@ describe("福建舰 · 整机", () => {
     for (let panel = 1; panel <= 4; panel++) {
       const tag = String(panel).padStart(2, "0");
       expect(staticIds.has(`carrier.island.array_${tag}_panel`), `array ${panel}`).toBe(true);
-      expect(built.getPart(`carrier.island.array_${tag}_tr`)!.instances.length).toBe(64);
+      expect(built.getPart(`carrier.island.array_${tag}_tr`)!.instances.length).toBe(100);
     }
     expect(built.getNode(RADAR_NODE)).toBeDefined();
     expect(staticIds.has("carrier.island.radar_antenna")).toBe(true);

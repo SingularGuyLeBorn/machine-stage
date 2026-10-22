@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { CV, hullHalfBeamAt } from "./constants";
+import { hullSurfaceHalfAt } from "./kits";
 import { A, B, C, M, T, pad, type CarrierCtx } from "./common";
 
 // ============================================================================
@@ -14,64 +15,46 @@ const deckTop = CV.DECK_Y + CV.DECK_T;
 export function addSurface(ctx: CarrierCtx): void {
   const add = (part: Parameters<CarrierCtx["add"]>[0]) => ctx.add(part);
 
-  // 舷号 18（左舷艏部/右舷舰岛）——用块体拼数字。
-  const digit = (value: 1 | 8) => {
-    const bars: ReturnType<typeof B>[] = [];
-    if (value === 1) {
-      bars.push(B(0.12, 0.9, 0.03, [0, 0, 0], 0.004), B(0.28, 0.1, 0.03, [0, -0.42, 0], 0.004));
-    } else {
-      bars.push(
-        B(0.42, 0.1, 0.03, [0, 0.4, 0], 0.004),
-        B(0.42, 0.1, 0.03, [0, -0.4, 0], 0.004),
-        B(0.42, 0.1, 0.03, [0, 0, 0], 0.004),
-        B(0.1, 0.9, 0.03, [-0.16, 0, 0], 0.004),
-        B(0.1, 0.9, 0.03, [0.16, 0, 0], 0.004),
-      );
+  // 舷号 18（左舷艏部）——按舷侧外飘面逐段贴装：竖直笔画切成 4 段，每段单独落在该高度的型线外板上，
+  // 整块平板既不会插进舰体，也不会在舷侧斜坡上悬空。
+  const addHullDigit = (value: 1 | 8, z: number) => {
+    const bars: Array<{ w: number; h: number; dx: number; dy: number }> =
+      value === 1
+        ? [
+            { w: 0.12, h: 0.9, dx: 0, dy: 0 },
+            { w: 0.28, h: 0.1, dx: 0, dy: -0.42 },
+          ]
+        : [
+            { w: 0.42, h: 0.1, dx: 0, dy: 0.4 },
+            { w: 0.42, h: 0.1, dx: 0, dy: 0 },
+            { w: 0.42, h: 0.1, dx: 0, dy: -0.4 },
+            { w: 0.1, h: 0.9, dx: -0.16, dy: 0 },
+            { w: 0.1, h: 0.9, dx: 0.16, dy: 0 },
+          ];
+    let index = 0;
+    for (const bar of bars) {
+      const pieces = bar.h > 0.4 ? 4 : 1;
+      const h = bar.h / pieces;
+      for (let piece = 0; piece < pieces; piece++) {
+        const dy = bar.dy - bar.h / 2 + h / 2 + piece * h;
+        index += 1;
+        add({
+          id: `${P}hull_number_${value}_${pad(index)}`,
+          name_cn: `舷号 ${value} 笔画 ${index}`,
+          name_en: `hull number ${value} stroke ${index}`,
+          assembly: ASSEMBLY,
+          build_layer: 5,
+          geometry: M(B(bar.w, h, 0.03, [0, 0, 0], 0.004)),
+          material: "cv_deck_line",
+          mate: A([-(hullSurfaceHalfAt(z + bar.dx, 2.45 + dy) + 0.022), 2.45 + dy, z + bar.dx], [0, -90, 0]),
+        });
+      }
     }
-    return M(...bars);
   };
-  add({
-    id: `${P}hull_number_1`,
-    name_cn: "舷号 1",
-    name_en: "hull number 1",
-    assembly: ASSEMBLY,
-    build_layer: 5,
-    geometry: digit(1),
-    material: "cv_deck_line",
-    mate: A([-(hullHalfBeamAt(12.2) + 0.015), 2.45, 12.2], [0, -90, 0]),
-  });
-  add({
-    id: `${P}hull_number_8`,
-    name_cn: "舷号 8",
-    name_en: "hull number 8",
-    assembly: ASSEMBLY,
-    build_layer: 5,
-    geometry: digit(8),
-    material: "cv_deck_line",
-    mate: A([-(hullHalfBeamAt(11.55) + 0.015), 2.45, 11.55], [0, -90, 0]),
-  });
+  addHullDigit(1, 12.2);
+  addHullDigit(8, 11.55);
 
-  // 做旧交给 PBR 贴图；不再用外贴方块冒充锈迹（贴片边缘会露馅）。
-  for (let wb = 0; wb < 20; wb++) {
-    const z0 = -17.4 + wb * 1.62;
-    const z1 = z0 + 1.62;
-    const zc = (z0 + z1) / 2;
-    for (const side of [-1, 1] as const) {
-      const xa = side * (hullHalfBeamAt(z0) + 0.012);
-      const xb = side * (hullHalfBeamAt(z1) + 0.012);
-      const yaw = Math.atan2(xb - xa, z1 - z0);
-      add({
-        id: `${P}waterline_band_${pad(wb + 1)}_${side === -1 ? "l" : "r"}`,
-        name_cn: `水线漆带 ${wb + 1} ${side === -1 ? "左" : "右"}`,
-        name_en: `waterline band ${wb + 1} ${side === -1 ? "l" : "r"}`,
-        assembly: ASSEMBLY,
-        build_layer: 5,
-        geometry: M(B(0.025, 0.16, 1.66, [0, 0, 0], 0.003)),
-        material: "cv_hull_boot",
-        mate: A([(xa + xb) / 2, 0.98, zc], [0, yaw, 0]),
-      });
-    }
-  }
+  // 水线漆带由舰体型线放样（carrierBootStripe）统一生成，这里不再叠加平板。
 
   // 锚 + 锚链 + 锚穴（舰艏两舷）。
   for (const side of [-1, 1] as const) {

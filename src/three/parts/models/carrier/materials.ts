@@ -6,18 +6,20 @@ import type { ModelRegistry } from "../../registry/types";
 // ============================================================================
 
 export const CV_MATERIALS: ModelRegistry["materials"] = {
-  cv_hull: { base: "#747d82", metalness: 1, roughness: 0.64, pbr: "plates", repeat: [6, 6], clearcoat: 0.22, clearcoatRoughness: 0.42, envMapIntensity: 1.15 },
-  cv_hull_dark: { base: "#565f63", metalness: 1, roughness: 0.68, pbr: "plates", repeat: [5, 5], envMapIntensity: 1.05 },
+  // 舰体是涂装钢板：漆膜为介电层，保留钢板法线/粗糙度，金属度低于裸钢，避免背光面死黑。
+  cv_hull: { base: "#7c858a", metalness: 0.42, roughness: 0.58, pbr: "plates", repeat: [4, 4], clearcoat: 0.18, clearcoatRoughness: 0.4, envMapIntensity: 0.95 },
+  cv_hull_dark: { base: "#5c666b", metalness: 0.45, roughness: 0.64, pbr: "plates", repeat: [4, 4], envMapIntensity: 0.9 },
   cv_hull_boot: { base: "#454b4e", metalness: 0.8, roughness: 0.8, pbr: "rust", repeat: [4, 3], envMapIntensity: 0.95 },
-  cv_antifouling: { base: "#5a2f2a", metalness: 0.04, roughness: 0.88, preset: "primer", envMapIntensity: 0.5 },
+  cv_antifouling: { base: "#7a332b", metalness: 0.04, roughness: 0.82, preset: "primer", envMapIntensity: 0.45 },
   cv_deck: { base: "#4b504f", metalness: 0.12, roughness: 0.92, preset: "cast", envMapIntensity: 0.55 },
   cv_deck_plate: { base: "#3f4547", metalness: 0.15, roughness: 0.86, pbr: "scratched", repeat: [4, 4], envMapIntensity: 0.55 },
   cv_deck_line: { base: "#f5f0e2", metalness: 0.02, roughness: 0.62, preset: "primer", envMapIntensity: 0.4 },
   cv_deck_yellow: { base: "#d1a22f", metalness: 0.04, roughness: 0.7, preset: "primer", envMapIntensity: 0.65 },
   cv_runway: { base: "#7b847f", metalness: 0.14, roughness: 0.86, preset: "cast", envMapIntensity: 0.38 },
   cv_deck_red: { base: "#8f332b", metalness: 0.05, roughness: 0.76, preset: "primer", envMapIntensity: 0.65 },
-  cv_steel: { base: "#a7b0b4", metalness: 1, roughness: 0.4, pbr: "brushed", repeat: [2, 2], anisotropy: 0.85, envMapIntensity: 1.3 },
-  cv_steel_dark: { base: "#626c71", metalness: 1, roughness: 0.54, pbr: "plates", repeat: [2, 2], envMapIntensity: 1.1 },
+  cv_deck_wear: { base: "#1e2422", metalness: 0.02, roughness: 0.96, preset: "rubber", envMapIntensity: 0.25, opacity: 0.62, depthWrite: false, doubleSided: false },
+  cv_steel: { base: "#a7b0b4", metalness: 1, roughness: 0.56, pbr: "brushed", repeat: [2, 2], anisotropy: 0.85, envMapIntensity: 0.55 },
+  cv_steel_dark: { base: "#626c71", metalness: 1, roughness: 0.62, pbr: "plates", repeat: [2, 2], envMapIntensity: 0.62 },
   cv_grate: { base: "#596367", metalness: 1, roughness: 0.74, pbr: "plates", repeat: [3, 3], envMapIntensity: 0.9 },
   cv_glass: { base: "#1b2b34", metalness: 0.5, roughness: 0.06, preset: "none", envMapIntensity: 1.9 },
   cv_bridge_glass: { base: "#b8d2dc", metalness: 0.1, roughness: 0.04, preset: "none", envMapIntensity: 1.2, opacity: 0.09, depthWrite: false, doubleSided: true },
@@ -28,7 +30,7 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_mfd: { base: "#071417", metalness: 0.03, roughness: 0.42, preset: "none", emissive: "#1c6f74", emissiveIntensity: 0.38, envMapIntensity: 0.3 },
   cv_upholstery: { base: "#24343d", metalness: 0.0, roughness: 0.94, preset: "canvas", envMapIntensity: 0.35 },
   cv_chart: { base: "#cfc7ad", metalness: 0.02, roughness: 0.86, preset: "primer", envMapIntensity: 0.45 },
-  cv_radar: { base: "#c8ced0", metalness: 0.2, roughness: 0.4, preset: "primer", envMapIntensity: 1.1 },
+  cv_radar: { base: "#c8ced0", metalness: 0.2, roughness: 0.54, preset: "primer", envMapIntensity: 0.55 },
   cv_radar_dark: { base: "#596368", metalness: 0.35, roughness: 0.55, preset: "primer", envMapIntensity: 0.8 },
   cv_aesa: { base: "#354149", metalness: 0.18, roughness: 0.58, preset: "primer", envMapIntensity: 0.42 },
   cv_aesa_tile: { base: "#8a969c", metalness: 0.22, roughness: 0.42, preset: "primer", envMapIntensity: 0.55 },
@@ -43,4 +45,6 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_warning: { base: "#d9a62f", metalness: 0.05, roughness: 0.7, emissive: "#4a2c00", envMapIntensity: 0.6 },
   cv_water: { base: "#41636e", metalness: 0.1, roughness: 0.25, preset: "none", envMapIntensity: 1.0 },
   cv_canvas: { base: "#5e6359", metalness: 0.0, roughness: 0.95, preset: "rubber", envMapIntensity: 0.4 },
+  cv_sea: { base: "#12313a", metalness: 0.0, roughness: 0.42, preset: "none", envMapIntensity: 0.42, opacity: 0.8, depthWrite: false, doubleSided: true },
+  cv_foam: { base: "#eef5f2", metalness: 0.0, roughness: 0.66, preset: "none", envMapIntensity: 0.4, opacity: 0.88, doubleSided: true },
 };

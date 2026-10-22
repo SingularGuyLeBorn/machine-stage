@@ -15,14 +15,34 @@ export function addHull(ctx: CarrierCtx): void {
 
   add({
     id: "carrier.hull.shell",
-    name_cn: "舰体外壳（分段焊接环）",
-    name_en: "hull shell",
+    name_cn: "舰体外壳（水线以上型线放样）",
+    name_en: "hull shell above waterline",
     assembly: HULL_ASSEMBLY,
     build_layer: 1,
     geometry: { type: "kit", kit: "carrierHullShell" },
     material: "cv_hull",
     mate: A([0, 0, 0]),
-    source: "1:8 展示尺度；外板按 24 站理论型线放样，内腔留 160mm 舷侧厚。",
+    source: "1:8 展示尺度；56 站理论型线放样：圆舭、舷侧外飘、艏柱前倾、巡洋舰艉。",
+  });
+  add({
+    id: "carrier.hull.underwater",
+    name_cn: "水下舰体（防污漆）",
+    name_en: "underwater hull",
+    assembly: HULL_ASSEMBLY,
+    build_layer: 1,
+    geometry: { type: "kit", kit: "carrierHullUnderwater" },
+    material: "cv_antifouling",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: "carrier.hull.boot_stripe",
+    name_cn: "水线漆带",
+    name_en: "boot topping stripe",
+    assembly: HULL_ASSEMBLY,
+    build_layer: 1,
+    geometry: { type: "kit", kit: "carrierBootStripe" },
+    material: "cv_hull_dark",
+    mate: A([0, 0, 0]),
   });
   add({
     id: "carrier.hull.bottom",
@@ -57,24 +77,14 @@ export function addHull(ctx: CarrierCtx): void {
     });
   }
 
-  // 前倾舰艏楔形段：从水线向甲板前缘外飘。
-  add({
-    id: "carrier.hull.bow_rake",
-    name_cn: "前倾外飘舰艏",
-    name_en: "raked flared bow",
-    assembly: HULL_ASSEMBLY,
-    build_layer: 1,
-    geometry: { type: "kit", kit: "carrierBowRake" },
-    material: "cv_hull",
-    mate: A([0, 0, 0]),
-  });
+  // 前倾舰艏已并入外板型线放样，这里只保留艏柱包板焊缝。
   add({
     id: "carrier.hull.bow_stem_strip",
     name_cn: "艏柱包板",
     name_en: "bow stem strip",
     assembly: HULL_ASSEMBLY,
     build_layer: 1,
-    geometry: M({ type: "weld", from: [0, 0.45, 18.75], to: [0, 4.4, 20.65], radius: 0.045 }),
+    geometry: M({ type: "weld", from: [0, 0.45, 18.55], to: [0, 4.42, 20.6], radius: 0.045 }),
     material: "cv_steel_dark",
     mate: A([0, 0, 0]),
   });
@@ -127,30 +137,43 @@ export function addHull(ctx: CarrierCtx): void {
       name_en: `floor frame ${station}`,
       assembly: HULL_ASSEMBLY,
       build_layer: 1,
-      geometry: M(B(half * 2, 0.14, 0.14, [0, 0, 0], 0.008)),
+      geometry: M(B(half * 0.9, 0.14, 0.14, [0, 0, 0], 0.008)),
       material: "cv_steel_dark",
       mate: A([0, CV.HULL_BOTTOM + 0.25, z]),
     });
-    add({
-      id: `carrier.hull.frame_${station}_side_l`,
-      name_cn: `左舷肋骨 ${station}`,
-      name_en: `port frame ${station}`,
-      assembly: HULL_ASSEMBLY,
-      build_layer: 1,
-      geometry: M(B(0.14, 3.1, 0.14, [0, 0, 0], 0.008)),
-      material: "cv_steel_dark",
-      mate: A([-half, CV.HULL_BOTTOM + 1.7, z]),
-    });
-    add({
-      id: `carrier.hull.frame_${station}_side_r`,
-      name_cn: `右舷肋骨 ${station}`,
-      name_en: `starboard frame ${station}`,
-      assembly: HULL_ASSEMBLY,
-      build_layer: 1,
-      geometry: M(B(0.14, 3.1, 0.14, [0, 0, 0], 0.008)),
-      material: "cv_steel_dark",
-      mate: A([half, CV.HULL_BOTTOM + 1.7, z]),
-    });
+    // 肋骨分三段随型线内收：下段贴舭部、中段过水线、上段到甲板梁，避免方盒式直壁。
+    for (const side of [-1, 1] as const) {
+      add({
+        id: `carrier.hull.frame_${station}_side_${side === -1 ? "l" : "r"}_lo`,
+        name_cn: `${side === -1 ? "左" : "右"}舷肋骨 ${station} 下段`,
+        name_en: `${side === -1 ? "port" : "starboard"} frame ${station} lower`,
+        assembly: HULL_ASSEMBLY,
+        build_layer: 1,
+        geometry: M(B(0.13, 1.35, 0.14, [0, 0, 0], 0.008)),
+        material: "cv_steel_dark",
+        mate: A([side * (half * 0.56), CV.HULL_BOTTOM + 0.82, z]),
+      });
+      add({
+        id: `carrier.hull.frame_${station}_side_${side === -1 ? "l" : "r"}_mid`,
+        name_cn: `${side === -1 ? "左" : "右"}舷肋骨 ${station} 中段`,
+        name_en: `${side === -1 ? "port" : "starboard"} frame ${station} middle`,
+        assembly: HULL_ASSEMBLY,
+        build_layer: 1,
+        geometry: M(B(0.13, 0.85, 0.14, [0, 0, 0], 0.008)),
+        material: "cv_steel_dark",
+        mate: A([side * (half * 0.88), CV.HULL_BOTTOM + 1.85, z]),
+      });
+      add({
+        id: `carrier.hull.frame_${station}_side_${side === -1 ? "l" : "r"}_hi`,
+        name_cn: `${side === -1 ? "左" : "右"}舷肋骨 ${station} 上段`,
+        name_en: `${side === -1 ? "port" : "starboard"} frame ${station} upper`,
+        assembly: HULL_ASSEMBLY,
+        build_layer: 1,
+        geometry: M(B(0.13, 1.35, 0.14, [0, 0, 0], 0.008)),
+        material: "cv_steel_dark",
+        mate: A([side * half, CV.HULL_BOTTOM + 2.85, z]),
+      });
+    }
     add({
       id: `carrier.hull.frame_${station}_beam`,
       name_cn: `甲板横梁 ${station}`,
@@ -164,9 +187,9 @@ export function addHull(ctx: CarrierCtx): void {
   }
 
   // 纵桁 ×6 ×10 段。
-  const girderX = [-3.1, -1.9, -0.65, 0.65, 1.9, 3.1];
+  const girderX = [-2.6, -1.5, -0.55, 0.55, 1.5, 2.6];
   for (let g = 0; g < girderX.length; g++) {
-    for (let s = 0; s < 10; s++) {
+    for (let s = 0; s < 9; s++) {
       add({
         id: `carrier.hull.girder_${pad(g + 1)}_${pad(s + 1)}`,
         name_cn: `纵桁 ${g + 1}-${s + 1}`,
@@ -226,9 +249,9 @@ export function addHull(ctx: CarrierCtx): void {
       name_en: `watertight bulkhead ${station}`,
       assembly: HULL_ASSEMBLY,
       build_layer: 1,
-      geometry: M(B(half * 2, throughHangar ? 0.7 : 3.0, 0.1, [0, 0, 0], 0.008)),
+      geometry: M(B(half * (throughHangar ? 1.36 : 1.7), throughHangar ? 0.7 : 2.0, 0.1, [0, 0, 0], 0.008)),
       material: "cv_steel_dark",
-      mate: A([0, CV.HULL_BOTTOM + (throughHangar ? 0.35 : 1.6), z]),
+      mate: A([0, throughHangar ? 0.9 : 2.35, z]),
     });
     for (let s = -1; s <= 1; s++) {
       add({
@@ -237,9 +260,9 @@ export function addHull(ctx: CarrierCtx): void {
         name_en: `bulkhead stiffener ${station}-${s + 2}`,
         assembly: HULL_ASSEMBLY,
         build_layer: 1,
-        geometry: M(B(0.1, throughHangar ? 0.6 : 2.9, 0.16, [0, 0, 0], 0.006)),
+        geometry: M(B(0.1, throughHangar ? 0.6 : 1.9, 0.16, [0, 0, 0], 0.006)),
         material: "cv_steel_dark",
-        mate: A([s * half * 0.55, CV.HULL_BOTTOM + (throughHangar ? 0.3 : 1.62), z - 0.08]),
+        mate: A([s * half * 0.55, throughHangar ? 0.9 : 2.36, z - 0.08]),
       });
     }
   });
@@ -320,11 +343,11 @@ export function addHull(ctx: CarrierCtx): void {
 
   // 舱室隔板（住舱/损管/配电）：作为内部体量，后续可剖视。
   const rooms = [
-    ["dc", "损管站", 2.7, -7.2],
-    ["berth_a", "住舱 A", -2.6, 7.5],
-    ["berth_b", "住舱 B", 2.6, 8.5],
-    ["galley", "厨房", -2.6, 2.5],
-    ["medical", "医疗舱", 2.6, 3.5],
+    ["dc", "损管站", 2.35, -7.2],
+    ["berth_a", "住舱 A", -2.25, 7.5],
+    ["berth_b", "住舱 B", 2.25, 8.5],
+    ["galley", "厨房", -2.25, 2.5],
+    ["medical", "医疗舱", 2.25, 3.5],
     ["switch", "配电舱", 1.2, -13.5],
   ] as const;
   for (const [key, name, x, z] of rooms) {

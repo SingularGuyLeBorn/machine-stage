@@ -343,8 +343,11 @@ function StageRuntime() {
       }
     });
     // 特效件（tags: fx）默认不可见，由动画在需要时切 visible；否则首帧会先闪一下。
+    // 海面/尾流同用 fx 标签（不参与结构检测、不撑大取景），但需要常显。
     for (const handle of next.parts) {
-      if (handle.def.tags?.includes("fx")) handle.object.visible = false;
+      if (handle.def.tags?.includes("fx") && !handle.def.id.startsWith("carrier.sea.")) {
+        handle.object.visible = false;
+      }
     }
     let triangles = 0;
     for (const handle of next.parts) {

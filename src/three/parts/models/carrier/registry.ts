@@ -10,13 +10,20 @@ import { addFlightDeck } from "./flightdeck";
 import { addIsland } from "./island";
 import { addAircraft, addParkedAircraft, HANGAR_SPOTS, PARKED_SPOTS } from "./aircraft";
 import { addSurface } from "./surface";
+import { addSea } from "./sea";
 import { addCarrierDetails } from "./details";
 import { addCarrierInteriors } from "./interiors";
 import { addScaleFigure } from "./scaleFigure";
 import {
+  carrierBootStripe,
   carrierBottom,
   carrierBowRake,
+  carrierBowWave,
+  carrierDsiBump,
   carrierFlightDeck,
+  carrierHullUnderwater,
+  carrierSeaSurface,
+  carrierSternWake,
   carrierHangarDeck,
   carrierHullBilgeKeel,
   carrierHullShell,
@@ -47,6 +54,7 @@ function buildCarrierOnce(): { registry: ModelRegistry; layouts: Record<string, 
   addParkedAircraft(ctx, aircraftParts, CV.DECK_Y + CV.DECK_T, PARKED_SPOTS, "parked");
   addParkedAircraft(ctx, aircraftParts, CV.HANGAR_Y + 0.14, HANGAR_SPOTS, "hangarparked");
   addSurface(ctx);
+  addSea(ctx);
   addScaleFigure(ctx);
   addCarrierDetails(ctx);
   addCarrierInteriors(ctx);
@@ -293,6 +301,42 @@ function buildCarrierOnce(): { registry: ModelRegistry; layouts: Record<string, 
       reason: "控制棒在燃料组件导向管内插抽",
       maxDepthMm: 20,
       allowDisplaced: true,
+    },
+    {
+      family: "cv-ammo-hull-containment",
+      a: "carrier.hull.shell",
+      b: "carrier.hangar.ammo_platform",
+      reason: "弹药升降平台在舰体内包络中运动；AABB 包含关系报 0mm，非实体干涉",
+      maxDepthMm: 2,
+      allowDisplaced: true,
+      allowSuspect: true,
+    },
+    {
+      family: "cv-ammo-boot-containment",
+      a: "carrier.hull.boot_stripe",
+      b: "carrier.hangar.ammo_platform",
+      reason: "弹药升降平台在舰体内包络中运动；水线漆带 AABB 包含报 0mm，非实体干涉",
+      maxDepthMm: 2,
+      allowDisplaced: true,
+      allowSuspect: true,
+    },
+    {
+      family: "cv-ammo-cart-hull-containment",
+      a: "carrier.hull.shell",
+      b: "carrier.hangar.ammo_cart",
+      reason: "弹药运输车在舰体内包络中运动；AABB 包含关系报 0mm，非实体干涉",
+      maxDepthMm: 2,
+      allowDisplaced: true,
+      allowSuspect: true,
+    },
+    {
+      family: "cv-rod-hull-containment",
+      a: "carrier.hull.*",
+      b: "carrier.power.control_rod_*",
+      reason: "控制棒束全程位于舰体包络内；型线放样后 AABB 包含关系报 0mm，非实体干涉",
+      maxDepthMm: 2,
+      allowDisplaced: true,
+      allowSuspect: true,
     },
     {
       family: "cv-crdm-guide",
@@ -662,6 +706,7 @@ function buildCarrierOnce(): { registry: ModelRegistry; layouts: Record<string, 
     { id: "island", name_cn: "L4 舰岛/雷达/近防", name_en: "island & sensors", explode: [0.4, 2.2, 0] as [number, number, number] },
     { id: "aircraft", name_cn: "L5 舰载机", name_en: "carrier aircraft", explode: [0, 2.8, 0] as [number, number, number] },
     { id: "surface", name_cn: "L5 表面/甲板作业", name_en: "surface & deck ops", explode: [0, 1.0, -0.4] as [number, number, number] },
+    { id: "sea", name_cn: "L5 海面/尾流", name_en: "sea & wake", explode: [0, -0.6, 0] as [number, number, number] },
   ];
 
   const registry: ModelRegistry = {
@@ -693,6 +738,8 @@ export const CARRIER_LAYOUTS: Record<string, InstanceLayout> = getCarrier().layo
 
 export const carrierBuilders = {
   carrierHullShell,
+  carrierHullUnderwater,
+  carrierBootStripe,
   carrierIslandTower,
   carrierBottom,
   carrierBowRake,
@@ -705,6 +752,10 @@ export const carrierBuilders = {
   carrierWing,
   carrierHullStrake,
   carrierHullBilgeKeel,
+  carrierSeaSurface,
+  carrierBowWave,
+  carrierSternWake,
+  carrierDsiBump,
 };
 
 export const CARRIER_CONSTANTS = CV;

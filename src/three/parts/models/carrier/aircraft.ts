@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { CV } from "./constants";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
 import type { PartDefinition } from "../../registry/types";
@@ -293,6 +294,94 @@ export function addAircraft(ctx: CarrierCtx): void {
         mate: A([side * (0.3 + (p % 2) * 0.08), 0.3 + Math.floor(p / 2) * 0.12, -0.45], [90, 0, 0]),
       });
     }
+  }
+
+  // DSI 鼓包 + 进气道唇口 + 喷口调节片 + 铆钉列 + 蒙皮对缝（照 j20.ts 的零件级密度补细节）。
+  for (const side of [-1, 1] as const) {
+    const tag = side === -1 ? "l" : "r";
+    add({
+      id: `${P}dsi_bump_${tag}`,
+      name_cn: `${tag === "l" ? "左" : "右"}DSI 鼓包`,
+      name_en: `DSI bump ${tag}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: { type: "kit", kit: "carrierDsiBump" },
+      material: "cv_aircraft",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.29, 0.38, 0.2]),
+    });
+    add({
+      id: `${P}intake_lip_${tag}`,
+      name_cn: `${tag === "l" ? "左" : "右"}进气道唇口`,
+      name_en: `intake lip ${tag}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(T(0.165, 0.135, 0.06, [0, 0, 0], 22)),
+      material: "cv_aircraft_dark",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.3, 0.38, 0.86], [90, 0, 0]),
+    });
+    for (let p = 0; p < 12; p++) {
+      const angle = (p / 12) * Math.PI * 2;
+      add({
+        id: `${P}nozzle_petal_${tag}_${pad(p + 1)}`,
+        name_cn: `${tag === "l" ? "左" : "右"}喷口调节片 ${p + 1}`,
+        name_en: `nozzle petal ${tag}-${p + 1}`,
+        assembly: "aircraft",
+        build_layer: 5,
+        geometry: M(B(0.028, 0.14, 0.03, [0, 0, 0], 0.004)),
+        material: "cv_steel_dark",
+        node: AIRCRAFT_NODE,
+        mate: A([side * 0.3 + Math.cos(angle) * 0.104, 0.38 + Math.sin(angle) * 0.104, -1.16], [0, 0, (angle * 180) / Math.PI - 90]),
+      });
+    }
+    add({
+      id: `${P}fuselage_rivets_${tag}`,
+      name_cn: `${tag === "l" ? "左" : "右"}机身铆钉列 ×24`,
+      name_en: `fuselage rivet row ${tag}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(S(0.007, [0, 0, 0], 6)),
+      material: "cv_steel_dark",
+      node: AIRCRAFT_NODE,
+      mate: A([0, 0, 0]),
+      instances: 24,
+      indexed: true,
+      instance_layout: `carrier.aircraft.rivets.${tag}`,
+    });
+    ctx.layout(`carrier.aircraft.rivets.${tag}`, ({ index: i }) => {
+      const row = Math.floor(i / 12);
+      const z = 0.75 - (i % 12) * 0.17;
+      return new THREE.Matrix4().makeTranslation(side * 0.143, row === 0 ? 0.5 : 0.34, z);
+    });
+    add({
+      id: `${P}skin_seam_${tag}`,
+      name_cn: `${tag === "l" ? "左" : "右"}机身纵向对缝`,
+      name_en: `fuselage longitudinal seam ${tag}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M({ type: "weld", from: [side * 0.148, 0.46, 0.82], to: [side * 0.148, 0.44, -1.18], radius: 0.004 }),
+      material: "cv_aircraft_dark",
+      node: AIRCRAFT_NODE,
+      mate: A([0, 0, 0]),
+    });
+    add({
+      id: `${P}wing_rivets_${tag}`,
+      name_cn: `${tag === "l" ? "左" : "右"}内翼铆钉列 ×12`,
+      name_en: `inner wing rivet row ${tag}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(S(0.006, [0, 0, 0], 6)),
+      material: "cv_steel_dark",
+      node: AIRCRAFT_NODE,
+      mate: A([0, 0, 0]),
+      instances: 12,
+      indexed: true,
+      instance_layout: `carrier.aircraft.wingrivets.${tag}`,
+    });
+    ctx.layout(`carrier.aircraft.wingrivets.${tag}`, ({ index: i }) => {
+      return new THREE.Matrix4().makeTranslation(side * (0.14 + i * 0.028), 0.348, 0.36);
+    });
   }
 
   // 内翼段（不折叠）。

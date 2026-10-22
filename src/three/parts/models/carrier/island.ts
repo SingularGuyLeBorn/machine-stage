@@ -346,22 +346,22 @@ export function addIsland(ctx: CarrierCtx): void {
     });
     add({
       id: `${P}array_${tag}_tr`,
-      name_cn: `${["前", "后", "右", "左"][index]}阵面 T/R 单元 ×64`,
+      name_cn: `${["前", "后", "右", "左"][index]}阵面 T/R 单元 ×100`,
       name_en: `phased array TR units ${tag}`,
       assembly: ASSEMBLY,
       build_layer: 4,
       geometry: { type: "kit", kit: "carrierTrTile", params: { s: 0.075, d: 0.035 } },
       material: "cv_aesa_tile",
       mate: A([...panel.pos], [...panel.rot]),
-      instances: 64,
+      instances: 100,
       indexed: true,
       instance_layout: `carrier.island.tr${index + 1}`,
-      source: "8×8 T/R 单元阵列；固定阵面电子扫描，不转动。",
+      source: "10×10 T/R 单元阵列；固定阵面电子扫描，不转动。",
     });
     ctx.layout(`carrier.island.tr${index + 1}`, ({ index: i }) => {
-      const col = i % 8;
-      const row = Math.floor(i / 8);
-      return new THREE.Matrix4().makeTranslation((col - 3.5) * 0.125, (row - 3.5) * 0.095, 0.075);
+      const col = i % 10;
+      const row = Math.floor(i / 10);
+      return new THREE.Matrix4().makeTranslation((col - 4.5) * 0.104, (row - 4.5) * 0.079, 0.075);
     });
     add({
       id: `${P}array_${tag}_recess`,
