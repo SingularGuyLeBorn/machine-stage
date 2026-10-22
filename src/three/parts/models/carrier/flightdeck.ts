@@ -132,14 +132,25 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   CAT_TRACKS.forEach((track, index) => {
     const node = JBD_NODES[index]!;
     const z = track.z0 - 1.65;
-    ctx.node({ name: node, parent: "root", pivot: [track.x, deckTop + 0.05, z], motion: "rotate", axis: "x", note: `弹射器 ${track.id} 挡焰板` });
+    ctx.node({ name: node, parent: "root", pivot: [track.x, deckTop + 0.05, z], motion: "rotate", axis: "x", rest_rotation: [-90, 0, 0], note: `弹射器 ${track.id} 挡焰板` });
     add({
       id: `${P}cat_${pad(track.id)}_jbd_panel`,
       name_cn: `弹射器 ${track.id} 挡焰板`,
       name_en: `jet blast deflector ${track.id}`,
       assembly: ASSEMBLY,
       build_layer: 3,
-      geometry: M(B(1.08, 0.92, 0.07, [0, 0.46, 0], 0.01), B(0.96, 0.035, 0.04, [0, 0.2, 0.045], 0.004)),
+      geometry: M(
+        B(1.08, 0.92, 0.07, [0, 0.46, 0], 0.01),
+        B(0.96, 0.035, 0.04, [0, 0.2, 0.045], 0.004),
+        B(1.0, 0.045, 0.06, [0, 0.36, 0.05], 0.004),
+        B(1.0, 0.045, 0.06, [0, 0.68, 0.05], 0.004),
+        B(1.0, 0.045, 0.06, [0, 0.9, 0.05], 0.004),
+        B(0.055, 0.84, 0.055, [-0.4, 0.5, 0.055], 0.004),
+        B(0.055, 0.84, 0.055, [0.4, 0.5, 0.055], 0.004),
+        B(1.0, 0.07, 0.075, [0, 0.035, 0.02], 0.004),
+        B(0.09, 0.13, 0.11, [-0.36, 0.03, 0.02], 0.004),
+        B(0.09, 0.13, 0.11, [0.36, 0.03, 0.02], 0.004),
+      ),
       material: "cv_steel_dark",
       node,
       mate: A([0, 0, 0]),

@@ -782,17 +782,32 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
     });
   }
   // 甲板车辆附件：原车辆为程序化积木件，已移除；附件不再单独悬空放置。
-  for (let r = 0; r < 10; r++) {
-    add({
-      id: `carrier.surface.detail_raft_bracket_${pad(r + 1)}`,
-      name_cn: `救生筏架 ${r + 1}`,
-      name_en: `life raft bracket ${r + 1}`,
-      assembly: SURFACE,
-      build_layer: 4,
-      geometry: M(B(0.06, 0.5, 0.6, [0, 0, 0], 0.004)),
-      material: "cv_steel",
-      mate: A([4.0, DECK_TOP + 0.25, 4.5 + r * 0.75]),
-    });
+  // 救生筏架：筏罐坐在低鞍座上，鞍座落在甲板并托住罐体，不再是竖立钢板。
+  add({
+    id: "carrier.surface.detail_raft_rack_beam",
+    name_cn: "救生筏纵向托梁",
+    name_en: "life raft rack beam",
+    assembly: SURFACE,
+    build_layer: 4,
+    geometry: M(B(0.1, 0.06, 4.3, [0, 0, 0], 0.004)),
+    material: "cv_steel",
+    mate: A([3.9, DECK_TOP + 0.03, 6.15]),
+  });
+  for (let r = 0; r < 6; r++) {
+    const rx = 3.9 + (r % 2) * 0.55 - 0.25;
+    const rz = 8.0 - r * 0.75;
+    for (const dz of [-0.28, 0.28] as const) {
+      add({
+        id: `carrier.surface.detail_raft_cradle_${pad(r + 1)}_${dz < 0 ? "a" : "f"}`,
+        name_cn: `救生筏鞍座 ${r + 1}-${dz < 0 ? "后" : "前"}`,
+        name_en: `life raft cradle ${r + 1}-${dz < 0 ? "aft" : "fore"}`,
+        assembly: SURFACE,
+        build_layer: 4,
+        geometry: M(B(0.5, 0.12, 0.1, [0, 0, 0], 0.004), B(0.34, 0.05, 0.08, [0, 0.08, 0], 0.003)),
+        material: "cv_steel_dark",
+        mate: A([rx, DECK_TOP + 0.06, rz + dz]),
+      });
+    }
   }
   for (let x = 0; x < 20; x++) {
     add({
