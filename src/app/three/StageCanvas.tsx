@@ -137,8 +137,18 @@ function Studio() {
       <directionalLight position={[-6, 3.5, -4.5]} intensity={0.34} color="#dfe7f2" />
       <HdrEnvironment />
       <SceneEnvIntensity value={1.12} />
+      <SceneExposure value={0.78} />
     </>
   );
+}
+
+/** 曝光：HDRI 工作室高光很强，压低曝光让金属高光不糊成白块。 */
+function SceneExposure({ value }: { value: number }) {
+  const gl = useThree((state) => state.gl);
+  useEffect(() => {
+    gl.toneMappingExposure = value;
+  }, [gl, value]);
+  return null;
 }
 
 /** 环境反射总强度（three r163+ 的 Scene.environmentIntensity）。 */

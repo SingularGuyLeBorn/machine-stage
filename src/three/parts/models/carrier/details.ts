@@ -594,7 +594,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
       build_layer: 4,
       geometry: M(B(0.1, 0.1, 0.1, [0, 0, 0], 0.004), C(0.02, 0.2, [0, 0.12, 0], 8)),
       material: "cv_steel",
-      mate: A([CV.ISLAND_X - 1.0 + (m % 5) * 0.5, CV.DECK_Y + CV.DECK_T + 3.4 + Math.floor(m / 5) * 0.22, CV.ISLAND_Z - 0.4 + (m % 2 === 0 ? 0.35 : -0.35)]),
+      mate: A([CV.ISLAND_X - 0.28 + (m % 5) * 0.14, CV.DECK_Y + CV.DECK_T + 4.2 + Math.floor(m / 10) * 0.57, CV.ISLAND_Z - 0.62 + Math.floor((m % 10) / 5) * 0.44]),
     });
   }
   for (let d = 0; d < 10; d++) {
