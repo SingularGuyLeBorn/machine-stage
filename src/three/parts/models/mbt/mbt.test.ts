@@ -115,7 +115,7 @@ describe("MBT-90 主战坦克 · 整机", () => {
     expect(built.getPart("mbt90.interior.ammo_heat_carousel_liner")!.def.material).toBe("mbt_copper");
   });
 
-  it("L4 复合装甲分层 + 100+ 块 ERA（每块外壳/炸药/夹层）", () => {
+  it("L4 复合装甲分层 + 100+ 块 ERA（壳体/背板/炸药/飞板/前盖）", () => {
     for (const id of [
       "mbt90.hull.turret_cheek_outer_l",
       "mbt90.hull.turret_cheek_ceramic_l",
@@ -134,9 +134,13 @@ describe("MBT-90 主战坦克 · 整机", () => {
       built.getPart("mbt90.hull.era_skirt_r_casing")!.instances.length +
       built.getPart("mbt90.hull.era_skirt_l_casing")!.instances.length;
     expect(blocks).toBeGreaterThanOrEqual(100);
-    for (const kind of ["casing", "explosive", "liner"]) {
-      expect(built.getPart(`mbt90.hull.era_glacis_${kind}`), kind).toBeDefined();
-    }
+    const distances = ["casing", "liner", "explosive", "flyer", "cover"].map((kind) => {
+      const part = built.getPart(`mbt90.hull.era_glacis_${kind}`);
+      expect(part, kind).toBeDefined();
+      expect(part!.def.explode?.direction, kind).toBeDefined();
+      return Number(part!.def.explode?.distance);
+    });
+    expect(new Set(distances).size).toBeGreaterThanOrEqual(4);
   });
 
   it("120mm 滑膛炮：热护套两段 + 抽烟装置 + 炮闩/制退机/复进机", () => {

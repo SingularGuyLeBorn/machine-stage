@@ -78,8 +78,10 @@ const FX_PARTS = [
 ];
 const ERA_PARTS = [
   "mbt90.hull.era_glacis_casing",
-  "mbt90.hull.era_glacis_explosive",
   "mbt90.hull.era_glacis_liner",
+  "mbt90.hull.era_glacis_explosive",
+  "mbt90.hull.era_glacis_flyer",
+  "mbt90.hull.era_glacis_cover",
   "mbt90.hull.era_glacis_bolt",
 ];
 const HIT_BLOCK = 12;
