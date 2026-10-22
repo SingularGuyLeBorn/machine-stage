@@ -20,6 +20,8 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_glass: { base: "#1b2b34", metalness: 0.5, roughness: 0.06, preset: "none", envMapIntensity: 1.9 },
   cv_radar: { base: "#c8ced0", metalness: 0.2, roughness: 0.4, preset: "primer", envMapIntensity: 1.1 },
   cv_radar_dark: { base: "#596368", metalness: 0.35, roughness: 0.55, preset: "primer", envMapIntensity: 0.8 },
+  cv_aesa: { base: "#354149", metalness: 0.18, roughness: 0.58, preset: "primer", envMapIntensity: 0.42 },
+  cv_aesa_tile: { base: "#8a969c", metalness: 0.22, roughness: 0.42, preset: "primer", envMapIntensity: 0.55 },
   cv_aircraft: { base: "#98a2a6", metalness: 1, roughness: 0.46, pbr: "plates", repeat: [3, 3], clearcoat: 0.28, clearcoatRoughness: 0.38, envMapIntensity: 1.2 },
   cv_aircraft_dark: { base: "#5a6469", metalness: 1, roughness: 0.56, pbr: "plates", repeat: [3, 3], envMapIntensity: 1.05 },
   cv_aircraft_belly: { base: "#d2d8da", metalness: 1, roughness: 0.48, pbr: "plates", repeat: [3, 3], envMapIntensity: 1.1 },

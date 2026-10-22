@@ -88,6 +88,70 @@ export function addIsland(ctx: CarrierCtx): void {
       material: "cv_hull",
       mate: A([x, y + 0.38, z - len / 2]),
     });
+    // 前向环绕窗带：4 扇玻璃 + 竖梃 + 窗台/窗楣（舰桥前视窗，不是实心墙）。
+    for (let w = 0; w < 4; w++) {
+      add({
+        id: `${P}bridge_${level + 1}_front_window_${w + 1}`,
+        name_cn: `舰岛 ${level + 1} 层前窗 ${w + 1}`,
+        name_en: `island front window ${level + 1}-${w + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(0.3, 0.3, 0.03, [0, 0, 0], 0.004)),
+        material: "cv_glass",
+        mate: A([x - 0.54 + w * 0.36, y + 0.45, z + len / 2 + 0.045]),
+      });
+    }
+    for (let m = 0; m < 3; m++) {
+      add({
+        id: `${P}bridge_${level + 1}_front_mullion_${m + 1}`,
+        name_cn: `舰岛 ${level + 1} 层前窗竖梃 ${m + 1}`,
+        name_en: `island front mullion ${level + 1}-${m + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(0.04, 0.34, 0.06, [0, 0, 0], 0.003)),
+        material: "cv_steel_dark",
+        mate: A([x - 0.36 + m * 0.36, y + 0.45, z + len / 2 + 0.05]),
+      });
+    }
+    for (const [tag, yy] of [["sill", 0.28], ["header", 0.62]] as const) {
+      add({
+        id: `${P}bridge_${level + 1}_front_${tag}`,
+        name_cn: `舰岛 ${level + 1} 层前窗${tag === "sill" ? "窗台" : "窗楣"}`,
+        name_en: `island front ${tag} ${level + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(width * 0.9, 0.03, 0.06, [0, 0, 0], 0.003)),
+        material: "cv_steel_dark",
+        mate: A([x, y + yy, z + len / 2 + 0.05]),
+      });
+    }
+    for (const side of [-1, 1] as const) {
+      const wx = x + side * (width / 2 + 0.05);
+      for (let m = 0; m < 4; m++) {
+        add({
+          id: `${P}bridge_${level + 1}_side_mullion_${side === -1 ? "p" : "s"}_${m + 1}`,
+          name_cn: `舰岛 ${level + 1} 层舷窗竖梃 ${m + 1}`,
+          name_en: `island side mullion ${level + 1}-${m + 1}`,
+          assembly: ASSEMBLY,
+          build_layer: 4,
+          geometry: M(B(0.05, 0.34, 0.05, [0, 0, 0], 0.003)),
+          material: "cv_steel_dark",
+          mate: A([wx, y + 0.45, z - 1.9 + m * 0.95 + 0.475]),
+        });
+      }
+      for (const [tag, yy] of [["sill", 0.28], ["header", 0.62]] as const) {
+        add({
+          id: `${P}bridge_${level + 1}_side_${tag}_${side === -1 ? "p" : "s"}`,
+          name_cn: `舰岛 ${level + 1} 层舷窗${tag === "sill" ? "窗台" : "窗楣"}`,
+          name_en: `island side ${tag} ${level + 1}`,
+          assembly: ASSEMBLY,
+          build_layer: 4,
+          geometry: M(B(0.05, 0.03, 4.9, [0, 0, 0], 0.003)),
+          material: "cv_steel_dark",
+          mate: A([wx, y + yy, z]),
+        });
+      }
+    }
     // 舰桥控制台/座椅/显控。
     for (let c = 0; c < 3; c++) {
       add({
@@ -113,12 +177,78 @@ export function addIsland(ctx: CarrierCtx): void {
     });
   }
 
+  // 右舷航行舰桥翼台：外伸格栅平台 + 斜撑 + 双层栏杆（真实可站立结构）。
+  {
+    const halfW = (1.62 - 0.1) / 2;
+    const wingY = baseY + 0.45 + 0.78 + 0.03;
+    const wingZ = z + 0.4;
+    const wx = x + halfW + 0.28;
+    add({
+      id: `${P}bridge_wing_platform`,
+      name_cn: "右舷舰桥翼台",
+      name_en: "starboard bridge wing",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.58, 0.06, 2.2, [0, 0, 0], 0.006)),
+      material: "cv_grate",
+      mate: A([wx, wingY, wingZ]),
+    });
+    for (const dz of [-0.8, 0.8] as const) {
+      add({
+        id: `${P}bridge_wing_brace_${dz < 0 ? "a" : "f"}`,
+        name_cn: `舰桥翼台斜撑 ${dz < 0 ? "后" : "前"}`,
+        name_en: `bridge wing brace ${dz < 0 ? "aft" : "fore"}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(0.5, 0.08, 0.08, [0, 0, 0], 0.004)),
+        material: "cv_steel",
+        mate: A([x + halfW + 0.16, wingY - 0.18, wingZ + dz], [0, 0, 45]),
+      });
+    }
+    for (const dz of [-0.95, -0.32, 0.32, 0.95] as const) {
+      add({
+        id: `${P}bridge_wing_post_${Math.round((dz + 1) * 10)}`,
+        name_cn: "舰桥翼台栏杆立柱",
+        name_en: "bridge wing rail post",
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(0.04, 0.2, 0.04, [0, 0, 0], 0.003), C(0.042, 0.03, [0, 0.1, 0], 10)),
+        material: "cv_steel",
+        mate: A([wx + 0.26, wingY + 0.1, wingZ + dz]),
+      });
+    }
+    for (const [tag, yy] of [["top", 0.2], ["mid", 0.1]] as const) {
+      add({
+        id: `${P}bridge_wing_rail_${tag}`,
+        name_cn: `舰桥翼台${tag === "top" ? "上" : "中"}栏杆`,
+        name_en: `bridge wing ${tag} rail`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(C(tag === "top" ? 0.016 : 0.014, 2.2, [0, 0, 0], 8)),
+        material: "cv_steel",
+        mate: A([wx + 0.26, wingY + yy, wingZ], [90, 0, 0]),
+      });
+    }
+    for (const dz of [-1.1, 1.1] as const) {
+      add({
+        id: `${P}bridge_wing_end_rail_${dz < 0 ? "a" : "f"}`,
+        name_cn: "舰桥翼台端栏杆",
+        name_en: "bridge wing end rail",
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(C(0.016, 0.58, [0, 0, 0], 8)),
+        material: "cv_steel",
+        mate: A([wx, wingY + 0.2, wingZ + dz], [0, 0, 90]),
+      });
+    }
+  }
+
   // 四面固定相控阵：前面/后面/左右舷。
   const panels = [
-    { key: "fwd", pos: [x, baseY + 2.35, z + 3.02] as const, rot: [0, 0, 0] as const },
-    { key: "aft", pos: [x, baseY + 2.35, z - 3.02] as const, rot: [0, Math.PI, 0] as const },
-    { key: "stbd", pos: [x + 1.08, baseY + 2.35, z] as const, rot: [0, Math.PI / 2, 0] as const },
-    { key: "port", pos: [x - 1.08, baseY + 2.35, z] as const, rot: [0, -Math.PI / 2, 0] as const },
+    { key: "fwd", pos: [x, baseY + 2.35, z + 3.02] as const, rot: [0, 0, 0] as const, behind: [0, 0, -0.08] as const },
+    { key: "aft", pos: [x, baseY + 2.35, z - 3.02] as const, rot: [0, Math.PI, 0] as const, behind: [0, 0, 0.08] as const },
+    { key: "stbd", pos: [x + 1.08, baseY + 2.35, z] as const, rot: [0, Math.PI / 2, 0] as const, behind: [-0.08, 0, 0] as const },
+    { key: "port", pos: [x - 1.08, baseY + 2.35, z] as const, rot: [0, -Math.PI / 2, 0] as const, behind: [0.08, 0, 0] as const },
   ];
   panels.forEach((panel, index) => {
     const tag = pad(index + 1);
@@ -139,7 +269,7 @@ export function addIsland(ctx: CarrierCtx): void {
       assembly: ASSEMBLY,
       build_layer: 4,
       geometry: { type: "kit", kit: "carrierTrTile", params: { s: 0.075, d: 0.035 } },
-      material: "cv_radar",
+      material: "cv_aesa_tile",
       mate: A([...panel.pos], [...panel.rot]),
       instances: 64,
       indexed: true,
@@ -159,7 +289,10 @@ export function addIsland(ctx: CarrierCtx): void {
       build_layer: 4,
       geometry: M(B(1.05, 0.76, 0.04, [0, 0, 0], 0.004)),
       material: "cv_copper",
-      mate: A([...panel.pos].map((v, i) => (i === 2 ? v - 0.08 : v)) as [number, number, number], [...panel.rot]),
+      mate: A(
+        [panel.pos[0] + panel.behind[0], panel.pos[1] + panel.behind[1], panel.pos[2] + panel.behind[2]],
+        [...panel.rot],
+      ),
     });
   });
 
