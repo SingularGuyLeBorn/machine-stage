@@ -122,6 +122,11 @@ export interface PartDefinition {
   instance_layout?: string;
   /** 双侧件：自动展开为左右两件（右侧 x 镜像），命名 <id>_l / <id>_r。 */
   dual?: boolean;
+  /**
+   * 零件级爆炸方向/距离（模型空间，优先于总成 explode）。
+   * 用于夹层结构（如 ERA 的前盖/炸药/飞板/背板）沿各自法线分层展开。
+   */
+  explode?: { direction: ExprVec3; distance?: Expr };
   /** 穿模时的人工提示（缺省由检测器按 mate/constants 自动生成）。 */
   hint?: string;
   /**

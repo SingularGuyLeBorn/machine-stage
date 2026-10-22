@@ -1028,40 +1028,47 @@ function buildParts(): PartDefinition[] {
   });
 
   // ================= ERA 反应装甲 =================
+  // 每块是盒式夹层：壳体框架 → 背板/钝感夹层 → 钝感炸药 → 前飞板 → 可拆前盖 → 螺栓。
+  // 零件级 explode 让爆炸视图沿各自法线分层展开，而不是整块一起平移。
+  const eraLayers = [
+    { key: "casing", name: "壳体框架", material: "mbt_era_steel", kit: "eraCasing", distance: 0.1 },
+    { key: "liner", name: "背板/钝感夹层", material: "mbt_steel_dark", kit: "eraLiner", distance: 0.14 },
+    { key: "explosive", name: "钝感炸药", material: "mbt_explosive", kit: "eraExplosive", distance: 0.2 },
+    { key: "flyer", name: "前飞板", material: "mbt_steel", kit: "eraFlyer", distance: 0.26 },
+    { key: "cover", name: "可拆前盖", material: "mbt_era_steel", kit: "eraCover", distance: 0.32 },
+  ] as const;
   for (const g of ERA_GROUPS) {
     const layout = `mbt.hull.era_${g.key}`;
     const [w, h, d] = g.size;
-    for (const [key, name, mat] of [
-      ["casing", "外壳", "mbt_era_steel"],
-      ["explosive", "钝感炸药", "mbt_explosive"],
-      ["liner", "钝感夹层", "mbt_ERA"],
-    ] as const) {
+    const explodeDir = rotated(g.rot, [0, 0, 1]);
+    for (const layer of eraLayers) {
       add({
-        id: `${P}era_${g.key}_${key}`,
-        name_cn: `ERA ${g.key} ${name}`,
-        name_en: `ERA ${g.key} ${key}`,
+        id: `${P}era_${g.key}_${layer.key}`,
+        name_cn: `ERA ${g.key} ${layer.name}`,
+        name_en: `ERA ${g.key} ${layer.key}`,
         assembly: "era",
         build_layer: 5,
         build_order: 620,
-        geometry: key === "casing" ? { type: "kit", kit: "eraCasing", params: { w, h, d } } : key === "explosive" ? { type: "kit", kit: "eraExplosive", params: { w: w * 0.9, h: h * 0.82, d: d * 0.7 } } : { type: "kit", kit: "eraLiner", params: { w: w * 0.95, h: h * 0.9, d: d * 0.1 } },
-        material: key === "liner" ? "mbt_steel_dark" : mat,
+        geometry: { type: "kit", kit: layer.kit, params: { w, h, d } },
+        material: layer.material,
         node: g.node,
         mate: A([0, 0, 0]),
         instances: g.cols * g.rows,
         indexed: true,
         instance_layout: layout,
         instance_nodes: g.node ? Array.from({ length: g.cols * g.rows }, () => g.node!) : undefined,
-        source: "ERA 反应装甲块：外壳 + 钝感炸药 + 背层；被击中时整块爆炸，推开来袭弹。",
+        explode: { direction: explodeDir, distance: layer.distance },
+        source: "ERA 反应装甲块：壳体框架/背板/钝感炸药/前飞板/可拆前盖/螺栓，被击中时整块爆炸并推开来袭弹。",
       });
     }
     add({
       id: `${P}era_${g.key}_bolt`,
-      name_cn: `ERA ${g.key} 安装螺栓`,
+      name_cn: `ERA ${g.key} 前盖螺栓`,
       name_en: `ERA ${g.key} bolt`,
       assembly: "era",
       build_layer: 5,
       build_order: 621,
-      geometry: MERGE(C(0.012, 0.03, [0, 0, 0], 8), C(0.017, 0.006, [0, 0.018, 0], 8)),
+      geometry: { type: "kit", kit: "eraBolt", params: { w, h, d } },
       material: "mbt_steel",
       node: g.node,
       mate: A([0, 0, 0]),
@@ -1069,6 +1076,7 @@ function buildParts(): PartDefinition[] {
       indexed: true,
       instance_layout: layout,
       instance_nodes: g.node ? Array.from({ length: g.cols * g.rows }, () => g.node!) : undefined,
+      explode: { direction: explodeDir, distance: 0.32 },
     });
   }
   add({
@@ -1086,6 +1094,7 @@ function buildParts(): PartDefinition[] {
     indexed: true,
     instance_layout: "mbt.hull.eraRail",
     instance_nodes: ["Turret", "Turret"],
+    explode: { direction: [0, 1.2, 0.8], distance: 0 },
   });
 
   // ================= 表面 / 附件 =================
@@ -1278,8 +1287,7 @@ export function makeHullRegistry(): ModelRegistry {
     materials: MBT_MATERIALS,
     parts: buildParts(),
     source_notes:
-      "现代主战坦克外壳：首上 33.7° 浅倾角、外凸楔形炮塔（±26° 前斜板）、复合装甲分层（钢/陶瓷/间隔/背板）、132 块 ERA（每块外壳+炸药+夹层）。" +
-      "120mm 滑膛炮：无膛线身管、两段热护套、中段抽烟装置、炮闩/制退机/复进机/摇臂；三色迷彩、战术编号、随车工具、油桶、缆绳。",
+      "现代主战坦克外壳：首上 33.7° 浅倾角、外凸楔形炮塔（±26° 前斜板）、复合装甲分层（钢/陶瓷/间隔/背板）、132 块盒式 ERA（壳体/背板/炸药/飞板/前盖）、120mm 滑膛炮：无膛线身管、两段热护套、中段抽烟装置、炮闩/制退机/复进机/摇臂；三色迷彩、战术编号、随车工具、油桶、缆绳。",
     expectedContacts: CONTACTS,
   };
 }

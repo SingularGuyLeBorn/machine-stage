@@ -133,30 +133,134 @@ const compositePlate: GeometryBuilder = (spec) => {
   return mergeGeometries(parts);
 };
 
-/** ERA 外壳：钢板盒 + 压条 + 安装耳（法线 +Z）。 */
+/** ERA 盒式夹层的分层尺寸（局部 +Z = 法线向外）。 */
+function eraLayers(d: number) {
+  const back = Math.min(0.018, d * 0.14);
+  const coverT = Math.min(0.016, d * 0.12);
+  const wall = Math.min(0.02, d * 0.14);
+  const z0 = -d / 2 + back;
+  const z1 = d / 2 - coverT - 0.002;
+  const cavity = Math.max(0.03, z1 - z0);
+  const linerT = Math.min(0.012, cavity * 0.12);
+  const flyerT = Math.min(0.012, cavity * 0.12);
+  const gap = 0.003;
+  const explosiveT = Math.max(0.02, cavity - linerT - flyerT - gap * 2 - 0.006);
+  return {
+    back,
+    coverT,
+    wall,
+    z0,
+    z1,
+    linerT,
+    flyerT,
+    explosiveT,
+    linerZ: z0 + linerT / 2,
+    explosiveZ: z0 + linerT + gap + explosiveT / 2,
+    flyerZ: z0 + linerT + gap + explosiveT + gap + flyerT / 2,
+  };
+}
+
+/** ERA 外壳：开口钢盒（背板 + 四周框 + 安装耳），前面留出夹层腔。 */
 const eraCasing: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
   const w = num(p, "w", 0.4);
   const h = num(p, "h", 0.24);
   const d = num(p, "d", 0.12);
+  const { back, wall } = eraLayers(d);
   const parts: THREE.BufferGeometry[] = [];
-  parts.push(bevelBoxGeometry(w, h, d, 0.006));
-  parts.push(bevelBoxGeometry(w * 0.9, 0.02, d + 0.012, 0.003).translate(0, h * 0.36, 0));
-  parts.push(bevelBoxGeometry(w * 0.9, 0.02, d + 0.012, 0.003).translate(0, -h * 0.36, 0));
-  for (const x of [-w * 0.36, w * 0.36]) {
-    parts.push(bevelBoxGeometry(0.06, 0.03, d + 0.04, 0.003).translate(x, -h / 2 + 0.015, 0));
+  parts.push(bevelBoxGeometry(w, h, back, 0.004).translate(0, 0, -d / 2 + back / 2));
+  const frameDepth = d - back;
+  const frameZ = back / 2;
+  parts.push(bevelBoxGeometry(w, wall, frameDepth, 0.002).translate(0, h / 2 - wall / 2, frameZ));
+  parts.push(bevelBoxGeometry(w, wall, frameDepth, 0.002).translate(0, -h / 2 + wall / 2, frameZ));
+  parts.push(bevelBoxGeometry(wall, h - wall * 2, frameDepth, 0.002).translate(-w / 2 + wall / 2, 0, frameZ));
+  parts.push(bevelBoxGeometry(wall, h - wall * 2, frameDepth, 0.002).translate(w / 2 - wall / 2, 0, frameZ));
+  // 外置加强筋（压在上下框上，不穿内腔）
+  for (const y of [h / 2 - 0.012, -h / 2 + 0.012]) {
+    parts.push(bevelBoxGeometry(w, 0.018, d + 0.008, 0.002).translate(0, y, 0.002));
   }
+  // 两个背面安装耳，压在装甲/安装轨上
+  for (const x of [-w * 0.36, w * 0.36]) {
+    parts.push(bevelBoxGeometry(0.06, 0.03, back + 0.03, 0.002).translate(x, -h / 2 + 0.015, -d / 2 - 0.005));
+  }
+  return mergeGeometries(parts);
+};
+
+/** ERA 前盖：可拆下的薄钢盖 + 两道横向压筋。 */
+const eraCover: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.4);
+  const h = num(p, "h", 0.24);
+  const d = num(p, "d", 0.12);
+  const { coverT } = eraLayers(d);
+  const parts: THREE.BufferGeometry[] = [];
+  parts.push(bevelBoxGeometry(w, h, coverT, 0.004).translate(0, 0, d / 2 - coverT / 2));
+  for (const y of [h * 0.32, -h * 0.32]) {
+    parts.push(bevelBoxGeometry(w * 0.92, 0.016, 0.012, 0.002).translate(0, y, d / 2 + 0.006));
+  }
+  parts.push(bevelBoxGeometry(0.02, h * 0.7, 0.008, 0.002).translate(0, 0, d / 2 + 0.005));
   return mergeGeometries(parts);
 };
 
 const eraExplosive: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
-  return bevelBoxGeometry(num(p, "w", 0.36), num(p, "h", 0.2), num(p, "d", 0.085), 0.004);
+  const w = num(p, "w", 0.4);
+  const h = num(p, "h", 0.24);
+  const d = num(p, "d", 0.12);
+  const { wall, explosiveT, explosiveZ } = eraLayers(d);
+  return bevelBoxGeometry(w - wall * 2 - 0.012, h - wall * 2 - 0.012, explosiveT, 0.003).translate(
+    0,
+    0,
+    explosiveZ,
+  );
 };
 
+/** 前飞板：爆炸时被推向来弹方向的钢板。 */
+const eraFlyer: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.4);
+  const h = num(p, "h", 0.24);
+  const d = num(p, "d", 0.12);
+  const { wall, flyerT, flyerZ } = eraLayers(d);
+  return bevelBoxGeometry(w - wall * 2 - 0.006, h - wall * 2 - 0.006, flyerT, 0.002).translate(
+    0,
+    0,
+    flyerZ,
+  );
+};
+
+/** 背板/钝感夹层：贴在壳体背板上。 */
 const eraLiner: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
-  return bevelBoxGeometry(num(p, "w", 0.38), num(p, "h", 0.22), num(p, "d", 0.012), 0.002);
+  const w = num(p, "w", 0.4);
+  const h = num(p, "h", 0.24);
+  const d = num(p, "d", 0.12);
+  const { wall, linerT, linerZ } = eraLayers(d);
+  return bevelBoxGeometry(w - wall * 2 - 0.004, h - wall * 2 - 0.004, linerT, 0.002).translate(
+    0,
+    0,
+    linerZ,
+  );
+};
+
+/** ERA 前盖螺栓 ×2（轴 +Z）。 */
+const eraBolt: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.4);
+  const h = num(p, "h", 0.24);
+  const d = num(p, "d", 0.12);
+  const parts: THREE.BufferGeometry[] = [];
+  for (const x of [-w * 0.32, w * 0.32]) {
+    const shaft = cylinderGeometry(0.011, 0.012, 0.011, 10, 0.001);
+    shaft.rotateX(Math.PI / 2);
+    shaft.translate(x, -h * 0.34, d / 2 + 0.008);
+    parts.push(shaft);
+    const head = cylinderGeometry(0.018, 0.006, 0.018, 10, 0.001);
+    head.rotateX(Math.PI / 2);
+    head.translate(x, -h * 0.34, d / 2 + 0.017);
+    parts.push(head);
+  }
+  return mergeGeometries(parts);
 };
 
 /** 尾篮：框架 + 底网。 */
@@ -258,8 +362,11 @@ export const mbtHullKitBuilders: Record<string, GeometryBuilder> = {
   mantlet,
   compositePlate,
   eraCasing,
+  eraCover,
   eraExplosive,
+  eraFlyer,
   eraLiner,
+  eraBolt,
   bustleRack,
   smokeCluster,
   weldSeam,

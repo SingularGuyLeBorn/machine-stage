@@ -49,6 +49,21 @@ export function explodeOffsetOf(
   handle: PartHandle,
   factor: number,
 ): THREE.Vector3 {
+  // 零件级方向：ERA 夹层这类需要沿各自法线分层，不受总成方向影响。
+  if (handle.def.explode) {
+    const resolved = resolveSpec(handle.def.explode.direction, assembled.constants) as [
+      number,
+      number,
+      number,
+    ];
+    const distance =
+      handle.def.explode.distance === undefined
+        ? EXPLODE_STEP_M
+        : Number(resolveSpec(handle.def.explode.distance, assembled.constants));
+    scratchVector.set(resolved[0], resolved[1], resolved[2]);
+    if (scratchVector.lengthSq() === 0) scratchVector.set(0, 1, 0);
+    return scratchVector.normalize().multiplyScalar(distance * factor);
+  }
   const dir = directionMap(assembled).get(handle.assembly) ?? new THREE.Vector3(0, 1, 0);
   return scratchVector.copy(dir).multiplyScalar((handle.buildLayer - 1) * EXPLODE_STEP_M * factor);
 }
