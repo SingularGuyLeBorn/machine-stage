@@ -141,9 +141,13 @@ const base = makeAk47Registry();
 const order = makeOrder(700);
 
 const clonePart = (p: PartDefinition): PartDefinition => {
-  const mate = p.mate && "to" in p.mate
+  let mate = p.mate && "to" in p.mate
     ? { ...p.mate, to: String(p.mate.to).replace(/^ak47\./, "bison.") }
     : p.mate;
+  if (p.id === "ak47.furniture.grip" && mate && "position" in mate) {
+    const pos = mate.position as [number, number, number];
+    mate = { ...mate, position: [-0.022, pos[1], pos[2]] };
+  }
   const instanceNodes = p.instance_nodes?.map((n) => n);
   return {
     ...p,

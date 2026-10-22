@@ -10,7 +10,7 @@ import { GUN_MATERIALS } from "../guns/materials";
 // ============================================================================
 
 const BLUED_DEEP: MaterialSpec = {
-  base: "#d5dce4",
+  base: "#a8b2be",
   metalness: 1,
   roughness: 0.2,
   preset: "steel",
@@ -21,7 +21,7 @@ const BLUED_DEEP: MaterialSpec = {
 };
 
 const BLUED_WEAR: MaterialSpec = {
-  base: "#e2e8ef",
+  base: "#bcc4cd",
   metalness: 1,
   roughness: 0.24,
   preset: "steel_rough",
@@ -32,7 +32,7 @@ const BLUED_WEAR: MaterialSpec = {
 };
 
 const PHOSPHATE: MaterialSpec = {
-  base: "#ccd2c6",
+  base: "#b2b8ac",
   metalness: 1,
   roughness: 0.5,
   preset: "steel_rough",
@@ -43,7 +43,7 @@ const PHOSPHATE: MaterialSpec = {
 };
 
 const PHOSPHATE_GREEN: MaterialSpec = {
-  base: "#cbd4c4",
+  base: "#b1b9a9",
   metalness: 1,
   roughness: 0.52,
   preset: "steel_rough",
@@ -54,7 +54,7 @@ const PHOSPHATE_GREEN: MaterialSpec = {
 };
 
 const PARKERIZED: MaterialSpec = {
-  base: "#c8cdd0",
+  base: "#b0b5b8",
   metalness: 1,
   roughness: 0.42,
   preset: "steel_rough",
@@ -65,7 +65,7 @@ const PARKERIZED: MaterialSpec = {
 };
 
 const MACHINED: MaterialSpec = {
-  base: "#e2e6ea",
+  base: "#ccd2d8",
   metalness: 1,
   roughness: 0.2,
   preset: "steel",
@@ -76,7 +76,7 @@ const MACHINED: MaterialSpec = {
 };
 
 const WEAR_EDGE: MaterialSpec = {
-  base: "#d8dde1",
+  base: "#c4cad0",
   metalness: 1,
   roughness: 0.28,
   preset: "steel",
@@ -87,7 +87,7 @@ const WEAR_EDGE: MaterialSpec = {
 };
 
 const SPRING_STEEL: MaterialSpec = {
-  base: "#c2c8ce",
+  base: "#b0b6bc",
   metalness: 1,
   roughness: 0.4,
   preset: "steel_rough",
@@ -134,7 +134,7 @@ const COPPER_JACKET: MaterialSpec = {
 };
 
 const LEAD_CORE: MaterialSpec = {
-  base: "#c3cad2",
+  base: "#b6bdc6",
   metalness: 1,
   roughness: 0.5,
   preset: "steel_rough",
@@ -144,7 +144,7 @@ const LEAD_CORE: MaterialSpec = {
 };
 
 const STEEL_CORE: MaterialSpec = {
-  base: "#e8ecef",
+  base: "#d6dce2",
   metalness: 1,
   roughness: 0.22,
   preset: "steel",

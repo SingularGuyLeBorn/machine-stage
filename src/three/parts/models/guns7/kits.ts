@@ -4,6 +4,7 @@ import {
   bevelBoxGeometry,
   cylinderGeometry,
   latheGeometry,
+  loftGeometry,
   mergeGeometries,
   plateGeometry,
   sphereGeometry,
@@ -555,6 +556,172 @@ const boxMagShell: GeometryBuilder = (spec) => {
 // （弹药的实例布局由各枪 registry 里的 layout 函数负责。）
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// stampedShell —— 冲压/机加工机匣外壳（AK/Bison/M60/M2HB/M134 共用）。
+//
+// 旧版这些机匣都是「一个方块 + 两片平板」，侧看就是积木。这里做真正的
+// 冲压件：截面是**圆角矩形**（squareness 决定方/圆程度），沿枪身方向挤出，
+// 壁上带纵向加强筋、铆钉列，前端可收窄；顶部开口型（gap）就是 AK 的
+// 弧形顶盖——外壳有真实的圆角与筋条，不再是直角盒子。
+//
+// 局部系：origin = 截面中心（X/Y 原点），+Z 枪口方向；z0..z1 为壳体范围。
+// ---------------------------------------------------------------------------
+const stampedShell: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.046);
+  const top = num(p, "top", 0.03);
+  const bottom = num(p, "bottom", -0.03);
+  const z0 = num(p, "z0", -0.2);
+  const z1 = num(p, "z1", 0.05);
+  const wall = num(p, "wall", 0.0024);
+  const squareness = num(p, "squareness", 0.72);
+  const gapStart = typeof p?.gapStart === "number" ? (p.gapStart as number) : null;
+  const gapEnd = typeof p?.gapEnd === "number" ? (p.gapEnd as number) : null;
+  const ribCount = num(p, "ribCount", 0);
+  const ribDepth = num(p, "ribDepth", 0.0016);
+  const ribWidth = num(p, "ribWidth", 0.005);
+  const ribTop = num(p, "ribTop", 0.012);
+  const ribBottom = num(p, "ribBottom", -0.012);
+  const ribZ0 = num(p, "ribZ0", z0 + 0.01);
+  const ribZ1 = num(p, "ribZ1", z1 - 0.01);
+  const rivetCount = num(p, "rivetCount", 0);
+  const rivetY = num(p, "rivetY", 0.014);
+  const rivetZ0 = num(p, "rivetZ0", z0 + 0.012);
+  const rivetZ1 = num(p, "rivetZ1", z1 - 0.012);
+  const frontTaper = num(p, "frontTaper", 0);
+  const frontDrop = num(p, "frontDrop", 0);
+
+  const len = z1 - z0;
+  const halfW = w / 2;
+  const cy = (top + bottom) / 2;
+  const halfTop = top - cy;
+  const halfBottom = cy - bottom;
+  const exponent = 2 / Math.max(0.08, 1 - squareness * 0.78);
+
+  const pointAt = (theta: number, inset: number): [number, number] => {
+    const c = Math.cos(theta);
+    const s = Math.sin(theta);
+    const hw = Math.max(halfW - inset, 0.003);
+    const ht = Math.max(halfTop - inset, 0.003);
+    const hb = Math.max(halfBottom - inset, 0.003);
+    const x = Math.sign(c) * Math.pow(Math.abs(c), exponent) * hw;
+    const y = cy + Math.sign(s) * Math.pow(Math.abs(s), exponent) * (s >= 0 ? ht : hb);
+    return [x, y];
+  };
+
+  const parts: THREE.BufferGeometry[] = [];
+  const segments = 72;
+  const hasGap = gapStart !== null && gapEnd !== null;
+  const outer: Array<[number, number]> = [];
+  const inner: Array<[number, number]> = [];
+  if (hasGap) {
+    // 开口型：只保留 gapEnd → gapStart+2π 的弧，形成 C/U 形壳
+    for (let i = 0; i <= segments; i++) {
+      const a = (gapEnd as number) + ((Math.PI * 2 - ((gapEnd as number) - (gapStart as number))) * i) / segments;
+      outer.push(pointAt(a, 0));
+      inner.push(pointAt(a, wall));
+    }
+  } else {
+    for (let i = 0; i <= segments; i++) {
+      const a = (Math.PI * 2 * i) / segments;
+      outer.push(pointAt(a, 0));
+      inner.push(pointAt(a, wall));
+    }
+  }
+
+  const shape = new THREE.Shape();
+  shape.moveTo(outer[0][0], outer[0][1]);
+  for (let i = 1; i < outer.length; i++) shape.lineTo(outer[i][0], outer[i][1]);
+  for (let i = inner.length - 1; i >= 0; i--) shape.lineTo(inner[i][0], inner[i][1]);
+  shape.closePath();
+  const shell = new THREE.ExtrudeGeometry(shape, {
+    depth: len,
+    bevelEnabled: true,
+    bevelThickness: 0.0006,
+    bevelSize: 0.0006,
+    bevelSegments: 1,
+    curveSegments: 64,
+    steps: 1,
+  });
+  shell.translate(0, 0, z0);
+  parts.push(shell);
+
+  // 纵向加强筋：沿两侧的浅凸台（冲压件上的压筋），不是贴图。
+  if (ribCount > 0) {
+    const ribH = ribTop - ribBottom;
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < ribCount; i++) {
+        const y = ribCount === 1 ? (ribTop + ribBottom) / 2 : ribBottom + (ribH * i) / (ribCount - 1);
+        const rib = bevelBoxGeometry(ribDepth, ribWidth, ribZ1 - ribZ0, 0.0004, 1);
+        rib.translate(side * (halfW + ribDepth / 2 - 0.0004), y, (ribZ0 + ribZ1) / 2);
+        parts.push(rib);
+      }
+    }
+  }
+
+  // 铆钉/螺钉列：机匣壳体上的紧固件。
+  if (rivetCount > 0) {
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < rivetCount; i++) {
+        const z = rivetCount === 1 ? (rivetZ0 + rivetZ1) / 2 : rivetZ0 + ((rivetZ1 - rivetZ0) * i) / (rivetCount - 1);
+        const rivet = cylinderGeometry(0.0018, 0.0016, 0.0018, 12);
+        rivet.rotateZ(Math.PI / 2);
+        rivet.translate(side * (halfW + 0.0004), rivetY, z);
+        parts.push(rivet);
+      }
+    }
+  }
+
+  // 前端收口：真实机匣前端会向枪管收窄，做成斜切端面。
+  if (frontTaper > 0) {
+    const nose = new THREE.Shape();
+    const half = halfW * (1 - frontTaper);
+    nose.moveTo(-half, bottom + frontDrop);
+    nose.lineTo(half, bottom + frontDrop);
+    nose.lineTo(halfW * 0.99, top);
+    nose.lineTo(-halfW * 0.99, top);
+    nose.closePath();
+    const cap = new THREE.ExtrudeGeometry(nose, {
+      depth: 0.004,
+      bevelEnabled: true,
+      bevelThickness: 0.0005,
+      bevelSize: 0.0005,
+      bevelSegments: 1,
+      steps: 1,
+    });
+    cap.translate(0, 0, z1 - 0.004);
+    parts.push(cap);
+  }
+
+  return merge(parts);
+};
+
+// ---------------------------------------------------------------------------
+// woodHandguard —— 木护木（AK / RPK / M60 共用）。
+//
+// 旧版是「一段没有厚度的圆筒壳」，看上去就是一根塑料管。这里用超椭圆
+// 放样出**实木护木**：截面是圆角矩形，顶部有与枪管同轴的凹槽（枪管坐
+// 进去），前端收窄、后端略宽，端面封口并带倒角。
+// 局部系：origin = 后端面中心（顶面），+Z 枪口。
+// ---------------------------------------------------------------------------
+const woodHandguard: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const len = num(p, "len", 0.15);
+  const w = num(p, "w", 0.046);
+  const h = num(p, "h", 0.032);
+  const grooveWidth = num(p, "grooveWidth", 0.013);
+  const grooveDepth = num(p, "grooveDepth", 0.008);
+  const sections = [
+    { z: 0, width: w, top: 0, bottom: -h, squareness: 0.6, grooveWidth, grooveDepth },
+    { z: len * 0.08, width: w * 0.99, top: -0.0008, bottom: -h * 0.99, squareness: 0.6, grooveWidth, grooveDepth },
+    { z: len * 0.5, width: w * 0.98, top: -0.0016, bottom: -h * 0.96, squareness: 0.58, grooveWidth, grooveDepth },
+    { z: len * 0.88, width: w * 0.94, top: -0.0026, bottom: -h * 0.9, squareness: 0.56, grooveWidth, grooveDepth },
+    { z: len - 0.006, width: w * 0.9, top: -0.0034, bottom: -h * 0.84, squareness: 0.54, grooveWidth, grooveDepth },
+    { z: len, width: w * 0.86, top: -0.004, bottom: -h * 0.8, squareness: 0.52, grooveWidth, grooveDepth },
+  ];
+  return loftGeometry(sections, 48, true, true);
+};
+
 export const gun7Kits: Record<string, GeometryBuilder> = {
   // 复用旧共享库中仍然正确的通用件（弹簧/弹药/焰/弹链/脚架/护木）
   ammoBullet: gunKitBuilders.ammoBullet,
@@ -585,6 +752,8 @@ export const gun7Kits: Record<string, GeometryBuilder> = {
   sightLeaf,
   triggerGuard,
   boxMagShell,
+  stampedShell,
+  woodHandguard,
 };
 
 /** 便捷几何：沿 Z 的圆柱（r/h 参数），原点在中心。 */

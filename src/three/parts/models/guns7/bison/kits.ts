@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { GeometryBuilder } from "../../../assembler/geometry";
-import { ball, box, cylinderX, cylinderY, cylinderZ, mergeAll, torusZ, tubeZ } from "../kits";
+import { ball, box, cylinderX, cylinderY, cylinderZ, latheGeometry, mergeAll, torusZ, tubeZ } from "../kits";
 
 // ============================================================================
 // models/guns7/bison/kits — PP-19 野牛专用几何
@@ -223,46 +223,139 @@ export const bisonDrumHanger: GeometryBuilder = () => {
 };
 
 /** 展示台底座（含毛毡垫）——与三八大盖同一视觉语言。 */
+// ---------------------------------------------------------------------------
+// bisonStandBase —— 机加工展示台底座（取代原来的长木板）。
+// 阶梯底座 + 两个立柱安装凸台 + 铭牌座，像 Type38 的展示台那样是钢件，
+// 不再是木板。
+// ---------------------------------------------------------------------------
 export const bisonStandBase: GeometryBuilder = () => {
   const parts: THREE.BufferGeometry[] = [];
-  const base = box(0.64, 0.012, 0.26, 0.002);
-  base.translate(0, 0.006, 0);
-  parts.push(base);
-  const top = box(0.62, 0.003, 0.24, 0.0008);
-  top.translate(0, 0.0135, 0);
-  parts.push(top);
+  // 下层地脚：外扩 12mm，圆角 6mm
+  const foot = box(0.66, 0.006, 0.28, 0.006);
+  foot.translate(0, 0.003, 0);
+  parts.push(foot);
+  // 上层台面：收窄 16mm，顶部留 2mm 机加工亮边
+  const deck = box(0.62, 0.006, 0.24, 0.004);
+  deck.translate(0, 0.009, 0);
+  parts.push(deck);
+  const topPlate = box(0.58, 0.002, 0.22, 0.002);
+  topPlate.translate(0, 0.013, 0);
+  parts.push(topPlate);
+  // 立柱安装凸台：与两个托架中心对应
+  for (const z of [-0.235, 0.16]) {
+    const boss = cylinderY(0.032, 0.008, 40);
+    boss.translate(0, 0.017, z);
+    parts.push(boss);
+    const chamfer = latheGeometry(
+      [
+        [0.032, 0],
+        [0.032, 0.004],
+        [0.029, 0.008],
+        [0.024, 0.008],
+        [0, 0.008],
+      ],
+      40,
+    );
+    chamfer.translate(0, 0.013, z);
+    parts.push(chamfer);
+  }
+  // 前部铭牌座
+  const plaque = box(0.10, 0.002, 0.035, 0.0015);
+  plaque.translate(0, 0.014, 0.06);
+  parts.push(plaque);
+  // 防滑槽
+  for (const side of [-1, 1]) {
+    const groove = box(0.56, 0.0012, 0.006, 0.0003);
+    groove.translate(0, 0.0012, side * 0.09);
+    parts.push(groove);
+  }
   return mergeAll(parts);
 };
-
+// ---------------------------------------------------------------------------
+// bisonStandPost —— 车削圆立柱（取代原来的方木柱）。
+// ---------------------------------------------------------------------------
 export const bisonStandPost: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
   const h = num(p, "h", 0.16);
   const parts: THREE.BufferGeometry[] = [];
-  const post = box(0.03, h, 0.04, 0.0016);
-  post.translate(0, h / 2, 0);
+  const postH = Math.max(h - 0.03, 0.04);
+  const post = cylinderY(0.010, postH, 40);
+  post.translate(0, 0.015 + postH / 2, 0);
   parts.push(post);
-  const foot = box(0.06, 0.008, 0.07, 0.0012);
-  foot.translate(0, 0.004, 0);
+  const foot = cylinderY(0.028, 0.010, 40);
+  foot.translate(0, 0.005, 0);
   parts.push(foot);
+  const footChamfer = latheGeometry(
+    [
+      [0.028, 0],
+      [0.028, 0.005],
+      [0.025, 0.008],
+      [0.016, 0.010],
+      [0, 0.010],
+    ],
+    40,
+  );
+  footChamfer.translate(0, 0, 0);
+  parts.push(footChamfer);
+  const collar = cylinderY(0.015, 0.008, 40);
+  collar.translate(0, 0.015 + postH + 0.004, 0);
+  parts.push(collar);
+  const topCollar = cylinderY(0.014, 0.007, 40);
+  topCollar.translate(0, 0.015 + postH, 0);
+  parts.push(topCollar);
+  // 锁紧手柄
+  const knobStem = cylinderX(0.004, 0.026, 20);
+  knobStem.translate(0.016, 0.015 + postH * 0.5, 0);
+  parts.push(knobStem);
+  const knob = latheGeometry(
+    [
+      [0, -0.006],
+      [0.010, -0.006],
+      [0.012, -0.003],
+      [0.012, 0.003],
+      [0.010, 0.006],
+      [0, 0.006],
+    ],
+    24,
+  );
+  knob.rotateZ(Math.PI / 2);
+  knob.translate(0.030, 0.015 + postH * 0.5, 0);
+  parts.push(knob);
   return mergeAll(parts);
 };
-
+// ---------------------------------------------------------------------------
+// bisonStandCradle —— 机加工 V 形托块（取代原来的两块斜板）。
+// ---------------------------------------------------------------------------
 export const bisonStandCradle: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
   const span = num(p, "span", 0.036);
   const parts: THREE.BufferGeometry[] = [];
-  for (const side of [-1, 1]) {
-    const arm = box(0.010, 0.036, 0.045, 0.001);
-    arm.rotateZ(side * 0.42);
-    arm.translate(side * span * 0.5, 0.010, 0);
-    parts.push(arm);
-  }
-  const saddle = box(0.014, 0.008, 0.045, 0.0008);
-  saddle.translate(0, -0.004, 0);
-  parts.push(saddle);
+  const halfW = span / 2;
+  const shape = new THREE.Shape();
+  shape.moveTo(-halfW, -0.03);
+  shape.lineTo(halfW, -0.03);
+  shape.lineTo(halfW, 0.0);
+  shape.lineTo(0.012, 0.0);
+  shape.lineTo(0, -0.014);
+  shape.lineTo(-0.012, 0.0);
+  shape.lineTo(-halfW, 0.0);
+  shape.closePath();
+  const block = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.045,
+    bevelEnabled: true,
+    bevelThickness: 0.0012,
+    bevelSize: 0.0012,
+    bevelSegments: 2,
+    curveSegments: 8,
+    steps: 1,
+  });
+  block.translate(0, 0, -0.0225);
+  parts.push(block);
+  const washer = cylinderY(0.018, 0.004, 32);
+  washer.translate(0, -0.032, 0);
+  parts.push(washer);
   return mergeAll(parts);
 };
-
 /** 机匣全包外壳：AK 冲压机匣外面再套一层封闭壳体，盖住枪机框/复进簧。 */
 export const bisonReceiverShell: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;

@@ -499,11 +499,17 @@ export function loftGeometry(
       centerY +
       Math.sign(s) * Math.pow(Math.abs(s), exponent) * (s >= 0 ? halfTop : halfBottom);
     if (s >= 0 && (section.grooveWidth ?? 0) > 0 && (section.grooveDepth ?? 0) > 0) {
-      // 顶面枪管槽：中心最深，向两侧平滑收平。真实护木不是平顶，而是
-      // 一条与枪管同轴的圆弧槽；这样枪管与木托是「坐进槽里」，不是穿模。
-      const gw = Math.max(section.grooveWidth ?? 0, 1e-4);
-      const dent = Math.exp(-Math.pow(Math.abs(px) / gw, 4)) * (section.grooveDepth ?? 0);
-      py -= dent;
+      // 顶面枪管槽：用一段**圆弧**从顶面"切"进去（min 取低），
+      // 得到真正的圆弧马鞍槽；枪管坐在槽里，而不是浮在木头上方。
+      // grooveWidth = 槽的半径（半宽），grooveDepth = 槽深。
+      const r = Math.max(section.grooveWidth ?? 0, 1e-4);
+      const depth = Math.min(section.grooveDepth ?? 0, r);
+      const d = Math.abs(px);
+      if (d < r) {
+        const centerY = section.top - depth + r;
+        const surf = centerY - Math.sqrt(Math.max(0, r * r - d * d));
+        py = Math.min(py, surf);
+      }
     }
     return [(section.cx ?? 0) + px, py, section.z];
   };

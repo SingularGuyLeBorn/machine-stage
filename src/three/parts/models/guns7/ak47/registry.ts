@@ -4,6 +4,7 @@ import type { GeometryBuilder } from "../../../assembler/geometry";
 import type { ModelRegistry } from "../../../registry/types";
 import { GUN_MATERIALS } from "../../guns/materials";
 import { gunKitBuilders } from "../../guns/kits";
+import { gun7Kits } from "../kits";
 import { gunHardwareBuilders } from "../../guns/hardware";
 import { shellKitBuilders } from "./kits-shell";
 import { ak47PartKitBuilders } from "./kits-parts";
@@ -98,13 +99,15 @@ export const AK47_EXTRA_CONSTANTS = {
 /** AK 材质：共享枪械库 + 本型号特需。 */
 export const AK47_MATERIALS: ModelRegistry["materials"] = {
   ...GUN_MATERIALS,
-  gunsteel: { base: "#d5dce4", metalness: 1, roughness: 0.36, preset: "steel", pbr: "brushed", anisotropy: 0.7, repeat: [3, 3], envMapIntensity: 1.3 },
-  worn_blued: { base: "#c9d0d7", metalness: 1, roughness: 0.42, preset: "steel_rough", pbr: "scratched", anisotropy: 0.4, repeat: [3, 3], envMapIntensity: 1.2 },
-  ejector_steel: { base: "#e8ecef", metalness: 1, roughness: 0.24, preset: "steel", pbr: "brushed", anisotropy: 1, repeat: [2, 2], envMapIntensity: 1.45 },
+  gunsteel: { base: "#9aa5b1", metalness: 1, roughness: 0.36, preset: "steel", pbr: "brushed", anisotropy: 0.7, repeat: [3, 3], envMapIntensity: 1.3 },
+  worn_blued: { base: "#8d97a3", metalness: 1, roughness: 0.42, preset: "steel_rough", pbr: "scratched", anisotropy: 0.4, repeat: [3, 3], envMapIntensity: 1.2 },
+  ejector_steel: { base: "#d2d8de", metalness: 1, roughness: 0.24, preset: "steel", pbr: "brushed", anisotropy: 1, repeat: [2, 2], envMapIntensity: 1.45 },
 };
 
 export const AK47_BUILDERS: Record<string, GeometryBuilder> = {
   ...gunKitBuilders,
+  stampedShell: gun7Kits.stampedShell,
+  woodHandguard: gun7Kits.woodHandguard,
   ...gunHardwareBuilders,
   ...shellKitBuilders,
   ...ak47PartKitBuilders,
@@ -887,10 +890,10 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     assembly: "furniture",
     build_layer: 4,
     build_order: 510,
-    geometry: { type: "kit", kit: "handguardShell", params: { r: 0.026, len: 0.13, slotDeg: 120 } },
+    geometry: { type: "kit", kit: "stampedShell", params: { w: 0.033, top: 0.0355, bottom: 0.0025, z0: 0, z1: 0.13, wall: 0.0035, squareness: 0.12, gapStart: 3.45, gapEnd: 5.95 } },
     material: "wood_furniture",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, 0, 0.14] },
+    mate: { type: "absolute", position: [0, 0.019, 0.075] },
     source: "上护木：层压桦木壳（⌀52 部分圆筒），罩住枪管与导气管；分解时连同导气管一起取下。",
   },
   {
@@ -900,10 +903,10 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     assembly: "furniture",
     build_layer: 4,
     build_order: 511,
-    geometry: { type: "kit", kit: "handguardShell", params: { r: 0.024, len: 0.15, slotDeg: 140 } },
+    geometry: { type: "kit", kit: "woodHandguard", params: { len: 0.15, w: 0.046, h: 0.03, grooveWidth: 0.013, grooveDepth: 0.006 } },
     material: "wood_furniture",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, 0, 0.135], rotation: [180, 0, 0] },
+    mate: { type: "absolute", position: [0, -0.0025, 0.06] },
     source: "下护木：层压桦木壳（底部弧筒），托住枪管前段，防手触碰高温枪管。",
   },
   {
@@ -955,7 +958,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "kit", kit: "gripWood", params: { w: 0.036, h: 0.075, t: 0.028, rakeDeg: 18 } },
     material: "wood_worn",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.025, -0.162] },
+    mate: { type: "absolute", position: [0, -0.028, -0.162] },
     source: "握把：木质 + 后倾 18°，表面磨亮（使用磨损质感层：握持处粗糙度显著降低）。",
   },
   {
@@ -1002,7 +1005,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: { type: "cylinder", r: 0.0022, h: 0.28, segments: 8 },
     material: "steel_machined",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [0, -0.03, 0.2], rotation: [90, 0, 0] },
+    mate: { type: "absolute", position: [-0.0115, -0.0038, 0.2], rotation: [90, 0, 0] },
     source: "通条：⌀4.4 × 280，收纳在枪管下方（清理枪管用）。",
   },
   {
@@ -1319,6 +1322,7 @@ export function makeAk47Registry(): ModelRegistry {
       { family: "fire-linkage", a: "ak47.fire.trigger", b: "ak47.fire.disconnector", reason: "单发阻铁骑在扳机杆上（联动接触）", maxDepthMm: 4 },
       { family: "fire-linkage", a: "ak47.fire.hammer_spring", b: "ak47.fire.sear", reason: "击锤簧压在阻铁座上（簧力传递）", maxDepthMm: 4 },
       { family: "fire-linkage", a: "ak47.fire.hammer_spring", b: "ak47.fire.trigger", reason: "击锤簧与扳机杆同区（簧座紧贴）", maxDepthMm: 4 },
+      { family: "grip-socket", a: "ak47.receiver.body", b: "ak47.furniture.grip", reason: "握把上端插入机匣握把槽（构造性包覆）", maxDepthMm: 1, allowDisplaced: true },
       { family: "fire-linkage", a: "ak47.fire.sear", b: "ak47.fire.hammer", reason: "阻铁挂击锤尾齿（待击接触）", maxDepthMm: 4 },
       { family: "fire-linkage", a: "ak47.fire.disconnector", b: "ak47.fire.hammer", reason: "单发阻铁与击锤尾齿同区（待击接触）", maxDepthMm: 4 },
     ],

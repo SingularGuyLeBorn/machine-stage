@@ -456,7 +456,7 @@ export function makeM134Layouts(): Record<string, InstanceLayout> {
 
 export const M134_MATERIALS: ModelRegistry["materials"] = {
   ...GUN_MATERIALS,
-  olive_drab: { base: "#cbd3b4", metalness: 1, roughness: 0.52, preset: "steel_rough", pbr: "plates", anisotropy: 0.15, repeat: [2, 2], envMapIntensity: 1.1 },
+  olive_drab: { base: "#a9b189", metalness: 1, roughness: 0.52, preset: "steel_rough", pbr: "plates", anisotropy: 0.15, repeat: [2, 2], envMapIntensity: 1.1 },
 };
 
 export function makeM134Registry(): ModelRegistry {

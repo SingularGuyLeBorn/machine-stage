@@ -13,7 +13,7 @@ import type { MaterialSpec } from "../../kernel/textures";
 
 /** 烤蓝钢（AK 系机匣 / 枪管 / 自动机）：发黑处理，深蓝近黑。 */
 const STEEL_BLUED: MaterialSpec = {
-  base: "#d5dce4",
+  base: "#a8b2be",
   metalness: 1,
   roughness: 0.26,
   preset: "steel",
@@ -37,7 +37,7 @@ const STEEL_PHOSPHATE: MaterialSpec = {
 
 /** 机加钢件（枪机 / 击针 / 阻铁 / 销）：亮钢色。 */
 const STEEL_MACHINED: MaterialSpec = {
-  base: "#e2e6ea",
+  base: "#ccd2d8",
   metalness: 1,
   roughness: 0.22,
   preset: "steel",
@@ -49,7 +49,7 @@ const STEEL_MACHINED: MaterialSpec = {
 
 /** 使用磨损钢（高频摩擦面：抽壳钩 / 闭锁凸笋 / 供弹齿）。 */
 const STEEL_WORN: MaterialSpec = {
-  base: "#d8d3c9",
+  base: "#b4afa6",
   metalness: 1,
   roughness: 0.4,
   preset: "steel_rough",
@@ -61,7 +61,7 @@ const STEEL_WORN: MaterialSpec = {
 
 /** 簧件（复进簧 / 击锤簧 / 托弹簧）：磷化 + 高糙。 */
 const STEEL_SPRING: MaterialSpec = {
-  base: "#d8dee4",
+  base: "#b6bcc2",
   metalness: 1,
   roughness: 0.48,
   preset: "steel_rough",
@@ -99,7 +99,7 @@ const COPPER: MaterialSpec = {
 
 /** 铅芯（弹头铅套）：暗灰蓝。 */
 const LEAD: MaterialSpec = {
-  base: "#dbe1e8",
+  base: "#bcc3cb",
   metalness: 1,
   roughness: 0.48,
   preset: "steel_rough",
@@ -110,7 +110,7 @@ const LEAD: MaterialSpec = {
 
 /** 钢芯（穿甲弹心）。 */
 const STEEL_CORE: MaterialSpec = {
-  base: "#e8ecef",
+  base: "#d6dce2",
   metalness: 1,
   roughness: 0.24,
   preset: "steel",

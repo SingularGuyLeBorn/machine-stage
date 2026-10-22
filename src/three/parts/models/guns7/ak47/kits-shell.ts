@@ -1,6 +1,13 @@
 import * as THREE from "three";
 import type { GeometryBuilder } from "../../../assembler/geometry";
-import { bevelBoxGeometry, latheGeometry, mergeGeometries, tubeGeometry } from "../../../kernel/geometry";
+import {
+  bevelBoxGeometry,
+  latheGeometry,
+  loftGeometry,
+  mergeGeometries,
+  tubeGeometry,
+} from "../../../kernel/geometry";
+import { gun7Kits } from "../kits";
 import { magSlotTransform } from "./constants";
 
 // ============================================================================
@@ -273,49 +280,41 @@ const followerPlate: GeometryBuilder = (spec) => {
 // stockWood —— 固定木枪托（YZ 侧面轮廓沿 X 挤出，含拇指孔/贴腮板/底板）。
 // 局部系：profile 点在 (z, y)，挤出宽 w（沿 X）。
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// stockWood —— 固定木枪托（AK-47 / 56 式）。
+//
+// 旧版是「侧轮廓挤出 + 固定厚度」，侧看就是一块斜切的木板。这里用超椭圆
+// 放样：枪托上缘（贴腮面）从机匣结合处略微下沉、向后平缓收窄，托底
+// 在尾部下弯成托底板座，截面宽度与圆角随长度连续变化 —— 是实木枪托，
+// 不是板子。局部系：origin = 与机匣结合端的上缘，-Z 向枪尾。
+// ---------------------------------------------------------------------------
 const stockWood: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
-  void num(p, "w", 0.042); // 宽度由 shape 轮廓表达
-  const thickness = num(p, "thickness", 0.03); // 挤出厚度（沿 X）
-  const length = num(p, "length", 0.16);
-  const drop = num(p, "drop", 0.055); // 枪托下沉量
-  const shape = new THREE.Shape();
-  // 侧面轮廓（z ≥ 0 向枪尾为负方向：这里 z=0 是机匣结合端）
-  shape.moveTo(0, 0);
-  shape.lineTo(-length, 0);
-  shape.lineTo(-length - 0.004, -drop); // 底板后沿
-  shape.lineTo(-0.004, -drop);
-  shape.lineTo(0, 0);
-  shape.closePath();
-  // 拇指孔（枪托上方的贯穿孔，减重+握持）
-  const hole = new THREE.Path();
-  const hx = -length * 0.55;
-  const hy = -drop * 0.45;
-  hole.moveTo(hx - 0.016, hy);
-  hole.lineTo(hx - 0.016, hy + 0.012);
-  hole.lineTo(hx + 0.016, hy + 0.012);
-  hole.lineTo(hx + 0.016, hy);
-  hole.closePath();
-  shape.holes.push(hole);
-  const inner = Math.max(thickness - 2 * 0.0008, 0.0008);
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth: inner,
-    bevelEnabled: true,
-    bevelThickness: 0.0008,
-    bevelSize: 0.0008,
-    bevelSegments: 1,
-    steps: 1,
-    curveSegments: 3,
-  });
-  geometry.translate(0, 0, -inner / 2);
-  geometry.rotateY(-Math.PI / 2); // 局部 +Z → 模型 +Z（shape 的 -x → 模型 -Z，即向枪尾）
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  return geometry;
+  const length = num(p, "length", 0.195);
+  const width = num(p, "w", 0.042);
+  const drop = num(p, "drop", 0.055);
+  const sections = [
+    { z: 0.0, width: width * 0.98, top: -0.006, bottom: -drop * 0.82, squareness: 0.58 },
+    { z: -length * 0.12, width: width, top: -0.0055, bottom: -drop * 0.9, squareness: 0.6 },
+    { z: -length * 0.32, width: width * 0.99, top: -0.006, bottom: -drop * 0.97, squareness: 0.6 },
+    { z: -length * 0.55, width: width * 0.97, top: -0.0072, bottom: -drop * 0.95, squareness: 0.58 },
+    { z: -length * 0.76, width: width * 0.96, top: -0.0102, bottom: -drop * 0.9, squareness: 0.56 },
+    { z: -length * 0.93, width: width * 0.97, top: -0.0122, bottom: -drop * 0.86, squareness: 0.56 },
+    { z: -length, width: width * 0.99, top: -0.0135, bottom: -drop * 0.8, squareness: 0.58 },
+  ];
+  return loftGeometry(sections, 28, true, true);
 };
+
 
 // ---------------------------------------------------------------------------
 // gripWood —— 木质握把（含指槽）。
+// 局部系：origin = 握把顶（与机匣结合处），向下延伸 h。
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// gripWood —— 层压木握把（三道指槽 + 连续后背弧）。
+//
+// 旧版是倒角方盒 + 一块斜底板。这里用超椭圆放样：前端切出三道指槽，
+// 后背（贴手掌的一面）保持连续弧线，握把末端略微外张；再整体后倾。
 // 局部系：origin = 握把顶（与机匣结合处），向下延伸 h。
 // ---------------------------------------------------------------------------
 const gripWood: GeometryBuilder = (spec) => {
@@ -323,20 +322,25 @@ const gripWood: GeometryBuilder = (spec) => {
   const w = num(p, "w", 0.036);
   const h = num(p, "h", 0.075);
   const t = num(p, "t", 0.028);
-  const rake = num(p, "rakeDeg", 18); // 后倾角
-  const parts: THREE.BufferGeometry[] = [];
-  const body = bevelBoxGeometry(w, h, t, 0.004, 2);
-  body.translate(0, -h / 2, 0);
-  parts.push(body);
-  // 后倾底座
-  const base = bevelBoxGeometry(w * 0.9, h * 0.2, t * 0.9, 0.004, 2);
-  base.rotateX(-THREE.MathUtils.degToRad(rake));
-  base.translate(0, -h + h * 0.1, t * 0.18);
-  parts.push(base);
-  const merged = mergeGeometries(parts);
-  for (const part of parts) part.dispose();
-  return merged;
+  const rakeDeg = num(p, "rakeDeg", 18);
+  const half = t / 2;
+  // 放样沿 -Z 建立（top = 手掌侧，bottom = 手指侧），再整体转成竖直握把。
+  const sections = [
+    { z: 0, width: w * 0.94, top: half * 0.96, bottom: -half * 0.96, squareness: 0.6 },
+    { z: -h * 0.16, width: w * 0.94, top: half * 0.94, bottom: -half * 0.9, squareness: 0.58 },
+    { z: -h * 0.3, width: w * 0.96, top: half * 0.9, bottom: -half * 0.78, squareness: 0.55 },
+    { z: -h * 0.45, width: w * 0.95, top: half * 0.88, bottom: -half * 0.9, squareness: 0.55 },
+    { z: -h * 0.58, width: w * 0.93, top: half * 0.86, bottom: -half * 0.76, squareness: 0.54 },
+    { z: -h * 0.74, width: w * 0.93, top: half * 0.86, bottom: -half * 0.86, squareness: 0.54 },
+    { z: -h * 0.88, width: w * 0.95, top: half * 0.88, bottom: -half * 0.8, squareness: 0.56 },
+    { z: -h, width: w * 0.98, top: half * 0.9, bottom: -half * 0.74, squareness: 0.58 },
+  ];
+  const grip = loftGeometry(sections, 26, true, true);
+  grip.rotateX(-Math.PI / 2); // -Z → -Y（握把竖直向下）
+  grip.rotateX(THREE.MathUtils.degToRad(rakeDeg)); // 后倾
+  return grip;
 };
+
 
 // ---------------------------------------------------------------------------
 // gasBlockKit —— 导气箍（倾斜导气孔 + 刺刀座基座）。
@@ -564,9 +568,12 @@ const boltHeadKit: GeometryBuilder = (spec) => {
 };
 
 // ---------------------------------------------------------------------------
-// receiverShell —— 全宽机匣顶盖 + 下机匣发射机侧板：正常状态把枪机框、
-// 复进簧、导轨和击锤/扳机簧全部盖住；顶盖后端让开表尺座，前端止于节套。
-// 局部系：origin = 枪膛轴线中心，+Z 向枪口。
+// receiverShell —— 机匣外壳：弧形冲压顶盖 + 下机匣侧板。
+//
+// 旧版是「一块平顶板 + 两条直角裙边 + 两块平板」，侧看就是一个方盒子。
+// AK 的顶盖是**冲压出来的弧形壳**：截面是圆角拱形（下方开口包住导轨与
+// 枪机框），表面有两道纵向压筋、尾部卡榫座和铆钉；下机匣两侧有压筋、
+// 铆钉与抛壳窗边框。局部系：origin = 枪膛轴线中心，+Z 向枪口。
 // ---------------------------------------------------------------------------
 const receiverShell: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
@@ -576,35 +583,41 @@ const receiverShell: GeometryBuilder = (spec) => {
   const z1 = num(p, "z1", 0.052);
   const t = num(p, "t", 0.0024);
   const parts: THREE.BufferGeometry[] = [];
-  const len = z1 - z0;
-  const zc = (z0 + z1) / 2;
 
-  // 全宽顶板与两侧裙边：盖住机匣顶部两条导轨和枪机框
-  const top = bevelBoxGeometry(w, t, len, 0.0005, 1);
-  top.translate(0, h, zc);
-  parts.push(top);
-  for (const side of [-1, 1]) {
-    const skirt = bevelBoxGeometry(t, 0.026, len, 0.0005, 1);
-    skirt.translate(side * (w / 2 - t / 2), h - 0.013, zc);
-    parts.push(skirt);
-  }
-  // 后端盖 + 前端唇
-  const rear = bevelBoxGeometry(w, 0.026, t, 0.0005, 1);
-  rear.translate(0, h - 0.013, z0 + t / 2);
-  parts.push(rear);
-  const front = bevelBoxGeometry(w, 0.010, t, 0.0005, 1);
-  front.translate(0, h - 0.005, z1 - t / 2);
-  parts.push(front);
+  // 顶盖：拱形冲压壳（下方开口），圆角截面 + 顶部压筋。
+  const cover = gun7Kits.stampedShell({
+    ...(spec as object),
+    params: {
+      w,
+      top: h,
+      bottom: h - 0.028,
+      z0,
+      z1,
+      wall: t,
+      squareness: 0.6,
+      gapStart: 3.5,
+      gapEnd: 5.9,
+      ribCount: 2,
+      ribDepth: 0.0016,
+      ribWidth: 0.0055,
+      ribTop: h + 0.0008,
+      ribBottom: h + 0.0008,
+      ribZ0: z0 + 0.016,
+      ribZ1: z1 - 0.012,
+    },
+  } as never, {} as never);
+  parts.push(cover);
 
-  // 顶盖两道纵向压筋 + 后部卡榫座
-  for (const x of [-0.011, 0.011]) {
-    const rib = bevelBoxGeometry(0.0038, 0.0018, len * 0.72, 0.0004, 1);
-    rib.translate(x, h + 0.0011, zc + 0.006);
-    parts.push(rib);
-  }
+  // 顶盖后端卡榫座 + 前端压边（真实顶盖是扣在机匣上的冲压件）
   const latch = bevelBoxGeometry(0.014, 0.006, 0.012, 0.0006, 1);
-  latch.translate(0, h + 0.0010, z0 + 0.014);
+  latch.translate(0, h + 0.001, z0 + 0.014);
   parts.push(latch);
+  const frontLip = bevelBoxGeometry(w * 0.96, 0.008, t, 0.0005, 1);
+  frontLip.translate(0, h - 0.006, z1 - t / 2);
+  parts.push(frontLip);
+  const rearLip = bevelBoxGeometry(w * 0.98, 0.014, t, 0.0005, 1);
+  rearLip.translate(0, h - 0.010, z0 + t / 2);
+  parts.push(rearLip);
 
   // 下机匣/发射机侧板：从机匣下缘伸到击锤簧下方，包住击发机构；
   // 前端停在弹匣井后方，底边留空让扳机/护圈露出。
@@ -615,6 +628,18 @@ const receiverShell: GeometryBuilder = (spec) => {
     const lower = bevelBoxGeometry(t, lowerH, lowerZ1 - lowerZ0, 0.0005, 1);
     lower.translate(side * (w / 2 - t / 2), -0.061, (lowerZ0 + lowerZ1) / 2);
     parts.push(lower);
+    // 冲压加强筋：两条横向浅凸台
+    for (const y of [-0.046, -0.07]) {
+      const rib = bevelBoxGeometry(0.0022, 0.004, lowerZ1 - lowerZ0 - 0.014, 0.0004, 1);
+      rib.translate(side * (w / 2 + 0.0007), y, (lowerZ0 + lowerZ1) / 2);
+      parts.push(rib);
+    }
+    // 铆钉：扳机销/弹匣卡笋的真实铆钉头
+    for (const z of [-0.132, -0.112]) {
+      const rivet = bevelBoxGeometry(0.0018, 0.005, 0.005, 0.0004, 1);
+      rivet.translate(side * (w / 2 + 0.0009), -0.084, z);
+      parts.push(rivet);
+    }
     const boss = bevelBoxGeometry(0.0032, 0.008, 0.008, 0.0004, 1);
     boss.translate(side * (w / 2 + 0.0008), -0.067, -0.128);
     parts.push(boss);

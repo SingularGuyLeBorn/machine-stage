@@ -55,7 +55,7 @@ export function StageCanvas() {
       camera={{ position: [4.6, 3.4, 5.2], fov: 34, near: 0.05, far: 200 }}
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
     >
-      <color attach="background" args={["#e9ecf0"]} />
+      <color attach="background" args={["#dce0e6"]} />
       <Suspense fallback={null}>
         <Studio />
       </Suspense>
@@ -77,11 +77,11 @@ export function StageCanvas() {
 function Studio() {
   return (
     <>
-      <ambientLight intensity={0.16} />
+      <ambientLight intensity={0.12} />
       <directionalLight
         castShadow
         position={[5.5, 8.5, 4.5]}
-        intensity={1.55}
+        intensity={1.25}
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0005}
         shadow-normalBias={0.01}
@@ -90,12 +90,12 @@ function Studio() {
       </directionalLight>
       <directionalLight position={[-6, 3.5, -4.5]} intensity={0.3} color="#dfe7f2" />
       <Environment
-        files="/hdr/cyclorama_hard_light_1k.hdr"
+        files="/hdr/studio_small_08_1k.hdr"
         background={false}
-        environmentIntensity={1.9}
+        environmentIntensity={1.5}
         environmentRotation={[0, 0.42, 0]}
       />
-      <SceneEnvIntensity value={1.9} />
+      <SceneEnvIntensity value={1.5} />
     </>
   );
 }
