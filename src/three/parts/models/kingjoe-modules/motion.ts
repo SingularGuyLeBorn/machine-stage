@@ -1,13 +1,21 @@
 import type { AssembledModel } from "../../assembler/assembler";
-import { Box3, Vector3 } from "three";
+import { Box3, Vector3, Quaternion } from "three";
 import { getModuleEffects, hideModuleEffects } from "./effects";
 import { updateModuleIllumination } from "./illumination";
+import { updatePedanRays } from "./rays";
+import { updatePedanMachinery, type PedanActivity } from "./machinery";
 
 export const MODULE_KEYS = ["legs", "pelvis", "chest", "head_arms"] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 export type Offset = [number, number, number];
 export type Openings = Record<ModuleKey, number>;
 const clamp = (x: number) => Math.max(0, Math.min(1, x));
+// 速度有机械分段感，位置始终连续；分段末端速度为零，不量化角度制造跳帧。
+function mechanicalEase(x: number): number {
+  const t = clamp(x) * 5,
+    step = Math.min(4, Math.floor(t));
+  return (step + smooth(t - step)) / 5;
+}
 export const smooth = (x: number) => {
   const t = clamp(x);
   return t * t * (3 - 2 * t);
@@ -53,7 +61,7 @@ export function flightOffset(key: ModuleKey, openness: number, gap = 3.8): Offse
   if (key === "head_arms") {
     const bend = smooth((u - 0.15) / 0.45);
     pose[0] *= bend;
-    pose[2] = -0.5 * pose[1] + (pose[2] + 0.5 * pose[1]) * bend - 0.8 * Math.sin(Math.PI * u) ** 2 * bend;
+    pose[2] = -0.5 * pose[1] + (pose[2] + 0.5 * pose[1]) * bend - 2.0 * Math.sin(Math.PI * u) ** 2 * bend;
   } else if (key === "pelvis" || key === "chest") {
     const bend = smooth((u - 0.1) / 0.5);
     pose[0] *= bend;
@@ -146,6 +154,8 @@ interface Playback {
   start: number;
   from: Openings;
   open: Openings;
+  arms: [number, number, number];
+  fromArms: [number, number, number];
 }
 const playback = new WeakMap<AssembledModel, Playback>();
 const all = (u: number) => Object.fromEntries(MODULE_KEYS.map((k) => [k, u])) as Openings;
@@ -154,13 +164,24 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
   let entry = playback.get(model);
   if (!entry || entry.state !== state) {
     const from = entry?.open ?? all(state === "separation" || state === "closed" ? 0 : 1);
-    entry = { state, start: seconds, from: { ...from }, open: { ...from } };
+    const arms: [number, number, number] = entry?.arms ?? (state === "closed" ? [-0.38, -1.8, 0] : [0, 0, 1]);
+    entry = {
+      state,
+      start: seconds,
+      from: { ...from },
+      open: { ...from },
+      arms: [...arms],
+      fromArms: [...arms],
+    };
     playback.set(model, entry);
   }
   const time = Math.max(0, seconds - entry.start);
+  const redModule = state.startsWith("ray_") ? state.slice(4) : null;
+  const beamDockTime =
+    state === "beam" && Object.values(entry.from).some((u) => u > 0.001) ? COMBINE_DURATION + 2.8 : 0;
   for (const key of MODULE_KEYS) {
     const from = entry.from[key];
-    if (state === "combining") {
+    if (state === "combining" || (state === "beam" && time < beamDockTime)) {
       const elapsed = (time - DOCK_DELAYS[key]) * (key === "legs" ? 6.8 / 1.2 : 1);
       // 等待期间也沿原飞行曲线慢慢接近；正式进场从等待终点继续，无跳位。
       // [OM-FREEPLAY] 预靠近最多占开放行程的 10%，保留充分的模块间距。
@@ -169,8 +190,11 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
       entry.open[key] =
         from <= 1e-8 ? 0 : elapsed < 0 ? waiting : combineOpenness(elapsed + inverseClose(from - drift));
     } else if (state === "separation")
-      entry.open[key] = from + (1 - from) * separationOpenness(time * (key === "head_arms" ? 3.9 / 2.3 : 1));
-    else entry.open[key] = state === "closed" ? 0 : 1;
+      entry.open[key] =
+        from +
+        (1 - from) * separationOpenness(Math.max(0, time - 1.2) * (key === "head_arms" ? 3.9 / 2.3 : 1));
+    else if (redModule) entry.open[key] = from + (1 - from) * smooth(time / 2);
+    else entry.open[key] = state === "closed" || state === "beam" ? 0 : 1;
   }
   const pose = modulePose(entry.open, model.constants.DISPLAY_SPACING!);
   for (const key of MODULE_KEYS) {
@@ -196,18 +220,114 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
     const deployment = smooth((entry.open[key] - 0.05) / 0.8);
     for (const side of [-1, 1]) {
       const antenna = model.getNode(`Antenna_${key}_${side < 0 ? "l" : "r"}`);
+      const mount = model.getNode(`Mount_${key}_${side < 0 ? "l" : "r"}`);
+      // 套筒向本体内缩回，不把闭合几何压成薄片；避免合体后伸入相邻模块。
+      if (mount) {
+        const base = model.registry.nodes.find((n) => n.name === mount.name)!.pivot as [
+          number,
+          number,
+          number,
+        ];
+        mount.position
+          .set(...base)
+          .addScaledVector(new Vector3(0, 1, 0).applyQuaternion(mount.quaternion), -0.14 * (1 - deployment));
+        // 头肩的侧向套筒沿内部斜导轨抬起收纳，避开胸甲双榫。
+        if (key === "head_arms") mount.position.y += 0.16 * (1 - deployment);
+      }
       if (antenna) {
         antenna.scale.y = 0.001 + 0.999 * deployment;
         antenna.visible = deployment > 0.001;
       }
       if (key === "legs") {
         const vane = model.getNode(`LegVane_${side < 0 ? "l" : "r"}`);
-        if (vane) vane.rotation.z = -side * deployment * 1.65;
+        if (vane) {
+          vane.rotation.z = -side * deployment * 1.65;
+          vane.scale.setScalar(0.001 + 0.999 * deployment);
+        }
       }
     }
   }
-  updateModuleIllumination(model, seconds);
-  if (state === "combining" || state === "separation") {
+  // [OM-FREEPLAY] 肩先抬、肘再伸；分离前 1.2s 收臂并腿，避免以战斗姿态穿过胸甲接口。
+  const beamTime = time - beamDockTime;
+  let target: [number, number, number] = [0, 0, 1];
+  if (state === "closed") target = [-0.38, -1.8, 0];
+  if (state === "combining" || (state === "beam" && time < beamDockTime)) {
+    // 头肩接近时先完成 18% 抬臂，对接结束后接着抬至肩高，跨阶段不跳姿态。
+    const approach = 0.18 * mechanicalEase((0.25 - entry.open.head_arms) / 0.25);
+    const finish = 0.82 * mechanicalEase((time - COMBINE_DURATION) / 2.8);
+    const startedClosed = Object.values(entry.from).every((u) => u <= 0.001);
+    const raised = startedClosed ? 1 : approach + finish;
+    target = [-0.38 * raised, -1.8 * raised, 1 - raised];
+  }
+  if (state === "beam" && beamTime >= 0) {
+    const raise = smooth(beamTime / 1.5),
+      push = smooth((beamTime - 1.5) / 0.55),
+      recover = smooth((beamTime - 4.1) / 1.2);
+    target = [
+      (-0.38 - raise * 0.35 - push * 0.68) * (1 - recover) - 0.32 * recover,
+      (-1.8 + raise * 0.15 + push * 1.25) * (1 - recover) - 1.8 * recover,
+      0,
+    ];
+  }
+  const blend = smooth(time / 1.2);
+  entry.arms = target.map((n, i) => entry!.fromArms[i] + (n - entry!.fromArms[i]) * blend) as [
+    number,
+    number,
+    number,
+  ];
+  const beamSpread =
+    state === "beam" ? 0.35 * smooth(beamTime / 1.3) * (1 - smooth((beamTime - 4.1) / 1.2)) : 0;
+  for (const [side, suffix] of [
+    [-1, "l"],
+    [1, "r"],
+  ] as const) {
+    const upper = model.getNode(`Joint_upper_${suffix}`),
+      fore = model.getNode(`Joint_fore_${suffix}`);
+    if (upper) {
+      upper.position.set(side * 1.14, 4.96, 0.34);
+      upper.rotation.set(entry.arms[0], 0, side * (0.16 * (1 - entry.arms[2]) + beamSpread));
+    }
+    if (fore) {
+      fore.position.set(side * 0.22, -0.94, -0.06);
+      fore.rotation.set(entry.arms[1], 0, 0);
+    }
+  }
+  // 护套跟随两端的真实关节姿态，逐层转动填满弯曲间隙；不靠挖去外壳让位。
+  for (const side of [-1, 1]) {
+    const suffix = side < 0 ? "l" : "r";
+    const upper = model.getNode(`Joint_upper_${suffix}`)!;
+    const fore = model.getNode(`Joint_fore_${suffix}`)!;
+    upper.updateMatrix();
+    for (const kind of ["upper", "fore"]) {
+      const shoulder = kind === "upper";
+      const target = shoulder ? upper.quaternion : fore.quaternion;
+      const pivot = shoulder ? new Vector3(side * 1.03, 4.96, 0.34) : new Vector3(side * 0.22, -0.94, -0.06);
+      const radius = shoulder ? new Vector3(-side * 0.125, 0, -0.337) : new Vector3(0, 0, -0.254);
+      for (let i = 0; i < 13; i++) {
+        const node = model.getNode(`Cuff_${kind}_${suffix}_${i}`)!;
+        const t = i / 12;
+        const q = new Quaternion().slerp(target, t);
+        node.position.copy(radius).applyQuaternion(q).add(pivot);
+        if (shoulder) node.position.x += side * 0.11 * t;
+        else node.position.applyMatrix4(upper.matrix);
+        node.quaternion.copy(shoulder ? q : upper.quaternion.clone().multiply(q));
+      }
+    }
+  }
+  const activity: PedanActivity = {
+    drive:
+      Math.abs(entry.arms[0]) +
+      Math.abs(entry.arms[1]) * 0.7 +
+      Object.values(entry.open).reduce((a, b) => a + b, 0),
+    charge: state === "beam" ? smooth(beamTime / 1.5) * (1 - smooth((beamTime - 3.8) / 1.2)) : 0,
+    yellow: state === "beam" ? smooth((beamTime - 1.5) / 0.3) * (1 - smooth((beamTime - 3.8) / 0.3)) : 0,
+    redModule: redModule && time > 2 ? redModule : null,
+  };
+  updatePedanMachinery(model, seconds, activity);
+  updateModuleIllumination(model, seconds, activity);
+  model.root.updateMatrixWorld(true);
+  updatePedanRays(model, seconds, activity.redModule, activity.yellow);
+  if (state === "combining" || state === "separation" || (state === "beam" && time < beamDockTime)) {
     model.root.updateMatrixWorld(true);
     getModuleEffects(model).update(seconds, entry.open);
   } else hideModuleEffects(model);

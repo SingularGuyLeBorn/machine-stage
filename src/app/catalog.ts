@@ -113,6 +113,8 @@ export interface StageModel {
   /** 里程碑标记（左栏卡片角标）。 */
   milestone: string;
   status: "ready" | "planned";
+  /** 用户指定隐藏的历史研究卡仍保留源码和注册表，避免与当前四分体展示混淆。 */
+  hidden?: boolean;
   registry?: ModelRegistry;
   layouts?: Record<string, InstanceLayout>;
   /** 变体清单（有它时，UI 用「变体」动作切换，registry 取第一个变体）。 */
@@ -234,7 +236,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoemodules",
     title: "金古桥 · 参考图分体",
-    subtitle: "头肩与完整双臂 / 胸甲 / 腹盆 / 腿部 · 原 GLB 细节",
+    subtitle: "四分体 / 佩丹设备舱 / 可动肩肘 / 双天线折线光束",
     milestone: "四模块",
     status: "ready",
     registry: makeKingJoeModuleRegistry(),
@@ -242,7 +244,17 @@ export const CATALOG: StageModel[] = [
     animate: poseKingJoeModules,
     animationClock: "continuous",
     framingBounds: moduleMotionBounds,
-    animatedStates: ["idle", "closed", "combining", "separation"],
+    animatedStates: [
+      "idle",
+      "closed",
+      "combining",
+      "separation",
+      "beam",
+      "ray_legs",
+      "ray_pelvis",
+      "ray_chest",
+      "ray_head_arms",
+    ],
     states: [
       { id: "idle", label: "分体检查", hint: "双臂整体跟随头肩；四模块缓慢悬浮，头灯和胸窗持续发光" },
       { id: "closed", label: "整机检查", hint: "回到原模型装配位置，不播放合体动画" },
@@ -252,6 +264,12 @@ export const CATALOG: StageModel[] = [
         hint: "腿部就位后，腹盆、胸甲、头肩依次沿曲线吸合；电花由小到大，最后轻微回弹",
       },
       { id: "separation", label: "展开分体", hint: "四体从起步沿空间曲线展开，天线伸出、髋鼓护片打开" },
+      { id: "beam", label: "佩丹黄色光线", hint: "双手抬至头前下方，向前送出并发射黄色折线光束" },
+      ...(["legs", "pelvis", "chest", "head_arms"] as const).map((key, i) => ({
+        id: `ray_${key}`,
+        label: ["腿部双天线", "腹盆双天线", "胸甲双天线", "头肩双天线"][i],
+        hint: "分体就位后，两根天线同步发射红色 Z 字电束",
+      })),
     ],
     actions: [
       { id: "modules-open", group: "分体", label: "分体检查", kind: "machine-state", state: "idle" },
@@ -265,18 +283,28 @@ export const CATALOG: StageModel[] = [
         state: "separation",
       },
       { id: "modules-reset", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "modules-beam", group: "佩丹光线", label: "整机黄色光线", kind: "machine-state", state: "beam" },
+      ...(["legs", "pelvis", "chest", "head_arms"] as const).map((key, i) => ({
+        id: `modules-ray-${key}`,
+        group: "佩丹光线",
+        label: ["腿部红色双束", "腹盆红色双束", "胸甲红色双束", "头肩红色双束"][i],
+        kind: "machine-state" as const,
+        state: `ray_${key}`,
+      })),
     ],
     readouts: () => [
-      { label: "主体", value: "4 个连通实体" },
+      { label: "主体", value: "4 分体 · 12 设备舱" },
       { label: "开放边", value: "0" },
-      { label: "双臂", value: "完整保留" },
+      { label: "双臂", value: "肩肘联动" },
       { label: "接口", value: "阶梯嵌合" },
     ],
     notes: [
-      "按参考图分为头肩与双臂、胸甲、腹盆、腿部；手臂按原骨骼归组，不经过躯干切平面。",
+      "分为头肩与双臂、胸甲、腹盆、腿部；肩肘采用前缘转轴和柔性叠层护套，手掌随前臂运动。",
       "保留原 GLB 的头部、四肢与腹盆细节。胸甲按参考图重塑为上窄下展的圆润双瓣，彩窗改为厚黑边与虹彩云斑玻璃；肩根保留大臂外露空间。",
       "腹盆上下凸起嵌入对应凹槽，原髋鼓完整归腿部。胸甲中央为圆 U 口，两侧双榫嵌入头肩凹槽；双臂根部带圆润护甲。",
       "四体沿连续曲线飞出，天线从本体套筒伸出；合体按腿部、腹盆、胸甲、头肩依次完成，电花由小到大，近距减速后吸合回弹。",
+      "佩丹计算晶核、磁约束能源、悬浮场线圈与电磁执行器为经用户批准的原创结构；承力轨、安装柱、螺旋弹簧和散热件可在零件树逐件查看。",
+      "分体可用双天线发射红色 Z 字电束；整机抬手、前送后由屏幕发射黄色电束。上下两串方形灯点持续流动，胸窗在呼吸亮起与近暗之间交替。",
     ],
   },
   {
@@ -711,6 +739,8 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoeskin",
     title: "金古桥 King Joe · 真实网格分件",
+    // 用户要求隐藏：这是早期 578 源件检查卡，当前展示使用“参考图分体”。
+    hidden: true,
     subtitle: "578 源件 · 四段飞船 · 四体分件查看 · 哑光银灰 + 彩虹胸 · 个人参考",
     milestone: "M-G·R3",
     status: "ready",
@@ -754,6 +784,8 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoewhole",
     title: "金古桥 King Joe · 整体实心（单件）",
+    // 用户要求隐藏：这是早期实心对照模型，保留用于几何回归，不再展示入口。
+    hidden: true,
     subtitle: "原皮表面 + 内部闭合实心核 + 缝隙补面 · 1 个 partId · 不是中空壳",
     milestone: "M-G·R3.1",
     status: "ready",

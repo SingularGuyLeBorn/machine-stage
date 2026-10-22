@@ -9,14 +9,16 @@ import { makeKingJoeSkinDetails } from "../kingjoe-skin/details";
 import data from "./modules.generated.json";
 import { chestWindowBuilders, chestWindowParts } from "./chest-windows";
 import { makeVisorBuilders, visorParts } from "./visor";
+import pedan from "./pedan.generated.json";
+import { interiorBuilders, INTERIOR_MATERIALS, makeInteriors } from "./interiors";
 
-// 原装甲与内部连接结构布尔融合；每个主体单独连通，阶梯凹凸接口由同一模具切出。
+// 四分体沿用原阶梯接口，外壳加工设备舱；肩肘分件保留原外表面，贴壳内骨架由实际内壁生成。
 function decode(value: string): ArrayBuffer {
   return Uint8Array.from(atob(value), (c) => c.charCodeAt(0)).buffer;
 }
 
 export const kingjoeModuleBuilders: Record<string, GeometryBuilder> = Object.fromEntries(
-  data.parts.map((part) => [
+  [...pedan.parts, ...pedan.structure].map((part) => [
     `kjModule_${part.key}`,
     () => {
       const geometry = new THREE.BufferGeometry();
@@ -67,6 +69,7 @@ for (const detail of makeKingJoeSkinDetails().filter((p) => p.assembly === "ship
   };
 }
 Object.assign(kingjoeModuleBuilders, chestWindowBuilders);
+Object.assign(kingjoeModuleBuilders, interiorBuilders);
 Object.assign(kingjoeModuleBuilders, makeVisorBuilders(kingjoeModuleBuilders.kjModule_head_arms!));
 
 const NAMES: Record<string, string> = {
@@ -133,6 +136,7 @@ const ANTENNAS = [
 ] as const;
 
 export function makeKingJoeModuleRegistry(): ModelRegistry {
+  const interiors = makeInteriors();
   const antennaNodes: ModelRegistry["nodes"] = [];
   const antennaParts: PartDefinition[] = [];
   for (const spec of ANTENNAS)
@@ -146,7 +150,8 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
       const e = new THREE.Euler().setFromQuaternion(
         new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction),
       );
-      const source = data.parts.find((p) => p.key === spec.key)!;
+      // 安装点取当前实际外壳；头部补全后不能继续吸附到旧网格表面。
+      const source = pedan.parts.find((p) => p.key === spec.key)!;
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute(
         "position",
@@ -215,20 +220,43 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
       mate: { type: "absolute", position: [-side * 0.11, 0, 0] },
     });
   }
-  const bodies: PartDefinition[] = data.parts.map((part, i) => ({
-    id: `kingjoemodules.${part.key}.body`,
-    name_cn: NAMES[part.key]!,
-    name_en: part.key,
-    assembly: part.key,
-    node: `Module_${part.key}`,
-    build_layer: 1,
-    build_order: i + 1,
-    geometry: { type: "kit", kit: `kjModule_${part.key}` },
-    material: part.groups[0]!.material,
-    materialGroups: part.groups.map((g) => g.material),
-    mate: { type: "absolute", position: [0, 0, 0] },
-    source: "原 GLB 表面与法线、UV；内部补实并融合为单实体，共用模具切出阶梯嵌合接口",
-  }));
+  const bodies: PartDefinition[] = pedan.parts
+    .filter((part) => part.key in NAMES)
+    .map((part, i) => ({
+      id: `kingjoemodules.${part.key}.body`,
+      name_cn: NAMES[part.key]!,
+      name_en: part.key,
+      assembly: part.key,
+      node: `Module_${part.key}`,
+      build_layer: 4,
+      build_order: 500 + i,
+      geometry: { type: "kit", kit: `kjModule_${part.key}` },
+      material: part.groups[0]!.material,
+      materialGroups: part.groups.map((g) => g.material),
+      mate: { type: "absolute", position: [0, 0, 0] },
+      source: "保留原 GLB 外表面与配合面，内部加工设备舱，肩肘切出可动外壳",
+    }));
+  const jointParts: PartDefinition[] = pedan.joints.map((joint, i) => {
+    const part = pedan.parts.find((p) => p.key === joint.key)!;
+    return {
+      id: `kingjoemodules.${joint.module}.${joint.key}`,
+      name_cn: joint.key.startsWith("upper")
+        ? "上臂关节外壳"
+        : joint.key.startsWith("fore")
+          ? "前臂与手掌外壳"
+          : "腿足关节外壳",
+      name_en: joint.key,
+      assembly: joint.module,
+      node: `Joint_${joint.key}`,
+      build_layer: 4,
+      build_order: 510 + i,
+      geometry: { type: "kit", kit: `kjModule_${joint.key}` },
+      material: part.groups[0]!.material,
+      materialGroups: part.groups.map((g) => g.material),
+      mate: { type: "absolute", position: joint.pivot.map((n) => -n) as [number, number, number] },
+      source: "从已确认外壳沿关节切分，零位拼回保持原表面",
+    };
+  });
   const details: PartDefinition[] = makeKingJoeSkinDetails()
     .filter((p) => p.assembly === "ship" && !p.id.includes(".visor_"))
     .map((part, i) => ({
@@ -240,7 +268,9 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
       build_order: 5 + i,
     }));
   const parts: PartDefinition[] = [
+    ...interiors.parts,
     ...bodies,
+    ...jointParts,
     ...details,
     ...visorParts,
     ...chestWindowParts,
@@ -248,17 +278,17 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
   ];
   // 本卡早期用 1..47 的局部 build_order；并入主线后统一抬到 ≥100，
   // 保留原有先后顺序（main 的 validate 以 <100 为错误）。
-  const orderMap = new Map<number, number>();
-  [...new Set(parts.map((part) => part.build_order))]
-    .sort((a, b) => a - b)
-    .forEach((order, index) => orderMap.set(order, 100 + index * 10));
-  for (const part of parts) part.build_order = orderMap.get(part.build_order)!;
+  parts.sort((a, b) => a.build_layer - b.build_layer || a.build_order - b.build_order);
+  parts.forEach((part, index) => {
+    part.build_order = 100 + index * 10;
+  });
 
   return {
     model: "kingjoemodules",
     title: "金古桥 · 参考图分体",
-    subtitle: "完整双臂 · 连通主体 · 阶梯嵌合接口",
+    subtitle: "佩丹设备舱 · 肩肘联动 · 阶梯嵌合接口",
     constants: {
+      ...interiors.constants,
       HIP_SEAM: String(data.hip),
       WAIST_SEAM: String(data.waist),
       NECK_SEAM: String(data.neck),
@@ -294,9 +324,24 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
         rest_rotation: [0, 180, 0],
       },
       ...antennaNodes,
+      ...pedan.joints.map((joint) => {
+        const parent = pedan.joints.find((p) => `Joint_${p.key}` === joint.parent);
+        return {
+          name: `Joint_${joint.key}`,
+          parent: joint.parent,
+          pivot: joint.pivot.map((n, i) => n - (parent?.pivot[i] ?? 0)) as [number, number, number],
+          motion: "rotate" as const,
+        };
+      }),
+      ...interiors.nodes,
     ],
     materials: {
       ...KINGJOE_SKIN_MATERIALS,
+      // 用户要求偏黄色金属外观；仅本分体模型改色，不改旧卡片的共用材质。
+      kjr_silver: { ...KINGJOE_SKIN_MATERIALS.kjr_silver, base: "#cbb374", metalness: 0.62, roughness: 0.5 },
+      kjr_silver_dark: { ...KINGJOE_SKIN_MATERIALS.kjr_silver_dark, base: "#968254", metalness: 0.58 },
+      kjr_dark: { ...KINGJOE_SKIN_MATERIALS.kjr_dark, base: "#514a36" },
+      ...INTERIOR_MATERIALS,
       kjm_glass_l: {
         base: "#ffffff",
         metalness: 0.18,
@@ -328,6 +373,25 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
     },
     parts,
     expectedContacts: [
+      ...(interiors.expectedContacts ?? []),
+      ...["l", "r"].map((side) => ({
+        family: "shoulder_rest_seam",
+        a: "kingjoemodules.head_arms.body",
+        b: `kingjoemodules.head_arms.upper_${side}`,
+        reason: "垂手时肩部水平分件面贴合；158 个实际运动姿态的实体求交检查为零体积",
+        maxDepthMm: 0.1,
+        allowSuspect: true,
+        staticOnly: true,
+      })),
+      ...["l", "r"].map((side) => ({
+        family: "elbow_rest_seam",
+        a: `kingjoemodules.head_arms.upper_${side}`,
+        b: `kingjoemodules.head_arms.fore_${side}`,
+        reason: "垂手时原分件平面贴合；实体布尔复核无交叠体积，仅允许亚毫米接触",
+        maxDepthMm: 0.1,
+        allowSuspect: true,
+        staticOnly: true,
+      })),
       ...[
         ["housing", "seal"],
         ["seal", "glass"],

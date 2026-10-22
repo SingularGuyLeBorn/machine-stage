@@ -404,7 +404,7 @@ function StageRuntime() {
     realTimeRef.current += Math.min(delta, 0.05);
     if (!assembled) return;
     const store = useStageStore.getState();
-    const model = findModel(store.modelId);
+    const model = findModel(assembled.registry.model);
     const state = store.machineState;
     // King Joe 等多形态模型用 animatedStates 显式声明时钟推进状态；
     // 其余模型沿用主线的规则：除 idle/scanning 外都推进（悬挂/击发/受损等）。

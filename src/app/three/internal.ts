@@ -9,6 +9,7 @@ import type { PartHandle } from "@/three/parts";
 // ============================================================================
 
 export function isInternalPart(modelId: string, handle: PartHandle): boolean {
+  if (modelId === "kingjoemodules") return handle.def.tags?.includes("internal") ?? false;
   if (modelId !== "mbt90" && modelId !== "ed90") return false;
   // FX / 泄压板在装甲外，不能随内部件隐藏。
   if (handle.def.tags?.includes("fx")) return false;
@@ -28,7 +29,8 @@ export function isXrayShellPart(modelId: string, handle: PartHandle): boolean {
   if (modelId !== "mbt90" && modelId !== "ed90") return false;
   if (!handle.partId.startsWith(`${modelId}.engine.`)) return false;
   if (handle.assembly === "engine_block" || handle.assembly === "crankcase") return true;
-  if (handle.assembly === "cylinder") return /(_liner|_head|_head_gasket|_injector_sleeve)$/.test(handle.partId);
+  if (handle.assembly === "cylinder")
+    return /(_liner|_head|_head_gasket|_injector_sleeve)$/.test(handle.partId);
   if (handle.assembly === "turbo") return /(turbine_housing|compressor_housing)(_[lr])?$/.test(handle.partId);
   return false;
 }

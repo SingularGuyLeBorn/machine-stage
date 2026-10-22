@@ -4,6 +4,10 @@ import { edriveBuilders, makeEdriveLayouts, makeEdriveRegistry } from "@/three/p
 import { makeMbtLayouts, makeMbtRegistry, mbtBuilders } from "@/three/parts/models/mbt/registry";
 import { isInternalPart, isXrayShellPart } from "./internal";
 import { applyXray } from "./pose";
+import {
+  makeKingJoeModuleRegistry,
+  kingjoeModuleBuilders,
+} from "@/three/parts/models/kingjoe-modules/registry";
 
 function build() {
   return buildModel(makeEdriveRegistry(), {
@@ -22,6 +26,17 @@ function buildMbt() {
 }
 
 describe("内部件剔除 / 幽灵壳透视", () => {
+  it("金古桥肩肘护套属于外观连接件，普通模式不能按内部设备隐藏", () => {
+    const model = buildModel(makeKingJoeModuleRegistry(), { builders: kingjoeModuleBuilders });
+    try {
+      const covers = model.parts.filter((p) => p.def.tags?.includes("joint-cover"));
+      expect(covers.length).toBe(74);
+      expect(covers.every((p) => p.def.material === "kjr_silver")).toBe(true);
+      for (const cover of covers) expect(isInternalPart("kingjoemodules", cover), cover.partId).toBe(false);
+    } finally {
+      model.dispose();
+    }
+  });
   it("电池/电机/内饰算内部，充电口/散热器/泄压板/FX 算外部", () => {
     const built = build();
     try {
