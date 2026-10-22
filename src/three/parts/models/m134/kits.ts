@@ -84,14 +84,34 @@ const m134Housing: GeometryBuilder = (spec) => {
   bottom.translate(0, -h / 2 + 0.003, (z0 + z1) / 2);
   parts.push(bottom);
   // 两侧板（后段：包住电机；前段开口让旋转机匣露出）
-  for (const side of [-1, 1]) {
+  // 左侧：整块侧板 + 抛壳导板（抛壳口在左侧）
+  {
     const rearPlate = new THREE.BoxGeometry(0.006, h, 0.14);
-    rearPlate.translate(side * (w / 2 - 0.003), 0, z0 + 0.07);
+    rearPlate.translate(-(w / 2 - 0.003), 0, z0 + 0.07);
     parts.push(rearPlate);
-    // 抛壳口下沿（左侧的抛壳导板）
     const chute = new THREE.BoxGeometry(0.004, 0.05, 0.06);
-    chute.translate(side * (w / 2 - 0.003), -0.02, -0.02);
+    chute.translate(-(w / 2 - 0.003), -0.02, -0.02);
     parts.push(chute);
+  }
+  // 右侧：上/下两段侧板，中间留出观察窗（z -0.18..-0.06, y -0.02..+0.02），
+  //   使 6 套枪机的往复在连发时可见。
+  {
+    const rearPlateUpper = new THREE.BoxGeometry(0.006, 0.05, 0.14);
+    rearPlateUpper.translate(w / 2 - 0.003, h / 2 - 0.025, z0 + 0.07);
+    parts.push(rearPlateUpper);
+    const rearPlateLower = new THREE.BoxGeometry(0.006, 0.05, 0.14);
+    rearPlateLower.translate(w / 2 - 0.003, -h / 2 + 0.025, z0 + 0.07);
+    parts.push(rearPlateLower);
+    const chute = new THREE.BoxGeometry(0.004, 0.05, 0.06);
+    chute.translate(w / 2 - 0.003, -0.02, -0.02);
+    parts.push(chute);
+    // 观察窗边框（机加工倒角）
+    const frameTop = new THREE.BoxGeometry(0.006, 0.004, 0.12);
+    frameTop.translate(w / 2 - 0.003, 0.022, z0 + 0.07);
+    parts.push(frameTop);
+    const frameBottom = new THREE.BoxGeometry(0.006, 0.004, 0.12);
+    frameBottom.translate(w / 2 - 0.003, -0.022, z0 + 0.07);
+    parts.push(frameBottom);
   }
   // 供弹机座（顶部：弹链从这里进入旋转机匣的进弹位置）
   const feedBase = new THREE.BoxGeometry(0.07, 0.03, 0.08);
