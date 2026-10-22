@@ -263,8 +263,111 @@ export const bisonStandCradle: GeometryBuilder = (spec) => {
   return mergeAll(parts);
 };
 
+/** 机匣全包外壳：AK 冲压机匣外面再套一层封闭壳体，盖住枪机框/复进簧。 */
+export const bisonReceiverShell: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.050);
+  const h = num(p, "h", 0.062);
+  const z0 = num(p, "z0", -0.240);
+  const z1 = num(p, "z1", 0.060);
+  const t = num(p, "t", 0.0022);
+  const len = z1 - z0;
+  const zc = (z0 + z1) / 2;
+  const parts: THREE.BufferGeometry[] = [];
+  for (const side of [-1, 1]) {
+    const wall = box(t, h, len, 0.0004);
+    wall.translate(side * (w / 2 - t / 2), 0, zc);
+    parts.push(wall);
+    const rib = box(0.0016, 0.008, len * 0.70, 0.0003);
+    rib.translate(side * (w / 2 + 0.0006), -0.006, zc + 0.010);
+    parts.push(rib);
+  }
+  const bottom = box(w, t, len, 0.0004);
+  bottom.translate(0, -h / 2 + t / 2, zc);
+  parts.push(bottom);
+  const top = box(w, t, len, 0.0004);
+  top.translate(0, h / 2 - t / 2, zc);
+  parts.push(top);
+  const rear = box(w, h, t, 0.0004);
+  rear.translate(0, 0, z0 + t / 2);
+  parts.push(rear);
+  // 前端节套环：枪管从中心孔穿出
+  const collar = tubeZ(0.024, 0.011, 0.020, 24);
+  collar.translate(0, 0, z1 - 0.004);
+  parts.push(collar);
+  // 顶盖三条加强筋（替代被外壳盖住的旧筋）
+  for (const x of [-0.013, 0, 0.013]) {
+    const rib = box(0.0042, 0.0018, len * 0.74, 0.0003);
+    rib.translate(x, h / 2 + 0.0010, zc + 0.004);
+    parts.push(rib);
+  }
+  // 右侧拉机柄长槽压边
+  const slotTop = box(0.0014, 0.0022, 0.105, 0.0003);
+  slotTop.translate(w / 2 + 0.0005, 0.020, -0.062);
+  parts.push(slotTop);
+  const slotBottom = slotTop.clone();
+  slotBottom.translate(0, -0.016, 0);
+  parts.push(slotBottom);
+  // 后部背带环座
+  const sling = box(0.016, 0.008, 0.010, 0.0005);
+  sling.translate(-(w / 2 + 0.006), 0.004, z0 + 0.018);
+  parts.push(sling);
+  // 下机匣/发射机侧板：把 AK 血统的击锤簧、扳机簧包在机匣内；
+  // 底边停在扳机护圈上方，扳机仍从下方露出。
+  for (const side of [-1, 1]) {
+    const lower = box(t, 0.060, 0.150, 0.0004);
+    lower.translate(side * (w / 2 - t / 2), -0.061, -0.150);
+    parts.push(lower);
+    const boss = box(0.003, 0.010, 0.010, 0.0004);
+    boss.translate(side * (w / 2 + 0.0010), -0.052, -0.176);
+    parts.push(boss);
+  }
+  // 下机匣前挡板：封住击锤簧前端从侧板前缘露出的缺口
+  const lowerFront = box(w, 0.060, 0.030, 0.0008);
+  lowerFront.translate(0, -0.061, -0.060);
+  parts.push(lowerFront);
+  return mergeAll(parts);
+};
+
+/** 弹筒全包外罩：封闭圆筒 + 两道包箍 + 前后端盖 + 侧面压筋。 */
+export const bisonDrumOuter: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const r = num(p, "r", 0.0385);
+  const len = num(p, "len", 0.154);
+  const y = num(p, "y", -0.058);
+  const zc = num(p, "zc", 0.142);
+  const parts: THREE.BufferGeometry[] = [];
+  const body = cylinderZ(r, len, 40);
+  body.translate(0, y, zc);
+  parts.push(body);
+  for (const dz of [-len * 0.30, len * 0.30]) {
+    const band = cylinderZ(r + 0.0022, 0.007, 40);
+    band.translate(0, y, zc + dz);
+    parts.push(band);
+  }
+  for (const dz of [-len / 2, len / 2]) {
+    const cap = cylinderZ(r + 0.0015, 0.008, 36);
+    cap.translate(0, y, zc + dz);
+    parts.push(cap);
+  }
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2;
+    const rib = box(0.006, 0.0035, len * 0.78, 0.0004);
+    rib.rotateZ(angle);
+    rib.translate(Math.cos(angle) * (r + 0.001), y + Math.sin(angle) * (r + 0.001), zc);
+    parts.push(rib);
+  }
+  // 前部发条轴座
+  const hub = cylinderZ(0.008, 0.018, 14);
+  hub.translate(0, y, zc + len / 2 + 0.010);
+  parts.push(hub);
+  return mergeAll(parts);
+};
+
 export const bisonKits: Record<string, GeometryBuilder> = {
   bisonBarrel,
+  bisonReceiverShell,
+  bisonDrumOuter,
   bisonMuzzle,
   bisonFrontSight,
   bisonFoldingStock,

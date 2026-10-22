@@ -518,6 +518,44 @@ parts.push(
     source: "后毛毡垫：托住机匣尾下缘，吸收拆装时的磕碰。",
   }),
 
+  // ---- 外壳：正常闭合，爆炸/透视时脱开 --------------------------------------
+  p({
+    id: "bison.receiver.outer_shell",
+    name_cn: "机匣外壳（全包）",
+    name_en: "Receiver outer shell",
+    assembly: "receiver",
+    build_layer: 5,
+    geometry: { type: "kit", kit: "bisonReceiverShell", params: { w: 0.050, h: 0.062, z0: -0.240, z1: 0.060, t: 0.0022 } },
+    material: "phosphate",
+    node: "AkRecoil",
+    mate: { type: "absolute" },
+    source: "机匣全包外壳：50 × 62mm 封闭冲压壳，左右侧板、底板、顶板、尾板和前节套环把枪机框、复进簧、击发机构全部盖住；顶面三道新加强筋、右侧拉机柄槽压边和后背带环座。正常状态看不到内部，爆炸/透视时才露出 AK 血统的自动机。",
+  }),
+  p({
+    id: "bison.mag.outer_shell",
+    name_cn: "弹筒外罩（全包）",
+    name_en: "Drum outer shell",
+    assembly: "magazine",
+    build_layer: 5,
+    geometry: { type: "kit", kit: "bisonDrumOuter", params: { r: 0.0385, len: 0.154, y: BISON_DRUM.Y, zc: BISON_DRUM.CZ } },
+    material: "phosphate",
+    node: "AkRecoil",
+    mate: { type: "absolute" },
+    source: "弹筒全包外罩：封闭圆筒把螺旋导轨、29 发弹和发条簧全部罩住，只保留顶部供弹口与机匣相接；两道包箍、前后端盖、四条压筋和前端发条轴座保留了野牛弹筒的识别特征。",
+  }),
+  p({
+    id: "bison.mag.feed_tower",
+    name_cn: "供弹塔",
+    name_en: "Feed tower",
+    assembly: "magazine",
+    build_layer: 5,
+    geometry: { type: "box", w: 0.028, h: 0.030, d: 0.044, bevel: 0.0012 },
+    material: "phosphate",
+    node: "AkRecoil",
+    mate: { type: "absolute", position: [0, -0.026, 0.075] },
+    source: "供弹塔：连接弹筒顶部供弹口与机匣前下方进弹口，把供弹唇和第一发弹包在内部；外表面与机匣、弹筒外罩贴合。",
+  }),
+
   // ---- 特效 -----------------------------------------------------------------
   p({
     id: "bison.fx.muzzle_flash",
@@ -587,6 +625,11 @@ const mappedContacts = (base.expectedContacts ?? [])
   .filter((rule) => keptIds.has(rule.a) && keptIds.has(rule.b));
 
 const bisonContacts: ModelRegistry["expectedContacts"] = [
+  // 外壳是封闭碰撞代理体：内部枪机/复进簧/弹筒螺旋/供弹唇都在它的空腔里。
+  // 外壳与任何内部件的 AABB 相交都属构造性包覆，深度上限放宽到 40mm。
+  { family: "bison-shell", a: "bison.receiver.outer_shell", b: "bison.*", reason: "全包机匣外壳罩住枪机框/复进簧/击发机构（封闭代理体）", maxDepthMm: 40, allowDisplaced: true, allowSuspect: true },
+  { family: "bison-shell", a: "bison.mag.outer_shell", b: "bison.*", reason: "全包弹筒外罩罩住螺旋导轨/弹药/发条簧（封闭代理体）", maxDepthMm: 40, allowDisplaced: true, allowSuspect: true },
+  { family: "bison-shell", a: "bison.mag.feed_tower", b: "bison.*", reason: "供弹塔桥接弹筒与机匣进弹口（闭合供弹通道）", maxDepthMm: 30, allowDisplaced: true, allowSuspect: true },
   { family: "bison-stock", a: "bison.stock.mount", b: "bison.stock.hinge", reason: "铰链轴压入铰链座销孔（6mm 轴颈配合）", maxDepthMm: 8, allowDisplaced: true },
   { family: "bison-stock", a: "bison.acc.sling_loop_rear", b: "bison.stock.mount", reason: "后背带环挂在机匣尾左侧，与折叠托铰链座相邻", maxDepthMm: 5, allowDisplaced: true },
   { family: "bison-drum", a: "bison.mag.follower", b: "bison.mag.winding_spring", reason: "托弹板中心毂与发条簧同轴（前后相邻）", maxDepthMm: 3, allowDisplaced: true },
