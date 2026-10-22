@@ -212,7 +212,7 @@ function StageRuntime() {
     const warmShaders = (target: AssembledModel) => {
       const warm = () => {
         if (useStageStore.getState().assembled !== target) return;
-        void gl.compileAsync(rootScene, camera).catch(() => {});
+        gl.compileAsync(rootScene, camera).catch(() => {});
         const cached = cache.get(key);
         if (cached) cached.warmed = true;
       };
@@ -341,7 +341,15 @@ function StageRuntime() {
       floor = { y: bounds.min.y, footprint: Math.max(size.x, size.z) };
     }
     const stats = { parts: next.parts.length, triangles: Math.round(triangles) };
-    cache.set(key, { assembled: next, library, stats, home, floor, lastUsed: performance.now(), warmed: false });
+    cache.set(key, {
+      assembled: next,
+      library,
+      stats,
+      home,
+      floor,
+      lastUsed: performance.now(),
+      warmed: false,
+    });
     // 只淘汰既不是正在显示、也不是刚装配的缓存项。
     while (cache.size > MODEL_CACHE_LIMIT) {
       let victimKey: string | null = null;
@@ -413,7 +421,11 @@ function StageRuntime() {
     }
     assembled.resetNodes();
     // 停机时传 0：悬挂回到装配态（否则会停在上一帧的抬起位）
-    model.animate?.(assembled, running ? clockRef.current : 0, state);
+    model.animate?.(
+      assembled,
+      model.animationClock === "continuous" ? realTimeRef.current : running ? clockRef.current : 0,
+      state,
+    );
     // 舱盖/加油口盖是交互件：用真实帧时间平滑开合，不跟机器状态时钟走
     setArmourWet(store.views.rain);
     if (store.modelId === "tiger") {
@@ -507,10 +519,7 @@ function StageRuntime() {
     const selectedHandle = selectedPart ? assembled.getPart(selectedPart) : undefined;
     const selectedInternal = selectedHandle ? isInternalPart(modelId, selectedHandle) : false;
     const showInternals =
-      views.xray ||
-      views.explode ||
-      buildIndex < buildOrdersOf(modelId).length ||
-      selectedInternal;
+      views.xray || views.explode || buildIndex < buildOrdersOf(modelId).length || selectedInternal;
     camera.layers.enable(0);
     if (showInternals) camera.layers.enable(2);
     else camera.layers.disable(2);

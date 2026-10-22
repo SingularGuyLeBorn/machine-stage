@@ -105,6 +105,8 @@ export interface StageVariant {
 }
 
 export interface StageModel {
+  /** [OM-FREEPLAY] 连续灯效与可反向合体使用场景时钟，状态内时序由模型管理。 */
+  animationClock?: "continuous";
   id: string;
   title: string;
   subtitle: string;
@@ -154,16 +156,11 @@ const testKit = makeTestRegistry();
 const makeT800MechRegistry = () => makeT800({ decompose: true }).registry;
 
 /** 当前生效的注册表（有变体时取选中变体的）。 */
-export function activeRegistryOf(
-  modelId: string,
-  variantId?: string,
-): ModelRegistry | undefined {
+export function activeRegistryOf(modelId: string, variantId?: string): ModelRegistry | undefined {
   const model = findModel(modelId);
   if (!model) return undefined;
   if (!model.variants?.length) return model.registry;
-  return (
-    model.variants.find((item) => item.id === variantId)?.registry ?? model.variants[0].registry
-  );
+  return model.variants.find((item) => item.id === variantId)?.registry ?? model.variants[0].registry;
 }
 
 /** 当前生效的实例布局（有变体时取选中变体的）。 */
@@ -243,10 +240,11 @@ export const CATALOG: StageModel[] = [
     registry: makeKingJoeModuleRegistry(),
     builders: kingjoeModuleBuilders,
     animate: poseKingJoeModules,
+    animationClock: "continuous",
     framingBounds: moduleMotionBounds,
-    animatedStates: ["combining", "separation"],
+    animatedStates: ["idle", "closed", "combining", "separation"],
     states: [
-      { id: "idle", label: "分体检查", hint: "双臂整体跟随头肩；四模块静态展开" },
+      { id: "idle", label: "分体检查", hint: "双臂整体跟随头肩；四模块缓慢悬浮，头灯和胸窗持续发光" },
       { id: "closed", label: "整机检查", hint: "回到原模型装配位置，不播放合体动画" },
       {
         id: "combining",
@@ -422,7 +420,13 @@ export const CATALOG: StageModel[] = [
     actions: [
       { id: "suspension-run", group: "机构", label: "悬挂演示", kind: "machine-state", state: "running" },
       { id: "drive-run", group: "机构", label: "行进演示", kind: "machine-state", state: "driving" },
-      { id: "engine-start", group: "机构", label: "发动机启动", kind: "machine-state", state: "engine_start" },
+      {
+        id: "engine-start",
+        group: "机构",
+        label: "发动机启动",
+        kind: "machine-state",
+        state: "engine_start",
+      },
       { id: "refuel", group: "勤务", label: "加油（开盖）", kind: "machine-state", state: "refuel" },
       { id: "cannon-fire", group: "火力", label: "主炮击发", kind: "machine-state", state: "firing" },
       { id: "loading-run", group: "火力", label: "装填演示", kind: "machine-state", state: "loading" },
@@ -431,7 +435,13 @@ export const CATALOG: StageModel[] = [
       { id: "hit-light", group: "受击", label: "轻击（小口径）", kind: "machine-state", state: "hit_light" },
       { id: "hit-heavy", group: "受击", label: "重击（大口径）", kind: "machine-state", state: "hit_heavy" },
       { id: "hit-oblique", group: "受击", label: "斜角命中", kind: "machine-state", state: "hit_oblique" },
-      { id: "hit-ricochet", group: "受击", label: "跳弹（未穿）", kind: "machine-state", state: "hit_ricochet" },
+      {
+        id: "hit-ricochet",
+        group: "受击",
+        label: "跳弹（未穿）",
+        kind: "machine-state",
+        state: "hit_ricochet",
+      },
       { id: "damage-intact", group: "战损", label: "完好", kind: "damage", level: "intact" },
       { id: "damage-dented", group: "战损", label: "破损（凹陷/裂痕）", kind: "damage", level: "damaged" },
       { id: "damage-broken", group: "战损", label: "破碎（断面露内构）", kind: "damage", level: "broken" },
@@ -474,12 +484,24 @@ export const CATALOG: StageModel[] = [
     animate: animateMbt,
     motionParts: MBT_MOTION_PARTS,
     states: [
-      { id: "idle", label: "停机", hint: "全车静止；可拖构建滑杆自内向外看 V12 动力 → 悬挂 → 战斗室 → 复合装甲" },
-      { id: "engine_start", label: "发动机启动", hint: "起动机拖动曲轴 → 逐缸点火 → 转速爬升到 620r/min 怠速" },
+      {
+        id: "idle",
+        label: "停机",
+        hint: "全车静止；可拖构建滑杆自内向外看 V12 动力 → 悬挂 → 战斗室 → 复合装甲",
+      },
+      {
+        id: "engine_start",
+        label: "发动机启动",
+        hint: "起动机拖动曲轴 → 逐缸点火 → 转速爬升到 620r/min 怠速",
+      },
       { id: "running", label: "怠速运转", hint: "曲轴/12 活塞/12 连杆/48 气门/双凸轮轴/双涡轮/风扇全部在动" },
       { id: "drive", label: "行进演示", hint: "履带滚动 + 14 轮独立起伏 + 传动齿轮转动；车体前后来回" },
       { id: "suspension", label: "液气悬挂", hint: "14 站液压缸/活塞杆/蓄能器独立随地形伸缩" },
-      { id: "aim", label: "炮塔瞄准", hint: "炮塔 +31°/−20° 回转 + 火炮 ±5.7° 俯仰；炮塔回正时驾驶员舱盖弹起并掀开再闭合" },
+      {
+        id: "aim",
+        label: "炮塔瞄准",
+        hint: "炮塔 +31°/−20° 回转 + 火炮 ±5.7° 俯仰；炮塔回正时驾驶员舱盖弹起并掀开再闭合",
+      },
       { id: "loading", label: "自动装弹机", hint: "转盘选弹 → 提弹机抬升 → 推弹杆推入炮膛 → 炮闩关闭" },
       { id: "fire", label: "主炮击发", hint: "后坐 340mm → 炮口焰 → 抽烟装置排烟 → 开闩抛壳" },
       { id: "era_hit", label: "ERA 被击中", hint: "首上反应装甲单块爆炸，来袭弹被推开" },
@@ -489,7 +511,13 @@ export const CATALOG: StageModel[] = [
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
     ],
     actions: [
-      { id: "mbt-engine-start", group: "动力", label: "发动机启动", kind: "machine-state", state: "engine_start" },
+      {
+        id: "mbt-engine-start",
+        group: "动力",
+        label: "发动机启动",
+        kind: "machine-state",
+        state: "engine_start",
+      },
       { id: "mbt-run", group: "动力", label: "怠速运转", kind: "machine-state", state: "running" },
       { id: "mbt-drive", group: "机動", label: "行进演示", kind: "machine-state", state: "drive" },
       { id: "mbt-suspension", group: "机動", label: "液气悬挂", kind: "machine-state", state: "suspension" },
@@ -532,13 +560,25 @@ export const CATALOG: StageModel[] = [
     readouts: edriveReadouts,
     states: [
       { id: "idle", label: "静音待机", hint: "纯电静音：无发动机、无排气；仪表显示电量/母线电压/电机温度" },
-      { id: "silent_drive", label: "静音行驶", hint: "双电机低噪驱动履带，车体低频起伏，静音滑行（噪声约 42dB）" },
+      {
+        id: "silent_drive",
+        label: "静音行驶",
+        hint: "双电机低噪驱动履带，车体低频起伏，静音滑行（噪声约 42dB）",
+      },
       { id: "boost", label: "瞬时加速", hint: "电机瞬时扭矩，0→加速无换挡顿挫；功率表打到 1200kW" },
       { id: "e_steer_left", label: "差速左转", hint: "左电机 900rpm / 右电机 3200rpm，左右履带差速转向" },
       { id: "e_steer_right", label: "差速右转", hint: "右电机 900rpm / 左电机 3200rpm，电动差速右转" },
       { id: "regen", label: "能量回收", hint: "制动/下坡：电机反拖发电，电量表上升，回收功率约 −420kW" },
-      { id: "charging", label: "快充", hint: "充电桩接快充口：装甲盖打开、充电枪锁止、800V 快充（电量爬升）" },
-      { id: "battery_hit", label: "电池被击中", hint: "电池包中弹：短路火星 → 热失控火球/浓烟，Pack 5 顶部泄压" },
+      {
+        id: "charging",
+        label: "快充",
+        hint: "充电桩接快充口：装甲盖打开、充电枪锁止、800V 快充（电量爬升）",
+      },
+      {
+        id: "battery_hit",
+        label: "电池被击中",
+        hint: "电池包中弹：短路火星 → 热失控火球/浓烟，Pack 5 顶部泄压",
+      },
       { id: "thermal_runaway", label: "热失控", hint: "热失控持续蔓延：高温/火焰/烟，电量骤降" },
       { id: "aim", label: "炮塔瞄准", hint: "炮塔回转 + 火炮俯仰（复用 MBT 火力系统）" },
       { id: "loading", label: "自动装弹机", hint: "转盘选弹 → 提弹臂 → 推弹杆 → 炮闩关闭" },
@@ -553,7 +593,13 @@ export const CATALOG: StageModel[] = [
       { id: "ed-stop", group: "电驱", label: "停机", kind: "machine-state", state: "idle" },
       { id: "ed-regen", group: "能量", label: "能量回收", kind: "machine-state", state: "regen" },
       { id: "ed-charge", group: "能量", label: "快充", kind: "machine-state", state: "charging" },
-      { id: "ed-battery-hit", group: "防护", label: "电池被击中", kind: "machine-state", state: "battery_hit" },
+      {
+        id: "ed-battery-hit",
+        group: "防护",
+        label: "电池被击中",
+        kind: "machine-state",
+        state: "battery_hit",
+      },
       { id: "ed-runaway", group: "防护", label: "热失控", kind: "machine-state", state: "thermal_runaway" },
       { id: "ed-aim", group: "火力", label: "炮塔瞄准", kind: "machine-state", state: "aim" },
       { id: "ed-loading", group: "火力", label: "自动装弹", kind: "machine-state", state: "loading" },

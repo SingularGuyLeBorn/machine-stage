@@ -479,7 +479,7 @@ describe("参考图四模块闭合分体", () => {
         if (Math.abs(positions.getY(i) - 4.6) < 0.01) red.push(colors.getX(i));
       // 同一高度横向也有明显色团变化，不能退回仅随高度着色的条纹。
       expect(Math.max(...red) - Math.min(...red)).toBeGreaterThan(0.12);
-      expect(registry.materials.kjm_glass!.vertexColors).toBe(true);
+      expect(registry.materials[window.def.material]!.vertexColors).toBe(true);
     }
     expect(registry.parts.some((p) => /chest.*(louver|grille|spine)/.test(p.id))).toBe(false);
     model.dispose();

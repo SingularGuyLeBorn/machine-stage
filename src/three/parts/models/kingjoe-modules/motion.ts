@@ -1,6 +1,7 @@
 import type { AssembledModel } from "../../assembler/assembler";
 import { Box3, Vector3 } from "three";
 import { getModuleEffects, hideModuleEffects } from "./effects";
+import { updateModuleIllumination } from "./illumination";
 
 export const MODULE_KEYS = ["legs", "pelvis", "chest", "head_arms"] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -88,7 +89,8 @@ export function moduleMotionBounds(model: AssembledModel): Box3 {
       bounds.union(g.boundingBox!.clone().translate(new Vector3(...pose[key])));
     }
   }
-  return bounds;
+  // [OM-FREEPLAY] 覆盖远距轻倾与悬浮的最大包络，防止合体取景裁掉天线。
+  return bounds.expandByScalar(0.75);
 }
 
 // [OM-FREEPLAY] 先让腿部就位，再腹盆、胸甲、头肩依次完成近距放电和吸合。
@@ -160,14 +162,37 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
     const from = entry.from[key];
     if (state === "combining") {
       const elapsed = (time - DOCK_DELAYS[key]) * (key === "legs" ? 6.8 / 1.2 : 1);
-      entry.open[key] = from <= 1e-8 ? 0 : elapsed < 0 ? from : combineOpenness(elapsed + inverseClose(from));
+      // 等待期间也沿原飞行曲线慢慢接近；正式进场从等待终点继续，无跳位。
+      // [OM-FREEPLAY] 预靠近最多占开放行程的 10%，保留充分的模块间距。
+      const drift = DOCK_DELAYS[key] > 0 ? Math.min(0.1, Math.max(0, from - 0.65)) : 0;
+      const waiting = from - drift * smooth(time / Math.max(0.001, DOCK_DELAYS[key]));
+      entry.open[key] =
+        from <= 1e-8 ? 0 : elapsed < 0 ? waiting : combineOpenness(elapsed + inverseClose(from - drift));
     } else if (state === "separation")
       entry.open[key] = from + (1 - from) * separationOpenness(time * (key === "head_arms" ? 3.9 / 2.3 : 1));
     else entry.open[key] = state === "closed" ? 0 : 1;
   }
   const pose = modulePose(entry.open, model.constants.DISPLAY_SPACING!);
   for (const key of MODULE_KEYS) {
-    model.getNode(`Module_${key}`)?.position.set(...pose[key]);
+    const node = model.getNode(`Module_${key}`)!;
+    node.position.set(...pose[key]);
+    // 以本体中心轻倾而不是绕世界原点翻转；脱榫/吸合近场严格恢复原配合姿态。
+    // 悬浮仅依赖绝对时钟与开放量，同一时刻反向播放也不会跳动。
+    const float = smooth((entry.open[key] - 0.4) / 0.6);
+    const phase = MODULE_KEYS.indexOf(key) * 1.73;
+    node.rotation.set(
+      float * (0.065 * Math.sin(seconds * 0.69 + phase)),
+      float * (0.08 * Math.sin(seconds * 0.43 + phase)),
+      float * (0.09 * Math.cos(seconds * 0.57 + phase)),
+    );
+    const geometry = model.getPart(`kingjoemodules.${key}.body`)!.geometry;
+    if (!geometry.boundingBox) geometry.computeBoundingBox();
+    const center = geometry.boundingBox!.getCenter(new Vector3());
+    node.position.add(center.clone().sub(center.applyQuaternion(node.quaternion)));
+    node.position.x += float * 0.045 * Math.sin(seconds * 0.63 + phase);
+    node.position.y +=
+      float * (0.11 * Math.sin(seconds * 1.1 + phase) + 0.035 * Math.sin(seconds * 1.79 + phase));
+    node.position.z += float * 0.045 * Math.cos(seconds * 0.71 + phase);
     const deployment = smooth((entry.open[key] - 0.05) / 0.8);
     for (const side of [-1, 1]) {
       const antenna = model.getNode(`Antenna_${key}_${side < 0 ? "l" : "r"}`);
@@ -181,6 +206,7 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
       }
     }
   }
+  updateModuleIllumination(model, seconds);
   if (state === "combining" || state === "separation") {
     model.root.updateMatrixWorld(true);
     getModuleEffects(model).update(seconds, entry.open);

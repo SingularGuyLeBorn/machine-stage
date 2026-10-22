@@ -239,7 +239,13 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
       node: "ModuleHeadDetails",
       build_order: 5 + i,
     }));
-  const parts: PartDefinition[] = [...bodies, ...details, ...visorParts, ...chestWindowParts, ...antennaParts];
+  const parts: PartDefinition[] = [
+    ...bodies,
+    ...details,
+    ...visorParts,
+    ...chestWindowParts,
+    ...antennaParts,
+  ];
   // 本卡早期用 1..47 的局部 build_order；并入主线后统一抬到 ≥100，
   // 保留原有先后顺序（main 的 validate 以 <100 为错误）。
   const orderMap = new Map<number, number>();
@@ -291,7 +297,15 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
     ],
     materials: {
       ...KINGJOE_SKIN_MATERIALS,
-      kjm_glass: {
+      kjm_glass_l: {
+        base: "#ffffff",
+        metalness: 0.18,
+        roughness: 0.34,
+        vertexColors: true,
+        clearcoat: 0.65,
+        clearcoatRoughness: 0.2,
+      },
+      kjm_glass_r: {
         base: "#ffffff",
         metalness: 0.18,
         roughness: 0.34,

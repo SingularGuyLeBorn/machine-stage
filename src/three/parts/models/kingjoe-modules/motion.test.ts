@@ -17,6 +17,34 @@ import skin from "../kingjoe-skin/segments.generated.json";
 
 const create = () => buildModel(makeKingJoeModuleRegistry(), { builders: kingjoeModuleBuilders });
 describe("分体、吸合和接触面电弧", () => {
+  it("待对接模块持续悬浮、预靠近且带倾角，近场恢复直立", () => {
+    const model = create();
+    animateKingJoeModules(model, 0, "idle");
+    animateKingJoeModules(model, 0, "combining");
+    const start = model.getNode("Module_head_arms")!.position.clone();
+    animateKingJoeModules(model, 3, "combining");
+    const first = model.getNode("Module_head_arms")!.position.clone();
+    const rotation = model.getNode("Module_head_arms")!.quaternion.clone();
+    animateKingJoeModules(model, 4, "combining");
+    const node = model.getNode("Module_head_arms")!;
+    expect(node.position.distanceTo(first)).toBeGreaterThan(0.02);
+    const heights = [4, 4.3, 4.6, 4.9].map((time) => {
+      animateKingJoeModules(model, time, "combining");
+      return node.position.y;
+    });
+    expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(0.015);
+    expect(rotation.angleTo(node.quaternion)).toBeGreaterThan(0.01);
+    expect(node.position.distanceTo(start)).toBeGreaterThan(0.04);
+    animateKingJoeModules(model, 17.8, "combining");
+    expect(node.quaternion.angleTo(new THREE.Quaternion())).toBeLessThan(1e-8);
+    const fx = getModuleEffects(model);
+    expect(fx.rigs[2]!.rings.every((ring) => ring.visible)).toBe(true);
+    expect(fx.rigs[2]!.rings[0]!.position.y).not.toBe(fx.rigs[2]!.center.y);
+    animateKingJoeModules(model, 22, "combining");
+    expect(node.position.length()).toBe(0);
+    expect(fx.group.visible).toBe(false);
+    model.dispose();
+  });
   it("近距速度近似匀减速，末段加速吸合，回弹不侵入另一实体", () => {
     const speed = (t: number) => (combineOpenness(t - 0.001) - combineOpenness(t + 0.001)) / 0.002;
     const speeds = [2.6, 3.2, 3.8, 4.4, 5].map(speed);
