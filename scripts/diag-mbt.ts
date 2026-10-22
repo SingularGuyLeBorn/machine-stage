@@ -5,6 +5,7 @@
 import { buildModel } from "../src/three/parts/assembler/assembler";
 import { validateRegistry } from "../src/three/parts/registry/validate";
 import { detectFloatingIslands, detectUnsupportedParts } from "../src/three/parts/solver/support";
+import { detectKitIslands } from "../src/three/parts/solver/kitConnectivity";
 import { detectStatic } from "../src/three/parts/solver/detect";
 import { partitionExpectedContacts } from "../src/three/parts/solver/whitelist";
 import { makeMbtRegistry, makeMbtLayouts, mbtBuilders } from "../src/three/parts/models/mbt/registry";
@@ -51,6 +52,16 @@ for (const island of islands.islands.slice(0, 10)) {
   console.log(`    ${island.size} 件：${island.refs.join(", ")}`);
 }
 
+// 件级支撑看不到合并 kit 内部断开（例如烟幕器上排两管）：单独扫子块连通。
+const kitIslands = detectKitIslands(built, { maxGapM: 0.02 });
+console.log(`  合并件内部悬空：${kitIslands.length} 处`);
+for (const row of kitIslands.slice(0, 12)) {
+  console.log(
+    `    ${row.partId}（${row.name}）${row.orphanPieces} 子块 / ${row.instances} 实例，` +
+      `最近外部零件 ${row.gap_mm === null ? "—" : `${row.gap_mm.toFixed(1)}mm`}，最大子块 ${row.size_mm.toFixed(1)}mm`,
+  );
+}
+
 let unexcused = 0;
 if (!skipStatic) {
   const started = performance.now();
@@ -77,5 +88,11 @@ if (!skipStatic) {
 
 built.dispose();
 process.exit(
-  errors.length > 0 || support.length > 0 || islands.islands.length > 0 || unexcused > 0 ? 1 : 0,
+  errors.length > 0 ||
+    support.length > 0 ||
+    islands.islands.length > 0 ||
+    kitIslands.length > 0 ||
+    unexcused > 0
+    ? 1
+    : 0,
 );

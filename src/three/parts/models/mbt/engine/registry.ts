@@ -1277,7 +1277,11 @@ function buildParts(): PartDefinition[] {
       assembly: "turbo",
       build_layer: 3,
       build_order: 457,
-      geometry: MERGE(C(0.045, 0.9, [0, 0, 0], 20), C(0.055, 0.05, [side * 0.42, 0, 0], 18)),
+      geometry: MERGE(
+        C(0.045, 0.9, [0, 0, 0], 20),
+        // 端部法兰与总管同轴（放在总管端头），不再用一个横向短接管硬连。
+        C(0.055, 0.05, [0, side * 0.45, 0], 18),
+      ),
       material: "mbt_rust",
       mate: A(bankPoint(side, 0, 0.39, side * 0.16), [0, 0, -90]),
     });
