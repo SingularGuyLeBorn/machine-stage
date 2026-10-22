@@ -11,8 +11,9 @@ import {
   type AssembledModel,
 } from "@/three/parts";
 import { findModel, type StageModel } from "../catalog";
-import { faultFromError, useStageStore } from "../state/stageStore";
+import { buildOrdersOf, faultFromError, useStageStore } from "../state/stageStore";
 import { applyDamage, applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
+import { isInternalPart } from "./internal";
 import { Weather } from "./Weather";
 import { setArmourWet } from "@/three/parts/kernel/armourSurface";
 import { TigerVfx } from "./vfx/TigerVfx";
@@ -45,6 +46,17 @@ function motionPartsOf(model: StageModel): ReadonlySet<string> | undefined {
     motionPartSets.set(model, set);
   }
   return set;
+}
+
+const originalRaycasts = new WeakMap<THREE.Object3D, THREE.Object3D["raycast"]>();
+function setPickable(object: THREE.Object3D, pickable: boolean): void {
+  if (pickable) {
+    const original = originalRaycasts.get(object);
+    if (original) object.raycast = original;
+  } else if (!originalRaycasts.has(object)) {
+    originalRaycasts.set(object, object.raycast);
+    object.raycast = () => {};
+  }
 }
 
 export function StageCanvas() {
@@ -131,6 +143,9 @@ function SceneEnvIntensity({ value }: { value: number }) {
 }
 
 function StageEffects() {
+  const xray = useStageStore((state) => state.views.xray);
+  // 透视时物体大量重叠，AO/Bloom 意义不大且会放大混合开销；直接走默认帧缓冲。
+  if (xray) return null;
   return (
     <EffectComposer multisampling={4}>
       <N8AO halfRes quality="medium" aoRadius={0.45} intensity={1.15} distanceFalloff={0.9} color="#26303c" />
@@ -145,6 +160,9 @@ function StageRuntime() {
   const rebuildToken = useStageStore((state) => state.rebuildToken);
   const overrides = useStageStore((state) => state.overrides);
   const views = useStageStore((state) => state.views);
+  const buildIndex = useStageStore((state) => state.buildIndex);
+  const selectedPart = useStageStore((state) => state.selectedPart);
+  const camera = useThree((state) => state.camera);
   const [scene, setScene] = useState<{ assembled: AssembledModel; seq: number } | null>(null);
   const seqRef = useRef(0);
   const [labelPoints, setLabelPoints] = useState<
@@ -246,6 +264,7 @@ function StageRuntime() {
       // 注意：释放必须放在「构建 effect」而不是子组件的 effect 里 —— StrictMode 会
       // 双调用子组件 effect，那样会把正在使用的模型误释放（场景里只剩空 Group）。
       store.detach();
+      applyXray(next, false);
       clearPose(next);
       next.dispose();
       library.dispose();
@@ -305,8 +324,13 @@ function StageRuntime() {
   // ---- 透视 / 战损 / 高亮 ----
   useEffect(() => {
     if (!assembled) return;
-    applyXray(assembled, views.xray);
-  }, [assembled, views.xray]);
+    // 外壳才做幽灵壳；内部件保持不透明，避免近千层透明混合。
+    // 选中内部件时自动幽灵化外壳，保证从零件树聚焦内部件时能看见。
+    const selectedHandle = selectedPart ? assembled.getPart(selectedPart) : undefined;
+    const selectedInternal = selectedHandle ? isInternalPart(modelId, selectedHandle) : false;
+    applyXray(assembled, views.xray || selectedInternal, (handle) => !isInternalPart(modelId, handle));
+    return () => applyXray(assembled, false);
+  }, [assembled, views.xray, modelId, selectedPart]);
 
   const damage = useStageStore((state) => state.damage);
   useEffect(() => {
@@ -314,7 +338,6 @@ function StageRuntime() {
     applyDamage(assembled, damage);
   }, [assembled, damage]);
 
-  const selectedPart = useStageStore((state) => state.selectedPart);
   const selectedInstance = useStageStore((state) => state.selectedInstance);
   const hoveredPart = useStageStore((state) => state.hoveredPart);
   const hoveredInstance = useStageStore((state) => state.hoveredInstance);
@@ -362,6 +385,31 @@ function StageRuntime() {
     store.setLidOpen(lid.key, !open);
   };
 
+  // ---- 渲染剔除：外部视角不画装甲内部件；透视/爆炸/构建回放/选中内部件时显示 ----
+  useEffect(() => {
+    if (!assembled) return;
+    const selectedHandle = selectedPart ? assembled.getPart(selectedPart) : undefined;
+    const selectedInternal = selectedHandle ? isInternalPart(modelId, selectedHandle) : false;
+    const showInternals =
+      views.xray ||
+      views.explode ||
+      buildIndex < buildOrdersOf(modelId).length ||
+      selectedInternal;
+    camera.layers.enable(0);
+    if (showInternals) camera.layers.enable(2);
+    else camera.layers.disable(2);
+    for (const handle of assembled.parts) {
+      if (!isInternalPart(modelId, handle)) continue;
+      handle.object.layers.set(2);
+      setPickable(handle.object, showInternals);
+      for (const variant of Object.values(handle.damageObjects)) {
+        if (!variant) continue;
+        variant.layers.set(2);
+        setPickable(variant, showInternals);
+      }
+    }
+  }, [assembled, modelId, camera, views.xray, views.explode, buildIndex, selectedPart]);
+
   // 开发期自检钩子（QA 截图 / 控制台调试；生产构建不写）
   const three = useThree();
   useEffect(() => {
@@ -372,6 +420,7 @@ function StageRuntime() {
       scene: three.scene,
       camera: three.camera,
       controls: three.controls,
+      gl: three.gl,
     };
   }, [assembled, three]);
 

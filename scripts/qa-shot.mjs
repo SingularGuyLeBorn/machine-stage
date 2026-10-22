@@ -13,6 +13,8 @@ const out = arg("out", "docs/qa/shot.jpeg");
 
 const nav = arg("nav", "");
 const click = arg("click", "");
+const viewport = arg("viewport", "");
+const dsf = Number(arg("dsf", "1"));
 const list = await (await fetch("http://127.0.0.1:9223/json/list")).json();
 const page =
   list.find((p) => p.type === "page" && p.url.includes("5175")) ??
@@ -38,6 +40,10 @@ ws.addEventListener("message", (event) => {
 await new Promise((resolve) => ws.addEventListener("open", resolve, { once: true }));
 await send("Runtime.enable");
 await send("Page.enable");
+if (viewport) {
+  const [width, height] = viewport.split("x").map(Number);
+  await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: dsf, mobile: false });
+}
 if (nav) {
   await send("Page.navigate", { url: nav });
   await new Promise((resolve) => setTimeout(resolve, 2600));

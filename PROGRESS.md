@@ -20,7 +20,7 @@ npx tsx scripts/diag-edrive.ts
 
 ```
 npx tsc --noEmit            # 0 错
-npx vitest run              # 244 passed / 1 skipped（ED-90 11 项）
+npx vitest run              # 247 passed / 1 skipped（ED-90 12 项 + 渲染内部件 2 项）
 ```
 
 截图：`docs/qa/ed90-hero.jpeg`、`ed90-rear.jpeg`、`ed90-drive.jpeg`、`ed90-charging.jpeg`、`ed90-battery-hit.jpeg`、`ed90-xray-pack.jpeg`、`ed90-cockpit-xray.jpeg`、`ed90-regen.jpeg`。
@@ -51,6 +51,24 @@ npx vitest run              # 244 passed / 1 skipped（ED-90 11 项）
 ## 切换性能（本轮一并修复）
 
 自动 `attach` 静态扫描在 MBT 上单次 41s，是切模型卡顿主因。改为**按需扫描**（ClippingPanel/面板重扫），切换只做装配。浏览器同会话实测：MBT 冷 859ms / 热 715ms，Tiger 热 919ms；首次 Tiger 5.6s 为材质/着色器首编译。MBT 与 ED 的门禁扫描仍离线完整执行。
+
+## 渲染性能分析 / 优化（2026-10-22）
+
+实测环境：RTX 5070 Ti（ANGLE D3D11）、1600×1000 CSS + dpr 1.5（canvas 1431×1244），以及 4K（canvas 4791×2984）。
+
+| 场景 | 优化前 | 优化后 |
+|---|---|---|
+| ED 普通视角 | 60fps（1942 calls / 7.38M tris/帧，含阴影） | 60fps（814 calls / 5.82M tris/帧） |
+| ED 透视 | **22.2fps（45.1ms/帧，p95 50.5ms）** | **60.3fps（16.6ms/帧）** |
+| ED 4K 普通 / 透视 | — / — | 60fps / **59.9fps** |
+| ED 行驶 / 爆炸 | 60fps | 60fps |
+
+结论：**三角面数量本身不是瓶颈**（4K、7M tris/帧仍 60fps）；真正的两类浪费是：
+
+1. **透视把所有零件材质都改成半透明**：975 个零件、数百万三角面全部进入透明排序 + 混合，22fps。现在只给**外壳**克隆“幽灵材质”，内部件保持不透明；透视下关闭 N8AO/Bloom/Vignette/MSAA（`StageEffects` 直接返回 null）。
+2. **普通视角仍渲染/投影装甲内部件**：电池/电机/内饰/发动机被装甲挡住但仍产生 draw call 和阴影。现在内部件放 layer 2，普通视角相机关闭该层、同时禁用其 raycast；透视/爆炸/构建回放/选中内部件时自动开启 layer 2。选中内部件会自动幽灵化外壳，方便从零件树聚焦。
+
+实现：`app/three/internal.ts`（内部件判定）、`StageCanvas`（layer/raycast 剔除、透视 predicate、透视关后处理）、`pose.ts#applyXray`（外壳 ghost 材质克隆 + 还原）、`scripts/qa-shot.mjs` 增加 viewport/dsf 供性能测量；`__stage.gl` 暴露渲染器供诊断。统计面板里的“三角面”仍是**模型总面数**（不是当前帧实际渲染面数）。
 
 ## 已知边界
 
