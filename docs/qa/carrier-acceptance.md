@@ -21,13 +21,13 @@
 ## 2026-10-23 外形/真实感返工
 - **舰体型线**：舰体外板从“直壁挤出 + 顶部薄环带”改为 **56 站理论型线放样**：水线以下椭圆舭部收窄、水线以上外飘、艏柱前倾（甲板缘前伸 2.08）、艉部船底上翘（巡洋舰艉）。水下单独放样红漆壳体，水线黑色 boot topping 由同一型线生成；水线漆带不再用平板贴片。
 - **首尾与甲板**：9.3° 斜角着舰跑道（中线 25 段/边线 10 段/钢琴键 8 根/接地点 6 块/端线）全部按跑道 s/d 参数化并同角度旋转；停机位框线缩小并避开着舰区；直升机点移至左舷前部；舰艏回收角、外飘舷台支撑梁保留。
-- **海态**：新增半透明涌浪海面（44×82 网格）+ 艏浪 + 艉流/开尔文尾迹；水下舰体、球鼻艏、双桨双舵可从水面下或透明海面看到。海面/尾流用 `fx` 标签，不参与结构检测，但常显（不撑大取景）。
+- **海态**：新增半透明涌浪海面（44×82 网格）+ 程序化水面材质（多方向正弦高度场 → 法线/粗糙度 + 碎浪白斑，`preset:"water"`，非金属板缝流程）+ 艏浪 + 艉流/开尔文尾迹；水下舰体、球鼻艏、双桨双舵可从水面下或透明海面看到。海面/尾流用 `fx` 标签，不参与结构检测，但常显（不撑大取景）。
 - **雷达/近防**：四面阵 T/R 由 8×8 提升到 **10×10（共 400 单元）**；雷达/裸钢 envMapIntensity 与 roughness 下调，去除岛顶白斑。
 - **甲板使用痕迹**：着舰轮胎擦痕 22 段、油污 8 处、挡焰板烧蚀 3 处（贴甲板薄片，非贴图伪造）。
 - **舰载机**：按 j20.ts 的气动布局重做——三角翼（内翼根弦 0.76 / 外翼后掠 0.34）、全动**外倾**垂尾（无平尾/无独立方向舵）、前置鸭翼、DSI 鼓包/唇口、12 片锯齿喷口调节片、EOTS 下颌窗、6 处 EODAS、腹部弹舱门/铰链、背脊整流、放气百叶、侧操纵台、机身棱线、铆钉列/蒙皮对缝；涂装改为低金属度哑光隐身灰。折叠外翼、尾钩、加强起落架、牵引杆保留。**说明：不是把 4875 行 j20.ts 逐行搬进来**，是按其结构清单和尺寸关系重构的舰载型；内部框段/口盖密度仍低于原文件。
 - **零件树**：总成第一层默认展开，L 分组默认折叠；反向联动选中仍会自动展开。
-- **证据**：`docs/qa/carrier-bow-quarter.jpeg`、`carrier-stern-quarter.jpeg`、`carrier-aircraft-j20.jpeg`、`carrier-ciws-support.jpeg`、`carrier-deck-wear.jpeg`、`carrier-underwater.jpeg`、`carrier-island-radar.jpeg`、`carrier-runway-marking.jpeg`、`carrier-tree-default.jpeg`、`carrier-hull-loft-side.jpeg`、`carrier-hull-close.jpeg`。
-- **已知差距（如实）**：海面仍以半透明平面 + 泡沫带表达，没有 FFT/法线贴图级海浪；舰载机已按 J-20 布局重构，但零件密度仍低于 j20.ts 原文件；首帧全舰远视角在低端 GPU 上编译/绘制期间可能短暂黑屏（工程机复现，非持续黑屏）；这些不当作“已完成”。
+- **证据**：`docs/qa/carrier-bow-quarter.jpeg`、`carrier-stern-quarter.jpeg`、`carrier-sea-water.jpeg`、`carrier-aircraft-j20.jpeg`、`carrier-ciws-support.jpeg`、`carrier-deck-wear.jpeg`、`carrier-underwater.jpeg`、`carrier-island-radar.jpeg`、`carrier-runway-marking.jpeg`、`carrier-tree-default.jpeg`、`carrier-hull-loft-side.jpeg`、`carrier-hull-close.jpeg`。
+- **已知差距（如实）**：海面是程序化涌浪网格 + 法线/粗糙度 + 泡沫带，不是 FFT/体渲染级海况；舰载机已按 J-20 布局重构，但零件密度仍低于 j20.ts 原文件；首帧全舰远视角在低端 GPU 上编译/绘制期间可能短暂黑屏（工程机复现，非持续黑屏）；这些不当作“已完成”。
 
 ## 外形返工（第一批）
 - [x] **斜角甲板**：飞行甲板改成不对称轮廓，左舷斜角外飘/艉部最宽、向艏收窄；着舰跑道中线从左舷艉向右舷前倾斜约 9.3°（在 6°~14° 内），带连续边线/中线/端线/接地点横杠。

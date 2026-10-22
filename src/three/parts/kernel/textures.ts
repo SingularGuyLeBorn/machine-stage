@@ -25,6 +25,7 @@ export type TexturePreset =
   | "canvas"
   | "rust"
   | "primer"
+  | "water"
   | "none";
 
 export interface MaterialSpec {
@@ -152,6 +153,18 @@ const PRESET_OPTIONS: Record<Exclude<TexturePreset, "none">, PresetOptions> = {
     mottle: 0.5,
     grain: 26,
     normalStrength: 0.7,
+  },
+  water: {
+    seed: 81021,
+    size: 512,
+    base: "#1b3b42",
+    roughness: 0.26,
+    seams: false,
+    rivets: false,
+    streak: 0,
+    mottle: 0,
+    grain: 0,
+    normalStrength: 1.8,
   },
   wood: {
     seed: 1357,
@@ -445,6 +458,70 @@ export function presetTextures(preset: Exclude<TexturePreset, "none">, repeat: [
     return cached;
   }
   const opt = PRESET_OPTIONS[preset];
+  if (preset === "water") {
+    // 水面单独生成：多方向正弦涌浪的高度场 → 法线/粗糙度，叠加碎浪白斑；
+    // 不套用金属板缝/铆钉流程，避免“金属海面”。
+    const size = 512;
+    const rand = mulberry32(opt.seed);
+    const makeCanvas = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = size;
+      return canvas;
+    };
+    const colorCanvas = makeCanvas();
+    const roughCanvas = makeCanvas();
+    const heightCanvas = makeCanvas();
+    const colorCtx = colorCanvas.getContext("2d")!;
+    const roughCtx = roughCanvas.getContext("2d")!;
+    const heightCtx = heightCanvas.getContext("2d")!;
+    const colorImg = colorCtx.createImageData(size, size);
+    const roughImg = roughCtx.createImageData(size, size);
+    const heightImg = heightCtx.createImageData(size, size);
+    const TAU = Math.PI * 2;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const u = (x / size) * TAU;
+        const v = (y / size) * TAU;
+        const h =
+          0.5 +
+          0.2 * Math.sin(u * 2 + v * 1.3 + Math.sin(v * 2) * 1.1) +
+          0.13 * Math.sin(v * 4 - u * 1.7) +
+          0.08 * Math.sin((u + v) * 7 + Math.cos(u * 3)) +
+          0.04 * Math.sin((u - v) * 13);
+        const shallow = Math.max(0, h - 0.74) * 3.2;
+        const foam = Math.min(1, shallow * (0.55 + rand() * 0.7));
+        const i = (y * size + x) * 4;
+        const shade = 150 + h * 55;
+        colorImg.data[i] = Math.min(255, shade + foam * 90);
+        colorImg.data[i + 1] = Math.min(255, shade + 6 + foam * 95);
+        colorImg.data[i + 2] = Math.min(255, shade + 10 + foam * 98);
+        colorImg.data[i + 3] = 255;
+        const rough = 0.12 + (1 - h) * 0.52 + foam * 0.3;
+        const rv = Math.round(rough * 255);
+        roughImg.data[i] = roughImg.data[i + 1] = roughImg.data[i + 2] = rv;
+        roughImg.data[i + 3] = 255;
+        const hv = Math.round(90 + h * 130);
+        heightImg.data[i] = heightImg.data[i + 1] = heightImg.data[i + 2] = hv;
+        heightImg.data[i + 3] = 255;
+      }
+    }
+    colorCtx.putImageData(colorImg, 0, 0);
+    roughCtx.putImageData(roughImg, 0, 0);
+    heightCtx.putImageData(heightImg, 0, 0);
+    const map = new THREE.CanvasTexture(colorCanvas);
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.wrapS = map.wrapT = THREE.RepeatWrapping;
+    map.anisotropy = 8;
+    map.repeat.set(repeat[0], repeat[1]);
+    const roughnessMap = new THREE.CanvasTexture(roughCanvas);
+    roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
+    roughnessMap.anisotropy = 8;
+    roughnessMap.repeat.set(repeat[0], repeat[1]);
+    const normalMap = heightToNormalMap(heightCanvas, 1.8);
+    const set = { map, roughnessMap, normalMap, repeat };
+    textureCache.set(key, set);
+    return set;
+  }
   const rand = mulberry32(opt.seed);
   const size = opt.size;
   const create = () => {

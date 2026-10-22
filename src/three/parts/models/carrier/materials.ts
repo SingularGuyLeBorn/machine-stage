@@ -46,6 +46,6 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_warning: { base: "#d9a62f", metalness: 0.05, roughness: 0.7, emissive: "#4a2c00", envMapIntensity: 0.6 },
   cv_water: { base: "#41636e", metalness: 0.1, roughness: 0.25, preset: "none", envMapIntensity: 1.0 },
   cv_canvas: { base: "#5e6359", metalness: 0.0, roughness: 0.95, preset: "rubber", envMapIntensity: 0.4 },
-  cv_sea: { base: "#12313a", metalness: 0.0, roughness: 0.42, preset: "none", envMapIntensity: 0.42, opacity: 0.8, depthWrite: false, doubleSided: true },
+  cv_sea: { base: "#2e5a66", metalness: 0.0, roughness: 0.42, preset: "water", repeat: [10, 10], envMapIntensity: 0.42, opacity: 0.8, depthWrite: false, doubleSided: true },
   cv_foam: { base: "#eef5f2", metalness: 0.0, roughness: 0.66, preset: "none", envMapIntensity: 0.4, opacity: 0.88, doubleSided: true },
 };
