@@ -55,6 +55,11 @@ export interface ClippingOptions {
   filter?: (handle: PartHandle) => boolean;
   /** 详细分析（测深）的零件对上限；超出的对只判定相交不测深（estimated）。 */
   analysisBudget?: number;
+  /**
+   * 并行扫描分片：只分析候选对中 index % count === index 的那一份。
+   * 多个 Worker 用相同装配和候选顺序时不会重复、不会漏对。
+   */
+  pairShard?: { index: number; count: number };
   onProgress?: (done: number, total: number) => void;
 }
 
@@ -109,7 +114,6 @@ function collectInstances(
 
 /** 点是否在网格内部（奇偶射线法，3 方向多数投票，防退化）。 */
 function pointInsideSolid(point: THREE.Vector3, bvh: MeshBVH, ray: THREE.Ray): boolean {
-  let votes = 0;
   let tested = 0;
   for (const direction of RAY_DIRECTIONS) {
     ray.set(point, direction);
@@ -123,13 +127,11 @@ function pointInsideSolid(point: THREE.Vector3, bvh: MeshBVH, ray: THREE.Ray): b
     }
     if (onSurface) continue;
     tested++;
-    if (hits.length % 2 === 1) votes++;
+    // 任一方向判定在外即可确定「点不在实体内」，不必再打另外两条射线。
+    // 原实现要凑满三方向再做 majority；绝大多数采样点第一条射线就能排除。
+    if (hits.length % 2 === 0) return false;
   }
-  if (tested === 0) return false;
-  // 一致性判据（原为多数表决）：中空/开口壳体（枪械的弹匣壳、机匣、护木）在
-  // 多数表决下会把「腔内空腔」误判为实体——任一方向射线穿过开口即可证明在外部。
-  // 只在全部方向都判「内」时才认定在实体内，避免把腔体内容判成穿透。
-  return votes === tested;
+  return tested > 0;
 }
 
 /** 采样点：顶点 + 面心 + 棱中点（解决「同尺寸共面盒体顶点恰好落在对方表面」的退化）。 */
@@ -156,6 +158,18 @@ function samplePoints(geometry: THREE.BufferGeometry, budget = 900): THREE.Vecto
     points.push(b.clone().add(c).multiplyScalar(0.5));
     points.push(c.clone().add(a).multiplyScalar(0.5));
     points.push(a.clone().add(b).add(c).multiplyScalar(1 / 3));
+  }
+  return points;
+}
+
+// 同一零件会出现在多对候选里：全局采样只算一次，避免按对重复遍历顶点/三角面。
+const sampleCache = new WeakMap<THREE.BufferGeometry, THREE.Vector3[]>();
+
+function cachedSamplePoints(geometry: THREE.BufferGeometry): THREE.Vector3[] {
+  let points = sampleCache.get(geometry);
+  if (!points) {
+    points = samplePoints(geometry, GLOBAL_SAMPLE_BUDGET);
+    sampleCache.set(geometry, points);
   }
   return points;
 }
@@ -374,15 +388,20 @@ export function analyzePair(bodyA: BodyInstance, bodyB: BodyInstance, detailed: 
 
   let depth: number | null = null;
   let point: THREE.Vector3 | null = null;
-  {
-    // 采样 = 相交三角形局部点（贴着交线）。
-    // 之前还会撒全几何的采样点去找"更深的点"，但那些点离交线可达几十毫米，
-    // 奇偶射线在管件端面边缘退化 → 把远处零件误判成"在实体内部"，产生大量假报告。
-    // 深度只从真正相交的三角形上量：那里的点必然落在对方实体内部。
-    // 全域采样点只保留交线附近的：远处点会被奇偶射线误判成"在实体内部"（假穿透），
-    // 而交线附近的点才是真正埋进去的部分（测深需要它们）。
-    const globalA = samplePoints(bodyA.handle.geometry, GLOBAL_SAMPLE_BUDGET);
-    const globalB = samplePoints(bodyB.handle.geometry, GLOBAL_SAMPLE_BUDGET);
+  // 交线退化成一个点/面（lineBox 为空）时不存在体积穿透，直接跳过昂贵的测深。
+  if (!lineBox.isEmpty()) {
+    // 采样 = 相交三角形局部点（贴着交线）+ 交线附近的全局点。
+    // 之前会把整件几何的采样点全送进 probeDepth，绝大多数点离交线几十毫米，
+    // 三次射线全部落空；现在先按交线包围盒筛到 50mm 内，只测真正可能埋进去的点。
+    const nearLineM = 0.05;
+    const filterScratch = new THREE.Vector3();
+    const globalA = cachedSamplePoints(bodyA.handle.geometry).filter(
+      (sample) => lineBox.distanceToPoint(sample) <= nearLineM,
+    );
+    const globalB = cachedSamplePoints(bodyB.handle.geometry).filter((sample) => {
+      filterScratch.copy(sample).applyMatrix4(matrixBToA); // B 局部 → A 局部
+      return lineBox.distanceToPoint(filterScratch) <= nearLineM;
+    });
     const probeA = probeDepth(
       overlapPointsA.concat(globalA),
       bodyA.matrix,
@@ -572,8 +591,14 @@ function detectStaticInner(assembled: AssembledModel, options: ClippingOptions =
   const budget = options.analysisBudget ?? 20000;
   assembled.root.updateMatrixWorld(true);
   const plan = planPairs(assembled, options);
+  const shard = options.pairShard && options.pairShard.count > 1 ? options.pairShard : null;
+  const total = shard
+    ? Math.ceil((plan.pairs.length - Math.min(shard.index, plan.pairs.length)) / shard.count)
+    : plan.pairs.length;
+  let done = 0;
   const reports: ClippingReport[] = [];
   for (let index = 0; index < plan.pairs.length; index++) {
+    if (shard && index % shard.count !== shard.index) continue;
     const [left, right] = plan.pairs[index];
     const detailed = index < budget;
     const contact = analyzePair(left, right, detailed);
@@ -581,7 +606,8 @@ function detectStaticInner(assembled: AssembledModel, options: ClippingOptions =
     if (contact && isReportableContact(contact, minDepthM)) {
       reports.push(makeReport(assembled, left, right, contact, "static", null));
     }
-    options.onProgress?.(index + 1, plan.pairs.length);
+    done++;
+    options.onProgress?.(done, total);
   }
   return sortReports(reports);
 }
@@ -656,11 +682,14 @@ export function detectSweep(assembled: AssembledModel, options: SweepOptions): C
   }
 
   // ---- 第 2 遍：逐帧检测 ----
+  const shard = options.pairShard && options.pairShard.count > 1 ? options.pairShard : null;
   const seen = new Set<string>();
   for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
     const bodyByRef = new Map<string, BodyInstance>();
     for (const body of sampleFrame(frameIndex)) bodyByRef.set(body.ref, body);
-    for (const candidate of candidates) {
+    for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex++) {
+      if (shard && candidateIndex % shard.count !== shard.index) continue;
+      const candidate = candidates[candidateIndex];
       const left = bodyByRef.get(candidate.leftRef);
       const right = bodyByRef.get(candidate.rightRef);
       if (!left || !right) continue;

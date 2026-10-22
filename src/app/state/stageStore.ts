@@ -5,6 +5,7 @@ import {
   detectSweep,
   parseInstanceRef,
   partitionExpectedContacts,
+  sortReports,
   summarizeReports,
   type AssembledModel,
   type ClippingReport,
@@ -269,16 +270,16 @@ interface ScanWorkerResult {
   error?: string;
 }
 
-let scanWorker: Worker | null = null;
+let scanWorkers: Worker[] = [];
 let scanEpoch = 0;
+/** 同一装配的静态扫描结果：几何没变时「重扫」直接复用（attach 新装配时清空）。 */
+let lastStaticScan: { target: AssembledModel; reports: ClippingReport[] } | null = null;
 
 /** 取消在跑的扫描（切模型 / 重建 / 重新扫描）：旧结果一律作废。 */
 function cancelScanWorker() {
   scanEpoch += 1;
-  if (scanWorker) {
-    scanWorker.terminate();
-    scanWorker = null;
-  }
+  for (const worker of scanWorkers) worker.terminate();
+  scanWorkers = [];
 }
 
 export const useStageStore = create<StageState>((set, get) => ({
@@ -375,6 +376,7 @@ export const useStageStore = create<StageState>((set, get) => ({
     // 切换模型时不再自动跑整机静态扫描：MBT 级模型一次扫描数十秒，
     // 会把主线程卡住。改为按需扫描（ClippingPanel / 动画面板手动触发）。
     cancelScanWorker();
+    lastStaticScan = null;
     const state = get();
     set({
       assembled,
@@ -394,6 +396,7 @@ export const useStageStore = create<StageState>((set, get) => ({
 
   detach: () => {
     cancelScanWorker();
+    lastStaticScan = null;
     set({ assembled: null, stats: null, scanPhase: "idle", scanKind: null });
   },
 
@@ -560,13 +563,28 @@ export const useStageStore = create<StageState>((set, get) => ({
   },
 
   runScan: (kind) => {
-    const { assembled, machineState, modelId, variantId, overrides, buildIndex } = get();
+    const { assembled, machineState, modelId, variantId, overrides, buildIndex, damageSeed } = get();
     if (!assembled) return;
     // 切模型瞬间 modelId 已更新、旧装配还没卸下：此时扫描会用错进度/错模型。
     if (assembled.root.name !== modelId) return;
     const model = findModel(modelId);
     const previousState = machineState === "scanning" ? "idle" : machineState;
     cancelScanWorker();
+    // 同一装配（几何未变）的静态结果可直接复用，避免重复起 8 个 Worker。
+    if (kind === "static" && lastStaticScan?.target === assembled) {
+      const shown = filterReportsByProgress(lastStaticScan.reports, modelId, buildIndex);
+      set({
+        scanPhase: "ready",
+        scanKind: "static",
+        allReports: lastStaticScan.reports,
+        reports: shown,
+        reportPartition: splitReports(modelId, shown),
+        scanMs: 0,
+        notice: "装配未变，复用上次静态扫描结果",
+        machineState: previousState,
+      });
+      return;
+    }
     const epoch = scanEpoch;
     set({
       scanPhase: "scanning",
@@ -577,9 +595,10 @@ export const useStageStore = create<StageState>((set, get) => ({
       machineState: "scanning",
     });
 
-    const finish = (raw: ClippingReport[], scanMs: number) => {
+    const finish = (raw: ClippingReport[], scanMs: number, reusable = true) => {
       const state = useStageStore.getState();
       if (state.modelId !== modelId || state.assembled !== assembled) return;
+      if (reusable && kind === "static") lastStaticScan = { target: assembled, reports: raw };
       const reports = filterReportsByProgress(raw, modelId, state.buildIndex);
       set({
         allReports: raw,
@@ -594,47 +613,80 @@ export const useStageStore = create<StageState>((set, get) => ({
 
     const fail = (error: unknown) => {
       useStageStore.getState().reportFault(faultFromError("穿模检测", error));
-      finish([], 0);
+      finish([], 0, false);
     };
 
-    // 有 Worker：检测在后台重建 + 跑 BVH，主线程全程可拖动。
+    // 有 Worker：检测在后台重建 + 跑 BVH；MBT/ED 级模型再按候选对拆给多个 Worker。
     if (typeof Worker !== "undefined" && import.meta.env.MODE !== "test") {
-      try {
-        const worker = new Worker(new URL("./scan.worker.ts", import.meta.url), { type: "module" });
-        scanWorker = worker;
-        worker.onmessage = (event: MessageEvent<ScanWorkerResult>) => {
-          if (epoch !== scanEpoch) return;
-          worker.terminate();
-          if (scanWorker === worker) scanWorker = null;
-          const data = event.data;
-          if (data.error !== undefined) {
-            fail(new Error(data.error));
-            return;
-          }
-          finish(data.reports ?? [], data.scanMs ?? 0);
-        };
-        worker.onerror = (event) => {
-          if (epoch !== scanEpoch) return;
-          event.preventDefault();
-          worker.terminate();
-          if (scanWorker === worker) scanWorker = null;
-          fail(new Error(event.message || "扫描 Worker 异常"));
-        };
-        worker.postMessage({
-          modelId,
-          variantId,
-          overrides,
-          kind,
-          state: previousState,
-          buildIndex,
-        });
-        return;
-      } catch {
-        if (scanWorker) {
-          scanWorker.terminate();
-          scanWorker = null;
+      const cores = typeof navigator !== "undefined" ? (navigator.hardwareConcurrency ?? 4) : 4;
+      const activeRegistry = model.variants?.find((item) => item.id === variantId)?.registry ?? model.registry;
+      const definitionCount = activeRegistry?.parts.length ?? 0;
+      // 大模型按候选对拆片；每片重建一次模型 + 独立 BVH，8 片在 16 核上摊得开。
+      const shardCount =
+        kind === "static" && definitionCount >= 500 ? Math.min(8, Math.max(1, cores - 1)) : 1;
+      const reports: ClippingReport[] = [];
+      const started = performance.now();
+      let pending = shardCount;
+      let failed = false;
+      let created = 0;
+
+      const settle = (error?: unknown) => {
+        if (epoch !== scanEpoch) return;
+        if (error !== undefined) {
+          if (failed) return;
+          failed = true;
+          cancelScanWorker();
+          fail(error);
+          return;
         }
-        // Worker 创建失败（旧浏览器 / 非模块环境）→ 走下面的主线程兜底。
+        pending -= 1;
+        if (pending === 0) finish(sortReports(reports), Math.round(performance.now() - started));
+      };
+
+      try {
+        for (let shardIndex = 0; shardIndex < shardCount; shardIndex++) {
+          const worker = new Worker(new URL("./scan.worker.ts", import.meta.url), { type: "module" });
+          created += 1;
+          scanWorkers.push(worker);
+          worker.onmessage = (event: MessageEvent<ScanWorkerResult>) => {
+            if (epoch !== scanEpoch) return;
+            worker.terminate();
+            scanWorkers = scanWorkers.filter((item) => item !== worker);
+            const data = event.data;
+            if (data.error !== undefined) {
+              settle(new Error(data.error));
+              return;
+            }
+            if (data.reports) for (const report of data.reports) reports.push(report);
+            settle();
+          };
+          worker.onerror = (event) => {
+            if (epoch !== scanEpoch) return;
+            event.preventDefault();
+            worker.terminate();
+            scanWorkers = scanWorkers.filter((item) => item !== worker);
+            settle(new Error(event.message || "扫描 Worker 异常"));
+          };
+          worker.postMessage({
+            modelId,
+            variantId,
+            overrides,
+            kind,
+            state: previousState,
+            buildIndex,
+            damageSeed,
+            shardIndex,
+            shardCount,
+          });
+        }
+        return;
+      } catch (error) {
+        if (created > 0) {
+          cancelScanWorker();
+          fail(error);
+          return;
+        }
+        // 一个 Worker 都没起来（旧浏览器 / 非模块环境）→ 走下面的主线程兜底。
       }
     }
 
