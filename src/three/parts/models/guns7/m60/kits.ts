@@ -104,7 +104,7 @@ const m60ReceiverShell: GeometryBuilder = (spec) => {
 
   // 左右侧板（M60 冲压机匣，外表面带一道纵向压筋）
   for (const side of [-1, 1]) {
-    const wall = bevelBoxGeometry(t, h, len, 0.0004, 1);
+    const wall = bevelBoxGeometry(t, h, len, 0.0025, 1);
     wall.translate(side * (w / 2 - t / 2), 0, zc);
     parts.push(wall);
     const rib = bevelBoxGeometry(0.0018, 0.007, len * 0.62, 0.0003, 1);
@@ -113,10 +113,10 @@ const m60ReceiverShell: GeometryBuilder = (spec) => {
   }
 
   // 底板 / 后板
-  const bottom = bevelBoxGeometry(w, t, len, 0.0004, 1);
+  const bottom = bevelBoxGeometry(w, t, len, 0.0025, 1);
   bottom.translate(0, -h / 2 + t / 2, zc);
   parts.push(bottom);
-  const rear = bevelBoxGeometry(w, h, t, 0.0004, 1);
+  const rear = bevelBoxGeometry(w, h, t, 0.0025, 1);
   rear.translate(0, 0, z0 + t / 2);
   parts.push(rear);
 
@@ -124,11 +124,11 @@ const m60ReceiverShell: GeometryBuilder = (spec) => {
   const feedZ0 = -0.132;
   const feedZ1 = 0.022;
   const topRearLen = feedZ0 - z0;
-  const topRear = bevelBoxGeometry(w, t, topRearLen, 0.0004, 1);
+  const topRear = bevelBoxGeometry(w, t, topRearLen, 0.0025, 1);
   topRear.translate(0, h / 2 - t / 2, z0 + topRearLen / 2);
   parts.push(topRear);
   const topFrontLen = z1 - feedZ1;
-  const topFront = bevelBoxGeometry(w, t, topFrontLen, 0.0004, 1);
+  const topFront = bevelBoxGeometry(w, t, topFrontLen, 0.0025, 1);
   topFront.translate(0, h / 2 - t / 2, feedZ1 + topFrontLen / 2);
   parts.push(topFront);
 
