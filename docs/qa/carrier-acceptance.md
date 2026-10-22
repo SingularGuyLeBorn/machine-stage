@@ -1,20 +1,33 @@
 # 福建舰 · 验收记录（carrier worktree）
 
 ## 零件与结构
-- 零件定义 **3631** / 展开 **3631** / 实例 **4199**
-- 分层：L1=1708、L2=292、L3=464、L4=890、L5=277
-- 三角面 1,990,876
+- 零件定义 **4596** / 展开 **4596** / 实例 **5197**
+- 分层：L1=1768、L2=317、L3=589、L4=967、L5=955
+- 三角面 2,371,233
+- 世界比例 **1 单位 = 1 米**：编辑数据 1:8，`presentationScale=7.9`；飞行甲板主体 316m，含舰艏回收角/外飘总包络约 326m，最大宽约 84.7m。
 - L1 舰体/反应堆/控制棒/蒸汽轮机/双轴双桨双舵；L2 机库/防火门/弹药库/弹药升降机；
-  L3 三弹射器（3×16 段）/滑梭/挡焰板/4 拦阻索/拦阻网/双舷侧升降机/右舷艉部航空吊车；
-  L4 四层舰岛/航海舰桥/CIC/4 面固定相控阵（4×64 TR）/旋转雷达/2×1130（各 11 管）；
-  L5 折叠翼/尾钩/加强起落架/弹射牵引杆/座舱仪表。
+  L3 斜角飞行甲板/三弹射器（3×16 段）/滑梭/挡焰板/4 拦阻索/拦阻网/双舷侧升降机/右舷艉部航空吊车；
+  L4 两层舰岛舱室（CIC/航海舰桥）+ 一体化隐身塔/4 面固定相控阵（4×64 TR）/旋转雷达/2×1130（各 11 管）；
+  L5 折叠翼/尾钩/加强起落架/弹射牵引杆/座舱仪表/甲板停放机。
 
 ## 门禁
 - 注册表校验：0 错
-- 悬空：0（船壳大 AABB 已从“支撑提供者”剔除后复查）；悬空孤岛：0；合并件内部悬空：0
-- 静态穿模：9505 报告 / **未豁免 0**
-- 动画扫掠：flight_ops 797 / engine 552 / hangar 72 / ciws 148，**未豁免均 0**
-- `npm test`：313 passed / 1 skipped；`npm run build`：通过
+- 悬空：0；悬空孤岛：0；合并件内部悬空：0
+- 静态穿模：11294 报告 / **未豁免 0**
+- 动画扫掠：flight_ops 817 / engine 538 / hangar 35 / ciws 140，**未豁免均 0**
+- `npm test`：313 passed / 1 skipped（沙箱内多 worker 会 OOM，已配置单 worker 串行）；`npm run build`：通过
+- 黑屏闪烁探针：垂直拖动 12 帧采样 `minAvg=114.5`、`darkFrames=0`（`scripts/flicker-probe.mjs`）
+
+## 外形返工（第一批）
+- [x] **斜角甲板**：飞行甲板改成不对称轮廓，左舷斜角外飘/艉部最宽、向艏收窄；着舰跑道中线从左舷艉向右舷前倾斜约 9.3°（在 6°~14° 内），带连续边线/中线/端线/接地点横杠。
+- [x] **舰艏**：新增前倾外飘楔形艏、艏柱包板、球鼻艏保留；艏部三段舷墙 + 上翘甲板段；舰艏两侧回收角（山羊角）与尼龙网。
+- [x] **舰艉/外飘**：舰体水线半宽向艉收窄；克令克以上外飘带加大，飞行甲板宽于舰体；左舷斜角外飘增加横梁/斜撑/纵桁/栏杆，消除悬空甲板。
+- [x] **一体化舰岛**：删去原四层方盒/成排黑窗，改为两层舱室 + 八折角内倾隐身塔；四面相控阵嵌入塔体（嵌入框/遮檐/下檐），四腿桁架桅改一体化八面桅 + 嵌入式电子战面；卫通罩缩小；1130 炮加独立支撑平台。
+- [x] **甲板标记**：斜角着舰跑道（深灰底色+白色中线/边线/端线/接地点）、直通起飞区中线/边线、8 个停机位框线+七段数字编号、直升机停靠点圆圈+H、3 处挡焰板红黄危险区+艉部危险区、弹射位编号、舰艏舷号 18、左右舷甲板外缘线。
+- [x] **停放机**：甲板 4 架斜列停放 J-15 + 机库 2 架；均复用完整机体几何（非简化盒），机翼展开/折叠状态区分，避开弹射跑道。
+- [~] **舰载机结构参考 j20.ts**：已按参考方向补了机翼后掠/尖弦、LERX、双垂尾、座舱仪表、起落架、折叠铰链、尾钩；但**尚未把 j20.ts 的 4875 行机身放样/铆钉/口盖体系整体移植**，现役 J-15 仍是自写程序化模型（主翼展开约 17.2m、机长 22.0m、含折叠翼高约 6.9m）。这是下一批必须继续的差距，不能宣称已按 j20.ts 完全重做。
+- [~] **舰体外形**：已加前倾艏/外飘/收窄艉/斜角甲板/舷墙，但舰体外壳仍是平面挤出 + 外飘带/艏楔的组合，不是逐站横剖面的完整放样；侧视轮廓与福建舰真图仍有差距。
+- [x] **改前/改后对照**：`docs/qa/carrier-before-after.jpeg`（左=改前渔船式侧视，右=本轮返工后侧视）。
 
 ## 内部红线验收（禁止“外面看不见就不做”）
 - [x] **航海舰桥可第一人称进入**：6 个圆形操舰仪表（航向/速度/舵角/车钟，指针持续摆动）、操舵轮（可转）、车钟手柄（可动）、雷达显控屏（扫描线旋转）、海图桌（海图/平行尺/分规/航线标绘）、通信/导航控制台、船长/航海长/通信席座椅与扶手、真实开窗、顶灯、舱门。
@@ -35,6 +48,7 @@
   - MetalScratched：`blue_metal_plate`（甲板防滑钢板的划痕法线/粗糙度）
   - MetalRust：`rust_coarse_01`（水线/舷侧锈蚀）
 - 贴图实体位于 `public/textures/metal/`，HDRI 位于 `public/hdr/`。
+- 舰载机为**涂装金属**：`metalness=1`、`roughness≈0.68`、`envMapIntensity≈0.35`，去掉了会造成大面积方格反光的 plates 贴图；不是用低粗糙度镜面糊出来的假金属。
 
 ## 红线二/三执行说明
 - 已删除程序化积木小人、甲板车辆、机库工具车及孤立附件；停放机改用回转体机身 + 翼型放样；按“宁可留空”处理，不再用方块/圆柱堆小人与小车。
@@ -69,11 +83,18 @@
 
 ## 内部视角口径与已知限制
 - 舰桥眼点从船长座椅靠背派生，海图桌在座椅后方，需鼠标拖动环视查看（`carrier-bridge-chart.jpeg`）。
-- 机库第一人称视角取在机库控制席，画面主体为控制台/状态板/调度屏；停机位与折叠翼停放机从剖切/机库舱内相机可见（`carrier-hangar-bay.jpeg`）。
+- 机库第一人称改为机库中线监控位，正对停放机；防火门在机库作业状态保持全开（`carrier-hangar-bay.jpeg` 为旧机位，最新以运行态为准）。
 - 座舱第一人称模式会隐藏座舱盖玻璃（透明件从内部会形成整面反射），风挡框架与仪表保留；这是观察内部的显示处理，不是删除座舱盖零件。
-- 反应堆/机舱/弹药库视角以设备与仪表为主，拖动可环视舱壁与管路。
+- 反应堆/机舱/弹药库视角以设备与仪表为主，拖动可环视舱壁与管路。机舱主配电板在左舷围壁（33 个断路器+3 表），需要转头查看。
+- **外形仍是返工中间状态**：舰体外板没有按真实横剖面逐站放样，舰岛也不是逐面对照福建舰真图，舰载机不是 j20.ts 的完整放样/铆钉体系；这些不要当成“已完成”。
+- 参考库中没有 055 驱逐舰与歼-35 实体（055 只有设计文档，J-35 在 fight-stage 是占位桩），不能拿简化模型充数，因此本轮只校核了航母/J-15/两型坦克的实测包络。
+- 两型坦克的包围盒含天线/机枪：Tiger 7.72×3.57(高)×3.81m、MBT 11.27→(含炮口)×4.02×4.04m；与表格的差异主要是炮管/天线/内部件包络，未做外形重做。
 
 ## 证据
+- **改前/改后外形对照**：`docs/qa/carrier-before-after.jpeg`（左=改前侧视，右=本轮返工后侧视）
+- **返工后俯视/侧视/正面**：`docs/qa/carrier-fujian-top.jpeg`、`docs/qa/carrier-fujian-side-full.jpeg`、`docs/qa/carrier-fujian-front.jpeg`
+- **返工后舰艏/舰岛**：`docs/qa/carrier-fujian-bow.jpeg`、`docs/qa/carrier-fujian-island.jpeg`、`docs/qa/carrier-fujian-overview.jpeg`
+- **舰载机特写/实测比例人**：`docs/qa/carrier-aircraft-closeup.jpeg`、`docs/qa/carrier-aircraft-closeup2.jpeg`、`docs/qa/carrier-scale-human.jpeg`、`docs/qa/carrier-scale-human-wide.jpeg`
 - 左舷走道/舰体侧面：`docs/qa/carrier-hull-side2.jpeg`
 - 整机金属外观：`docs/qa/carrier-metal-overview7.jpeg`
 - 舰体侧视/艏部/艉部：`docs/qa/carrier-side-full.jpeg`、`docs/qa/carrier-bow-profile.jpeg`、`docs/qa/carrier-stern-profile.jpeg`、`docs/qa/carrier-bulbous-bow.jpeg`
@@ -99,6 +120,11 @@
 npx tsc --noEmit
 npx tsx scripts/diag-carrier.ts
 npx tsx scripts/diag-carrier-sweep.ts --state flight_ops --duration 30 --fps 2
-npm test
+npx tsx scripts/diag-carrier-sweep.ts --state engine --duration 12 --fps 2
+npx tsx scripts/diag-carrier-sweep.ts --state hangar --duration 12 --fps 2
+npx tsx scripts/diag-carrier-sweep.ts --state ciws --duration 8 --fps 2
+npx tsx scripts/diag-scale.ts            # 尺寸/1:1 换算/参照人审计
+node scripts/flicker-probe.mjs            # 垂直拖动黑屏探针
+npm test                                  # vitest 单 worker（配置已固定）
 npm run build
 ```

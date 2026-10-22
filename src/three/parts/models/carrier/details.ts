@@ -115,6 +115,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
   for (let bi = 0; bi < BULKHEADS.length; bi++) {
     const z = BULKHEADS[bi]!;
     const half = Math.max(0.8, hullHalfBeamAt(z) - 0.3);
+    const throughHangar = z > -17 && z < 11;
     for (let s = 0; s < 4; s++) {
       add({
         id: `carrier.hull.detail_bulkhead_stiff_${pad(bi + 1)}_${s + 1}`,
@@ -122,9 +123,9 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
         name_en: `bulkhead stiffener ${bi + 1}-${s + 1}`,
         assembly: HULL,
         build_layer: 1,
-        geometry: M(B(0.08, 2.6, 0.1, [0, 0, 0], 0.004)),
+        geometry: M(B(0.08, throughHangar ? 0.6 : 2.6, 0.1, [0, 0, 0], 0.004)),
         material: "cv_steel_dark",
-        mate: A([(s - 1.5) * half * 0.38, CV.HULL_BOTTOM + 1.5, z - 0.08]),
+        mate: A([(s - 1.5) * half * 0.38, CV.HULL_BOTTOM + (throughHangar ? 0.3 : 1.5), z - 0.08]),
       });
     }
     for (let p = 0; p < 2; p++) {
@@ -782,18 +783,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
       });
     }
   }
-  for (let x = 0; x < 20; x++) {
-    add({
-      id: `carrier.surface.detail_deck_box_${pad(x + 1)}`,
-      name_cn: `甲板工具箱 ${x + 1}`,
-      name_en: `deck box ${x + 1}`,
-      assembly: SURFACE,
-      build_layer: 5,
-      geometry: M(B(0.5, 0.4, 0.4, [0, 0, 0], 0.006), B(0.46, 0.04, 0.36, [0, 0.22, 0], 0.003)),
-      material: "cv_canvas",
-      mate: A([-4.3 + (x % 4) * 0.42, DECK_TOP + 0.2, -6.2 + Math.floor(x / 4) * 0.5]),
-    });
-  }
+  // 甲板工具箱组会与后移的 3 号弹射器挡焰板干涉，按“宁缺毋滥”整组移除。
 }
 
 function CIWS_LOCAL(index: number): [number, number, number] {

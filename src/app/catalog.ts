@@ -86,6 +86,15 @@ export type StageAction =
   | { id: string; group: string; label: string; kind: "variant"; variant: string }
   | { id: string; group: string; label: string; kind: "reset-view" }
   | { id: string; group: string; label: string; kind: "reroll-damage" }
+  | {
+      id: string;
+      group: string;
+      label: string;
+      kind: "focus-node";
+      node: string;
+      offset?: [number, number, number];
+      radius?: number;
+    }
   | { id: string; group: string; label: string; kind: "camera"; mode: CameraMode }
   | { id: string; group: string; label: string; kind: "planned"; note: string };
 
@@ -896,8 +905,10 @@ export const CATALOG: StageModel[] = [
     builders: carrierBuilders,
     animate: animateCarrier,
     framingBounds: carrierBounds,
+    // 编辑数据是 1:8；场景统一为 1 单位 = 1 米：40×7.9=316m，9.6×7.9≈76m。
+    presentationScale: [7.9, 7.9, 7.9],
     animatedStates: [...CARRIER_ANIMATED_STATES],
-    cameras: ["orbit", "bridge", "cic", "engine_room", "reactor_room", "magazine", "hangar", "cockpit"],
+    cameras: ["orbit", "bridge", "cic", "engine_room", "reactor_room", "magazine", "hangar", "cockpit", "flight"],
     states: [
       ...CARRIER_STATE_LABELS.map((state) => ({ id: state.id as string, label: state.label, hint: state.hint })),
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
@@ -915,6 +926,8 @@ export const CATALOG: StageModel[] = [
       { id: "cv-cam-magazine", group: "内部视角", label: "弹药库", kind: "camera", mode: "magazine" },
       { id: "cv-cam-hangar", group: "内部视角", label: "机库", kind: "camera", mode: "hangar" },
       { id: "cv-cam-cockpit", group: "内部视角", label: "舰载机座舱", kind: "camera", mode: "cockpit" },
+      { id: "cv-cam-flight", group: "内部视角", label: "跟拍舰载机", kind: "camera", mode: "flight" },
+      { id: "cv-aircraft-closeup", group: "航空", label: "舰载机特写", kind: "focus-node", node: "CV_Aircraft", offset: [0, 4, 0], radius: 14 },
       { id: "cv-explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
       { id: "cv-xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
       { id: "cv-labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },

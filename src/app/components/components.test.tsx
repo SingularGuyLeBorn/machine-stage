@@ -114,6 +114,7 @@ describe("PartTree", () => {
     const head = screen.getByText("测试总成").closest("button")!;
     expect(head.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(head);
+    document.querySelectorAll(".tree__group-head--layer").forEach((element) => fireEvent.click(element));
     expect(screen.getByText("立柱")).toBeDefined();
     expect(head.getAttribute("aria-expanded")).toBe("true");
     fireEvent.click(screen.getByText("立柱").closest("button")!);
@@ -133,6 +134,7 @@ describe("PartTree", () => {
     render(<PartTree />);
     openTree();
     fireEvent.click(screen.getByText("测试总成"));
+    document.querySelectorAll(".tree__group-head--layer").forEach((element) => fireEvent.click(element));
     fireEvent.click(screen.getByText("立柱").closest("button")!);
     expect(useStageStore.getState().selectedPart).toBe("test.frame.pillar");
     expect(useStageStore.getState().isolation).toEqual({ kind: "part", partId: "test.frame.pillar" });

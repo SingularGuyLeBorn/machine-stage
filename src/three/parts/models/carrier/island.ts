@@ -31,10 +31,10 @@ export function addIsland(ctx: CarrierCtx): void {
     material: "cv_hull_dark",
     mate: A([x, baseY + 0.18, z]),
   });
-  for (let level = 0; level < 4; level++) {
+  for (let level = 0; level < 2; level++) {
     const y = baseY + 0.45 + level * 0.78;
-    const width = 1.62 - level * 0.1;
-    const len = 5.9 - level * 0.2;
+    const width = level < 2 ? 1.62 - level * 0.1 : 1.28 - (level - 2) * 0.16;
+    const len = level < 2 ? 5.9 - level * 0.2 : 4.9 - (level - 2) * 0.5;
     add({
       id: `${P}bridge_${level + 1}_floor`,
       name_cn: `舰岛 ${level + 1} 层甲板`,
@@ -58,8 +58,8 @@ export function addIsland(ctx: CarrierCtx): void {
         material: "cv_hull",
         mate: A([x + side * width / 2, y + 0.38, z], [0, 0, side * 2]),
       });
-      // 玻璃窗：每层 5 扇。
-      for (let w = 0; w < 5; w++) {
+      // 玻璃窗：下两层保留真实舷窗，上层用窄玻璃带 + 折角面。
+      if (level < 2) for (let w = 0; w < 5; w++) {
         add({
           id: `${P}bridge_${level + 1}_window_${side === -1 ? "p" : "s"}_${w + 1}`,
           name_cn: `舰岛 ${level + 1} 层舷窗 ${side === -1 ? "左" : "右"} ${w + 1}`,
@@ -92,8 +92,8 @@ export function addIsland(ctx: CarrierCtx): void {
       material: "cv_hull",
       mate: A([x, y + 0.38, z - len / 2]),
     });
-    // 前向环绕窗带：4 扇玻璃 + 竖梃 + 窗台/窗楣（舰桥前视窗，不是实心墙）。
-    for (let w = 0; w < 4; w++) {
+    // 前向环绕窗带：下两层；上层改成一条窄玻璃带。
+    if (level < 2) for (let w = 0; w < 4; w++) {
       add({
         id: `${P}bridge_${level + 1}_front_window_${w + 1}`,
         name_cn: `舰岛 ${level + 1} 层前窗 ${w + 1}`,
@@ -105,7 +105,7 @@ export function addIsland(ctx: CarrierCtx): void {
         mate: A([x - 0.54 + w * 0.36, y + 0.45, z + len / 2 + 0.045]),
       });
     }
-    for (let m = 0; m < 3; m++) {
+    if (level < 2) for (let m = 0; m < 3; m++) {
       add({
         id: `${P}bridge_${level + 1}_front_mullion_${m + 1}`,
         name_cn: `舰岛 ${level + 1} 层前窗竖梃 ${m + 1}`,
@@ -117,7 +117,7 @@ export function addIsland(ctx: CarrierCtx): void {
         mate: A([x - 0.36 + m * 0.36, y + 0.45, z + len / 2 + 0.05]),
       });
     }
-    for (const [tag, yy] of [["sill", 0.28], ["header", 0.62]] as const) {
+    if (level < 2) for (const [tag, yy] of [["sill", 0.28], ["header", 0.62]] as const) {
       add({
         id: `${P}bridge_${level + 1}_front_${tag}`,
         name_cn: `舰岛 ${level + 1} 层前窗${tag === "sill" ? "窗台" : "窗楣"}`,
@@ -131,7 +131,7 @@ export function addIsland(ctx: CarrierCtx): void {
     }
     for (const side of [-1, 1] as const) {
       const wx = x + side * (width / 2 + 0.05);
-      for (let m = 0; m < 4; m++) {
+      if (level < 2) for (let m = 0; m < 4; m++) {
         add({
           id: `${P}bridge_${level + 1}_side_mullion_${side === -1 ? "p" : "s"}_${m + 1}`,
           name_cn: `舰岛 ${level + 1} 层舷窗竖梃 ${m + 1}`,
@@ -143,7 +143,7 @@ export function addIsland(ctx: CarrierCtx): void {
           mate: A([wx, y + 0.45, z - 1.9 + m * 0.95 + 0.475]),
         });
       }
-      for (const [tag, yy] of [["sill", 0.28], ["header", 0.62]] as const) {
+      if (level < 2) for (const [tag, yy] of [["sill", 0.28], ["header", 0.62]] as const) {
         add({
           id: `${P}bridge_${level + 1}_side_${tag}_${side === -1 ? "p" : "s"}`,
           name_cn: `舰岛 ${level + 1} 层舷窗${tag === "sill" ? "窗台" : "窗楣"}`,
@@ -172,6 +172,44 @@ export function addIsland(ctx: CarrierCtx): void {
     }
     }
     }
+    if (level >= 2) {
+      add({
+        id: `${P}bridge_${level + 1}_vision_band`,
+        name_cn: `舰岛 ${level + 1} 层窄玻璃带`,
+        name_en: `island level ${level + 1} vision band`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(width * 0.74, 0.1, 0.03, [0, 0, 0], 0.004)),
+        material: "cv_glass",
+        mate: A([x, y + 0.47, z + len / 2 + 0.035]),
+      });
+      for (const side of [-1, 1] as const) {
+        add({
+          id: `${P}bridge_${level + 1}_cheek_${side === -1 ? "p" : "s"}`,
+          name_cn: `舰岛 ${level + 1} 层折角面 ${side === -1 ? "左" : "右"}`,
+          name_en: `island level ${level + 1} chamfer ${side === -1 ? "p" : "s"}`,
+          assembly: ASSEMBLY,
+          build_layer: 4,
+          geometry: M(B(0.34, 0.74, 0.05, [0, 0, 0], 0.004)),
+          material: "cv_hull_dark",
+          mate: A([x + side * (width / 2 - 0.03), y + 0.38, z + len / 2 - 0.03], [0, side * 45, 0]),
+        });
+      }
+    }
+    if (level === 0) {
+      for (const side of [-1, 1] as const) {
+        add({
+          id: `${P}bridge_1_cheek_${side === -1 ? "p" : "s"}`,
+          name_cn: `舰岛基座折角面 ${side === -1 ? "左" : "右"}`,
+          name_en: `island base chamfer ${side === -1 ? "p" : "s"}`,
+          assembly: ASSEMBLY,
+          build_layer: 4,
+          geometry: M(B(0.4, 0.74, 0.05, [0, 0, 0], 0.004)),
+          material: "cv_hull_dark",
+          mate: A([x + side * (width / 2 - 0.02), y + 0.38, z + len / 2 - 0.02], [0, side * 45, 0]),
+        });
+      }
+    }
     add({
       id: `${P}bridge_${level + 1}_roof`,
       name_cn: `舰岛 ${level + 1} 层顶板`,
@@ -181,6 +219,40 @@ export function addIsland(ctx: CarrierCtx): void {
       geometry: M(B(width + 0.15, 0.05, len + 0.15, [0, 0, 0], 0.006)),
       material: "cv_hull_dark",
       mate: A([x, y + 0.74, z]),
+    });
+  }
+
+  // 一体化隐身塔：只有两层舱室（CIC/舰桥）+ 折角内倾塔体，不再叠四层方盒办公楼。
+  add({
+    id: `${P}faceted_tower`,
+    name_cn: "舰岛一体化隐身塔",
+    name_en: "island faceted stealth tower",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: { type: "kit", kit: "carrierIslandTower" },
+    material: "cv_hull_dark",
+    mate: A([x, baseY + 1.97, z]),
+  });
+  add({
+    id: `${P}tower_vision_band`,
+    name_cn: "塔体前向窄玻璃带",
+    name_en: "tower vision band",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.86, 0.07, 0.025, [0, 0, 0], 0.003)),
+    material: "cv_glass",
+    mate: A([x, baseY + 2.72, z + 2.02]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}tower_side_slit_${side === -1 ? "p" : "s"}`,
+      name_cn: `塔体侧向观察窗 ${side === -1 ? "左" : "右"}`,
+      name_en: `tower side slit ${side === -1 ? "p" : "s"}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.025, 0.06, 1.5, [0, 0, 0], 0.003)),
+      material: "cv_glass",
+      mate: A([x + side * 0.65, baseY + 2.72, z]),
     });
   }
 
@@ -255,10 +327,10 @@ export function addIsland(ctx: CarrierCtx): void {
 
   // 四面固定相控阵：前面/后面/左右舷。
   const panels = [
-    { key: "fwd", pos: [x, baseY + 2.35, z + 3.02] as const, rot: [0, 0, 0] as const, behind: [0, 0, -0.08] as const },
-    { key: "aft", pos: [x, baseY + 2.35, z - 3.02] as const, rot: [0, Math.PI, 0] as const, behind: [0, 0, 0.08] as const },
-    { key: "stbd", pos: [x + 1.08, baseY + 2.35, z] as const, rot: [0, Math.PI / 2, 0] as const, behind: [-0.08, 0, 0] as const },
-    { key: "port", pos: [x - 1.08, baseY + 2.35, z] as const, rot: [0, -Math.PI / 2, 0] as const, behind: [0.08, 0, 0] as const },
+    { key: "fwd", pos: [x, baseY + 2.32, z + 2.02] as const, rot: [0, 0, 0] as const, behind: [0, 0, -0.08] as const },
+    { key: "aft", pos: [x, baseY + 2.32, z - 2.02] as const, rot: [0, Math.PI, 0] as const, behind: [0, 0, 0.08] as const },
+    { key: "stbd", pos: [x + 0.64, baseY + 2.32, z] as const, rot: [0, Math.PI / 2, 0] as const, behind: [-0.08, 0, 0] as const },
+    { key: "port", pos: [x - 0.64, baseY + 2.32, z] as const, rot: [0, -Math.PI / 2, 0] as const, behind: [0.08, 0, 0] as const },
   ];
   panels.forEach((panel, index) => {
     const tag = pad(index + 1);
@@ -292,6 +364,36 @@ export function addIsland(ctx: CarrierCtx): void {
       return new THREE.Matrix4().makeTranslation((col - 3.5) * 0.125, (row - 3.5) * 0.095, 0.075);
     });
     add({
+      id: `${P}array_${tag}_recess`,
+      name_cn: `${["前", "后", "右", "左"][index]}相控阵嵌入框`,
+      name_en: `phased array recess ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(1.3, 0.98, 0.05, [0, 0, 0], 0.006)),
+      material: "cv_hull_dark",
+      mate: A([panel.pos[0] + panel.behind[0] * 0.35, panel.pos[1], panel.pos[2] + panel.behind[2] * 0.35], [...panel.rot]),
+    });
+    add({
+      id: `${P}array_${tag}_hood`,
+      name_cn: `${["前", "后", "右", "左"][index]}相控阵遮檐`,
+      name_en: `phased array hood ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(1.28, 0.07, 0.16, [0, 0, 0], 0.004)),
+      material: "cv_hull_dark",
+      mate: A([panel.pos[0], panel.pos[1] + 0.49, panel.pos[2]]),
+    });
+    add({
+      id: `${P}array_${tag}_sill`,
+      name_cn: `${["前", "后", "右", "左"][index]}相控阵下檐`,
+      name_en: `phased array sill ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(1.28, 0.06, 0.12, [0, 0, 0], 0.004)),
+      material: "cv_hull_dark",
+      mate: A([panel.pos[0], panel.pos[1] - 0.49, panel.pos[2]]),
+    });
+    add({
       id: `${P}array_${tag}_cooling`,
       name_cn: `${["前", "后", "右", "左"][index]}阵面水冷板`,
       name_en: `phased array cooling ${tag}`,
@@ -307,124 +409,76 @@ export function addIsland(ctx: CarrierCtx): void {
   });
 
   // 旋转搜索雷达（桅杆顶部）。
-  // 主桅杆：四腿桁架 + 三道水平环梁 + 交叉斜撑 + 两层平台 + 直梯（实体结构，不是圆柱十字）。
+  // 一体化隐身桅：内倾八面体 + 嵌入式电子战面板，不再是四腿脚手架。
   const mastX = x;
   const mastZ = z - 0.4;
   const mastBaseY = baseY + 3.0;
   const mastTopY = baseY + 5.0;
   add({
     id: `${P}mast`,
-    name_cn: "主桅杆基座",
-    name_en: "main mast foundation",
+    name_cn: "一体化桅杆基座",
+    name_en: "integrated mast foundation",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(C(0.28, 0.35, [0, 0, 0], 20), T(0.3, 0.24, 0.06, [0, 0.17, 0], 20)),
+    geometry: M(C(0.46, 0.34, [0, 0, 0], 8, 0.3), C(0.3, 0.6, [0, 0.42, 0], 8, 0.22)),
     material: "cv_hull_dark",
     mate: A([mastX, mastBaseY, mastZ]),
   });
-  const legBottom = 0.24;
-  const legTop = 0.11;
-  const corners: Array<[number, number]> = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
-  for (const [sx, sz] of corners) {
+  add({
+    id: `${P}mast_shell`,
+    name_cn: "一体化隐身桅杆",
+    name_en: "integrated stealth mast",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(C(0.44, 1.55, [0, 0.95, 0], 8, 0.15), C(0.16, 0.3, [0, 1.86, 0], 8, 0.08)),
+    material: "cv_hull_dark",
+    mate: A([mastX, mastBaseY, mastZ]),
+  });
+  add({
+    id: `${P}mast_top_platform`,
+    name_cn: "桅顶平台",
+    name_en: "mast top platform",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(C(0.34, 0.025, [0, 0, 0], 8, 0.3)),
+    material: "cv_grate",
+    mate: A([mastX, mastTopY - 0.02, mastZ]),
+  });
+  for (const [tag, dx, dz, rot] of [
+    ["f", 0, -0.31, 0],
+    ["a", 0, 0.31, Math.PI],
+    ["p", -0.31, 0, Math.PI / 2],
+    ["s", 0.31, 0, -Math.PI / 2],
+  ] as const) {
     add({
-      id: `carrier.island.mast_leg_${sx < 0 ? "l" : "r"}${sz < 0 ? "f" : "a"}`,
-      name_cn: `桅杆主腿 ${sx < 0 ? "左" : "右"}${sz < 0 ? "前" : "后"}`,
-      name_en: `mast leg ${sx < 0 ? "port" : "stbd"}${sz < 0 ? "fwd" : "aft"}`,
+      id: `${P}mast_ew_${tag}`,
+      name_cn: `一体化桅杆电子战阵面 ${tag.toUpperCase()}`,
+      name_en: `integrated mast EW panel ${tag}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M({ type: "weld", from: [sx * legBottom, 0, sz * legBottom], to: [sx * legTop, mastTopY - mastBaseY, sz * legTop], radius: 0.032, seed: 31 + sx + sz }),
+      geometry: M(B(0.42, 0.52, 0.035, [0, 0, 0], 0.006)),
+      material: "cv_aesa",
+      mate: A([mastX + dx, mastBaseY + 1.22, mastZ + dz], [0, rot, 0]),
+    });
+  }
+  for (const [tag, dx, dz] of [
+    ["f", -0.18, -0.18],
+    ["a", 0.18, 0.18],
+    ["p", -0.18, 0.18],
+    ["s", 0.18, -0.18],
+  ] as const) {
+    add({
+      id: `${P}mast_whip_${tag}`,
+      name_cn: `一体化桅杆鞭状天线 ${tag.toUpperCase()}`,
+      name_en: `integrated mast whip antenna ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(C(0.012, 0.75 + (tag === "f" ? 0.2 : 0), [0, 0, 0], 8), C(0.035, 0.05, [0, -0.38, 0], 8)),
       material: "cv_steel",
-      mate: A([mastX, mastBaseY, mastZ]),
+      mate: A([mastX + dx, mastTopY - 0.3, mastZ + dz]),
     });
   }
-  for (const level of [0.55, 1.15, 1.72]) {
-    const r = legBottom + (legTop - legBottom) * (level / 2);
-    const ring: Array<[string, [number, number, number], [number, number, number]]> = [
-      ["f", [-r, level, -r], [r, level, -r]],
-      ["a", [-r, level, r], [r, level, r]],
-      ["p", [-r, level, -r], [-r, level, r]],
-      ["s", [r, level, -r], [r, level, r]],
-    ];
-    for (const [tag, from, to] of ring) {
-      add({
-        id: `carrier.island.mast_ring_${Math.round(level * 100)}_${tag}`,
-        name_cn: `桅杆环梁 ${level}m ${tag}`,
-        name_en: `mast ring beam ${level} ${tag}`,
-        assembly: ASSEMBLY,
-        build_layer: 4,
-        geometry: M({ type: "weld", from, to, radius: 0.018, seed: 60 + Math.round(level * 10) + tag.charCodeAt(0) }),
-        material: "cv_steel_dark",
-        mate: A([mastX, mastBaseY, mastZ]),
-      });
-    }
-  }
-  // 两层平台 + 栏杆 + 直梯（可走上去的真实结构）。
-  for (const level of [1.15, 1.72]) {
-    const r = 0.42;
-    add({
-      id: `carrier.island.mast_platform_${Math.round(level * 100)}`,
-      name_cn: `桅杆平台 ${level}m`,
-      name_en: `mast platform ${level}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(B(r * 2, 0.03, r * 2, [0, 0, 0], 0.004), T(r * 0.9, r * 0.84, 0.02, [0, -0.02, 0], 20)),
-      material: "cv_grate",
-      mate: A([mastX, mastBaseY + level, mastZ]),
-    });
-    for (const [sx, sz] of corners) {
-      add({
-        id: `carrier.island.mast_rail_post_${Math.round(level * 100)}_${sx < 0 ? "l" : "r"}${sz < 0 ? "f" : "a"}`,
-        name_cn: `桅杆平台栏杆柱 ${level}m`,
-        name_en: `mast rail post ${level}`,
-        assembly: ASSEMBLY,
-        build_layer: 4,
-        geometry: M(C(0.014, 0.55, [0, 0, 0], 8)),
-        material: "cv_steel",
-        mate: A([mastX + sx * r * 0.86, mastBaseY + level + 0.28, mastZ + sz * r * 0.86]),
-      });
-    }
-    for (const [tag, from, to] of [
-      ["f", [-r * 0.86, level + 0.55, -r * 0.86], [r * 0.86, level + 0.55, -r * 0.86]],
-      ["a", [-r * 0.86, level + 0.55, r * 0.86], [r * 0.86, level + 0.55, r * 0.86]],
-      ["p", [-r * 0.86, level + 0.55, -r * 0.86], [-r * 0.86, level + 0.55, r * 0.86]],
-      ["s", [r * 0.86, level + 0.55, -r * 0.86], [r * 0.86, level + 0.55, r * 0.86]],
-    ] as const) {
-      add({
-        id: `carrier.island.mast_rail_${Math.round(level * 100)}_${tag}`,
-        name_cn: `桅杆平台栏杆 ${level}m ${tag}`,
-        name_en: `mast rail ${level} ${tag}`,
-        assembly: ASSEMBLY,
-        build_layer: 4,
-        geometry: M({ type: "weld", from: [from[0], from[1], from[2]], to: [to[0], to[1], to[2]], radius: 0.012 }),
-        material: "cv_steel",
-        mate: A([mastX, mastBaseY, mastZ]),
-      });
-    }
-  }
-  for (let rung = 0; rung < 8; rung++) {
-    add({
-      id: `carrier.island.mast_ladder_rung_${rung + 1}`,
-      name_cn: `桅杆直梯踏步 ${rung + 1}`,
-      name_en: `mast ladder rung ${rung + 1}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(C(0.014, 0.36, [0, 0, 0], 8)),
-      material: "cv_steel",
-      mate: A([mastX, mastBaseY + 0.22 + rung * 0.22, mastZ - 0.2], [0, 0, 90]),
-    });
-  }
-  for (const side of [-1, 1] as const) {
-    add({
-      id: `carrier.island.mast_ladder_rail_${side === -1 ? "l" : "r"}`,
-      name_cn: `桅杆直梯扶手 ${side === -1 ? "左" : "右"}`,
-      name_en: `mast ladder rail ${side === -1 ? "l" : "r"}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(C(0.018, 2.1, [0, 0, 0], 8)),
-      material: "cv_steel",
-      mate: A([mastX + side * 0.19, mastBaseY + 1.05, mastZ - 0.2]),
-    });
-  }
+
   ctx.node({ name: RADAR_NODE, parent: "root", pivot: [x, baseY + 5.15, z - 0.4], motion: "rotate", axis: "y", note: "旋转搜索雷达（电子扫描相控阵固定）" });
   add({
     id: `${P}radar_pedestal`,
@@ -448,27 +502,15 @@ export function addIsland(ctx: CarrierCtx): void {
     node: RADAR_NODE,
     mate: A([0, 0, 0]),
   });
-  for (let a = 0; a < 8; a++) {
-    add({
-      id: `${P}antenna_${a + 1}`,
-      name_cn: `桅杆鞭状天线 ${a + 1}`,
-      name_en: `mast whip antenna ${a + 1}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(C(0.012, 1.1 + (a % 3) * 0.25, [0, 0, 0], 8), C(0.045, 0.06, [0, -0.55, 0], 10)),
-      material: "cv_steel",
-      mate: A([mastX - 0.22 + (a % 4) * 0.15, baseY + 4.78, mastZ - 0.22 + Math.floor(a / 4) * 0.44]),
-    });
-  }
   add({
     id: `${P}satcom_dome`,
     name_cn: "卫通天线罩",
     name_en: "satcom radome",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(S(0.4, [0, 0, 0], 24), C(0.47, 0.1, [0, -0.35, 0], 24)),
+    geometry: M(S(0.24, [0, 0, 0], 24), C(0.28, 0.08, [0, -0.22, 0], 24)),
     material: "cv_radar",
-    mate: A([x + 0.65, baseY + 3.62, z + 3.1]),
+    mate: A([x + 0.52, baseY + 3.55, z + 2.45]),
   });
   add({
     id: `${P}chimney`,
@@ -476,7 +518,7 @@ export function addIsland(ctx: CarrierCtx): void {
     name_en: "funnel",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(B(0.8, 1.9, 0.9, [0, 0, 0], 0.02), B(0.6, 0.18, 0.7, [0, 0.98, 0], 0.012), B(0.72, 0.2, 0.82, [0, 0.3, 0], 0.008)),
+    geometry: M(B(0.66, 1.75, 0.78, [0, 0, 0], 0.02), B(0.48, 0.16, 0.58, [0, 0.92, 0], 0.012), B(0.6, 0.18, 0.7, [0, 0.3, 0], 0.008)),
     material: "cv_hull_dark",
     mate: A([x + 0.1, baseY + 2.55, z - 2.45], [-12, 0, 0]),
   });
@@ -489,6 +531,29 @@ export function addIsland(ctx: CarrierCtx): void {
   ciwsSpots.forEach((spot, index) => {
     const tu = CIWS_NODES[index]!;
     const tag = pad(index + 1);
+    const platformY = spot[1] - 0.22;
+    add({
+      id: `${P}ciws_${tag}_platform`,
+      name_cn: `1130 近防炮 ${index + 1} 平台`,
+      name_en: `CIWS ${index + 1} platform`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.95, 0.06, 1.0, [0, 0, 0], 0.006)),
+      material: "cv_grate",
+      mate: A([spot[0], platformY, spot[2]]),
+    });
+    for (const dz of [-0.65, 0.65] as const) {
+      add({
+        id: `${P}ciws_${tag}_brace_${dz < 0 ? "a" : "f"}`,
+        name_cn: `1130 近防炮 ${index + 1} 平台斜撑 ${dz < 0 ? "后" : "前"}`,
+        name_en: `CIWS ${index + 1} platform brace ${dz < 0 ? "a" : "f"}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M({ type: "weld", from: [x, baseY + 3.28, z + Math.sign(spot[2] - z) * 1.35], to: [spot[0], platformY - 0.02, spot[2] + dz], radius: 0.04 }),
+        material: "cv_steel_dark",
+        mate: A([0, 0, 0]),
+      });
+    }
     add({
       id: `${P}ciws_${tag}_base`,
       name_cn: `1130 近防炮 ${index + 1} 底座`,

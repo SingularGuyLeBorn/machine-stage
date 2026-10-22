@@ -73,20 +73,29 @@ export function PartTree() {
   const [open, setOpen] = useState(false);
   const rowRefs = useRef(new Map<string, HTMLButtonElement>());
 
-  const toggle = (groupId: string) =>
-    setExpanded((previous) => ({ ...previous, [groupId]: !previous[groupId] }));
+  const toggle = (key: string) =>
+    setExpanded((previous) => ({ ...previous, [key]: !previous[key] }));
 
   // 反向联动：视口点选 / 报告点选 / 飞行到零件后，左树要能看见它——
-  // 自动展开所在总成，并把该行滚进视野。
+  // 自动展开所在总成与层分组，并把该行滚进视野。
+  // 依赖里不能放 expanded：用户手动折叠时如果选中件还在该组，会被立刻重新展开。
   useEffect(() => {
     if (!selectedPart || !open) return;
     const group = tree.groups.find((item) => item.parts.some((part) => part.id === selectedPart));
-    if (group && !expanded[group.id]) {
-      setExpanded((previous) => ({ ...previous, [group.id]: true }));
-      return; // 展开后重跑一次，再滚动
-    }
-    rowRefs.current.get(selectedPart)?.scrollIntoView?.({ block: "nearest" });
-  }, [selectedPart, tree, expanded, open]);
+    if (!group) return;
+    const part = group.parts.find((item) => item.id === selectedPart);
+    setExpanded((previous) => {
+      let next = previous;
+      if (!previous[group.id]) next = { ...next, [group.id]: true };
+      const layerKey = `${group.id}:${part?.layer ?? 0}`;
+      if (part && !next[layerKey]) next = { ...next, [layerKey]: true };
+      return next;
+    });
+    const frame = requestAnimationFrame(() => {
+      rowRefs.current.get(selectedPart)?.scrollIntoView?.({ block: "nearest" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selectedPart, tree, open]);
 
   return (
     <section className={`panel${open ? " panel--grow" : ""}`}>
@@ -128,33 +137,58 @@ export function PartTree() {
                   </button>
                   {groupOpen ? (
                     <div className="tree__group-body">
-                      {group.parts.map((part) => (
-                        <button
-                          key={part.id}
-                          type="button"
-                          className="tree__part"
-                          ref={(element) => {
-                            if (element) rowRefs.current.set(part.id, element);
-                            else rowRefs.current.delete(part.id);
-                          }}
-                          aria-current={part.id === selectedPart}
-                          title={`${part.id} · ${BUILD_LAYER_LABELS[part.layer]?.name_cn ?? ""}`}
-                          onMouseEnter={() => hoverPart(part.id)}
-                          onMouseLeave={() => hoverPart(null)}
-                          onClick={() => {
-                            selectPart(part.id);
-                            requestFocus(part.id);
-                            openPartIsolation(part.id);
-                          }}
-                        >
-                          <span className="tree__layer" data-layer={part.layer} />
-                          <span className="tree__name">{part.nameCn}</span>
-                          <span className="tree__meta">
-                            {part.instances ? `×${part.instances}` : part.dual ? "L/R" : ""}
-                            <span className="num">{part.order}</span>
-                          </span>
-                        </button>
-                      ))}
+                      {group.layers.map((layer) => {
+                        const layerKey = `${group.id}:${layer}`;
+                        const layerOpen = Boolean(expanded[layerKey]);
+                        const layerParts = group.parts.filter((part) => part.layer === layer);
+                        return (
+                          <div key={layerKey}>
+                            <button
+                              type="button"
+                              className="tree__group-head tree__group-head--layer"
+                              aria-expanded={layerOpen}
+                              onClick={() => toggle(layerKey)}
+                            >
+                              <span className="tree__chevron" data-open={layerOpen}>
+                                <ChevronRight size={12} aria-hidden />
+                              </span>
+                              {BUILD_LAYER_LABELS[layer]?.name_cn ?? `L${layer}`}
+                              <span className="badge badge--plain">{layerParts.length} 件</span>
+                            </button>
+                            {layerOpen ? (
+                              <div className="tree__group-body tree__group-body--layer">
+                                {layerParts.map((part) => (
+                                  <button
+                                    key={part.id}
+                                    type="button"
+                                    className="tree__part"
+                                    ref={(element) => {
+                                      if (element) rowRefs.current.set(part.id, element);
+                                      else rowRefs.current.delete(part.id);
+                                    }}
+                                    aria-current={part.id === selectedPart}
+                                    title={`${part.id} · ${BUILD_LAYER_LABELS[part.layer]?.name_cn ?? ""}`}
+                                    onMouseEnter={() => hoverPart(part.id)}
+                                    onMouseLeave={() => hoverPart(null)}
+                                    onClick={() => {
+                                      selectPart(part.id);
+                                      requestFocus(part.id);
+                                      openPartIsolation(part.id);
+                                    }}
+                                  >
+                                    <span className="tree__layer" data-layer={part.layer} />
+                                    <span className="tree__name">{part.nameCn}</span>
+                                    <span className="tree__meta">
+                                      {part.instances ? `×${part.instances}` : part.dual ? "L/R" : ""}
+                                      <span className="num">{part.order}</span>
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>

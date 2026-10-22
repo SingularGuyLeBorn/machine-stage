@@ -225,6 +225,10 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
         ),
       );
     }
+    if (def.scale) {
+      const scale = resolveSpec(def.scale, constants) as [number, number, number];
+      group.scale.set(scale[0], scale[1], scale[2]);
+    }
     parent.add(group);
     group.updateMatrix();
     nodes.set(name, group);

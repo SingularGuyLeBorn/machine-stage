@@ -114,7 +114,7 @@ export function Viewport() {
       <PartInfoCard />
 
       {cameraMode !== "orbit" ? (
-        isCarrierInteriorMode(cameraMode) ? (
+        isCarrierInteriorMode(cameraMode) || cameraMode === "flight" ? (
           <div className="interior-view">
             <div className="interior-view__label">{CAMERA_MODE_LABELS[cameraMode].label}</div>
             <div className="interior-view__hint">{CAMERA_MODE_LABELS[cameraMode].hint}</div>
@@ -292,7 +292,7 @@ export function Viewport() {
               驾驶席
             </button>
           ) : null}
-          <button type="button" className="btn btn--sm" title="回到初始方位" onClick={requestViewReset}>
+          <button type="button" className="btn btn--sm" title="回到初始方位" onClick={() => requestViewReset()}>
             <Crosshair size={13} aria-hidden />
             复位
           </button>

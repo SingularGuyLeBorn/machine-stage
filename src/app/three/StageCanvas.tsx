@@ -77,7 +77,7 @@ export function StageCanvas() {
     <Canvas
       shadows
       dpr={[1, 1.5]}
-      camera={{ position: [4.6, 3.4, 5.2], fov: 34, near: 0.05, far: 200 }}
+      camera={{ position: [4.6, 3.4, 5.2], fov: 34, near: 0.05, far: 4000 }}
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
     >
       <color attach="background" args={["#e9ecf0"]} />
@@ -272,7 +272,8 @@ function StageRuntime() {
         if (store.preserveViewOnRebuild) {
           useStageStore.setState({ preserveViewOnRebuild: false });
         } else {
-          store.requestViewReset();
+          // 模型切换直接切到取景位：航母与坦克的尺度差上百倍，飞行动画会让相机穿过船体。
+          store.requestViewReset(true);
         }
       }
       clockRef.current = 0;
@@ -360,15 +361,19 @@ function StageRuntime() {
     let home: CachedBuild["home"] = null;
     let floor: CachedBuild["floor"] = null;
     if (!bounds.isEmpty()) {
-      const frame = model.framingBounds?.(next) ?? bounds;
+      // 取景/地面/阴影都在世界空间计算：presentationScale 把编辑尺度换算成米。
+      const presentation = model.presentationScale ?? [1, 1, 1];
+      const scaleMatrix = new THREE.Matrix4().makeScale(presentation[0], presentation[1], presentation[2]);
+      const frame = (model.framingBounds?.(next) ?? bounds).clone().applyMatrix4(scaleMatrix);
+      const worldBounds = bounds.clone().applyMatrix4(scaleMatrix);
       const center = frame.getCenter(new THREE.Vector3());
       const frameSize = frame.getSize(new THREE.Vector3());
-      const size = bounds.getSize(new THREE.Vector3());
+      const size = worldBounds.getSize(new THREE.Vector3());
       home = {
         center: [center.x, center.y, center.z],
         radius: Math.max(frameSize.length() * 0.5, 0.5),
       };
-      floor = { y: bounds.min.y, footprint: Math.max(size.x, size.z) };
+      floor = { y: worldBounds.min.y, footprint: Math.max(size.x, size.z) };
     }
     const stats = { parts: next.parts.length, triangles: Math.round(triangles) };
     cache.set(key, { assembled: next, library, stats, home, floor, lastUsed: performance.now(), warmed: false });
@@ -580,19 +585,21 @@ function StageRuntime() {
 
   if (!assembled && !buildError) return null;
 
+  // 网格随模型尺度（航母 316m / 坦克 8m）调整，避免大舰下网格细得看不见。
+  const gridSpan = Math.max(40, (stageFloor?.footprint ?? 1.2) * 1.4);
   return (
     <>
       {views.grid ? (
         <Grid
           position={[0, (stageFloor?.y ?? 0) - 0.004, 0]}
-          args={[40, 40]}
-          cellSize={0.25}
+          args={[gridSpan, gridSpan]}
+          cellSize={gridSpan / 160}
           cellThickness={0.5}
           cellColor="#d3d9e1"
-          sectionSize={1}
+          sectionSize={gridSpan / 16}
           sectionThickness={1}
           sectionColor="#bcc4cf"
-          fadeDistance={26}
+          fadeDistance={gridSpan * 0.65}
           fadeStrength={1.2}
           followCamera={false}
           raycast={() => null}
@@ -709,9 +716,13 @@ function CameraRig() {
   const camera = useThree((state) => state.camera);
   const gl = useThree((state) => state.gl);
   const controls = useThree((state) => state.controls) as
-    { target: THREE.Vector3; update: () => void; enabled: boolean } | null | undefined;
+    | { target: THREE.Vector3; update: () => void; enabled: boolean; maxDistance?: number; minDistance?: number }
+    | null
+    | undefined;
   const focus = useStageStore((state) => state.focus);
   const cameraMode = useStageStore((state) => state.cameraMode);
+  const setCameraMode = useStageStore((state) => state.setCameraMode);
+  const machineState = useStageStore((state) => state.machineState);
   const assembled = useStageStore((state) => state.assembled);
   const flight = useRef<{
     fromPosition: THREE.Vector3;
@@ -732,18 +743,32 @@ function CameraRig() {
   const previousMode = useRef<CameraMode>("orbit");
   /** 第一人称视线目标（平滑用）。 */
   const lookTarget = useRef(new THREE.Vector3(0, 0.8, 0));
-  const look = useRef({ yaw: 0, pitch: 0, dragging: false, x: 0, y: 0 });
+  const look = useRef({ yaw: 0, pitch: 0, dragging: false, x: 0, y: 0, zoom: 1 });
   const perspective = camera as THREE.PerspectiveCamera;
 
   useEffect(() => {
     look.current.yaw = 0;
     look.current.pitch = 0;
     look.current.dragging = false;
+    look.current.zoom = 1;
     // 进入机库内部视角就切到机库作业状态（防火门打开），从任意视角直接切过来都生效。
     if (cameraMode === "hangar" && useStageStore.getState().machineState !== "hangar") {
       useStageStore.getState().setMachineState("hangar");
     }
   }, [cameraMode]);
+
+  // 点「弹射/拦阻闭环」后自动切到跟拍，完整看到滑行、弹射、爬升、进近、拦阻。
+  const previousMachineState = useRef(machineState);
+  useEffect(() => {
+    if (
+      machineState === "flight_ops" &&
+      previousMachineState.current !== "flight_ops" &&
+      assembled?.getNode("CV_Aircraft")
+    ) {
+      setCameraMode("flight");
+    }
+    previousMachineState.current = machineState;
+  }, [machineState, assembled, setCameraMode]);
 
   // 舰船内部第一人称：鼠标拖拽环视（舰桥里能转头看海图桌/座椅/侧窗）。
   useEffect(() => {
@@ -762,18 +787,26 @@ function CameraRig() {
       look.current.x = event.clientX;
       look.current.y = event.clientY;
       look.current.yaw -= dx * 0.005;
-      look.current.pitch = THREE.MathUtils.clamp(look.current.pitch - dy * 0.004, -1.15, 1.15);
+      // 与自由视角一致：往下拖 = 往下看（之前的符号是反的）。
+      look.current.pitch = THREE.MathUtils.clamp(look.current.pitch + dy * 0.004, -1.25, 1.25);
     };
     const up = () => {
       look.current.dragging = false;
     };
+    const wheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const factor = Math.exp(event.deltaY * 0.0011);
+      look.current.zoom = THREE.MathUtils.clamp(look.current.zoom * factor, 0.45, 2.6);
+    };
     el.addEventListener("pointerdown", down);
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    el.addEventListener("wheel", wheel, { passive: false });
     return () => {
       el.removeEventListener("pointerdown", down);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      el.removeEventListener("wheel", wheel);
     };
   }, [cameraMode, gl]);
 
@@ -827,9 +860,27 @@ function CameraRig() {
     const fov = (camera as THREE.PerspectiveCamera).fov ?? 34;
     // 1.15 ≈ 让包围球填满 ~85% 视锥（1.65 会把整机拉得又小又远，像展示柜角落里的玩具）
     const distance = Math.max(0.35, (focus.radius * 1.15) / Math.tan(THREE.MathUtils.degToRad(fov / 2)));
+    const toPosition = target.clone().addScaledVector(direction, distance);
+    // 航母真实尺度 316m：远裁剪面/轨道缩放上限按取景半径扩展，否则整舰会被裁掉。
+    const far = Math.max(200, distance + focus.radius * 4);
+    if (perspective.far < far) {
+      perspective.far = far;
+      perspective.updateProjectionMatrix();
+    }
+    const maxDistance = Math.max(200, distance * 20);
+    if (controls.maxDistance !== undefined) controls.maxDistance = maxDistance;
+    if (controls.minDistance !== undefined) controls.minDistance = Math.max(0.1, focus.radius * 0.01);
+    if (focus.instant) {
+      camera.position.copy(toPosition);
+      controls.target.copy(target);
+      controls.update();
+      flight.current = null;
+      useStageStore.setState({ focus: null });
+      return;
+    }
     flight.current = {
       fromPosition: camera.position.clone(),
-      toPosition: target.clone().addScaledVector(direction, distance),
+      toPosition,
       fromTarget: currentTarget,
       toTarget: target,
       fromFov: fov,
@@ -840,6 +891,31 @@ function CameraRig() {
   }, [focus, camera, controls, cameraMode]);
 
   useFrame((_state, delta) => {
+    // —— 跟拍舰载机：以 CV_Aircraft 节点位姿为基准，完整覆盖弹射/拦阻闭环 ——
+    if (cameraMode === "flight" && assembled) {
+      const node = assembled.getNode("CV_Aircraft");
+      if (node) {
+        const targetPos = node.getWorldPosition(new THREE.Vector3());
+        const rotation = node.getWorldQuaternion(new THREE.Quaternion());
+        const desiredPosition = targetPos
+          .clone()
+          .add(new THREE.Vector3(0, 12, -34).applyQuaternion(rotation));
+        const desiredTarget = targetPos
+          .clone()
+          .add(new THREE.Vector3(0, 2.4, 8).applyQuaternion(rotation));
+        const k = 1 - Math.exp(-4.5 * delta);
+        camera.position.lerp(desiredPosition, k);
+        lookTarget.current.lerp(desiredTarget, k);
+        const targetFov = 52;
+        if (Math.abs(perspective.fov - targetFov) > 1e-3) {
+          perspective.fov += (targetFov - perspective.fov) * k;
+          perspective.updateProjectionMatrix();
+        }
+        camera.lookAt(lookTarget.current);
+        return;
+      }
+    }
+
     // —— 第一人称：眼点由零件包围盒派生（已是世界空间），窄视场，平滑跟随 ——
     const view = firstPersonView(cameraMode, assembled);
     if (view) {
@@ -853,8 +929,9 @@ function CameraRig() {
       const distance = Math.max(1, view.target.distanceTo(view.position));
       const desiredTarget = view.position.clone().addScaledVector(baseDir, distance);
       lookTarget.current.lerp(desiredTarget, k);
-      if (Math.abs(perspective.fov - view.fov) > 1e-3) {
-        perspective.fov += (view.fov - perspective.fov) * k;
+      const targetFov = THREE.MathUtils.clamp(view.fov * look.current.zoom, 18, 100);
+      if (Math.abs(perspective.fov - targetFov) > 1e-3) {
+        perspective.fov += (targetFov - perspective.fov) * k;
         perspective.updateProjectionMatrix();
       }
       camera.lookAt(lookTarget.current);
@@ -884,8 +961,10 @@ function CameraRig() {
       target={target}
       enableDamping
       dampingFactor={0.12}
-      minDistance={0.5}
-      maxDistance={40}
+      minDistance={0.1}
+      maxDistance={2000}
+      minPolarAngle={0.04}
+      maxPolarAngle={Math.PI / 2 - 0.015}
     />
   );
 }

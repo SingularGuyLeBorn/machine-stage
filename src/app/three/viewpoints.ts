@@ -27,7 +27,8 @@ export type CameraMode =
   | "reactor_room"
   | "magazine"
   | "hangar"
-  | "cockpit";
+  | "cockpit"
+  | "flight";
 
 export const CARRIER_INTERIOR_MODES = [
   "bridge",
@@ -90,7 +91,7 @@ export function firstPersonView(
   mode: CameraMode,
   assembled: AssembledModel | null,
 ): FirstPersonView | null {
-  if (mode === "orbit" || !assembled) return null;
+  if (mode === "orbit" || mode === "flight" || !assembled) return null;
   const toWorld = (local: THREE.Vector3) => local.applyMatrix4(assembled.root.matrixWorld);
 
   if (mode === "driver") {
@@ -190,10 +191,10 @@ const CARRIER_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec
     fov: 66,
   },
   engine_room: {
-    eyePart: "carrier.power.engine_control_seat_back",
-    eye: [0, 0.12, 0.05],
-    targetPart: "carrier.power.engine_room_walls",
-    fov: 70,
+    eyePart: "carrier.power.engine_view_camera",
+    eye: [0, 0, 0],
+    targetPart: "carrier.power.engine_switchboard",
+    fov: 78,
   },
   reactor_room: {
     eyePart: "carrier.power.reactor_control_seat_back",
@@ -203,17 +204,16 @@ const CARRIER_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec
     fov: 62,
   },
   magazine: {
-    eyePart: "carrier.hangar.magazine_control_seat_back",
-    eye: [0, 0.005, -0.04],
-    targetPart: "carrier.hangar.magazine_rack_1",
-    fov: 62,
+    eyePart: "carrier.hangar.magazine_view_camera",
+    eye: [0, 0, 0],
+    targetPart: "carrier.hangar.magazine_rack_ext_2",
+    fov: 72,
   },
   hangar: {
-    eyePart: "carrier.hangar.hangar_control_seat_back",
-    // 坐在机库控制席，正对状态板/调度屏；停机位与折叠翼停放机可在舱内环视。
-    eye: [0, 0.02, 0.05],
-    targetPart: "carrier.hangar.hangar_control_board",
-    fov: 66,
+    eyePart: "carrier.hangar.hangar_view_camera",
+    eye: [0, 0, 0],
+    targetPart: "carrier.aircraft.hangarparked1_fuselage_mid",
+    fov: 55,
   },
 };
 
@@ -229,4 +229,5 @@ export const CAMERA_MODE_LABELS: Record<CameraMode, { label: string; hint: strin
   magazine: { label: "弹药库", hint: "在弹药库内，拖动环视弹药架 / 扬弹机 / 库存显控；再点一次退出" },
   hangar: { label: "机库", hint: "在机库内，拖动环视停机位 / 维护区 / 机库控制台；再点一次退出" },
   cockpit: { label: "舰载机座舱", hint: "舰载机座舱：平显 / 多功能显示器 / 操纵杆，拖动环视；再点一次退出" },
+  flight: { label: "跟拍舰载机", hint: "跟拍舰载机：完整看滑行 / 弹射 / 爬升 / 进近 / 拦阻；再点一次退出" },
 };

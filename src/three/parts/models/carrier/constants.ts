@@ -1,8 +1,8 @@
 // ============================================================================
 // models/carrier/constants —— 福建舰（Type 003）单一真值源
 //
-// 展示尺度 1:8：真实舰长约 320m → 模型 40m；飞行甲板宽约 78m → 9.6m。
-// 坐标：+X 右舷（舰岛侧）、+Y 上、+Z 舰艏；龙骨底面 y=0，飞行甲板面 y=4.4。
+// 编辑尺度 1:8，展示时由 presentationScale=7.9 换算为米：真实舰长约 316m。
+// 坐标：+X 右舷（舰岛侧）、+Y 上、+Z 舰艏；龙骨底面 y=0，飞行甲板面 y=4.4（编辑单位）。
 // ============================================================================
 
 export const CV = {
@@ -42,7 +42,7 @@ export const CV = {
   WIRE_HALF: 3.0,
   WIRE_Y: 4.62,
 
-  ELEVATOR_X: 4.35,
+  ELEVATOR_X: 3.76,
   ELEVATOR_Z: [2.0, -12.8] as const,
   ELEVATOR_W: 2.0,
   ELEVATOR_L: 3.4,
@@ -58,11 +58,12 @@ export const CV_CONSTANTS: Record<string, number> = Object.fromEntries(
   Object.entries(CV).filter(([, value]) => typeof value === "number"),
 ) as Record<string, number>;
 
-/** 舰体平面轮廓（半宽随 z 变化）：用于外壳与甲板平面形状。 */
+/** 舰体平面轮廓半宽随 z 变化（HULL_BEAM 是全宽，这里返回半宽）。 */
 export function hullHalfBeamAt(z: number): number {
+  const half = CV.HULL_BEAM / 2;
   const t = (z - CV.HULL_Z_STERN) / (CV.HULL_Z_BOW - CV.HULL_Z_STERN);
-  if (t < 0.12) return CV.HULL_BEAM * (0.78 + 0.22 * (t / 0.12));
-  if (t < 0.72) return CV.HULL_BEAM;
+  if (t < 0.12) return half * (0.62 + 0.38 * (t / 0.12));
+  if (t < 0.72) return half;
   const bow = (t - 0.72) / 0.28;
-  return CV.HULL_BEAM * Math.max(0.03, 1 - bow * bow * 0.98);
+  return half * Math.max(0.03, 1 - bow * bow * 0.98);
 }

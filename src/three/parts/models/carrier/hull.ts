@@ -51,11 +51,33 @@ export function addHull(ctx: CarrierCtx): void {
       name_en: `keel strake ${k + 1}`,
       assembly: HULL_ASSEMBLY,
       build_layer: 1,
-      geometry: M(B(0.28, 0.22, 34, [0, 0, 0], 0.01)),
+      geometry: M(B(0.28, 0.22, 5.8, [0, 0, 0], 0.01)),
       material: "cv_steel_dark",
-      mate: A([0, CV.HULL_BOTTOM + 0.17, -16 + k * 6.2], [0, 0, 0]),
+      mate: A([0, CV.HULL_BOTTOM + 0.17, -15 + k * 6.0], [0, 0, 0]),
     });
   }
+
+  // 前倾舰艏楔形段：从水线向甲板前缘外飘。
+  add({
+    id: "carrier.hull.bow_rake",
+    name_cn: "前倾外飘舰艏",
+    name_en: "raked flared bow",
+    assembly: HULL_ASSEMBLY,
+    build_layer: 1,
+    geometry: { type: "kit", kit: "carrierBowRake" },
+    material: "cv_hull",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: "carrier.hull.bow_stem_strip",
+    name_cn: "艏柱包板",
+    name_en: "bow stem strip",
+    assembly: HULL_ASSEMBLY,
+    build_layer: 1,
+    geometry: M({ type: "weld", from: [0, 0.45, 18.75], to: [0, 4.4, 20.65], radius: 0.045 }),
+    material: "cv_steel_dark",
+    mate: A([0, 0, 0]),
+  });
 
   // 球鼻艏（回转体放样，压在艏柱/龙骨前端）+ 声呐导流罩。
   add({
@@ -196,15 +218,17 @@ export function addHull(ctx: CarrierCtx): void {
   BULKHEAD_Z.forEach((z, index) => {
     const half = Math.max(0.8, hullHalfBeamAt(z) - 0.28);
     const station = pad(index + 1);
+    // 机库/机舱/弹药库段：舱壁只保留在底层甲板以下，避免横穿可进入舱室。
+    const throughHangar = z > -17 && z < 11;
     add({
       id: `carrier.hull.bulkhead_${station}`,
       name_cn: `水密舱壁 ${station}`,
       name_en: `watertight bulkhead ${station}`,
       assembly: HULL_ASSEMBLY,
       build_layer: 1,
-      geometry: M(B(half * 2, 3.0, 0.1, [0, 0, 0], 0.008)),
+      geometry: M(B(half * 2, throughHangar ? 0.7 : 3.0, 0.1, [0, 0, 0], 0.008)),
       material: "cv_steel_dark",
-      mate: A([0, CV.HULL_BOTTOM + 1.6, z]),
+      mate: A([0, CV.HULL_BOTTOM + (throughHangar ? 0.35 : 1.6), z]),
     });
     for (let s = -1; s <= 1; s++) {
       add({
@@ -213,9 +237,9 @@ export function addHull(ctx: CarrierCtx): void {
         name_en: `bulkhead stiffener ${station}-${s + 2}`,
         assembly: HULL_ASSEMBLY,
         build_layer: 1,
-        geometry: M(B(0.1, 2.9, 0.16, [0, 0, 0], 0.006)),
+        geometry: M(B(0.1, throughHangar ? 0.6 : 2.9, 0.16, [0, 0, 0], 0.006)),
         material: "cv_steel_dark",
-        mate: A([s * half * 0.55, CV.HULL_BOTTOM + 1.62, z - 0.08]),
+        mate: A([s * half * 0.55, CV.HULL_BOTTOM + (throughHangar ? 0.3 : 1.62), z - 0.08]),
       });
     }
   });
@@ -287,9 +311,9 @@ export function addHull(ctx: CarrierCtx): void {
         name_en: `shell segment ${s + 1}-${side === -1 ? "l" : "r"}`,
         assembly: HULL_ASSEMBLY,
         build_layer: 1,
-        geometry: M(B(0.05, 2.2, 4.5, [0, 0, 0], 0.008)),
+        geometry: M(B(0.05, 2.2, s === 7 ? 3.3 : 4.5, [0, 0, 0], 0.008)),
         material: "cv_hull_dark",
-        mate: A([side * (half - 0.06), 1.95, z + 2.2]),
+        mate: A([side * (half - 0.06), 1.95, z + (s === 7 ? 1.65 : 2.2)]),
       });
     }
   }

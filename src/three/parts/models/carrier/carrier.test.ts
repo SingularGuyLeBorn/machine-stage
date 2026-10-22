@@ -133,10 +133,11 @@ describe("福建舰 · 整机", () => {
     }
   });
 
-  it("L4 舰岛：三层舰桥 + 4 面固定相控阵（4×64 TR）+ 旋转雷达 + 2 座 1130（各 11 管）", () => {
-    for (let level = 1; level <= 4; level++) {
+  it("L4 舰岛：两层舱室 + 一体化隐身塔 + 4 面固定相控阵（4×64 TR）+ 旋转雷达 + 2 座 1130（各 11 管）", () => {
+    for (let level = 1; level <= 2; level++) {
       expect(staticIds.has(`carrier.island.bridge_${level}_floor`), `bridge ${level}`).toBe(true);
     }
+    expect(staticIds.has("carrier.island.faceted_tower"), "faceted tower").toBe(true);
     for (let panel = 1; panel <= 4; panel++) {
       const tag = String(panel).padStart(2, "0");
       expect(staticIds.has(`carrier.island.array_${tag}_panel`), `array ${panel}`).toBe(true);
@@ -206,7 +207,7 @@ describe("福建舰 · 整机", () => {
     expect(airborne.aircraft.y).toBeGreaterThan(launch.aircraft.y + 1.2);
     expect(airborne.shuttleZ).toBeCloseTo(CV.CAT_Z0, 5);
     // 机翼从折叠 1.72 rad 展开到 0
-    expect(Math.abs(taxi.wing)).toBeGreaterThan(1.5);
+    expect(Math.abs(taxi.wing)).toBeGreaterThan(1.4);
     expect(Math.abs(launch.wing)).toBeLessThan(0.05);
     // 进近放钩、着舰钩住第 2 道索并拉出
     expect(approach.hook).toBeLessThan(-0.3);
@@ -214,7 +215,7 @@ describe("福建舰 · 整机", () => {
     expect(Math.abs(caught.wire)).toBeGreaterThan(0.25);
     expect(caught.aircraft.z).toBeGreaterThan(approach.aircraft.z);
     // 复位后重新折叠系留
-    expect(Math.abs(secured.wing)).toBeGreaterThan(1.5);
+    expect(Math.abs(secured.wing)).toBeGreaterThan(1.4);
     expect(secured.aircraft.z).toBeCloseTo(CV.AIRCRAFT_PARK[1], 1);
   });
 

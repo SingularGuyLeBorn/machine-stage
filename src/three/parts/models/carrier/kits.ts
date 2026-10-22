@@ -56,10 +56,10 @@ export function hullPlan(inset = 0): Array<[number, number]> {
 /** 飞行甲板轮廓：右舷直边 + 左舷外飘 + 斜角艏 + 两处舷侧升降机开口。 */
 function deckPlan(): Array<[number, number]> {
   const b = CV.DECK_BEAM / 2;
-  const notchX = 3.32;
+  const notchX = CV.ELEVATOR_X - CV.ELEVATOR_W / 2;
   const halfL = CV.ELEVATOR_L / 2 + 0.02;
   const points: Array<[number, number]> = [
-    [-b + 0.25, CV.DECK_Z_STERN],
+    [-b + 0.2, CV.DECK_Z_STERN],
     [b, CV.DECK_Z_STERN],
   ];
   const elevators = [...CV.ELEVATOR_Z].sort((a, c) => a - c);
@@ -69,8 +69,9 @@ function deckPlan(): Array<[number, number]> {
     points.push([notchX, ez + halfL]);
     points.push([b, ez + halfL]);
   }
-  points.push([b, 13.5], [b - 0.4, 17.8], [b - 1.25, CV.DECK_Z_BOW]);
-  points.push([-b + 1.4, CV.DECK_Z_BOW], [-b, 16.2], [-b, -14.5], [-b + 0.5, CV.DECK_Z_STERN]);
+  // 右舷直边 + 方艏斜切；左舷为斜角甲板外飘（艉部收、舯部最宽、艏部收）。
+  points.push([b, 12.5], [b - 0.35, 17.6], [b - 1.3, 19.4], [b - 2.2, 20.5]);
+  points.push([-b + 2.4, 20.9], [-b + 1.3, 19.6], [-b + 0.1, 16.0], [-b - 0.7, 10.0], [-b - 1.05, 4.0], [-b - 1.05, -4.0], [-b - 0.9, -12.0], [-b - 0.4, CV.DECK_Z_STERN]);
   return points;
 }
 
@@ -93,9 +94,79 @@ export const carrierHullShell: GeometryBuilder = () => {
   return mergeWithUv([geometry, hullUpperBand()]);
 };
 
+/** 舰岛一体化隐身塔：八折角内倾体，承接相控阵/桅杆，不再叠方形楼层。 */
+export const carrierIslandTower: GeometryBuilder = () => {
+  const sections = [
+    { y: 0, w: 0.76, l: 2.45, c: 0.22 },
+    { y: 0.72, w: 0.62, l: 2.02, c: 0.2 },
+    { y: 1.34, w: 0.48, l: 1.56, c: 0.17 },
+  ];
+  const ring = (s: { w: number; l: number; c: number }) => [
+    [-s.w + s.c, -s.l], [s.w - s.c, -s.l], [s.w, -s.l + s.c], [s.w, s.l - s.c],
+    [s.w - s.c, s.l], [-s.w + s.c, s.l], [-s.w, s.l - s.c], [-s.w, -s.l + s.c],
+  ];
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (const sec of sections) for (const [px, pz] of ring(sec)) positions.push(px, sec.y, pz);
+  for (let h = 0; h < sections.length - 1; h++) {
+    for (let i = 0; i < 8; i++) {
+      const a = h * 8 + i, b = h * 8 + ((i + 1) % 8);
+      const c = (h + 1) * 8 + ((i + 1) % 8), d = (h + 1) * 8 + i;
+      indices.push(a, d, c, a, c, b);
+    }
+  }
+  const top = (sections.length - 1) * 8;
+  for (let i = 1; i < 7; i++) indices.push(top, top + i, top + i + 1);
+  const bottom = 0;
+  for (let i = 1; i < 7; i++) indices.push(bottom, bottom + i + 1, bottom + i);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+/** 前倾舰艏楔形放样：从水线尖艏向甲板前缘外飘，侧面看是斜切艏而不是方盒。 */
+export const carrierBowRake: GeometryBuilder = () => {
+  const rings = [
+    { y: 0.44, z: 18.5, half: 0.08 },
+    { y: 1.35, z: 18.95, half: 0.38 },
+    { y: 2.55, z: 19.35, half: 0.86 },
+    { y: 3.75, z: 19.95, half: 1.1 },
+    { y: 4.45, z: 20.55, half: 1.5 },
+  ];
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const ringPts = rings.map((r) => [
+    new THREE.Vector3(-r.half, r.y, r.z - 0.42),
+    new THREE.Vector3(-r.half * 0.72, r.y, r.z + 0.08),
+    new THREE.Vector3(0, r.y, r.z + 0.28),
+    new THREE.Vector3(r.half * 0.72, r.y, r.z + 0.08),
+    new THREE.Vector3(r.half, r.y, r.z - 0.42),
+  ]);
+  for (const ring of ringPts) for (const p of ring) positions.push(p.x, p.y, p.z);
+  for (let h = 0; h < ringPts.length - 1; h++) {
+    for (let i = 0; i < 4; i++) {
+      const a = h * 5 + i;
+      const b = h * 5 + i + 1;
+      const c = (h + 1) * 5 + i + 1;
+      const d = (h + 1) * 5 + i;
+      indices.push(a, d, c, a, c, b);
+    }
+  }
+  // 下水线底封口
+  const bottom = 0;
+  for (let i = 1; i < 4; i++) indices.push(bottom, bottom + i + 1, bottom + i);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
 /** 克令克（y=3.05）到飞行甲板底（y=4.42）的外飘舷侧环带：收口甲板与舰体之间的透空缝。 */
 function hullUpperBand(): THREE.BufferGeometry {
-  const knuckle = 3.05;
+  const knuckle = 2.4;
   const top = CV.DECK_Y + 0.02;
   const heights = [knuckle, 3.4, 3.72, 4.05, top];
   const base = hullPlan(0);
@@ -104,7 +175,7 @@ function hullUpperBand(): THREE.BufferGeometry {
     const ease = t * t * (3 - 2 * t);
     return base.map(([x, z]) => {
       const bow = Math.min(1, Math.max(0, (z - 5) / 12));
-      const flare = (0.055 + 0.13 * bow * bow) * ease;
+      const flare = (0.48 + 0.38 * bow * bow) * ease;
       return new THREE.Vector3(x + Math.sign(x) * flare, y, z);
     });
   });

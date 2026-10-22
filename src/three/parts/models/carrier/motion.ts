@@ -64,8 +64,9 @@ const lerp = (a: number, b: number, u: number) => a + (b - a) * u;
 function setWings(assembled: AssembledModel, fold: number): void {
   const left = assembled.getNode(WING_FOLD_L);
   const right = assembled.getNode(WING_FOLD_R);
-  if (left) left.rotation.z = -fold;
-  if (right) right.rotation.z = fold;
+  const safe = Math.min(fold, 1.45);
+  if (left) left.rotation.z = -safe;
+  if (right) right.rotation.z = safe;
 }
 
 function setAircraftPose(
@@ -283,9 +284,9 @@ function flightPose(t: number): {
 export function animateCarrier(assembled: AssembledModel, seconds: number, state = "idle"): void {
   const t = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
 
-  // 默认姿态：舰载机系留、机翼折叠、挡焰板平放、拦阻索复位。
+  // 默认姿态：舰载机系留、机翼展开（便于看清整机外形）、挡焰板平放、拦阻索复位。
   setAircraftPose(assembled, PARK, 0, 0, 0);
-  setWings(assembled, 1.72);
+  setWings(assembled, 0);
   setHook(assembled, 0);
   setWirePull(assembled, 0);
   setShuttle(assembled, CV.CAT_Z0);
@@ -305,9 +306,9 @@ export function animateCarrier(assembled: AssembledModel, seconds: number, state
     return;
   }
   if (state === "hangar") {
+    // 机库作业时防火门保持全开，第一人称才能看见纵深停机位与停放机。
+    setDoors(assembled, 1);
     const cycle = t % 8;
-    const open = cycle < 2.5 ? smooth(cycle / 1.0) : cycle < 5.5 ? 1 : 1 - smooth((cycle - 5.5) / 1.0);
-    setDoors(assembled, open);
     const drop = -1.1 * (0.5 - 0.5 * Math.cos((Math.min(cycle, 6) / 6) * Math.PI * 2));
     setAmmoElevator(assembled, drop);
     setRadar(assembled, t * 0.5);
@@ -345,7 +346,7 @@ export const CARRIER_STATE_LABELS = [
 export const CARRIER_ANIMATED_STATES = ["engine", "flight_ops", "hangar", "ciws"];
 
 export function carrierBounds(): THREE.Box3 {
-  return new THREE.Box3(new THREE.Vector3(-10, 0, -30), new THREE.Vector3(10, DECK_TOP + 9.5, 24));
+  return new THREE.Box3(new THREE.Vector3(-6, 0, -21.5), new THREE.Vector3(6, 11, 21.5));
 }
 
 export function carrierFlightPhase(seconds: number): string {

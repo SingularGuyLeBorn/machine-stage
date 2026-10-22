@@ -214,6 +214,73 @@ export function addHangar(ctx: CarrierCtx): void {
     });
     ctx.layout(`carrier.hangar.magazine${r + 1}`, ({ index }) => new THREE.Matrix4().makeTranslation((index - 3.5) * 0.28, 0, 0));
   }
+  // 弹药库纵深弹架：3 列 ×12 发，填满当前第一人称视线内的空舱。
+  for (let r = 0; r < 3; r++) {
+    const rz = -5.6 - r * 1.05;
+    add({
+      id: `${P}magazine_rack_ext_${r + 1}`,
+      name_cn: `弹药库纵深弹架 ${r + 1}`,
+      name_en: `magazine deep rack ${r + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 2,
+      geometry: M(B(2.4, 0.08, 0.7, [0, 0, 0], 0.006), B(2.3, 0.7, 0.06, [0, 0.35, -0.32], 0.006), B(2.3, 0.06, 0.7, [0, 0.7, 0], 0.006)),
+      material: "cv_steel_dark",
+      mate: A([0, CV.LOWER_DECK_Y + 0.4, rz]),
+    });
+    add({
+      id: `${P}magazine_round_ext_${r + 1}`,
+      name_cn: `纵深弹药 ${r + 1} ×12`,
+      name_en: `deep magazine rounds ${r + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 2,
+      geometry: M(C(0.06, 0.5, [0, 0, 0], 12), C(0.02, 0.16, [0, 0.32, 0], 10)),
+      material: "cv_steel",
+      mate: A([0, CV.LOWER_DECK_Y + 0.55, rz], [90, 0, 0]),
+      instances: 12,
+      indexed: true,
+      instance_layout: `carrier.hangar.magazineExt${r + 1}`,
+    });
+    ctx.layout(`carrier.hangar.magazineExt${r + 1}`, ({ index }) => new THREE.Matrix4().makeTranslation((index - 5.5) * 0.19, 0, 0));
+  }
+  // 舷侧导弹发射筒 + 弹药箱 + 装填托架。
+  for (const side of [-1, 1] as const) {
+    const tag = side === -1 ? "p" : "s";
+    for (let c = 0; c < 4; c++) {
+      add({
+        id: `${P}magazine_canister_${tag}_${c + 1}`,
+        name_cn: `舷侧导弹发射筒 ${tag.toUpperCase()}-${c + 1}`,
+        name_en: `magazine missile canister ${tag} ${c + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 2,
+        geometry: M(B(0.16, 0.1, 0.16, [0, 0, 0], 0.004), C(0.085, 1.0, [0, 0.55, 0], 14), T(0.1, 0.08, 0.05, [0, 1.08, 0], 14)),
+        material: "cv_steel_dark",
+        mate: A([side * 2.75, CV.LOWER_DECK_Y + 0.05, -1.8 - c * 0.9]),
+      });
+    }
+    for (let b = 0; b < 3; b++) {
+      add({
+        id: `${P}magazine_crate_${tag}_${b + 1}`,
+        name_cn: `弹药箱 ${tag.toUpperCase()}-${b + 1}`,
+        name_en: `ammo crate ${tag} ${b + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 2,
+        geometry: M(B(0.62, 0.32, 0.42, [0, 0, 0], 0.008), B(0.56, 0.02, 0.36, [0, 0.17, 0], 0.002)),
+        material: "cv_warning",
+        mate: A([side * 2.15, CV.LOWER_DECK_Y + 0.16 + Math.floor(b / 2) * 0.33, -1.35 - (b % 2) * 0.5]),
+      });
+    }
+    add({
+      id: `${P}magazine_loading_cradle_${tag}`,
+      name_cn: `装填托架 ${tag.toUpperCase()}`,
+      name_en: `loading cradle ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 2,
+      geometry: M(B(0.85, 0.08, 0.32, [0, 0, 0], 0.005), B(0.06, 0.35, 0.28, [-0.32, -0.2, 0], 0.004), B(0.06, 0.35, 0.28, [0.32, -0.2, 0], 0.004), C(0.05, 0.2, [0, 0.14, 0], 10)),
+      material: "cv_steel",
+      mate: A([side * 1.55, CV.LOWER_DECK_Y + 0.27, -7.8]),
+    });
+  }
+
   // 机库停放的第二架舰载机（折叠翼，简化但完整的外形）。
   add({
     id: `${P}spare_aircraft_body`,
@@ -334,4 +401,26 @@ export function addHangar(ctx: CarrierCtx): void {
     instance_layout: "carrier.hangar.foam",
   });
   ctx.layout("carrier.hangar.foam", ({ index }) => new THREE.Matrix4().makeTranslation(-3.0 + (index % 6) * 1.2, CV.HANGAR_Y + 1.75, -12 + Math.floor(index / 6) * 8));
+
+  // 机库第一人称监控位：立柱 + 相机，固定在机库中线，正对停放机。
+  add({
+    id: `${P}hangar_view_pole`,
+    name_cn: "机库监控立柱",
+    name_en: "hangar camera pole",
+    assembly: ASSEMBLY,
+    build_layer: 2,
+    geometry: M(B(0.22, 0.03, 0.22, [0, 0, 0], 0.006), C(0.026, 0.55, [0, 0.28, 0], 10)),
+    material: "cv_steel",
+    mate: A([0, CV.HANGAR_Y + 0.15, -1.0]),
+  });
+  add({
+    id: `${P}hangar_view_camera`,
+    name_cn: "机库监控相机",
+    name_en: "hangar camera",
+    assembly: ASSEMBLY,
+    build_layer: 2,
+    geometry: M(B(0.14, 0.1, 0.18, [0, 0, 0], 0.006), B(0.03, 0.03, 0.12, [0, -0.09, 0.1], 0.002)),
+    material: "cv_steel_dark",
+    mate: A([0, CV.HANGAR_Y + 0.55, -1.0]),
+  });
 }

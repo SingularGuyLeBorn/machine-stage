@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { CV } from "./constants";
+import { CV, hullHalfBeamAt } from "./constants";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
 
 // ============================================================================
@@ -131,7 +131,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // 挡焰板：铰接节点，待机平放，弹射时竖起。
   CAT_TRACKS.forEach((track, index) => {
     const node = JBD_NODES[index]!;
-    const z = track.z0 - 1.65;
+    const z = track.z0 - 3.2;
     ctx.node({ name: node, parent: "root", pivot: [track.x, deckTop + 0.05, z], motion: "rotate", axis: "x", rest_rotation: [-90, 0, 0], note: `弹射器 ${track.id} 挡焰板` });
     add({
       id: `${P}cat_${pad(track.id)}_jbd_panel`,
@@ -688,40 +688,249 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   });
 
   // ---- 甲板标记与系留点 ----
-  for (let d = 0; d < 20; d++) {
-    add({
-      id: `${P}marking_center_${pad(d + 1)}`,
-      name_cn: `跑道中线 ${d + 1}`,
-      name_en: `centerline dash ${d + 1}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(B(0.12, 0.006, 1.0, [0, 0, 0], 0.002)),
-      material: "cv_deck_line",
-      mate: A([-0.2, deckTop + 0.048, -18 + d * 1.8]),
-    });
-  }
-  for (let d = 0; d < 12; d++) {
-    add({
-      id: `${P}marking_cat_${pad(d + 1)}`,
-      name_cn: `弹射位标线 ${d + 1}`,
-      name_en: `catapult marking ${d + 1}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(B(0.06, 0.006, 0.5, [0, 0, 0], 0.002)),
-      material: "cv_deck_yellow",
-      mate: A([d % 2 === 0 ? -1.9 : 1.5, deckTop + 0.049, 2.8 + Math.floor(d / 2) * 2.4]),
-    });
-  }
+  const markY = deckTop + 0.052;
+  const runwayX = (z: number) => 1.45 + ((z + 18.4) / 30.9) * -4.4;
+  // 斜角跑道底层深灰漆带：给所有白色标线提供连续附着面，同时形成真实跑道底色。
   add({
-    id: `${P}marking_landing_box`,
-    name_cn: "着舰区标线框",
-    name_en: "landing area box",
+    id: `${P}runway_underlay`,
+    name_cn: "斜角着舰跑道底色",
+    name_en: "angled runway underlay",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(B(4.8, 0.006, 0.1, [0, 0, 0], 0.002), B(4.8, 0.006, 0.1, [0, 0, -6.8], 0.002), B(0.1, 0.006, 6.9, [-2.4, 0, -3.4], 0.002), B(0.1, 0.006, 6.9, [2.4, 0, -3.4], 0.002)),
-    material: "cv_deck_line",
-    mate: A([0, deckTop + 0.05, -6.4]),
+    geometry: M(B(3.5, 0.004, 31.4, [0, 0, 0], 0.0015)),
+    material: "cv_deck_plate",
+    mate: A([-0.75, deckTop + 0.041, -2.95], [0, -8.1, 0]),
   });
+  // 斜角着舰跑道：从右舷艉部向左侧前方倾斜约 8.6°，与直通起飞区分开。
+  for (let d = 0; d < 25; d++) {
+    const z = -18.4 + d * 1.3;
+    add({
+      id: `${P}runway_center_${pad(d + 1)}`,
+      name_cn: `斜角跑道中线 ${d + 1}`,
+      name_en: `angled runway centerline ${d + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.14, 0.006, 0.72, [0, 0, 0], 0.002)),
+      material: "cv_deck_line",
+      mate: A([runwayX(z), markY + 0.004, z]),
+    });
+  }
+  for (const side of [-1, 1] as const) {
+    for (let s = 0; s < 11; s++) {
+      const z = -18.4 + s * 2.9;
+      add({
+        id: `${P}runway_edge_${side === -1 ? "p" : "s"}_${pad(s + 1)}`,
+        name_cn: `斜角跑道${side === -1 ? "左" : "右"}边线 ${s + 1}`,
+        name_en: `angled runway edge ${side === -1 ? "p" : "s"} ${s + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(0.14, 0.006, 2.9, [0, 0, 0], 0.0015)),
+        material: "cv_deck_line",
+        mate: A([runwayX(z) + side * 1.55, markY + 0.004, z]),
+      });
+    }
+  }
+  for (let bar = 0; bar < 8; bar++) {
+    const z = -15.4 + Math.floor(bar / 4) * 1.2;
+    const x = runwayX(z);
+    add({
+      id: `${P}runway_threshold_${pad(bar + 1)}`,
+      name_cn: `着舰区横杠 ${bar + 1}`,
+      name_en: `landing threshold bar ${bar + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.55, 0.006, 0.12, [0, 0, 0], 0.0015)),
+      material: "cv_deck_line",
+      mate: A([x + (bar % 2 === 0 ? -0.85 : 0.85), markY + 0.005, z]),
+    });
+  }
+  for (let td = 0; td < 6; td++) {
+    const z = -10.5 + td * 0.55;
+    const x = runwayX(z);
+    add({
+      id: `${P}runway_touchdown_${pad(td + 1)}`,
+      name_cn: `着舰接地点标记 ${td + 1}`,
+      name_en: `touchdown mark ${td + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.5, 0.006, 0.09, [0, 0, 0], 0.0015)),
+      material: "cv_deck_line",
+      mate: A([x + (td % 2 === 0 ? -0.55 : 0.55), markY + 0.005, z]),
+    });
+  }
+  for (const [tag, ez] of [["aft", -18.35], ["fwd", 12.35]] as const) {
+    const cx = runwayX(ez);
+    add({
+      id: `${P}runway_end_${tag}`,
+      name_cn: `斜角跑道端线 ${tag === "aft" ? "艉" : "艏"}`,
+      name_en: `angled runway end ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(3.25, 0.006, 0.12, [0, 0, 0], 0.0015)),
+      material: "cv_deck_line",
+      mate: A([cx, markY + 0.006, ez]),
+    });
+  }
+  // 直通起飞区：中线 + 两侧边线（黄色）。
+  for (let d = 0; d < 10; d++) {
+    add({
+      id: `${P}takeoff_center_${pad(d + 1)}`,
+      name_cn: `起飞区中线 ${d + 1}`,
+      name_en: `takeoff centerline ${d + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.06, 0.006, 0.6, [0, 0, 0], 0.0015)),
+      material: "cv_deck_yellow",
+      mate: A([0, markY + 0.004, 4.5 + d * 1.35]),
+    });
+  }
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}takeoff_edge_${side === -1 ? "p" : "s"}`,
+      name_cn: `起飞区${side === -1 ? "左" : "右"}边线`,
+      name_en: `takeoff edge ${side === -1 ? "p" : "s"}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.06, 0.006, 12.6, [0, 0, 0], 0.0015)),
+      material: "cv_deck_yellow",
+      mate: A([side * 3.35, markY + 0.004, 10.5]),
+    });
+  }
+  // 停机位框线 + 编号（七段数字），全部贴在甲板上。
+  const parkingSpots: Array<[number, number, number]> = [
+    [3.5, 10.0, 1], [3.5, 14.2, 2], [-2.4, -14.4, 3], [-2.4, -18.0, 4],
+    [-1.2, 6.7, 5], [0.8, 1.6, 6], [2.9, -17.2, 7], [-3.5, -8.7, 8],
+  ];
+  const digitSegments: Record<string, string[]> = {
+    "1": ["b", "c"], "2": ["a", "b", "g", "e", "d"], "3": ["a", "b", "g", "c", "d"],
+    "4": ["f", "g", "b", "c"], "5": ["a", "f", "g", "c", "d"], "6": ["a", "f", "g", "e", "c", "d"],
+    "7": ["a", "b", "c"], "8": ["a", "b", "c", "d", "e", "f", "g"], "9": ["a", "b", "c", "d", "f", "g"],
+  };
+  const drawDigit = (digit: string, idPrefix: string, cx: number, cz: number, size = 0.5) => {
+    const w = size * 0.5;
+    const h = size;
+    const t = Math.max(0.035, size * 0.09);
+    const segs: Record<string, [number, number, number, number]> = {
+      a: [0, h / 2, w, t], g: [0, 0, w, t], d: [0, -h / 2, w, t],
+      f: [-w / 2, h / 4, t, h / 2], b: [w / 2, h / 4, t, h / 2],
+      e: [-w / 2, -h / 4, t, h / 2], c: [w / 2, -h / 4, t, h / 2],
+    };
+    for (const s of digitSegments[digit] ?? []) {
+      const [dx, dz, sw, sd] = segs[s]!;
+      add({
+        id: `${P}${idPrefix}_${s}`,
+        name_cn: `停机位编号 ${digit}`,
+        name_en: `parking number ${digit}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(sw, 0.006, sd, [0, 0, 0], 0.001)),
+        material: "cv_deck_yellow",
+        mate: A([cx + dx, markY + 0.006, cz + dz]),
+      });
+    }
+  };
+  parkingSpots.forEach(([sx, sz, n], index) => {
+    const w = 2.5;
+    const d = 2.0;
+    add({
+      id: `${P}parking_box_${pad(index + 1)}`,
+      name_cn: `停机位框线 ${n}`,
+      name_en: `parking spot box ${n}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(w, 0.006, 0.06, [0, 0, 0], 0.0015), B(w, 0.006, 0.06, [0, 0, -d], 0.0015), B(0.06, 0.006, d, [-w / 2, 0, -d / 2], 0.0015), B(0.06, 0.006, d, [w / 2, 0, -d / 2], 0.0015)),
+      material: "cv_deck_yellow",
+      mate: A([sx, markY + 0.003, sz + d / 2]),
+    });
+    drawDigit(String(n), `parking_num_${n}`, sx + w / 2 - 0.25, sz + 0.55, 0.5);
+  });
+  // 甲板外缘线：把斜角甲板的折线轮廓勾出来（俯视一眼能看出不是长方形）。
+  const portEdge: Array<[number, number]> = [
+    [-5.2, -20], [-5.68, -12], [-5.8, -4], [-5.8, 4], [-5.44, 10], [-4.64, 16], [-2.86, 20],
+  ];
+  for (let i = 0; i < portEdge.length - 1; i++) {
+    const [x0, z0] = portEdge[i]!;
+    const [x1, z1] = portEdge[i + 1]!;
+    const dx = x1 - x0;
+    const dz = z1 - z0;
+    add({
+      id: `${P}deck_edge_port_${i + 1}`,
+      name_cn: `左舷甲板外缘线 ${i + 1}`,
+      name_en: `port deck edge line ${i + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.08, 0.006, Math.hypot(dx, dz), [0, 0, 0], 0.0015)),
+      material: "cv_deck_line",
+      mate: A([(x0 + x1) / 2, markY + 0.006, (z0 + z1) / 2], [0, (Math.atan2(dx, dz) * 180) / Math.PI, 0]),
+    });
+  }
+  for (const [z0, z1] of [[-18.0, -14.8], [-10.9, 0.1], [3.9, 12.0]] as const) {
+    add({
+      id: `${P}deck_edge_stbd_${String(z0).replace("-", "m").replace(".", "_")}`,
+      name_cn: `右舷甲板外缘线 ${z0}~${z1}`,
+      name_en: `starboard deck edge line ${z0}~${z1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.08, 0.006, z1 - z0, [0, 0, 0], 0.0015)),
+      material: "cv_deck_line",
+      mate: A([4.72, markY + 0.006, (z0 + z1) / 2]),
+    });
+  }
+
+  // 直升机停靠点（圆圈 + H）。
+  add({
+    id: `${P}helipad_circle`,
+    name_cn: "直升机停靠点圆圈",
+    name_en: "helipad circle",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M({ type: "torus", radius: 0.78, tube: 0.035, radialSegments: 8, tubularSegments: 32 }),
+    material: "cv_deck_line",
+    mate: A([2.75, markY + 0.006, 6.4], [90, 0, 0]),
+  });
+  add({
+    id: `${P}helipad_h`,
+    name_cn: "直升机 H 标记",
+    name_en: "helipad H",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.12, 0.006, 0.78, [0, 0, 0], 0.0015), B(0.12, 0.006, 0.78, [-0.48, 0, 0], 0.0015), B(0.6, 0.006, 0.12, [-0.24, 0, 0], 0.0015)),
+    material: "cv_deck_line",
+    mate: A([2.75, markY + 0.007, 6.4]),
+  });
+  // 舷号 18（舰艏甲板）。
+  drawDigit("1", "hull_number_1", -0.95, 17.0, 1.5);
+  drawDigit("8", "hull_number_8", 0.75, 17.0, 1.5);
+  // 弹射位数字 + 危险区（挡焰板后红黄条 + 艉部危险区）。
+  drawDigit("1", "cat_number_1", -1.7, 2.6, 0.42);
+  drawDigit("2", "cat_number_2", 1.7, 2.6, 0.42);
+  drawDigit("3", "cat_number_3", -3.15, -1.0, 0.42);
+  for (const [cx, cz] of [[-1.7, 1.1], [1.7, 1.1], [-3.15, -4.0]] as const) {
+    for (let st = 0; st < 5; st++) {
+      add({
+        id: `${P}danger_${String(cx).replace("-", "m").replace(".", "_")}_${st + 1}`,
+        name_cn: `挡焰板危险区 ${st + 1}`,
+        name_en: `JBD danger stripe ${st + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(2.2 - st * 0.28, 0.006, 0.18, [0, 0, 0], 0.0015)),
+        material: st % 2 === 0 ? "cv_deck_red" : "cv_deck_yellow",
+        mate: A([cx, markY + 0.005, cz - st * 0.26]),
+      });
+    }
+  }
+  for (let st = 0; st < 6; st++) {
+    add({
+      id: `${P}stern_danger_${st + 1}`,
+      name_cn: `艉部危险区 ${st + 1}`,
+      name_en: `stern danger stripe ${st + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(5.0 - st * 0.4, 0.006, 0.18, [0, 0, 0], 0.0015)),
+      material: st % 2 === 0 ? "cv_deck_red" : "cv_deck_yellow",
+      mate: A([0, markY + 0.005, -19.4 + st * 0.23]),
+    });
+  }
   add({
     id: `${P}tiedown`,
     name_cn: "甲板系留点 ×80",
@@ -765,5 +974,243 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   ctx.layout("carrier.deck.edgeLight", ({ index }) => {
     const [side, z] = lightSpots[index]!;
     return new THREE.Matrix4().makeTranslation(side * 4.55, deckTop + 0.02, z);
+  });
+
+  // ---- 舷侧外飘支撑 / 甲板下纵桁与斜撑（把飞行甲板接回舰体，消除悬空感） ----
+  for (const side of [-1, 1] as const) {
+    const tag = side === -1 ? "p" : "s";
+    for (let i = 0; i < 13; i++) {
+      const z = -17.5 + i * 2.92;
+      const half = hullHalfBeamAt(z);
+      add({
+        id: `${P}sponson_shell_${tag}_${pad(i + 1)}`,
+        name_cn: `舷侧外飘支撑板 ${tag.toUpperCase()}-${i + 1}`,
+        name_en: `sponson shell ${tag} ${i + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 3,
+        geometry: M(B(0.08, 0.5, 2.92, [0, 0, 0], 0.006)),
+        material: "cv_hull",
+        mate: A([side * (half + 0.02), CV.HULL_TOP + 0.25, z]),
+      });
+      add({
+        id: `${P}sponson_brace_${tag}_${pad(i + 1)}`,
+        name_cn: `甲板斜撑 ${tag.toUpperCase()}-${i + 1}`,
+        name_en: `deck brace ${tag} ${i + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 3,
+        geometry: M({ type: "weld", from: [0, 0, 0], to: [side * 0.76, 0.42, 0], radius: 0.035 }),
+        material: "cv_steel_dark",
+        mate: A([side * (half + 0.02), CV.HULL_TOP + 0.02, z]),
+      });
+    }
+    add({
+      id: `${P}sponson_underside_${tag}`,
+      name_cn: `甲板外飘底封板 ${tag.toUpperCase()}`,
+      name_en: `deck overhang underside ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M(B(1.05, 0.05, 35.2, [0, 0, 0], 0.008)),
+      material: "cv_steel_dark",
+      mate: A([side * 4.28, CV.DECK_Y - 0.025, 0]),
+    });
+    add({
+      id: `${P}sponson_edge_${tag}`,
+      name_cn: `甲板舷边纵桁 ${tag.toUpperCase()}`,
+      name_en: `deck edge girder ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M(B(0.07, 0.5, 35.4, [0, 0, 0], 0.006)),
+      material: "cv_hull_dark",
+      mate: A([side * 4.79, deckTop - 0.27, 0]),
+    });
+    add({
+      id: `${P}sponson_girder_${tag}`,
+      name_cn: `甲板下纵桁 ${tag.toUpperCase()}`,
+      name_en: `deck longitudinal girder ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M(B(0.12, 0.12, 35.2, [0, 0, 0], 0.006)),
+      material: "cv_steel_dark",
+      mate: A([side * 3.72, CV.DECK_Y - 0.12, 0]),
+    });
+    for (let beam = 0; beam < 11; beam++) {
+      add({
+        id: `${P}sponson_beam_${tag}_${pad(beam + 1)}`,
+        name_cn: `甲板横梁 ${tag.toUpperCase()}-${beam + 1}`,
+        name_en: `deck transverse beam ${tag} ${beam + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 3,
+        geometry: M(B(1.05, 0.07, 0.12, [0, 0, 0], 0.004)),
+        material: "cv_steel_dark",
+        mate: A([side * 4.25, CV.DECK_Y - 0.045, -16.2 + beam * 3.2]),
+      });
+    }
+  }
+
+  // ---- 左舷斜角甲板外飘支撑 + 舷边栏杆 ----
+  for (let i = 0; i < 9; i++) {
+    const z = -14 + i * 2.5;
+    add({
+      id: `${P}port_sponson_beam_${pad(i + 1)}`,
+      name_cn: `左舷斜角甲板横梁 ${i + 1}`,
+      name_en: `port angled deck beam ${i + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M(B(1.35, 0.09, 0.14, [0, 0, 0], 0.005)),
+      material: "cv_steel_dark",
+      mate: A([-4.72, CV.DECK_Y - 0.05, z]),
+    });
+    add({
+      id: `${P}port_sponson_brace_${pad(i + 1)}`,
+      name_cn: `左舷斜角甲板斜撑 ${i + 1}`,
+      name_en: `port angled deck brace ${i + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M({ type: "weld", from: [-3.92, 3.96, z], to: [-5.0, 4.36, z], radius: 0.038 }),
+      material: "cv_steel_dark",
+      mate: A([0, 0, 0]),
+    });
+  }
+  add({
+    id: `${P}port_edge_girder`,
+    name_cn: "左舷斜角甲板纵桁",
+    name_en: "port angled deck girder",
+    assembly: ASSEMBLY,
+    build_layer: 3,
+    geometry: M(B(0.08, 0.5, 21.0, [0, 0, 0], 0.006)),
+    material: "cv_hull_dark",
+    mate: A([-5.1, CV.DECK_Y - 0.25, -4.0]),
+  });
+  for (let i = 0; i < 6; i++) {
+    const z = -13 + i * 3.2;
+    add({
+      id: `${P}port_edge_post_${i + 1}`,
+      name_cn: `左舷斜角甲板栏杆柱 ${i + 1}`,
+      name_en: `port edge rail post ${i + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.035, 0.22, 0.035, [0, 0, 0], 0.003)),
+      material: "cv_steel",
+      mate: A([-5.04, deckTop + 0.11, z]),
+    });
+  }
+  for (const [tag, yy] of [["top", 0.22], ["mid", 0.11]] as const) {
+    add({
+      id: `${P}port_edge_rail_${tag}`,
+      name_cn: `左舷斜角甲板${tag === "top" ? "上" : "中"}栏杆`,
+      name_en: `port edge ${tag} rail`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(C(0.015, 18.2, [0, 0, 0], 8)),
+      material: "cv_steel",
+      mate: A([-5.04, deckTop + yy, -4.5], [90, 0, 0]),
+    });
+  }
+
+  // ---- 舰艏回收角（山羊角）+ 尼龙网 ----
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}recovery_horn_${side === -1 ? "p" : "s"}`,
+      name_cn: `舰艏回收角 ${side === -1 ? "左" : "右"}`,
+      name_en: `bow recovery horn ${side === -1 ? "p" : "s"}`,
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M({ type: "weld", from: [side * 2.05, deckTop + 0.04, 19.45], to: [side * 2.55, deckTop + 0.08, 21.15], radius: 0.045 }),
+      material: "cv_steel",
+      mate: A([0, 0, 0]),
+    });
+    add({
+      id: `${P}recovery_horn_brace_${side === -1 ? "p" : "s"}`,
+      name_cn: `回收角支撑 ${side === -1 ? "左" : "右"}`,
+      name_en: `recovery horn brace ${side === -1 ? "p" : "s"}`,
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M({ type: "weld", from: [side * 2.55, deckTop + 0.08, 21.15], to: [side * 0.9, deckTop + 0.06, 18.4], radius: 0.03 }),
+      material: "cv_steel",
+      mate: A([0, 0, 0]),
+    });
+  }
+  for (let i = 0; i < 4; i++) {
+    add({
+      id: `${P}recovery_net_bar_${i + 1}`,
+      name_cn: `回收角尼龙网横杆 ${i + 1}`,
+      name_en: `recovery net bar ${i + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M(C(0.012, 4.6, [0, 0, 0], 6)),
+      material: "cv_canvas",
+      mate: A([0, deckTop + 0.1, 19.8 + i * 0.42], [0, 0, 90]),
+    });
+  }
+  for (let i = 0; i < 8; i++) {
+    add({
+      id: `${P}recovery_net_line_${i + 1}`,
+      name_cn: `回收角尼龙网纵索 ${i + 1}`,
+      name_en: `recovery net line ${i + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M(C(0.008, 1.6, [0, 0, 0], 6)),
+      material: "cv_canvas",
+      mate: A([-1.9 + i * 0.55, deckTop + 0.09, 20.5], [90, 0, 0]),
+    });
+  }
+
+  // ---- 舰艏上翘甲板（真实甲板有轻微上翘/外飘，不是一块平板） ----
+  for (let i = 0; i < 4; i++) {
+    const z = 16.6 + i * 1.05;
+    const width = 8.3 - i * 0.7;
+    add({
+      id: `${P}bow_ramp_${pad(i + 1)}`,
+      name_cn: `舰艏上翘甲板 ${i + 1}`,
+      name_en: `bow ramp plate ${i + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M(B(width, 0.06, 1.2, [0, 0, 0], 0.006)),
+      material: "cv_deck_plate",
+      mate: A([0, deckTop + 0.035 + i * 0.055, z], [-2 - i * 1.8, 0, 0]),
+    });
+  }
+  // 舰艏舷墙：沿最后 3 段甲板边缘抬起，侧视能看到舰艏上翘而不是平切方盒。
+  const bowEdges: Array<{ tag: string; points: Array<[number, number]> }> = [
+    { tag: "p", points: [[-4.2, 17.5], [-3.3, 19.6], [-2.4, 20.9]] },
+    { tag: "s", points: [[4.45, 17.6], [3.5, 19.4], [2.6, 20.5]] },
+  ];
+  for (const edge of bowEdges) {
+    for (let i = 0; i < edge.points.length - 1; i++) {
+      const [x0, z0] = edge.points[i]!;
+      const [x1, z1] = edge.points[i + 1]!;
+      const dx = x1 - x0;
+      const dz = z1 - z0;
+      add({
+        id: `${P}bow_bulwark_${edge.tag}_${i + 1}`,
+        name_cn: `舰艏舷墙 ${edge.tag.toUpperCase()}-${i + 1}`,
+        name_en: `bow bulwark ${edge.tag} ${i + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 3,
+        geometry: M(B(0.06, 0.34, Math.hypot(dx, dz), [0, 0, 0], 0.004)),
+        material: "cv_hull",
+        mate: A([(x0 + x1) / 2, deckTop + 0.17 + i * 0.03, (z0 + z1) / 2], [0, (Math.atan2(dx, dz) * 180) / Math.PI, 0]),
+      });
+    }
+  }
+  add({
+    id: `${P}bow_bulwark_front`,
+    name_cn: "舰艏前舷墙",
+    name_en: "bow front bulwark",
+    assembly: ASSEMBLY,
+    build_layer: 3,
+    geometry: M(B(5.1, 0.38, 0.07, [0, 0, 0], 0.006)),
+    material: "cv_hull",
+    mate: A([0.1, deckTop + 0.22, 20.95], [0, 0, 0]),
+  });
+  add({
+    id: `${P}bow_bulwark`,
+    name_cn: "舰艏上翘前板",
+    name_en: "bow bulwark",
+    assembly: ASSEMBLY,
+    build_layer: 3,
+    geometry: M(B(4.8, 0.34, 0.08, [0, 0, 0], 0.006)),
+    material: "cv_hull",
+    mate: A([0, deckTop + 0.25, 20.1], [12, 0, 0]),
   });
 }

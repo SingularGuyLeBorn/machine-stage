@@ -8,17 +8,20 @@ import { addPower } from "./power";
 import { addHangar } from "./hangar";
 import { addFlightDeck } from "./flightdeck";
 import { addIsland } from "./island";
-import { addAircraft } from "./aircraft";
+import { addAircraft, addParkedAircraft, HANGAR_SPOTS, PARKED_SPOTS } from "./aircraft";
 import { addSurface } from "./surface";
 import { addCarrierDetails } from "./details";
 import { addCarrierInteriors } from "./interiors";
+import { addScaleFigure } from "./scaleFigure";
 import {
   carrierBottom,
+  carrierBowRake,
   carrierFlightDeck,
   carrierHangarDeck,
   carrierHullBilgeKeel,
   carrierHullShell,
   carrierHullStrake,
+  carrierIslandTower,
   carrierLowerDeck,
   carrierPropeller,
   carrierRadarPanel,
@@ -27,7 +30,7 @@ import {
 } from "./kits";
 
 // ============================================================================
-// models/carrier/registry —— 福建舰整机注册表（1:8 展示尺度）
+// models/carrier/registry —— 福建舰整机注册表（编辑 1:8，世界 1 单位 = 1 米）
 // L1 舰体/动力 → L2 机库/弹药 → L3 飞行甲板/弹射/拦阻 → L4 舰岛/雷达/近防 → L5 舰载机/表面
 // ============================================================================
 
@@ -38,8 +41,13 @@ function buildCarrierOnce(): { registry: ModelRegistry; layouts: Record<string, 
   addHangar(ctx);
   addFlightDeck(ctx);
   addIsland(ctx);
+  const aircraftStart = ctx.parts.length;
   addAircraft(ctx);
+  const aircraftParts = ctx.parts.slice(aircraftStart);
+  addParkedAircraft(ctx, aircraftParts, CV.DECK_Y + CV.DECK_T, PARKED_SPOTS, "parked");
+  addParkedAircraft(ctx, aircraftParts, CV.HANGAR_Y + 0.14, HANGAR_SPOTS, "hangarparked");
   addSurface(ctx);
+  addScaleFigure(ctx);
   addCarrierDetails(ctx);
   addCarrierInteriors(ctx);
 
@@ -127,6 +135,14 @@ function buildCarrierOnce(): { registry: ModelRegistry; layouts: Record<string, 
       b: "carrier.aircraft.wing_fold_*",
       reason: "折叠翼铰链/作动器/锁与翼根的转动配合",
       maxDepthMm: 30,
+      allowDisplaced: true,
+    },
+    {
+      family: "cv-wing-fold-kinematic",
+      a: "carrier.aircraft.wing_fold_actuator_*",
+      b: "carrier.aircraft.wing_outer_*",
+      reason: "折叠作动筒与翼面在收放过程中的推杆/耳片转动配合",
+      maxDepthMm: 45,
       allowDisplaced: true,
     },
     {
@@ -651,7 +667,7 @@ function buildCarrierOnce(): { registry: ModelRegistry; layouts: Record<string, 
   const registry: ModelRegistry = {
     model: "carrier",
     title: "福建舰 · 电磁弹射航母",
-    subtitle: "1:8 展示尺度 · 平直甲板 / 电磁弹射 / 拦阻降落 / 相控阵 / 1130 近防",
+    subtitle: "1 单位 = 1 米 · 316m 斜角甲板 / 电磁弹射 / 拦阻降落 / 相控阵 / 1130 近防",
     constants: CV_CONSTANTS,
     assemblies,
     nodes: ctx.nodes,
@@ -659,7 +675,7 @@ function buildCarrierOnce(): { registry: ModelRegistry; layouts: Record<string, 
     parts: ctx.parts,
     expectedContacts: contacts,
     source_notes:
-      "福建舰（Type 003）1:8 展示模型：40m 舰体、9.6m 飞行甲板；L1 龙骨/肋骨/水密舱/压水堆/蒸汽轮机/双桨双舵；L2 机库/弹药库/弹药升降机；L3 三条电磁弹射器/四道拦阻索/两部舷侧升降机/起降闭环；L4 三层舰岛/四面固定相控阵/旋转雷达/1130 近防；L5 歼-15 舰载机（折叠翼/尾钩/加强起落架）与甲板作业。",
+      "福建舰（Type 003）真实尺度模型：世界 1 单位 = 1 米，舰长约 316m、飞行甲板宽约 76m（编辑数据 1:8，presentationScale=7.9）；L1 龙骨/肋骨/水密舱/压水堆/蒸汽轮机/双桨双舵；L2 机库/弹药库/弹药升降机；L3 斜角飞行甲板/三条电磁弹射器/四道拦阻索/两部舷侧升降机/起降闭环；L4 两层舱室 + 一体化隐身塔/四面固定相控阵/旋转雷达/1130 近防；L5 歼-15 舰载机（折叠翼/尾钩/加强起落架）与甲板作业。",
   };
   return { registry, layouts: ctx.layouts };
 }
@@ -677,7 +693,9 @@ export const CARRIER_LAYOUTS: Record<string, InstanceLayout> = getCarrier().layo
 
 export const carrierBuilders = {
   carrierHullShell,
+  carrierIslandTower,
   carrierBottom,
+  carrierBowRake,
   carrierFlightDeck,
   carrierHangarDeck,
   carrierLowerDeck,

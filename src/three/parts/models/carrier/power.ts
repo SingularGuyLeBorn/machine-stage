@@ -367,9 +367,9 @@ export function addPower(ctx: CarrierCtx): void {
         name_en: `${tag} propeller shaft ${s + 1}`,
         assembly: ASSEMBLY,
         build_layer: 1,
-        geometry: M(C(0.09, 1.35, [0, 0, 0], 14)),
+        geometry: M(C(0.09, 0.62, [0, 0, 0], 14)),
         material: "cv_steel",
-        mate: A([side * 1.5, 1.0, -16.9 - s * 1.25], [90, 0, 0]),
+        mate: A([side * 1.5, 1.0, -17.3 - s * 0.58], [90, 0, 0]),
       });
     }
     const propNode = `CV_Prop_${tag}`;

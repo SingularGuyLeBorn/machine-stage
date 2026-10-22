@@ -1,5 +1,6 @@
 import { CV } from "./constants";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
+import type { PartDefinition } from "../../registry/types";
 
 // ============================================================================
 // L5 舰载机（歼-15 舰载型）—— 折叠机翼 / 尾钩 / 加强起落架 / 弹射牵引杆
@@ -11,15 +12,79 @@ export const WING_FOLD_L = "CV_AircraftWingL";
 export const WING_FOLD_R = "CV_AircraftWingR";
 export const HOOK_NODE = "CV_AircraftHook";
 
+export const AIRCRAFT_SCALE_Z = 22 / 24.06;
+
+// 甲板斜列停机位：避开舰岛、升降机与拦阻索；机翼展开，贴近真实甲板停机照。
+export const PARKED_SPOTS = [
+  { x: 3.5, z: 10.0, yaw: 30 },
+  { x: 3.5, z: 14.2, yaw: 30 },
+  { x: -2.4, z: -14.4, yaw: -30 },
+  { x: -2.4, z: -18.0, yaw: -30 },
+] as const;
+
+export const HANGAR_SPOTS = [
+  { x: -1.0, z: 2.4, yaw: 0 },
+  { x: 1.0, z: 6.1, yaw: 180 },
+] as const;
+
+/** 把已建好的 J-15 零件复制成静态停放机（含完整外翼/尾翼/起落架，不是简化盒）。 */
+export function addParkedAircraft(
+  ctx: CarrierCtx,
+  sourceParts: PartDefinition[],
+  deckTop: number,
+  spots: readonly { x: number; z: number; yaw: number }[],
+  key: string,
+): void {
+  spots.forEach((spot, index) => {
+    const tag = index + 1;
+    const rootName = `CV_Aircraft_${key}_${tag}`;
+    const wingL = `${rootName}_WingL`;
+    const wingR = `${rootName}_WingR`;
+    const hook = `${rootName}_Hook`;
+    ctx.node({
+      name: rootName,
+      parent: "root",
+      pivot: [spot.x, deckTop, spot.z],
+      rest_rotation: [0, spot.yaw, 0],
+      scale: [1, 1, AIRCRAFT_SCALE_Z],
+      note: `${key === "hangar" ? "机库" : "甲板"}停放舰载机 ${tag}`,
+    });
+    ctx.node({ name: wingL, parent: rootName, pivot: [-0.48, 0.28, 0.02], note: `停放机 ${tag} 左翼` });
+    ctx.node({ name: wingR, parent: rootName, pivot: [0.48, 0.28, 0.02], note: `停放机 ${tag} 右翼` });
+    ctx.node({ name: hook, parent: rootName, pivot: [0, 0.27, -1.12], note: `停放机 ${tag} 尾钩` });
+
+    const nodeMap = new Map<string, string>([
+      [AIRCRAFT_NODE, rootName],
+      [WING_FOLD_L, wingL],
+      [WING_FOLD_R, wingR],
+      [HOOK_NODE, hook],
+    ]);
+    for (const part of sourceParts) {
+      // 停放机不挂弹、不伸尾钩/弹射杆；这些机构在停机状态收起，避免与甲板和舱壁干涉。
+      if (/(launch_bar|missile_|hook_)/.test(part.id)) continue;
+      const { build_order: _order, id, name_cn, name_en, node, ...rest } = part;
+      ctx.add({
+        ...rest,
+        id: `carrier.aircraft.${key}${tag}_${id.replace(/^carrier\.aircraft\./, "")}`,
+        name_cn: `${key === "hangar" ? "机库停放机" : "甲板停放机"} ${tag} ${name_cn}`,
+        name_en: `${key} parked ${tag} ${name_en}`,
+        assembly: "aircraft",
+        node: node ? (nodeMap.get(node) ?? rootName) : rootName,
+      });
+    }
+  });
+}
+
 export function addAircraft(ctx: CarrierCtx): void {
   const add = (part: Parameters<CarrierCtx["add"]>[0]) => ctx.add(part);
   const P = "carrier.aircraft.";
   const deckTop = CV.DECK_Y + CV.DECK_T;
   const [parkX, parkZ] = CV.AIRCRAFT_PARK;
 
-  ctx.node({ name: AIRCRAFT_NODE, parent: "root", pivot: [parkX, deckTop, parkZ], motion: "translate", axis: "z", note: "舰载机（弹射/拦阻闭环）" });
-  ctx.node({ name: WING_FOLD_L, parent: AIRCRAFT_NODE, pivot: [-0.55, 0.4, 0.02], motion: "rotate", axis: "z", note: "左外翼折叠铰链" });
-  ctx.node({ name: WING_FOLD_R, parent: AIRCRAFT_NODE, pivot: [0.55, 0.4, 0.02], motion: "rotate", axis: "z", note: "右外翼折叠铰链" });
+  // J-15 真实全长 22m；编辑数据略长，节点沿机体轴压缩到 22/24.06。
+  ctx.node({ name: AIRCRAFT_NODE, parent: "root", pivot: [parkX, deckTop, parkZ], scale: [1, 1, AIRCRAFT_SCALE_Z], motion: "translate", axis: "z", note: "舰载机（弹射/拦阻闭环）" });
+  ctx.node({ name: WING_FOLD_L, parent: AIRCRAFT_NODE, pivot: [-0.48, 0.28, 0.02], motion: "rotate", axis: "z", note: "左外翼折叠铰链" });
+  ctx.node({ name: WING_FOLD_R, parent: AIRCRAFT_NODE, pivot: [0.48, 0.28, 0.02], motion: "rotate", axis: "z", note: "右外翼折叠铰链" });
   ctx.node({ name: HOOK_NODE, parent: AIRCRAFT_NODE, pivot: [0, 0.27, -1.12], motion: "rotate", axis: "x", note: "尾钩收放" });
 
   const fuselage = (id: string, name_cn: string, geometry: Parameters<CarrierCtx["add"]>[0]["geometry"], y: number, z: number, material = "cv_aircraft") =>
@@ -239,10 +304,10 @@ export function addAircraft(ctx: CarrierCtx): void {
       name_en: `inner wing ${tag}`,
       assembly: "aircraft",
       build_layer: 5,
-      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.62, rootChord: 0.55, tipChord: 0.42, sweep: 0.03, thickness: 0.1, dihedralDeg: 2, sections: 10 }, mirror: side === -1 ? "x" : undefined },
+      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.4, rootChord: 0.58, tipChord: 0.34, sweep: 0.1, thickness: 0.085, dihedralDeg: 2, sections: 10 }, mirror: side === -1 ? "x" : undefined },
       material: "cv_aircraft",
       node: AIRCRAFT_NODE,
-      mate: A([side * 0.16, 0.36, 0.24]),
+      mate: A([side * 0.08, 0.3, 0.24]),
     });
     add({
       id: `${P}wing_fold_hinge_${tag}`,
@@ -253,7 +318,7 @@ export function addAircraft(ctx: CarrierCtx): void {
       geometry: M(C(0.055, 0.42, [0, 0, 0], 14), B(0.09, 0.09, 0.12, [0, 0, 0], 0.006)),
       material: "cv_steel_dark",
       node: AIRCRAFT_NODE,
-      mate: A([side * 0.78, 0.37, 0.0], [90, 0, 0]),
+      mate: A([side * 0.48, 0.31, 0.0], [90, 0, 0]),
     });
     add({
       id: `${P}wing_fold_actuator_${tag}`,
@@ -264,7 +329,7 @@ export function addAircraft(ctx: CarrierCtx): void {
       geometry: M(C(0.04, 0.3, [0, 0, 0], 14), C(0.022, 0.2, [0, 0.2, 0], 10)),
       material: "cv_steel",
       node: AIRCRAFT_NODE,
-      mate: A([side * 0.66, 0.3, -0.1], [0, 0, side * 65]),
+      mate: A([side * 0.4, 0.27, -0.1], [0, 0, side * 65]),
     });
     add({
       id: `${P}wing_fold_lock_${tag}`,
@@ -275,7 +340,7 @@ export function addAircraft(ctx: CarrierCtx): void {
       geometry: M(B(0.07, 0.08, 0.1, [0, 0, 0], 0.004)),
       material: "cv_steel_dark",
       node: AIRCRAFT_NODE,
-      mate: A([side * 0.7, 0.43, 0.12]),
+      mate: A([side * 0.44, 0.34, 0.12]),
     });
 
     const foldNode = side === -1 ? WING_FOLD_L : WING_FOLD_R;
@@ -285,7 +350,7 @@ export function addAircraft(ctx: CarrierCtx): void {
       name_en: `outer wing ${tag}`,
       assembly: "aircraft",
       build_layer: 5,
-      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.46, rootChord: 0.5, tipChord: 0.28, sweep: 0.08, thickness: 0.09, dihedralDeg: 2.5, sections: 9 }, mirror: side === -1 ? "x" : undefined },
+      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.52, rootChord: 0.56, tipChord: 0.16, sweep: 0.36, thickness: 0.075, dihedralDeg: 3.5, sections: 12 }, mirror: side === -1 ? "x" : undefined },
       material: "cv_aircraft",
       node: foldNode,
       mate: A([0, -0.04, 0.24]),
@@ -299,7 +364,7 @@ export function addAircraft(ctx: CarrierCtx): void {
       geometry: { ...M({ type: "polygon", points: [[0, 0.1], [0.08, 0.06], [0.08, -0.13], [0, -0.18]], depth: 0.05, bevel: 0.008 }), mirror: side === -1 ? "x" : undefined },
       material: "cv_aircraft_dark",
       node: foldNode,
-      mate: A([side * 0.46, 0, -0.08], [90, 0, 0]),
+      mate: A([side * 0.52, 0, -0.08], [90, 0, 0]),
     });
     add({
       id: `${P}aileron_${tag}`,
@@ -307,7 +372,7 @@ export function addAircraft(ctx: CarrierCtx): void {
       name_en: `aileron ${tag}`,
       assembly: "aircraft",
       build_layer: 5,
-      geometry: { ...M({ type: "polygon", points: [[0.03, -0.18], [0.43, -0.16], [0.43, -0.29], [0.04, -0.32]], depth: 0.025, bevel: 0.004 }), mirror: side === -1 ? "x" : undefined },
+      geometry: { ...M({ type: "polygon", points: [[0.1, -0.18], [0.5, -0.16], [0.5, -0.29], [0.11, -0.32]], depth: 0.025, bevel: 0.004 }), mirror: side === -1 ? "x" : undefined },
       material: "cv_aircraft_dark",
       node: foldNode,
       mate: A([0, 0.02, 0], [90, 0, 0]),
@@ -318,7 +383,7 @@ export function addAircraft(ctx: CarrierCtx): void {
       name_en: `flap ${tag}`,
       assembly: "aircraft",
       build_layer: 5,
-      geometry: { ...M({ type: "polygon", points: [[0.02, -0.02], [0.41, 0], [0.41, -0.14], [0.03, -0.16]], depth: 0.025, bevel: 0.004 }), mirror: side === -1 ? "x" : undefined },
+      geometry: { ...M({ type: "polygon", points: [[0.09, -0.02], [0.49, 0], [0.49, -0.14], [0.1, -0.16]], depth: 0.025, bevel: 0.004 }), mirror: side === -1 ? "x" : undefined },
       material: "cv_aircraft_dark",
       node: foldNode,
       mate: A([0, 0.02, 0], [90, 0, 0]),
@@ -332,8 +397,8 @@ export function addAircraft(ctx: CarrierCtx): void {
       build_layer: 5,
       geometry: M(B(0.08, 0.1, 0.28, [0, 0, 0], 0.006)),
       material: "cv_aircraft_dark",
-      node: AIRCRAFT_NODE,
-      mate: A([side * 0.52, 0.28, -0.05]),
+      node: side === -1 ? WING_FOLD_L : WING_FOLD_R,
+      mate: A([side * 0.2, -0.04, -0.05]),
     });
     add({
       id: `${P}missile_${tag}_body`,
@@ -352,10 +417,10 @@ export function addAircraft(ctx: CarrierCtx): void {
       name_en: `tailplane ${tag}`,
       assembly: "aircraft",
       build_layer: 5,
-      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.55, rootChord: 0.36, tipChord: 0.16, sweep: 0.12, thickness: 0.07, dihedralDeg: 3, sections: 8 }, mirror: side === -1 ? "x" : undefined },
+      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.27, rootChord: 0.34, tipChord: 0.1, sweep: 0.18, thickness: 0.065, dihedralDeg: 3, sections: 8 }, mirror: side === -1 ? "x" : undefined },
       material: "cv_aircraft",
       node: AIRCRAFT_NODE,
-      mate: A([side * 0.36, 0.38, -0.92]),
+      mate: A([side * 0.18, 0.38, -0.92]),
     });
     add({
       id: `${P}fin_${tag}`,
@@ -363,7 +428,7 @@ export function addAircraft(ctx: CarrierCtx): void {
       name_en: `vertical fin ${tag}`,
       assembly: "aircraft",
       build_layer: 5,
-      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.5, rootChord: 0.34, tipChord: 0.14, sweep: 0.12, thickness: 0.08, dihedralDeg: 0, sections: 8 }, mirror: side === -1 ? "x" : undefined },
+      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.34, rootChord: 0.4, tipChord: 0.1, sweep: 0.26, thickness: 0.07, dihedralDeg: 0, sections: 8 }, mirror: side === -1 ? "x" : undefined },
       material: "cv_aircraft",
       node: AIRCRAFT_NODE,
       mate: A([side * 0.18, 0.44, -0.9], [0, 0, side * 90]),
@@ -388,10 +453,21 @@ export function addAircraft(ctx: CarrierCtx): void {
       name_en: `canard ${side === -1 ? "l" : "r"}`,
       assembly: "aircraft",
       build_layer: 5,
-      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.34, rootChord: 0.24, tipChord: 0.1, sweep: 0.05, thickness: 0.06, dihedralDeg: 3, sections: 7 }, mirror: side === -1 ? "x" : undefined },
+      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.22, rootChord: 0.24, tipChord: 0.06, sweep: 0.12, thickness: 0.055, dihedralDeg: 3, sections: 7 }, mirror: side === -1 ? "x" : undefined },
       material: "cv_aircraft",
       node: AIRCRAFT_NODE,
-      mate: A([side * 0.3, 0.4, 0.62]),
+      mate: A([side * 0.2, 0.4, 0.62]),
+    });
+    add({
+      id: `${P}lerx_${side === -1 ? "l" : "r"}`,
+      name_cn: `${side === -1 ? "左" : "右"}翼根边条`,
+      name_en: `leading edge extension ${side === -1 ? "l" : "r"}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.34, rootChord: 0.3, tipChord: 0.05, sweep: -0.3, thickness: 0.045, dihedralDeg: 1, sections: 8 }, mirror: side === -1 ? "x" : undefined },
+      material: "cv_aircraft",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.1, 0.32, 0.28]),
     });
   }
 

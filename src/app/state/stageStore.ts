@@ -38,6 +38,8 @@ export interface FocusRequest {
   nonce: number;
   /** true = 同时回到初始方位角（重置视角）。 */
   resetAngle?: boolean;
+  /** true = 直接切到取景位，不做飞行动画（模型切换时避免相机穿过船体）。 */
+  instant?: boolean;
 }
 
 export interface StageStats {
@@ -220,9 +222,9 @@ interface StageState {
   /** 切换模型变体（同一模型的不同版本：原型 / 机械拆解版）。 */
   setVariant(variantId: string): void;
   requestFocus(partId: string): void;
-  focusPoint(center: [number, number, number], radius?: number, resetAngle?: boolean): void;
+  focusPoint(center: [number, number, number], radius?: number, resetAngle?: boolean, instant?: boolean): void;
   setHome(center: [number, number, number], radius: number): void;
-  requestViewReset(): void;
+  requestViewReset(instant?: boolean): void;
   runScan(kind: "static" | "sweep"): void;
   setNotice(notice: string | null): void;
   /** 记录运行故障（错误面板数据源）。 */
@@ -551,15 +553,15 @@ export const useStageStore = create<StageState>((set, get) => ({
     get().focusPoint([center.x, center.y, center.z], Math.max(size.length() * 0.5, 0.18));
   },
 
-  focusPoint: (center, radius = 0.8, resetAngle = false) =>
-    set((state) => ({ focus: { center, radius, nonce: (state.focus?.nonce ?? 0) + 1, resetAngle } })),
+  focusPoint: (center, radius = 0.8, resetAngle = false, instant = false) =>
+    set((state) => ({ focus: { center, radius, nonce: (state.focus?.nonce ?? 0) + 1, resetAngle, instant } })),
 
   setHome: (center, radius) => set({ home: { center, radius } }),
 
-  requestViewReset: () => {
+  requestViewReset: (instant = false) => {
     const { home } = get();
     if (!home) return;
-    get().focusPoint(home.center, home.radius, true);
+    get().focusPoint(home.center, home.radius, true, instant);
   },
 
   runScan: (kind) => {

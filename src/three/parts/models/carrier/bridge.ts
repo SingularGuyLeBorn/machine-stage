@@ -309,4 +309,21 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
   part(`clock_face`, "舰桥时钟", M({ type: "torus", radius: 0.045, tube: 0.004, radialSegments: 8, tubularSegments: 20 }), "cv_steel", [x - 0.35, floorY + 0.34, z - halfL + 0.05]);
   part(`clock_hand_h`, "舰桥时钟时针", M(B(0.004, 0.025, 0.002, [0, 0.0125, 0], 0.001)), "cv_gauge_mark", [x - 0.35, floorY + 0.34, z - halfL + 0.052]);
   part(`clock_hand_m`, "舰桥时钟分针", M(B(0.003, 0.038, 0.002, [0, 0.019, 0], 0.001)), "cv_gauge_mark", [x - 0.35, floorY + 0.34, z - halfL + 0.053], [0, 0, 120]);
+
+  // ---- 两舷备用显控台 / 后壁报警板与海图柜（避免转头看到空墙） ----
+  for (const side of [-1, 1] as const) {
+    const tag = side === -1 ? "p" : "s";
+    for (const [idx, dz] of [-0.9, 0.45].entries()) {
+      part(`side_console_${tag}_${idx + 1}`, `两舷备用显控台 ${tag.toUpperCase()}-${idx + 1}`, M(B(0.22, 0.22, 0.55, [0, 0, 0], 0.006), B(0.2, 0.18, 0.04, [0, 0.2, -0.18], 0.004)), "cv_steel_dark", [x + side * 0.6, floorY + 0.12, z - dz]);
+      part(`side_screen_${tag}_${idx + 1}`, `两舷备用显控屏 ${tag.toUpperCase()}-${idx + 1}`, M(B(0.16, 0.1, 0.008, [0, 0, 0], 0.002)), "cv_screen", [x + side * 0.6, floorY + 0.27, z - dz - 0.18]);
+      part(`side_switch_${tag}_${idx + 1}`, `两舷备用开关组 ${tag.toUpperCase()}-${idx + 1}`, M(B(0.016, 0.12, 0.28, [0, 0, 0], 0.003)), "cv_gauge_face", [x + side * 0.6, floorY + 0.295, z - dz + 0.14]);
+    }
+  }
+  part(`rear_alarm_panel`, "舰桥报警板", M(B(0.7, 0.34, 0.03, [0, 0, 0], 0.004)), "cv_gauge_face", [x + 0.1, floorY + 0.4, z - halfL + 0.05]);
+  for (let a = 0; a < 10; a++) {
+    part(`rear_alarm_switch_${a + 1}`, `报警板开关 ${a + 1}`, M(B(0.04, 0.06, 0.018, [0, 0, 0], 0.002), B(0.09, 0.016, 0.02, [0, 0.05, 0], 0.002)), "cv_warning", [x - 0.2 + (a % 5) * 0.12, floorY + 0.31 + Math.floor(a / 5) * 0.14, z - halfL + 0.068]);
+  }
+  part(`rear_chart_cabinet`, "舰桥海图柜", M(B(0.45, 0.55, 0.28, [0, 0, 0], 0.008), B(0.45, 0.02, 0.3, [0, 0.18, 0.02], 0.004), B(0.45, 0.02, 0.3, [0, -0.08, 0.02], 0.004)), "cv_steel_dark", [x - 0.45, floorY + 0.275, z - halfL + 0.24]);
+  part(`rear_life_ring`, "舰桥救生圈", M({ type: "torus", radius: 0.075, tube: 0.018, radialSegments: 8, tubularSegments: 20 }), "cv_deck_red", [x + 0.52, floorY + 0.32, z - halfL + 0.055]);
+  part(`binoculars`, "舰桥望远镜", M(C(0.022, 0.09, [0, 0, 0], 10), C(0.022, 0.09, [0.05, 0, 0], 10)), "cv_steel_dark", [x - 0.45, floorY + 0.58, z - halfL + 0.24]);
 }
