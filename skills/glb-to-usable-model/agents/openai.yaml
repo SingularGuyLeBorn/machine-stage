@@ -1,4 +1,4 @@
-interface:
-  display_name: "GLB 可用模型制作"
-  short_description: "从 GLB 资产检查到闭合分件、材质复原、接口设计与动画验证的完整流程"
-  default_prompt: "使用 $glb-to-usable-model，按参考图把这个 GLB 做成可用的闭合分件模型，保留细节并验证动画。"
+interface:
+  display_name: "GLB 可用模型制作"
+  short_description: "从参考和反馈判断形体、分件与接口问题，保护已确认区域，用针对性验证减少返工"
+  default_prompt: "使用 $glb-to-usable-model，先结合参考判断这个 GLB 的问题和部件关系，再选择适合的修改与验证，保住已经确认的部分，不套用金古桥形状。"
