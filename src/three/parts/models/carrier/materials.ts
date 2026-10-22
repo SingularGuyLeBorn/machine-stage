@@ -9,6 +9,7 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_hull: { base: "#747d82", metalness: 1, roughness: 0.64, pbr: "plates", repeat: [6, 6], clearcoat: 0.22, clearcoatRoughness: 0.42, envMapIntensity: 1.15 },
   cv_hull_dark: { base: "#565f63", metalness: 1, roughness: 0.68, pbr: "plates", repeat: [5, 5], envMapIntensity: 1.05 },
   cv_hull_boot: { base: "#454b4e", metalness: 0.8, roughness: 0.8, pbr: "rust", repeat: [4, 3], envMapIntensity: 0.95 },
+  cv_antifouling: { base: "#5a2f2a", metalness: 0.04, roughness: 0.88, preset: "primer", envMapIntensity: 0.5 },
   cv_deck: { base: "#4b504f", metalness: 0.12, roughness: 0.92, preset: "cast", envMapIntensity: 0.55 },
   cv_deck_plate: { base: "#3f4547", metalness: 0.15, roughness: 0.86, pbr: "scratched", repeat: [4, 4], envMapIntensity: 0.55 },
   cv_deck_line: { base: "#ddd8c9", metalness: 0.02, roughness: 0.78, preset: "primer", envMapIntensity: 0.6 },

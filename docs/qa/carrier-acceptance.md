@@ -1,9 +1,9 @@
 # 福建舰 · 验收记录（carrier worktree）
 
 ## 零件与结构
-- 零件定义 **3369** / 展开 **3369** / 实例 **3944**
-- 分层：L1=1656、L2=264、L3=464、L4=725、L5=260
-- 三角面 1,830,194
+- 零件定义 **3371** / 展开 **3371** / 实例 **3946**
+- 分层：L1=1658、L2=264、L3=464、L4=725、L5=260
+- 三角面 1,831,146
 - L1 舰体/反应堆/控制棒/蒸汽轮机/双轴双桨双舵；L2 机库/防火门/弹药库/弹药升降机；
   L3 三弹射器（3×16 段）/滑梭/挡焰板/4 拦阻索/拦阻网/双舷侧升降机/右舷艉部航空吊车；
   L4 三层舰桥/4 面固定相控阵（4×64 TR）/旋转雷达/2×1130（各 11 管）；
@@ -12,7 +12,7 @@
 ## 门禁
 - 注册表校验：0 错
 - 悬空：0（船壳大 AABB 已从“支撑提供者”剔除后复查）；悬空孤岛：0；合并件内部悬空：0
-- 静态穿模：9361 报告 / **未豁免 0**
+- 静态穿模：9374 报告 / **未豁免 0**
 - 动画扫掠：flight_ops 768 / engine 526 / hangar 46 / ciws 144，**未豁免均 0**
 - `npm test`：312 passed / 1 skipped；`npm run build`：通过
 
@@ -39,13 +39,14 @@
 - 甲板栏杆/外走道栏杆按 1:8 实尺修正到 0.2m（约 1.6m 实尺），救生圈缩到 0.12m 直径；删除外贴黑色方块做旧件，做旧交给 PBR。
 - 舰岛相控阵阵面改为深灰底 + 浅灰 T/R 网格（8×8 可见）；修正水冷板偏移到阵面背后（原代码把侧阵水冷板沿世界 Z 偏，导致外露）；四面阵面冷却板均按各自法向后退。
 - 舰桥四层增加前向环绕窗带（每层 4 扇玻璃 + 3 根竖梃 + 窗台/窗楣）与侧窗竖梃/窗台，不再是实心前壁；右舷增加舰桥翼台（格栅平台 + 斜撑 + 双层栏杆 + 端栏杆）。
+- 舰艏增加回转体放样的球鼻艏（长 2.35m、最大半径 0.36m，压在艏柱/龙骨前端）与声呐导流罩；球鼻艏采用防污漆材质，不再是尖艏直接插水的简化形态。
 - 飞行甲板右舷艉部增加航空吊车：基座/加强肘板/回转齿圈/回转台/桅柱/司机室及托架/四弦杆桁架吊臂/8 根斜撑/绞车及支座/滑轮组吊钩/双起升索；吊臂根部设铰座，绞车与司机室均有实体托架落地。
 - 说明：3274 个零件中仍有大量真实结构板/梁/管路以简单几何表达（箱体、圆柱是这些零件的真实形态）；不等同于“积木拼装”。但整舰尚未达到“每个设备都可对照实机零件级制造图”的绝对无简化标准，后续需继续以真实网格资产替换设备级简化件。
 
 ## 证据
 - 左舷走道/舰体侧面：`docs/qa/carrier-hull-side2.jpeg`
 - 整机金属外观：`docs/qa/carrier-metal-overview7.jpeg`
-- 舰体侧视/艏部/艉部：`docs/qa/carrier-side-full.jpeg`、`docs/qa/carrier-bow-profile.jpeg`、`docs/qa/carrier-stern-profile.jpeg`
+- 舰体侧视/艏部/艉部：`docs/qa/carrier-side-full.jpeg`、`docs/qa/carrier-bow-profile.jpeg`、`docs/qa/carrier-stern-profile.jpeg`、`docs/qa/carrier-bulbous-bow.jpeg`
 - 舰载机近景：`docs/qa/carrier-aircraft-close3.jpeg`
 - 舰岛/近防：`docs/qa/carrier-07-island.jpeg`、`docs/qa/carrier-08-ciws.jpeg`、`docs/qa/carrier-island-close2.jpeg`、`docs/qa/carrier-array-front.jpeg`
 - 艉部航空吊车：`docs/qa/carrier-crane-close.jpeg`、`docs/qa/carrier-deck-crane.jpeg`

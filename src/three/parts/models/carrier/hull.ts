@@ -1,5 +1,5 @@
 import { CV, hullHalfBeamAt } from "./constants";
-import { A, B, C, M, T, pad, type CarrierCtx } from "./common";
+import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
 
 // ============================================================================
 // L1 舰体结构：外壳、龙骨、肋骨、纵桁、多层甲板、水密舱壁、可开关水密门、
@@ -56,6 +56,42 @@ export function addHull(ctx: CarrierCtx): void {
       mate: A([0, CV.HULL_BOTTOM + 0.17, -16 + k * 6.2], [0, 0, 0]),
     });
   }
+
+  // 球鼻艏（回转体放样，压在艏柱/龙骨前端）+ 声呐导流罩。
+  add({
+    id: "carrier.hull.bulbous_bow",
+    name_cn: "球鼻艏",
+    name_en: "bulbous bow",
+    assembly: HULL_ASSEMBLY,
+    build_layer: 1,
+    geometry: M({
+      type: "latheZ",
+      profile: [
+        [0.02, 17.15],
+        [0.1, 17.35],
+        [0.2, 17.6],
+        [0.3, 17.95],
+        [0.36, 18.35],
+        [0.35, 18.75],
+        [0.28, 19.1],
+        [0.16, 19.35],
+        [0.04, 19.5],
+      ],
+      segments: 32,
+    }),
+    material: "cv_antifouling",
+    mate: A([0, 0.6, 0]),
+  });
+  add({
+    id: "carrier.hull.sonar_dome",
+    name_cn: "声呐导流罩",
+    name_en: "bow sonar dome",
+    assembly: HULL_ASSEMBLY,
+    build_layer: 1,
+    geometry: M(S(0.16, [0, 0, 0], 20)),
+    material: "cv_rubber",
+    mate: A([0, 0.38, 18.55]),
+  });
 
   // 肋骨框架：32 站 × 肋板/左右舷侧/甲板梁。
   const frameCount = 32;
