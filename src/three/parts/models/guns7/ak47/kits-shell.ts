@@ -563,8 +563,71 @@ const boltHeadKit: GeometryBuilder = (spec) => {
   return merged;
 };
 
+// ---------------------------------------------------------------------------
+// receiverShell —— 全宽机匣顶盖 + 下机匣发射机侧板：正常状态把枪机框、
+// 复进簧、导轨和击锤/扳机簧全部盖住；顶盖后端让开表尺座，前端止于节套。
+// 局部系：origin = 枪膛轴线中心，+Z 向枪口。
+// ---------------------------------------------------------------------------
+const receiverShell: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.046);
+  const h = num(p, "h", 0.034);
+  const z0 = num(p, "z0", -0.223);
+  const z1 = num(p, "z1", 0.052);
+  const t = num(p, "t", 0.0024);
+  const parts: THREE.BufferGeometry[] = [];
+  const len = z1 - z0;
+  const zc = (z0 + z1) / 2;
+
+  // 全宽顶板与两侧裙边：盖住机匣顶部两条导轨和枪机框
+  const top = bevelBoxGeometry(w, t, len, 0.0005, 1);
+  top.translate(0, h, zc);
+  parts.push(top);
+  for (const side of [-1, 1]) {
+    const skirt = bevelBoxGeometry(t, 0.026, len, 0.0005, 1);
+    skirt.translate(side * (w / 2 - t / 2), h - 0.013, zc);
+    parts.push(skirt);
+  }
+  // 后端盖 + 前端唇
+  const rear = bevelBoxGeometry(w, 0.026, t, 0.0005, 1);
+  rear.translate(0, h - 0.013, z0 + t / 2);
+  parts.push(rear);
+  const front = bevelBoxGeometry(w, 0.010, t, 0.0005, 1);
+  front.translate(0, h - 0.005, z1 - t / 2);
+  parts.push(front);
+
+  // 顶盖两道纵向压筋 + 后部卡榫座
+  for (const x of [-0.011, 0.011]) {
+    const rib = bevelBoxGeometry(0.0038, 0.0018, len * 0.72, 0.0004, 1);
+    rib.translate(x, h + 0.0011, zc + 0.006);
+    parts.push(rib);
+  }
+  const latch = bevelBoxGeometry(0.014, 0.006, 0.012, 0.0006, 1);
+  latch.translate(0, h + 0.0010, z0 + 0.014);
+  parts.push(latch);
+
+  // 下机匣/发射机侧板：从机匣下缘伸到击锤簧下方，包住击发机构；
+  // 前端停在弹匣井后方，底边留空让扳机/护圈露出。
+  const lowerH = 0.056;
+  const lowerZ0 = -0.150;
+  const lowerZ1 = -0.040;
+  for (const side of [-1, 1]) {
+    const lower = bevelBoxGeometry(t, lowerH, lowerZ1 - lowerZ0, 0.0005, 1);
+    lower.translate(side * (w / 2 - t / 2), -0.061, (lowerZ0 + lowerZ1) / 2);
+    parts.push(lower);
+    const boss = bevelBoxGeometry(0.0032, 0.008, 0.008, 0.0004, 1);
+    boss.translate(side * (w / 2 + 0.0008), -0.067, -0.128);
+    parts.push(boss);
+  }
+
+  const merged = mergeGeometries(parts);
+  for (const part of parts) part.dispose();
+  return merged;
+};
+
 const shellKitBuilders: Record<string, GeometryBuilder> = {
   receiverBody,
+  receiverShell,
   magazineBody,
   followerPlate,
   stockWood,
