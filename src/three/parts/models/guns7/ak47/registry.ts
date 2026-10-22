@@ -1206,6 +1206,7 @@ export function makeAk47Registry(): ModelRegistry {
       { family: "ak-fire", a: "ak47.receiver.trigger_guard", b: "ak47.fire.hammer_spring", reason: "护圈前立柱与击锤簧同区（扳机组座）", maxDepthMm: 5, allowDisplaced: true },
       { family: "ak-gas", a: "ak47.barrel.gas_block", b: "ak47.gas.piston", reason: "活塞头在导气箍气缸内滑动（气缸为封闭代理体）", maxDepthMm: 5, allowDisplaced: true },
       { family: "ak-fire", a: "ak47.fire.hammer", b: "ak47.ammo.*", reason: "击锤与供弹口第一发弹相邻（机匣内腔）", maxDepthMm: 4, allowDisplaced: true },
+      { family: "ak-fire", a: "ak47.fire.hammer_spring", b: "ak47.ammo.*", reason: "击锤簧在弹匣口后上方，供弹上移时与上排弹壳/发射药 AABB 近似接触（细钢丝，深度≤4mm）", maxDepthMm: 4, allowDisplaced: true },
       { family: "ak-internal", a: "ak47.action.firing_pin", b: "ak47.ammo.*", reason: "击针打击底火/穿过弹壳底孔", maxDepthMm: 4, allowDisplaced: true },
       { family: "ak-internal", a: "ak47.action.recoil_spring", b: "ak47.action.recoil_spring", reason: "复进簧相邻圈压缩并圈接触", maxDepthMm: 1, allowDisplaced: true },
       { family: "ak-internal", a: "ak47.mag.body", b: "ak47.ammo.*", reason: "弹药在弹匣壳体内（含 AABB 相切形式）", maxDepthMm: 6, allowDisplaced: true, allowSuspect: true },

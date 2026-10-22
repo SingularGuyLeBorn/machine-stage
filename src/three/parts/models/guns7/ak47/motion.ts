@@ -294,7 +294,8 @@ export function animateAk47(
           if (r >= 0) {
             const slot = magRound(r);
             m = new THREE.Matrix4().makeTranslation(slot.pos[0], slot.pos[1] + SY, slot.pos[2]);
-            m.multiply(new THREE.Matrix4().makeTranslation(0, 0, offset));
+            // 弧位中心到弹壳底缘 28.1mm；缺这一项会让整列弹前移一个弹长。
+            m.multiply(new THREE.Matrix4().makeTranslation(0, 0, -0.0281 + offset));
           } else visible = false;
         }
       }
