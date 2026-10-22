@@ -3,7 +3,7 @@ import { MeshBVH } from "three-mesh-bvh";
 import type { GeometryBuilder } from "../../assembler/geometry";
 import type { ModelRegistry, PartDefinition, GeometrySpec } from "../../registry/types";
 import data from "./pedan.generated.json";
-import { addPedanMachinery, powerMaterial } from "./machinery";
+import { addPedanDetailAssemblies, addPedanMachinery, powerMaterial } from "./machinery";
 import { CUFF } from "./joint-covers";
 
 // 用户已批准的原创佩丹技术：磁约束能源、计算晶核、场调制器与悬浮线圈。
@@ -390,6 +390,7 @@ export function makeInteriors(): Pick<ModelRegistry, "parts" | "nodes" | "consta
       source: "原外壳向内保留 25mm 壁厚；28mm 随形加强肋和 26mm 纵梁，原创内部结构",
     });
   }
+  addPedanDetailAssemblies(parts, nodes);
   for (const joint of data.joints) {
     const shoulder = joint.key.startsWith("upper");
     for (let i = 0; i < CUFF.layers; i++) {

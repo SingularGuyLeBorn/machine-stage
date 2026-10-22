@@ -229,6 +229,113 @@ export function addPedanMachinery(
   }
 }
 
+/**
+ * 在既有设备上增加齿列、散热鳍、随动触头和场极靴。按各分体原有内部实例数
+ * 分配新增数量，因此每个分体恰好翻倍；重复件共享几何并用 instance_nodes 随动。
+ * [OM-FREEPLAY] 四类附件的比例是原创机械解释，全部留在原设备的内壁安全球内。
+ */
+export function addPedanDetailAssemblies(parts: PartDefinition[], nodes: ModelRegistry["nodes"]): void {
+  const original = parts.filter((p) => p.tags?.includes("internal"));
+  for (const module of new Set(original.map((p) => p.assembly))) {
+    const budget = original
+      .filter((p) => p.assembly === module)
+      .reduce((sum, p) => sum + (p.instances ?? 1), 0);
+    const mounts = original.filter((p) => p.assembly === module && /_network_\d+_mount$/.test(p.id));
+    for (const [index, mount] of mounts.entries()) {
+      const base = mount.node!;
+      const suffix = base.slice("Pedan_base_".length);
+      const r = Number((mount.geometry as { params: Record<string, number> }).params.r) / 0.58;
+      const count = Math.floor(budget / mounts.length) + (index < budget % mounts.length ? 1 : 0);
+      const families: Array<{
+        key: string;
+        label: string;
+        count: number;
+        parent: string;
+        radial: number;
+        y: number;
+        kit: string;
+        params: Record<string, number>;
+        material: string;
+      }> = [
+        {
+          key: "teeth",
+          label: "随动场转子齿列",
+          count: 6,
+          parent: `Pedan_rotor_${suffix}`,
+          radial: 0.76,
+          y: 0,
+          kit: "pedanBox",
+          params: { w: r * 0.16, h: r * 0.12, d: r * 0.13 },
+          material: "pedan_titanium",
+        },
+        {
+          key: "fins",
+          label: "底座径向散热鳍",
+          count: 6,
+          parent: base,
+          radial: 0.64,
+          y: -0.37,
+          kit: "pedanBox",
+          params: { w: r * 0.18, h: r * 0.46, d: r * 0.14 },
+          material: "pedan_coil",
+        },
+        {
+          key: "contacts",
+          label: "执行芯随动触头",
+          count: 4,
+          parent: `Pedan_slider_${suffix}`,
+          radial: 0.2,
+          y: 0.16,
+          kit: "pedanCylinder",
+          params: { r: r * 0.07, h: r * 0.18 },
+          material: "pedan_red",
+        },
+        {
+          key: "poles",
+          label: "分段相位场极靴",
+          count: count - 16,
+          parent: base,
+          radial: 0.43,
+          y: 0.47,
+          kit: "pedanBox",
+          params: { w: r * 0.26, h: r * 0.18, d: r * 0.18 },
+          material: "pedan_violet",
+        },
+      ];
+      for (const family of families) {
+        const instanceNodes = Array.from({ length: family.count }, (_, j) => {
+          const name = `Pedan_detail_${suffix}_${family.key}_${j}`;
+          const angle = (j * Math.PI * 2) / family.count;
+          nodes.push({
+            name,
+            parent: family.parent,
+            pivot: [Math.cos(angle) * r * family.radial, r * family.y, Math.sin(angle) * r * family.radial],
+            rest_rotation: [0, -THREE.MathUtils.radToDeg(angle), 0],
+          });
+          return name;
+        });
+        parts.push({
+          id: mount.id.replace(/_mount$/, `_${family.key}`),
+          name_cn: family.label,
+          name_en: family.key,
+          assembly: module,
+          node: base,
+          build_layer: 2,
+          build_order: mount.build_order,
+          geometry: { type: "kit", kit: family.kit, params: family.params },
+          material: family.material,
+          instances: family.count,
+          indexed: true,
+          instance_nodes: instanceNodes,
+          mate: { type: "absolute", position: [0, 0, 0] },
+          tags: ["internal", "pedan-detail"],
+          source: "原创设备附件；安装于既有转子、执行芯和底座，尺寸从内壁约束设备半径派生",
+        });
+      }
+    }
+  }
+}
+
 const caches = new WeakMap<
   AssembledModel,
   {

@@ -114,7 +114,7 @@ function contactSurface(geometry: THREE.BufferGeometry, mate: THREE.BufferGeomet
 describe("参考图四模块闭合分体", () => {
   const registry = makeKingJoeModuleRegistry();
 
-  it("剧照眼带沿头壳后倾，金属框背面贴壳，玻璃保留纵向透光而没有横向百叶", () => {
+  it("剧照眼带沿头壳后倾，金属框背面贴壳，玻璃保留磨砂底色，固定灯阵由材质驱动", () => {
     const model = buildModel(registry, { builders: kingjoeModuleBuilders });
     const head = model.getPart("kingjoemodules.head_arms.body")!.geometry.clone();
     const tree = new MeshBVH(head);

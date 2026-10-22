@@ -363,10 +363,11 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
       kjm_visor_glass: {
         base: "#ffffff",
         metalness: 0.08,
-        roughness: 0.3,
+        // 固定灯格需要在灯光反射下仍能分行，磨砂层压低清漆的集中白斑。
+        roughness: 0.6,
         vertexColors: true,
-        clearcoat: 0.8,
-        clearcoatRoughness: 0.19,
+        clearcoat: 0.12,
+        clearcoatRoughness: 0.5,
       },
       // [OM-FREEPLAY] 新封口以低反光深银区分，保留原表面的银灰外观。
       kjr_cap: { base: "#606a73", metalness: 0.45, roughness: 0.65 },
