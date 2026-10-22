@@ -69,7 +69,7 @@ const stockWrist: GeometryBuilder = (spec) => {
     { z: -0.215, width: wall, top: -0.031, bottom: -0.071, squareness: 0.5 },
     { z: -0.19, width: wall, top: -0.031, bottom: -0.068, squareness: 0.5 },
     { z: -0.17, width: wall, top: -0.031, bottom: -0.064, squareness: 0.48 },
-    { z: -0.158, width: wall, top: -0.031, bottom: -0.062, squareness: 0.46 },
+    { z: -0.155, width: wall, top: -0.031, bottom: -0.062, squareness: 0.46 },
   ];
   const parts: THREE.BufferGeometry[] = [];
   for (const side of [-1, 1]) {
@@ -81,7 +81,7 @@ const stockWrist: GeometryBuilder = (spec) => {
       { z: -0.24, width: wall, top: -0.062, bottom: -0.072, squareness: 0.6 },
       { z: -0.2, width: wall, top: -0.062, bottom: -0.073, squareness: 0.6 },
       { z: -0.17, width: wall, top: -0.058, bottom: -0.067, squareness: 0.58 },
-      { z: -0.158, width: wall, top: -0.055, bottom: -0.064, squareness: 0.56 },
+      { z: -0.155, width: wall, top: -0.055, bottom: -0.064, squareness: 0.56 },
     ];
     const rail = loftGeometry(railSections, 16, true, true);
     rail.translate(side * (width / 2 - wall / 2), 0, 0);
