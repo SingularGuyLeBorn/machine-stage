@@ -263,6 +263,133 @@ const eraBolt: GeometryBuilder = (spec) => {
   return mergeGeometries(parts);
 };
 
+/** 车长 M2HB 枪座轭架：插在指挥塔枪架顶部的枢轴上。 */
+const cupolaM2Cradle: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  parts.push(cylinderGeometry(0.06, 0.08, 0.052, 16, 0.002));
+  parts.push(bevelBoxGeometry(0.26, 0.035, 0.16, 0.002).translate(0, 0.05, 0));
+  for (const x of [-0.105, 0.105]) {
+    parts.push(bevelBoxGeometry(0.035, 0.16, 0.13, 0.002).translate(x, 0.13, 0));
+    const pin = cylinderGeometry(0.034, 0.04, 0.034, 12, 0.001);
+    pin.rotateZ(Math.PI / 2);
+    pin.translate(x, 0.17, 0);
+    parts.push(pin);
+  }
+  const wheel = cylinderGeometry(0.055, 0.018, 0.055, 16, 0.001);
+  wheel.rotateZ(Math.PI / 2);
+  wheel.translate(-0.16, 0.12, 0.02);
+  parts.push(wheel);
+  parts.push(bevelBoxGeometry(0.04, 0.06, 0.1, 0.002).translate(-0.145, 0.08, 0.01));
+  parts.push(bevelBoxGeometry(0.05, 0.025, 0.08, 0.002).translate(0, 0.22, 0.02));
+  return mergeGeometries(parts);
+};
+
+/** 车长 M2HB 机匣：盒式机匣 + 顶盖 + 供弹托盘 + 抛壳口 + 拉机柄。 */
+const cupolaM2Receiver: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  parts.push(bevelBoxGeometry(0.16, 0.17, 0.46, 0.004));
+  parts.push(bevelBoxGeometry(0.15, 0.03, 0.3, 0.003).translate(0, 0.1, -0.05));
+  parts.push(bevelBoxGeometry(0.06, 0.012, 0.03, 0.002).translate(0, 0.122, -0.18));
+  for (const x of [-0.085, 0.085]) {
+    parts.push(bevelBoxGeometry(0.012, 0.13, 0.32, 0.002).translate(x, 0, 0));
+    for (const z of [-0.13, -0.02, 0.09]) {
+      parts.push(cylinderGeometry(0.008, 0.01, 0.008, 6, 0.001).translate(x, 0.065, z));
+    }
+  }
+  parts.push(bevelBoxGeometry(0.15, 0.15, 0.03, 0.003).translate(0, 0, -0.245));
+  parts.push(bevelBoxGeometry(0.08, 0.055, 0.1, 0.003).translate(-0.09, 0.015, 0.02));
+  parts.push(bevelBoxGeometry(0.09, 0.025, 0.16, 0.002).translate(-0.055, 0.115, -0.08));
+  const charging = cylinderGeometry(0.012, 0.09, 0.012, 8, 0.001);
+  charging.rotateZ(Math.PI / 2);
+  charging.translate(0.13, 0, -0.02);
+  parts.push(charging);
+  parts.push(bevelBoxGeometry(0.04, 0.03, 0.03, 0.001).translate(0.18, 0, -0.02));
+  const collar = cylinderGeometry(0.055, 0.06, 0.045, 18, 0.001);
+  collar.rotateX(Math.PI / 2);
+  collar.translate(0, 0, 0.25);
+  parts.push(collar);
+  parts.push(bevelBoxGeometry(0.1, 0.02, 0.08, 0.002).translate(0, -0.09, -0.18));
+  return mergeGeometries(parts);
+};
+
+/** 车长 M2HB 重枪管：厚壁枪管 + 散热环 + 枪口 + 前准星 + 提把。 */
+const cupolaM2Barrel: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  const chamber = cylinderGeometry(0.045, 0.22, 0.045, 20, 0.002);
+  chamber.rotateX(Math.PI / 2);
+  chamber.translate(0, 0, 0.11);
+  parts.push(chamber);
+  const heavy = cylinderGeometry(0.032, 0.86, 0.026, 20, 0.002);
+  heavy.rotateX(Math.PI / 2);
+  heavy.translate(0, 0, 0.65);
+  parts.push(heavy);
+  for (let i = 0; i < 5; i++) {
+    const ring = tubeGeometry(0.038, 0.033, 0.012, 18);
+    ring.rotateX(Math.PI / 2);
+    ring.translate(0, 0, 0.24 + i * 0.038);
+    parts.push(ring);
+  }
+  const muzzle = cylinderGeometry(0.04, 0.12, 0.031, 18, 0.002);
+  muzzle.rotateX(Math.PI / 2);
+  muzzle.translate(0, 0, 1.14);
+  parts.push(muzzle);
+  parts.push(bevelBoxGeometry(0.03, 0.07, 0.04, 0.002).translate(0, 0.06, 1.0));
+  for (const x of [-0.025, 0.025]) {
+    parts.push(bevelBoxGeometry(0.012, 0.045, 0.03, 0.001).translate(x, 0.065, 1.0));
+  }
+  // 提把：两根立柱 + 横握把
+  for (const z of [0.48, 0.66]) {
+    parts.push(bevelBoxGeometry(0.018, 0.06, 0.018, 0.001).translate(0, 0.055, z));
+  }
+  parts.push(bevelBoxGeometry(0.028, 0.025, 0.2, 0.003).translate(0, 0.09, 0.57));
+  parts.push(bevelBoxGeometry(0.03, 0.025, 0.09, 0.002).translate(0.055, -0.01, 0.3));
+  return mergeGeometries(parts);
+};
+
+/** 车长 M2HB 双握把 + 扳机。 */
+const cupolaM2Grips: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  parts.push(bevelBoxGeometry(0.08, 0.1, 0.12, 0.003).translate(0, -0.01, 0.05));
+  for (const x of [-0.085, 0.085]) {
+    parts.push(bevelBoxGeometry(0.038, 0.13, 0.05, 0.004).translate(x, -0.03, -0.02));
+    parts.push(bevelBoxGeometry(0.045, 0.02, 0.06, 0.002).translate(x, 0.04, -0.02));
+  }
+  parts.push(bevelBoxGeometry(0.12, 0.022, 0.04, 0.002).translate(0, 0.02, 0));
+  parts.push(bevelBoxGeometry(0.028, 0.025, 0.1, 0.002).translate(0, 0.045, 0.08));
+  parts.push(bevelBoxGeometry(0.07, 0.015, 0.035, 0.001).translate(0, 0.035, 0.11));
+  return mergeGeometries(parts);
+};
+
+/** 车长 M2HB 弹箱：箱体 + 顶盖 + 卡扣 + 提手 + 供弹槽。 */
+const cupolaM2AmmoBox: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  parts.push(bevelBoxGeometry(0.18, 0.22, 0.28, 0.004));
+  parts.push(bevelBoxGeometry(0.19, 0.03, 0.29, 0.003).translate(0, 0.12, 0));
+  for (const z of [-0.08, 0.08]) {
+    parts.push(bevelBoxGeometry(0.035, 0.025, 0.045, 0.002).translate(0.09, 0.105, z));
+  }
+  parts.push(bevelBoxGeometry(0.075, 0.025, 0.12, 0.003).translate(0, 0.145, 0));
+  parts.push(bevelBoxGeometry(0.14, 0.05, 0.12, 0.002).translate(-0.09, 0.06, -0.04));
+  // 从箱顶接到机匣进弹口的竖直供弹槽（下移弹箱后仍与机匣连通）。
+  parts.push(bevelBoxGeometry(0.14, 0.18, 0.1, 0.002).translate(-0.09, 0.19, -0.04));
+  parts.push(bevelBoxGeometry(0.1, 0.04, 0.08, 0.002).translate(-0.09, 0.27, -0.04));
+  parts.push(bevelBoxGeometry(0.03, 0.12, 0.03, 0.002).translate(-0.13, 0.12, -0.04));
+  return mergeGeometries(parts);
+};
+
+/** 车长 M2HB 弹链：一排黄铜弹 + 深色链节。 */
+const cupolaM2Belt: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 9; i++) {
+    const x = -0.12 + i * 0.03;
+    const round = cylinderGeometry(0.011, 0.07, 0.009, 8, 0.001);
+    round.rotateZ(Math.PI / 2);
+    round.translate(x, 0, 0);
+    parts.push(round);
+    parts.push(bevelBoxGeometry(0.026, 0.008, 0.024, 0.001).translate(x + 0.015, -0.02, 0));
+  }
+  return mergeGeometries(parts);
+};
 /** 尾篮：框架 + 底网。 */
 const bustleRack: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
@@ -367,6 +494,12 @@ export const mbtHullKitBuilders: Record<string, GeometryBuilder> = {
   eraFlyer,
   eraLiner,
   eraBolt,
+  cupolaM2Cradle,
+  cupolaM2Receiver,
+  cupolaM2Barrel,
+  cupolaM2Grips,
+  cupolaM2AmmoBox,
+  cupolaM2Belt,
   bustleRack,
   smokeCluster,
   weldSeam,

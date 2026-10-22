@@ -143,6 +143,24 @@ describe("MBT-90 主战坦克 · 整机", () => {
     expect(new Set(distances).size).toBeGreaterThanOrEqual(4);
   });
 
+  it("车长 M2HB 机枪：枪架上有轭架/机匣/枪管/握把/弹箱/弹链", () => {
+    for (const id of [
+      "mbt90.hull.cupola_mg_mount",
+      "mbt90.hull.cupola_mg_cradle",
+      "mbt90.hull.cupola_mg_receiver",
+      "mbt90.hull.cupola_mg_barrel",
+      "mbt90.hull.cupola_mg_grips",
+      "mbt90.hull.cupola_mg_ammo_box",
+      "mbt90.hull.cupola_mg_belt",
+      "mbt90.hull.cupola_mg_rear_sight",
+      "mbt90.hull.cupola_mg_spent_bag",
+    ]) {
+      expect(built.getPart(id), id).toBeDefined();
+    }
+    expect(built.getPart("mbt90.hull.cupola_mg_receiver")!.instances.length).toBe(1);
+    expect(built.getPart("mbt90.hull.cupola_mg_barrel")!.instances.length).toBe(1);
+  });
+
   it("120mm 滑膛炮：热护套两段 + 抽烟装置 + 炮闩/制退机/复进机", () => {
     for (const id of [
       "mbt90.hull.gun_barrel",

@@ -739,6 +739,108 @@ function buildParts(): PartDefinition[] {
     node: "Turret",
     mate: A(TL(0.55, 2.73, -0.18)),
   });
+  // 车长 M2HB 12.7mm 重机枪：架在现有枪架顶部的枢轴上，随炮塔回转。
+  add({
+    id: `${P}cupola_mg_cradle`,
+    name_cn: "车长机枪轭架/高低机",
+    name_en: "cupola MG cradle & elevation gear",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 469,
+    geometry: { type: "kit", kit: "cupolaM2Cradle" },
+    material: "mbt_steel_dark",
+    node: "Turret",
+    mate: A(TL(0.55, 3.02, -0.18)),
+  });
+  add({
+    id: `${P}cupola_mg_receiver`,
+    name_cn: "车长机枪机匣",
+    name_en: "cupola MG receiver",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 469,
+    geometry: { type: "kit", kit: "cupolaM2Receiver" },
+    material: "mbt_steel_dark",
+    node: "Turret",
+    mate: A(TL(0.55, 3.16, -0.04)),
+  });
+  add({
+    id: `${P}cupola_mg_barrel`,
+    name_cn: "车长机枪重枪管",
+    name_en: "cupola MG heavy barrel",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 469,
+    geometry: { type: "kit", kit: "cupolaM2Barrel" },
+    material: "mbt_steel",
+    node: "Turret",
+    mate: A(TL(0.55, 3.16, 0.19)),
+  });
+  add({
+    id: `${P}cupola_mg_grips`,
+    name_cn: "车长机枪双握把/扳机",
+    name_en: "cupola MG spade grips",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 469,
+    geometry: { type: "kit", kit: "cupolaM2Grips" },
+    material: "mbt_steel_dark",
+    node: "Turret",
+    mate: A(TL(0.55, 3.14, -0.33)),
+  });
+  add({
+    id: `${P}cupola_mg_ammo_box`,
+    name_cn: "车长机枪弹箱",
+    name_en: "cupola MG ammo box",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 469,
+    geometry: { type: "kit", kit: "cupolaM2AmmoBox" },
+    material: "mbt_paint_dark",
+    node: "Turret",
+    mate: A(TL(0.73, 2.98, -0.06)),
+  });
+  add({
+    id: `${P}cupola_mg_belt`,
+    name_cn: "车长机枪弹链",
+    name_en: "cupola MG ammo belt",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 469,
+    geometry: { type: "kit", kit: "cupolaM2Belt" },
+    material: "mbt_brass",
+    node: "Turret",
+    mate: A(TL(0.62, 3.25, -0.09)),
+  });
+  add({
+    id: `${P}cupola_mg_rear_sight`,
+    name_cn: "车长机枪照门",
+    name_en: "cupola MG rear sight",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 469,
+    geometry: MERGE(
+      B(0.06, 0.03, 0.06, [0, 0.015, 0], 0.002),
+      B(0.008, 0.07, 0.008, [-0.03, 0.06, 0], 0.001),
+      B(0.008, 0.07, 0.008, [0.03, 0.06, 0], 0.001),
+      B(0.068, 0.012, 0.012, [0, 0.095, 0], 0.001),
+    ),
+    material: "mbt_steel_dark",
+    node: "Turret",
+    mate: A(TL(0.55, 3.26, -0.24)),
+  });
+  add({
+    id: `${P}cupola_mg_spent_bag`,
+    name_cn: "车长机枪抛壳袋",
+    name_en: "cupola MG spent case bag",
+    assembly: "turret",
+    build_layer: 4,
+    build_order: 469,
+    geometry: MERGE(B(0.14, 0.18, 0.16, [0, 0, 0], 0.02), B(0.03, 0.04, 0.08, [0, 0.11, -0.05], 0.005)),
+    material: "mbt_canvas",
+    node: "Turret",
+    mate: A(TL(0.43, 3.0, -0.06)),
+  });
   add({
     id: `${P}loader_hatch`,
     name_cn: "装填手舱盖",
@@ -1287,7 +1389,7 @@ export function makeHullRegistry(): ModelRegistry {
     materials: MBT_MATERIALS,
     parts: buildParts(),
     source_notes:
-      "现代主战坦克外壳：首上 33.7° 浅倾角、外凸楔形炮塔（±26° 前斜板）、复合装甲分层（钢/陶瓷/间隔/背板）、132 块盒式 ERA（壳体/背板/炸药/飞板/前盖）、120mm 滑膛炮：无膛线身管、两段热护套、中段抽烟装置、炮闩/制退机/复进机/摇臂；三色迷彩、战术编号、随车工具、油桶、缆绳。",
+      "现代主战坦克外壳：首上 33.7° 浅倾角、外凸楔形炮塔（±26° 前斜板）、复合装甲分层（钢/陶瓷/间隔/背板）、132 块盒式 ERA（壳体/背板/炸药/飞板/前盖）、120mm 滑膛炮：无膛线身管、两段热护套、中段抽烟装置、炮闩/制退机/复进机/摇臂；车长 M2HB 12.7mm 机枪（轭架/机匣/重枪管/握把/弹箱/弹链）；三色迷彩、战术编号、随车工具、油桶、缆绳。",
     expectedContacts: CONTACTS,
   };
 }
