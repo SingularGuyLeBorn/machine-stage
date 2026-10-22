@@ -365,6 +365,70 @@ describe("参考图四模块闭合分体", () => {
     model.dispose();
   });
 
+  it("合体时胸甲不覆盖大臂外侧，颈肩接口不扩大前后遮挡", () => {
+    const model = buildModel(registry, { builders: kingjoeModuleBuilders });
+    poseKingJoeModules(model, 0, "closed");
+    model.syncInstances();
+    model.root.updateMatrixWorld(true);
+    const geometries = ["head_arms", "chest"].map((key) => {
+      const part = model.getPart(`kingjoemodules.${key}.body`)!;
+      return part.geometry.clone().applyMatrix4(model.instanceMatrix(part, 0, new THREE.Matrix4()));
+    });
+    const [head, chest] = geometries.map((g) => new MeshBVH(g));
+    const sourceTriangles = skin.parts
+      .filter((p) => /upperarm/.test(p.semantic))
+      .flatMap((arm) => {
+        const decode = (value: string) => {
+          const bytes = Buffer.from(value, "base64");
+          return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length);
+        };
+        const positions = new Float32Array(decode(arm.position));
+        const indices = new Uint32Array(decode(arm.index));
+        return Array.from({ length: indices.length / 3 }, (_, i) => {
+          const vertices = [0, 1, 2].map((k) => {
+            const j = indices[i * 3 + k]! * 3;
+            return new THREE.Vector3(-positions[j]!, positions[j + 1]! + 4.55, -positions[j + 2]!);
+          });
+          return new THREE.Triangle(vertices[0]!, vertices[1]!, vertices[2]!);
+        });
+      });
+    // [OM-FREEPLAY] 前后上限来自本次已确认前壳的合体视线检查，保留少量采样余量；
+    // 正面允许前壳对大臂内缘的自然投影重叠，左右外侧则不允许被胸甲遮住。
+    for (const [label, towardViewer, maximum] of [
+      ["正面", new THREE.Vector3(0, 0, 1), 0.48],
+      ["背面", new THREE.Vector3(0, 0, -1), 0.18],
+      ["左侧", new THREE.Vector3(-1, 0, 0), 0],
+      ["右侧", new THREE.Vector3(1, 0, 0), 0],
+    ] as const) {
+      const sides = [
+        { visible: 0, hidden: 0 },
+        { visible: 0, hidden: 0 },
+      ];
+      for (const triangle of sourceTriangles) {
+        const facing = triangle.getNormal(new THREE.Vector3()).dot(towardViewer);
+        if (facing <= 0.05) continue;
+        const center = triangle.getMidpoint(new THREE.Vector3());
+        const ray = new THREE.Ray(
+          center.clone().addScaledVector(towardViewer, 10),
+          towardViewer.clone().negate(),
+        );
+        const sourceHit = head!.raycastFirst(ray, THREE.DoubleSide);
+        if (!sourceHit || Math.abs(sourceHit.distance - 10) > 0.0002) continue;
+        const area = triangle.getArea() * facing;
+        const side = sides[center.x < 0 ? 0 : 1]!;
+        side.visible += area;
+        const blocker = chest!.raycastFirst(ray, THREE.DoubleSide);
+        if (blocker && blocker.distance < 10 - 0.0002) side.hidden += area;
+      }
+      const visibleSides = sides.filter((s) => s.visible > 0.01);
+      expect(visibleSides.length, `${label} 必须覆盖可见大臂`).toBe(towardViewer.z === 0 ? 1 : 2);
+      for (const side of visibleSides)
+        expect(side.hidden / side.visible, `${label} 胸甲遮挡比例`).toBeLessThanOrEqual(maximum);
+    }
+    geometries.forEach((g) => g.dispose());
+    model.dispose();
+  });
+
   it("胸甲上窄下展，云斑彩窗沿弧面闭合且不是横向色条", () => {
     const model = buildModel(registry, { builders: kingjoeModuleBuilders });
     const body = model.parts.find((p) => p.partId === "kingjoemodules.chest.body")!.geometry;
