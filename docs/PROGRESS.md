@@ -2166,3 +2166,4 @@ npm run build
 - **金古桥合体**：等待模块改为真正三维靠拢——横向/纵深插值持续到本轮对接前 0.25s；中途有 0.8–1.6m 飞行弧线抬升；双频浮动 0.12–0.24m；飞行倾斜（俯仰/滚转/偏航约 ±5°/±2.6°）。不是只上下动，也不再在 1.4s 内全部钉到轴上。
 - **证据**：`docs/qa/mbt-rear-closed.jpg`、`kingjoe-combine-approach.jpg`（四体分散飞行）、`kingjoe-combine-hover.jpg`（下体已对接、胸/头悬空倾斜）。
 - **验证**：`npm test` 302 passed / 1 skipped；`npm run build` ✓；`diag-mbt.ts` 静态 0、支撑 0。
+- **尾舱侧边（追加）**：尾板加宽到 2.72m，侧回折板加宽到 0.12m 并向后包住侧甲末端，补底封板；后侧角缝已封死。证据：`docs/qa/mbt-rear-left.jpg`、`mbt-rear-right.jpg`。
