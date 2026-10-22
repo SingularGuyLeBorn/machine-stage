@@ -637,7 +637,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       geometry: M(B(CV.ELEVATOR_W, 0.12, CV.ELEVATOR_L, [0, 0, 0], 0.008), B(CV.ELEVATOR_W - 0.12, 0.03, CV.ELEVATOR_L - 0.12, [0, 0.07, 0], 0.004)),
       material: "cv_deck_plate",
       node,
-      mate: A([0, 0, 0]),
+      mate: A([0, -0.085, 0]),
     });
     add({
       id: `${P}elevator_${index + 1}_frame`,
@@ -740,22 +740,30 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     const row = Math.floor(index / 10);
     return new THREE.Matrix4().makeTranslation(-3.9 + col * 0.86, deckTop + 0.01, -17 + row * 4.2);
   });
+  const lightSpots: Array<[number, number]> = [];
+  for (let row = 0; row < 14; row++) {
+    const z = -18 + row * 2.6;
+    for (const side of [-1, 1] as const) {
+      const inElevator = CV.ELEVATOR_Z.some((ez) => Math.abs(z - ez) < CV.ELEVATOR_L / 2 + 0.3);
+      if (side === 1 && inElevator) continue;
+      lightSpots.push([side, z]);
+    }
+  }
   add({
     id: `${P}deck_light`,
-    name_cn: "甲板边灯 ×28",
+    name_cn: "甲板边灯",
     name_en: "deck edge lights",
     assembly: ASSEMBLY,
     build_layer: 4,
     geometry: M(C(0.045, 0.05, [0, 0, 0], 10), S(0.055, [0, 0.03, 0], 10)),
     material: "cv_glow",
     mate: A([0, 0, 0]),
-    instances: 28,
+    instances: lightSpots.length,
     indexed: true,
     instance_layout: "carrier.deck.edgeLight",
   });
   ctx.layout("carrier.deck.edgeLight", ({ index }) => {
-    const side = index % 2 === 0 ? -1 : 1;
-    const row = Math.floor(index / 2);
-    return new THREE.Matrix4().makeTranslation(side * 4.55, deckTop + 0.02, -18 + row * 2.6);
+    const [side, z] = lightSpots[index]!;
+    return new THREE.Matrix4().makeTranslation(side * 4.55, deckTop + 0.02, z);
   });
 }

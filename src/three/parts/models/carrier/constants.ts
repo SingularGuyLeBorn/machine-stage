@@ -43,7 +43,7 @@ export const CV = {
   WIRE_Y: 4.62,
 
   ELEVATOR_X: 4.35,
-  ELEVATOR_Z: [-1.2, -8.2] as const,
+  ELEVATOR_Z: [2.0, -12.8] as const,
   ELEVATOR_W: 2.0,
   ELEVATOR_L: 3.4,
 

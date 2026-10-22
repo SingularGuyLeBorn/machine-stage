@@ -159,27 +159,35 @@ export function addSurface(ctx: CarrierCtx): void {
     mate: A([-(hullHalfBeamAt(0) + 0.56), CV.DECK_Y - 0.22, 1.0], [90, 0, 0]),
   });
 
-  // 甲板边缘栏杆/支柱（实例化）。
+  // 甲板边缘栏杆/支柱（实例化；右舷升降机开口处不设立柱）。
+  const railPostSpots: Array<[number, number]> = [];
+  for (let row = 0; row < 18; row++) {
+    const z = -18 + row * 2.1;
+    for (const side of [-1, 1] as const) {
+      const inElevator = CV.ELEVATOR_Z.some((ez) => Math.abs(z - ez) < CV.ELEVATOR_L / 2 + 0.3);
+      if (side === 1 && inElevator) continue;
+      railPostSpots.push([side, z]);
+    }
+  }
   add({
     id: `${P}deck_rail_post`,
-    name_cn: "甲板栏杆立柱 ×36",
+    name_cn: "甲板栏杆立柱",
     name_en: "deck rail posts",
     assembly: ASSEMBLY,
     build_layer: 4,
     geometry: M(B(0.04, 0.2, 0.04, [0, 0, 0], 0.004), C(0.045, 0.04, [0, 0.11, 0], 10)),
     material: "cv_steel",
     mate: A([0, 0, 0]),
-    instances: 36,
+    instances: railPostSpots.length,
     indexed: true,
     instance_layout: "carrier.surface.railPost",
   });
   ctx.layout("carrier.surface.railPost", ({ index }) => {
-    const side = index % 2 === 0 ? -1 : 1;
-    const row = Math.floor(index / 2);
-    return new THREE.Matrix4().makeTranslation(side * 4.66, deckTop + 0.1, -18 + row * 2.1);
+    const [side, z] = railPostSpots[index]!;
+    return new THREE.Matrix4().makeTranslation(side * 4.66, deckTop + 0.1, z);
   });
   add({
-    id: `${P}deck_rail_l`,
+    id: `${P}deck_rail_l_1`,
     name_cn: "左舷甲板栏杆",
     name_en: "port deck rail",
     assembly: ASSEMBLY,
@@ -189,7 +197,7 @@ export function addSurface(ctx: CarrierCtx): void {
     mate: A([-4.66, deckTop + 0.2, 0], [90, 0, 0]),
   });
   add({
-    id: `${P}deck_rail_l_mid`,
+    id: `${P}deck_rail_l_mid_1`,
     name_cn: "左舷甲板中栏杆",
     name_en: "port deck mid rail",
     assembly: ASSEMBLY,
@@ -198,29 +206,43 @@ export function addSurface(ctx: CarrierCtx): void {
     material: "cv_steel",
     mate: A([-4.66, deckTop + 0.1, 0], [90, 0, 0]),
   });
-  add({
-    id: `${P}deck_rail_r`,
-    name_cn: "右舷甲板栏杆",
-    name_en: "starboard deck rail",
-    assembly: ASSEMBLY,
-    build_layer: 4,
-    geometry: M(C(0.018, 26.0, [0, 0, 0], 8)),
-    material: "cv_steel",
-    mate: A([4.66, deckTop + 0.2, -6], [90, 0, 0]),
-  });
-  add({
-    id: `${P}deck_rail_r_mid`,
-    name_cn: "右舷甲板中栏杆",
-    name_en: "starboard deck mid rail",
-    assembly: ASSEMBLY,
-    build_layer: 4,
-    geometry: M(C(0.014, 26.0, [0, 0, 0], 8)),
-    material: "cv_steel",
-    mate: A([4.66, deckTop + 0.1, -6], [90, 0, 0]),
+  // 右舷栏杆在升降机开口处断开（三段），不横跨升降机平台。
+  const starboardRailSegments: Array<[number, number]> = [
+    [-19, -14.57],
+    [-11.03, 0.23],
+    [3.77, 7],
+  ];
+  starboardRailSegments.forEach(([z0, z1], index) => {
+    const center = (z0 + z1) / 2;
+    const length = z1 - z0;
+    add({
+      id: `${P}deck_rail_r_${index + 1}`,
+      name_cn: `右舷甲板栏杆 ${index + 1}`,
+      name_en: `starboard deck rail ${index + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(C(0.018, length, [0, 0, 0], 8)),
+      material: "cv_steel",
+      mate: A([4.66, deckTop + 0.2, center], [90, 0, 0]),
+    });
+    add({
+      id: `${P}deck_rail_r_mid_${index + 1}`,
+      name_cn: `右舷甲板中栏杆 ${index + 1}`,
+      name_en: `starboard deck mid rail ${index + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(C(0.014, length, [0, 0, 0], 8)),
+      material: "cv_steel",
+      mate: A([4.66, deckTop + 0.1, center], [90, 0, 0]),
+    });
   });
 
-  // 救生圈/救生筏/消防栓。
+  // 救生圈/救生筏/消防栓（避开升降机开口）。
+  const ringZPort = [-12, -8.8, -5.6, -2.4];
+  const ringZStarboard = [-10.2, -6.9, -3.6, -0.3];
   for (let l = 0; l < 8; l++) {
+    const side = l % 2 === 0 ? -1 : 1;
+    const index = Math.floor(l / 2);
     add({
       id: `${P}life_ring_${l + 1}`,
       name_cn: `救生圈 ${l + 1}`,
@@ -229,7 +251,7 @@ export function addSurface(ctx: CarrierCtx): void {
       build_layer: 4,
       geometry: M({ type: "torus", radius: 0.06, tube: 0.014, radialSegments: 10, tubularSegments: 24 }),
       material: "cv_warning",
-      mate: A([(l % 2 === 0 ? -1 : 1) * 4.64, deckTop + 0.14, -12 + Math.floor(l / 2) * 3.2], [0, 90, 0]),
+      mate: A([side * 4.64, deckTop + 0.14, side === -1 ? ringZPort[index]! : ringZStarboard[index]!], [0, 90, 0]),
     });
   }
   add({

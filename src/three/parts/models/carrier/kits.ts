@@ -53,20 +53,25 @@ export function hullPlan(inset = 0): Array<[number, number]> {
   return points;
 }
 
-/** 飞行甲板轮廓：右舷直边 + 左舷外飘 + 斜角艏。 */
+/** 飞行甲板轮廓：右舷直边 + 左舷外飘 + 斜角艏 + 两处舷侧升降机开口。 */
 function deckPlan(): Array<[number, number]> {
   const b = CV.DECK_BEAM / 2;
-  return [
+  const notchX = 3.32;
+  const halfL = CV.ELEVATOR_L / 2 + 0.02;
+  const points: Array<[number, number]> = [
     [-b + 0.25, CV.DECK_Z_STERN],
     [b, CV.DECK_Z_STERN],
-    [b, 13.5],
-    [b - 0.4, 17.8],
-    [b - 1.25, CV.DECK_Z_BOW],
-    [-b + 1.4, CV.DECK_Z_BOW],
-    [-b, 16.2],
-    [-b, -14.5],
-    [-b + 0.5, CV.DECK_Z_STERN],
   ];
+  const elevators = [...CV.ELEVATOR_Z].sort((a, c) => a - c);
+  for (const ez of elevators) {
+    points.push([b, ez - halfL]);
+    points.push([notchX, ez - halfL]);
+    points.push([notchX, ez + halfL]);
+    points.push([b, ez + halfL]);
+  }
+  points.push([b, 13.5], [b - 0.4, 17.8], [b - 1.25, CV.DECK_Z_BOW]);
+  points.push([-b + 1.4, CV.DECK_Z_BOW], [-b, 16.2], [-b, -14.5], [-b + 0.5, CV.DECK_Z_STERN]);
+  return points;
 }
 
 /** 舰体外壳（带内腔的环形挤出）+ 上部外飘环带（克令克以上向甲板底收口）。 */
