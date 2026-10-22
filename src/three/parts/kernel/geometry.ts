@@ -446,19 +446,268 @@ export function spurGearGeometry(
   return geometry;
 }
 
+/** 放样截面：沿 +Z 排列的椭圆/超椭圆截面。用于枪托、握把、护木这类
+ *  真实木/塑件——不是「一块板挤出」，截面宽度、高度、中心线都随长度变化。
+ *  top/bottom 是局部 Y 的绝对上下缘，允许贴腮板与托底下沉分别控制。 */
+export interface LoftSection {
+  z: number;
+  width: number;
+  top: number;
+  bottom: number;
+  /** 截面中心 X（默认 0）；用于弯枪托/贴腮偏置。 */
+  cx?: number;
+  /** 0 = 椭圆；0.5~0.75 = 圆角矩形。 */
+  squareness?: number;
+  /** 顶面枪管槽半宽（沿 X）；0 或省略 = 不开槽。 */
+  grooveWidth?: number;
+  /** 枪管槽深度（向下）；仅在 grooveWidth > 0 时生效。 */
+  grooveDepth?: number;
+}
+
+/** 沿 Z 放样：每站生成超椭圆截面，站间三角化，两端可选封口。
+ *  法线/UV 一并生成；返回索引几何。 */
+export function loftGeometry(
+  sections: LoftSection[],
+  segments = 28,
+  capStart = true,
+  capEnd = true,
+): THREE.BufferGeometry {
+  if (sections.length < 2) throw new Error("loftGeometry：至少需要 2 个截面");
+  if (segments < 8) throw new Error("loftGeometry：segments 至少 8");
+  const sorted = [...sections].sort((a, b) => a.z - b.z);
+  const ring = segments + 1; // 复制接缝顶点，保证 UV 连续且不出现接缝法线
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  const zi0 = sorted[0].z;
+  const zi1 = sorted[sorted.length - 1].z;
+  const spanZ = Math.max(zi1 - zi0, 1e-6);
+
+  const pointAt = (section: LoftSection, j: number): [number, number, number] => {
+    const theta = (j / segments) * Math.PI * 2;
+    const c = Math.cos(theta);
+    const s = Math.sin(theta);
+    const square = THREE.MathUtils.clamp(section.squareness ?? 0.45, 0, 0.92);
+    // 超椭圆指数：square=0 时 2（椭圆），square→0.92 时趋近圆角矩形。
+    const exponent = 2 / Math.max(0.08, 1 - square * 0.78);
+    const halfW = Math.max(section.width / 2, 1e-5);
+    const centerY = (section.top + section.bottom) / 2;
+    const halfTop = Math.max(section.top - centerY, 1e-5);
+    const halfBottom = Math.max(centerY - section.bottom, 1e-5);
+    const px = Math.sign(c) * Math.pow(Math.abs(c), exponent) * halfW;
+    let py =
+      centerY +
+      Math.sign(s) * Math.pow(Math.abs(s), exponent) * (s >= 0 ? halfTop : halfBottom);
+    if (s >= 0 && (section.grooveWidth ?? 0) > 0 && (section.grooveDepth ?? 0) > 0) {
+      // 顶面枪管槽：中心最深，向两侧平滑收平。真实护木不是平顶，而是
+      // 一条与枪管同轴的圆弧槽；这样枪管与木托是「坐进槽里」，不是穿模。
+      const gw = Math.max(section.grooveWidth ?? 0, 1e-4);
+      const dent = Math.exp(-Math.pow(Math.abs(px) / gw, 4)) * (section.grooveDepth ?? 0);
+      py -= dent;
+    }
+    return [(section.cx ?? 0) + px, py, section.z];
+  };
+
+  for (let i = 0; i < sorted.length; i++) {
+    const section = sorted[i];
+    const v = (section.z - zi0) / spanZ;
+    for (let j = 0; j <= segments; j++) {
+      const [x, y, z] = pointAt(section, j % segments);
+      positions.push(x, y, z);
+      // U 沿枪身长度、V 绕截面：木纹/拉丝方向都沿枪管轴向，避免木托上出现
+      // 一圈一圈的横纹（真实枪托木纹是顺着枪身走的）。
+      uvs.push(v, j / segments);
+    }
+  }
+  for (let i = 0; i < sorted.length - 1; i++) {
+    for (let j = 0; j < segments; j++) {
+      const a = i * ring + j;
+      const b = a + 1;
+      const c = (i + 1) * ring + j;
+      const d = c + 1;
+      // 逆时针环 + +Z 前进 → (a,b,c) 为外法线。
+      indices.push(a, b, c, b, d, c);
+    }
+  }
+
+  const addCap = (section: LoftSection, atStart: boolean) => {
+    const base = atStart ? 0 : (sorted.length - 1) * ring;
+    const centerY = (section.top + section.bottom) / 2;
+    const center = positions.length / 3;
+    positions.push(section.cx ?? 0, centerY, section.z);
+    uvs.push(0.5, 0.5);
+    for (let j = 0; j < segments; j++) {
+      const a = base + j;
+      const b = base + j + 1;
+      // 起点朝 -Z，终点朝 +Z
+      if (atStart) indices.push(center, b, a);
+      else indices.push(center, a, b);
+    }
+  };
+  if (capStart) addCap(sorted[0], true);
+  if (capEnd) addCap(sorted[sorted.length - 1], false);
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+/**
+ * 生成平面投影 UV（按主法线方向选投影面）。
+ *
+ * 为什么必须有它：three 的各向异性（MeshPhysicalMaterial.anisotropy）靠
+ * `getTangentFrame()` 从 UV 的屏幕空间导数重建切线基。UV 缺失或整段为 0 时
+ * 行列式为 0，切线退化 → 各向异性 BRDF 产生 NaN → 金属整块变黑
+ * （也会让 Bloom 把 NaN 扩散成全屏黑）。所以合并前必须保证每个几何都有
+ * 真实变化的 UV。
+ */
+export function planarUv(geometry: THREE.BufferGeometry, scale = 40): THREE.BufferGeometry {
+  const position = geometry.getAttribute("position");
+  const normal = geometry.getAttribute("normal");
+  if (!position) return geometry;
+  const uv = new Float32Array(position.count * 2);
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i);
+    const y = position.getY(i);
+    const z = position.getZ(i);
+    let nx = 0;
+    let ny = 1;
+    let nz = 0;
+    if (normal) {
+      nx = Math.abs(normal.getX(i));
+      ny = Math.abs(normal.getY(i));
+      nz = Math.abs(normal.getZ(i));
+    }
+    let u: number;
+    let v: number;
+    if (ny >= nx && ny >= nz) {
+      u = x;
+      v = z;
+    } else if (nx >= nz) {
+      u = z;
+      v = y;
+    } else {
+      u = x;
+      v = y;
+    }
+    uv[i * 2] = u * scale;
+    uv[i * 2 + 1] = v * scale;
+  }
+  geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  return geometry;
+}
+
+/**
+ * 计算稳定的切线属性（tangent vec4）。
+ *
+ * three 的各向异性高光在缺少 tangent 属性时用 `getTangentFrame()` 从 UV 的
+ * 屏幕空间导数重建切线基；UV 退化的三角形会得到零切线，进而在
+ * `anisotropyT/anisotropyB` 上产生 NaN → 整块金属变黑（Bloom 还会把 NaN
+ * 扩散成全屏黑）。这里直接给出 tangent 属性：UV 正常时按 Mikkelsen 公式算，
+ * UV 退化时回退到一条与法线正交的确定方向，保证不出现 NaN。
+ */
+export function computeTangentsSafe(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  const position = geometry.getAttribute("position");
+  const normal = geometry.getAttribute("normal");
+  const uv = geometry.getAttribute("uv");
+  if (!position || !normal || !uv) return geometry;
+  const count = position.count;
+  const accumulated = new Float32Array(count * 3);
+  const index = geometry.index;
+  const triangleCount = Math.floor((index ? index.count : count) / 3);
+  const at = (i: number) => (index ? index.getX(i) : i);
+  for (let t = 0; t < triangleCount; t++) {
+    const ia = at(t * 3);
+    const ib = at(t * 3 + 1);
+    const ic = at(t * 3 + 2);
+    const e1x = position.getX(ib) - position.getX(ia);
+    const e1y = position.getY(ib) - position.getY(ia);
+    const e1z = position.getZ(ib) - position.getZ(ia);
+    const e2x = position.getX(ic) - position.getX(ia);
+    const e2y = position.getY(ic) - position.getY(ia);
+    const e2z = position.getZ(ic) - position.getZ(ia);
+    const du1 = uv.getX(ib) - uv.getX(ia);
+    const dv1 = uv.getY(ib) - uv.getY(ia);
+    const du2 = uv.getX(ic) - uv.getX(ia);
+    const dv2 = uv.getY(ic) - uv.getY(ia);
+    const det = du1 * dv2 - du2 * dv1;
+    if (Math.abs(det) < 1e-12) continue; // 退化 UV：留 0，后面统一回退
+    const r = 1 / det;
+    const tx = (e1x * dv2 - e2x * dv1) * r;
+    const ty = (e1y * dv2 - e2y * dv1) * r;
+    const tz = (e1z * dv2 - e2z * dv1) * r;
+    accumulated[ia * 3] += tx;
+    accumulated[ia * 3 + 1] += ty;
+    accumulated[ia * 3 + 2] += tz;
+    accumulated[ib * 3] += tx;
+    accumulated[ib * 3 + 1] += ty;
+    accumulated[ib * 3 + 2] += tz;
+    accumulated[ic * 3] += tx;
+    accumulated[ic * 3 + 1] += ty;
+    accumulated[ic * 3 + 2] += tz;
+  }
+  const tangents = new Float32Array(count * 4);
+  for (let i = 0; i < count; i++) {
+    const nx = normal.getX(i);
+    const ny = normal.getY(i);
+    const nz = normal.getZ(i);
+    let tx = accumulated[i * 3];
+    let ty = accumulated[i * 3 + 1];
+    let tz = accumulated[i * 3 + 2];
+    // Gram-Schmidt：切线正交化到法线平面
+    const d = tx * nx + ty * ny + tz * nz;
+    tx -= d * nx;
+    ty -= d * ny;
+    tz -= d * nz;
+    let len = Math.hypot(tx, ty, tz);
+    if (len < 1e-8) {
+      // 回退：取一条与法线不平行的确定方向
+      if (Math.abs(nx) < 0.9) {
+        tx = 1;
+        ty = 0;
+        tz = 0;
+      } else {
+        tx = 0;
+        ty = 1;
+        tz = 0;
+      }
+      const d2 = tx * nx + ty * ny + tz * nz;
+      tx -= d2 * nx;
+      ty -= d2 * ny;
+      tz -= d2 * nz;
+      len = Math.hypot(tx, ty, tz) || 1;
+    }
+    tangents[i * 4] = tx / len;
+    tangents[i * 4 + 1] = ty / len;
+    tangents[i * 4 + 2] = tz / len;
+    tangents[i * 4 + 3] = 1;
+  }
+  geometry.setAttribute("tangent", new THREE.BufferAttribute(tangents, 4));
+  return geometry;
+}
+
+/** 合并几何：先补齐法线与 UV（UV 缺失时用平面投影），再合并。 */
 export function mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry {
   if (geometries.length === 0) throw new Error("kernel.mergeGeometries：空数组");
-  if (geometries.length === 1) return geometries[0].clone();
   const prepared = geometries.map((geometry) => (geometry.index ? geometry.toNonIndexed() : geometry));
   for (const geometry of prepared) {
     if (!geometry.getAttribute("normal")) geometry.computeVertexNormals();
-    if (!geometry.getAttribute("uv")) {
-      const count = geometry.getAttribute("position").count;
-      geometry.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(count * 2), 2));
-    }
+    if (!geometry.getAttribute("uv")) planarUv(geometry);
     for (const name of Object.keys(geometry.attributes)) {
       if (name !== "position" && name !== "normal" && name !== "uv") geometry.deleteAttribute(name);
     }
+  }
+  if (prepared.length === 1) {
+    const single = prepared[0].clone();
+    if (single !== geometries[0]) single.dispose();
+    single.computeBoundingSphere();
+    single.computeBoundingBox();
+    return single;
   }
   const merged = mergeGeometriesRaw(prepared, false);
   if (!merged) throw new Error("kernel.mergeGeometries：几何属性不一致，合并失败");

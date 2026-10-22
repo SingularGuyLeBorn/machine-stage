@@ -10,119 +10,148 @@ import { GUN_MATERIALS } from "../guns/materials";
 // ============================================================================
 
 const BLUED_DEEP: MaterialSpec = {
-  base: "#1c2027",
-  metalness: 0.9,
-  roughness: 0.3,
+  base: "#d5dce4",
+  metalness: 1,
+  roughness: 0.2,
   preset: "steel",
+  pbr: "brushed",
+  anisotropy: 0.9,
   repeat: [3, 3],
-  envMapIntensity: 1.25,
+  envMapIntensity: 1.8,
 };
 
 const BLUED_WEAR: MaterialSpec = {
-  base: "#343a43",
-  metalness: 0.88,
-  roughness: 0.4,
+  base: "#e2e8ef",
+  metalness: 1,
+  roughness: 0.24,
   preset: "steel_rough",
+  pbr: "scratched",
+  anisotropy: 0.5,
+  repeat: [3, 3],
+  envMapIntensity: 1.6,
+};
+
+const PHOSPHATE: MaterialSpec = {
+  base: "#ccd2c6",
+  metalness: 1,
+  roughness: 0.5,
+  preset: "steel_rough",
+  pbr: "scratched",
+  anisotropy: 0.25,
   repeat: [3, 3],
   envMapIntensity: 1.1,
 };
 
-const PHOSPHATE: MaterialSpec = {
-  base: "#3f443f",
-  metalness: 0.78,
-  roughness: 0.58,
-  preset: "steel_rough",
-  repeat: [3, 3],
-  envMapIntensity: 0.9,
-};
-
 const PHOSPHATE_GREEN: MaterialSpec = {
-  base: "#4b5447",
-  metalness: 0.7,
-  roughness: 0.62,
+  base: "#cbd4c4",
+  metalness: 1,
+  roughness: 0.52,
   preset: "steel_rough",
+  pbr: "plates",
+  anisotropy: 0.15,
   repeat: [3, 3],
-  envMapIntensity: 0.85,
+  envMapIntensity: 1.05,
 };
 
 const PARKERIZED: MaterialSpec = {
-  base: "#4d5153",
-  metalness: 0.76,
-  roughness: 0.55,
+  base: "#c8cdd0",
+  metalness: 1,
+  roughness: 0.42,
   preset: "steel_rough",
-  repeat: [2, 2],
-  envMapIntensity: 0.95,
-};
-
-const MACHINED: MaterialSpec = {
-  base: "#aeb4bb",
-  metalness: 0.94,
-  roughness: 0.24,
-  preset: "steel",
+  pbr: "scratched",
+  anisotropy: 0.2,
   repeat: [2, 2],
   envMapIntensity: 1.35,
 };
 
+const MACHINED: MaterialSpec = {
+  base: "#e2e6ea",
+  metalness: 1,
+  roughness: 0.2,
+  preset: "steel",
+  pbr: "brushed",
+  anisotropy: 1,
+  repeat: [2, 2],
+  envMapIntensity: 1.5,
+};
+
 const WEAR_EDGE: MaterialSpec = {
-  base: "#889095",
-  metalness: 0.9,
-  roughness: 0.34,
+  base: "#d8dde1",
+  metalness: 1,
+  roughness: 0.28,
   preset: "steel",
-  repeat: [2, 2],
-  envMapIntensity: 1.15,
-};
-
-const SPRING_STEEL: MaterialSpec = {
-  base: "#5a5f63",
-  metalness: 0.82,
-  roughness: 0.44,
-  preset: "steel_rough",
-  repeat: [2, 2],
-  envMapIntensity: 1,
-};
-
-const BRASS_CASE: MaterialSpec = {
-  base: "#b88935",
-  metalness: 0.92,
-  roughness: 0.3,
-  preset: "steel",
+  pbr: "brushed",
+  anisotropy: 0.7,
   repeat: [2, 2],
   envMapIntensity: 1.3,
 };
 
-const BRASS_TARNISH: MaterialSpec = {
-  base: "#8e6b2d",
-  metalness: 0.86,
-  roughness: 0.45,
+const SPRING_STEEL: MaterialSpec = {
+  base: "#c2c8ce",
+  metalness: 1,
+  roughness: 0.4,
   preset: "steel_rough",
+  pbr: "scratched",
+  anisotropy: 0.2,
   repeat: [2, 2],
-  envMapIntensity: 1.05,
+  envMapIntensity: 1.15,
 };
 
-const COPPER_JACKET: MaterialSpec = {
-  base: "#9e6035",
-  metalness: 0.92,
-  roughness: 0.32,
+const BRASS_CASE: MaterialSpec = {
+  base: "#e8b45c",
+  metalness: 1,
+  roughness: 0.24,
+  pbrColor: false,
   preset: "steel",
-  repeat: [1, 1],
+  pbr: "brushed",
+  anisotropy: 0.45,
+  repeat: [2, 2],
+  envMapIntensity: 1.4,
+};
+
+const BRASS_TARNISH: MaterialSpec = {
+  base: "#b98f42",
+  metalness: 1,
+  roughness: 0.4,
+  pbrColor: false,
+  preset: "steel_rough",
+  pbr: "scratched",
+  anisotropy: 0.3,
+  repeat: [2, 2],
   envMapIntensity: 1.2,
 };
 
-const LEAD_CORE: MaterialSpec = {
-  base: "#7c838d",
-  metalness: 0.55,
-  roughness: 0.58,
-  preset: "steel_rough",
+const COPPER_JACKET: MaterialSpec = {
+  base: "#c9813f",
+  metalness: 1,
+  roughness: 0.28,
+  pbrColor: false,
+  preset: "steel",
+  pbr: "brushed",
+  anisotropy: 0.45,
   repeat: [1, 1],
+  envMapIntensity: 1.35,
+};
+
+const LEAD_CORE: MaterialSpec = {
+  base: "#c3cad2",
+  metalness: 1,
+  roughness: 0.5,
+  preset: "steel_rough",
+  pbr: "scratched",
+  repeat: [1, 1],
+  envMapIntensity: 1.15,
 };
 
 const STEEL_CORE: MaterialSpec = {
-  base: "#a6adb4",
-  metalness: 0.95,
-  roughness: 0.26,
+  base: "#e8ecef",
+  metalness: 1,
+  roughness: 0.22,
   preset: "steel",
+  pbr: "brushed",
+  anisotropy: 0.85,
   repeat: [1, 1],
-  envMapIntensity: 1.25,
+  envMapIntensity: 1.35,
 };
 
 const PROPELLANT: MaterialSpec = {
@@ -133,44 +162,56 @@ const PROPELLANT: MaterialSpec = {
 };
 
 const PRIMER: MaterialSpec = {
-  base: "#c7a24d",
-  metalness: 0.9,
-  roughness: 0.38,
+  base: "#e8c274",
+  metalness: 1,
+  roughness: 0.32,
+  pbrColor: false,
   preset: "steel",
+  pbr: "brushed",
+  anisotropy: 0.4,
   repeat: [1, 1],
+  envMapIntensity: 1.25,
 };
 
 const WOOD_T38: MaterialSpec = {
-  base: "#6e3f20",
-  metalness: 0.02,
-  roughness: 0.62,
+  base: "#e6d8c6",
+  metalness: 0.0,
+  roughness: 0.52,
   preset: "wood",
-  repeat: [2, 1.5],
-  clearcoat: 0.08,
-  clearcoatRoughness: 0.6,
+  pbr: "wood",
+  normalScale: 0.7,
+  repeat: [2, 2],
+  envMapIntensity: 0.55,
+  clearcoat: 0.1,
+  clearcoatRoughness: 0.62,
 };
 
 const WOOD_AK: MaterialSpec = {
-  base: "#7c4a25",
-  metalness: 0.02,
-  roughness: 0.66,
+  base: "#e6d8c6",
+  metalness: 0.0,
+  roughness: 0.56,
   preset: "wood",
-  repeat: [2, 1.5],
+  pbr: "wood",
+  normalScale: 0.7,
+  repeat: [2, 2],
+  envMapIntensity: 0.5,
 };
 
 const WOOD_WORN: MaterialSpec = {
-  base: "#94613a",
-  metalness: 0.03,
-  roughness: 0.38,
+  base: "#e0d2c0",
+  metalness: 0.0,
+  roughness: 0.44,
   preset: "wood",
+  pbr: "wood",
+  normalScale: 0.65,
   repeat: [1.5, 1.5],
-  envMapIntensity: 1.15,
+  envMapIntensity: 0.6,
 };
 
 const BAKELITE: MaterialSpec = {
-  base: "#3a2620",
-  metalness: 0.12,
-  roughness: 0.42,
+  base: "#4a3128",
+  metalness: 0.08,
+  roughness: 0.4,
   preset: "rubber",
   repeat: [2, 2],
   clearcoat: 0.35,
@@ -194,11 +235,14 @@ const CANVAS_GREEN: MaterialSpec = {
 };
 
 const OLIVE_DRAB: MaterialSpec = {
-  base: "#4e5440",
-  metalness: 0.45,
-  roughness: 0.62,
+  base: "#a8b08c",
+  metalness: 1,
+  roughness: 0.52,
   preset: "armor",
+  pbr: "plates",
+  anisotropy: 0.15,
   repeat: [2, 2],
+  envMapIntensity: 1.1,
 };
 
 const CARBON_FOULING: MaterialSpec = {
@@ -256,11 +300,14 @@ const SMOKE: MaterialSpec = {
 };
 
 const STEEL_SOFT: MaterialSpec = {
-  base: "#6c7178",
-  metalness: 0.85,
-  roughness: 0.5,
+  base: "#c2c8ce",
+  metalness: 1,
+  roughness: 0.42,
   preset: "steel_rough",
+  pbr: "scratched",
+  anisotropy: 0.3,
   repeat: [2, 2],
+  envMapIntensity: 1.2,
 };
 
 export const GUN7_MATERIALS: Record<string, MaterialSpec> = {

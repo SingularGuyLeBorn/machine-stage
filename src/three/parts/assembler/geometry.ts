@@ -9,6 +9,7 @@ import {
   latheGeometry,
   louverGeometry,
   mergeGeometries,
+  planarUv,
   plateGeometry,
   polygonExtrudeGeometry,
   rivetStripGeometry,
@@ -123,11 +124,16 @@ export function buildGeometry(spec: GeometrySpec, ctx: GeometryBuildContext): TH
   if (spec.type === "kit") {
     const kitBuilder = ctx.builders?.[spec.kit];
     if (!kitBuilder) throw new Error(`assembler：未注册的几何 kit "${spec.kit}"`);
-    return kitBuilder(spec, ctx);
+    const geometry = kitBuilder(spec, ctx);
+    // 各向异性材质需要真实变化的 UV 重建切线基；缺 UV 的几何一律补平面投影。
+    if (!geometry.getAttribute("uv")) planarUv(geometry);
+    return geometry;
   }
   const builder = BUILTIN[spec.type];
   if (!builder) throw new Error(`assembler：未知几何类型 "${(spec as { type: string }).type}"`);
-  return builder(spec, ctx);
+  const geometry = builder(spec, ctx);
+  if (!geometry.getAttribute("uv")) planarUv(geometry);
+  return geometry;
 }
 
 export const builtinGeometryBuilders = BUILTIN;

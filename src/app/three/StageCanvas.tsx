@@ -1,7 +1,7 @@
-import { ContactShadows, Environment, Grid, Html, Lightformer, OrbitControls } from "@react-three/drei";
+import { ContactShadows, Environment, Grid, Html, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Bloom, EffectComposer, N8AO, Vignette } from "@react-three/postprocessing";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import {
   buildModel,
@@ -56,7 +56,9 @@ export function StageCanvas() {
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
     >
       <color attach="background" args={["#e9ecf0"]} />
-      <Studio />
+      <Suspense fallback={null}>
+        <Studio />
+      </Suspense>
       <StageRuntime />
       <TigerVfx />
       <CameraRig />
@@ -65,58 +67,35 @@ export function StageCanvas() {
   );
 }
 
-/** 程序化 studio 环境：三面柔光箱 + 顶部条形光 + 暗底，无外部 HDR 资产。
- *  明暗对比是金属感的来源——环境若是一块均匀灰，金属反射出来就是灰塑料。 */
+/** Studio 环境：真实 HDRI 环境反射 + 定向硬光/阴影。
+ *
+ *  金属的识别度来自「它反射到了什么」。程序化 Lightformer 只能给几块纯色
+ *  亮斑，反射在枪管上仍像塑料；这里换成 Poly Haven 的 CC0 摄影棚 HDRI
+ *  （studio_small_08_1k.hdr），柔光箱、暗部、地面明暗分界都是真实拍摄的，
+ *  金属表面才能出现连续、带方向的高光。定向光只负责阴影和轮廓，不负责
+ *  主导反射。 */
 function Studio() {
   return (
     <>
-      <ambientLight intensity={0.3} />
+      <ambientLight intensity={0.16} />
       <directionalLight
         castShadow
         position={[5.5, 8.5, 4.5]}
-        intensity={1.7}
-        shadow-mapSize={[1024, 1024]}
-        shadow-bias={-0.0006}
-        shadow-normalBias={0.012}
+        intensity={1.55}
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0005}
+        shadow-normalBias={0.01}
       >
         <orthographicCamera attach="shadow-camera" args={[-5, 5, 5, -5, 0.1, 40]} />
       </directionalLight>
-      <directionalLight position={[-6, 3.5, -4.5]} intensity={0.34} color="#dfe7f2" />
-      <Environment resolution={128} frames={1}>
-        <color attach="background" args={["#aab2bc"]} />
-        <Lightformer
-          form="rect"
-          intensity={3.4}
-          position={[0, 6.5, 1.5]}
-          rotation-x={Math.PI / 2}
-          scale={[9, 5, 1]}
-        />
-        <Lightformer
-          form="rect"
-          intensity={2.0}
-          position={[-6.5, 3, 2]}
-          rotation-y={Math.PI / 2}
-          scale={[6, 4, 1]}
-        />
-        <Lightformer
-          form="rect"
-          intensity={1.4}
-          position={[6.5, 2.5, -2]}
-          rotation-y={-Math.PI / 2}
-          scale={[6, 4, 1]}
-        />
-        <Lightformer form="ring" intensity={1.1} position={[0, 3, -7]} scale={4} />
-        {/* 暗底：给金属一条明确的地平线，反射里才有明暗分界 */}
-        <Lightformer
-          form="rect"
-          color="#1d2126"
-          intensity={0.16}
-          position={[0, -3.2, 0]}
-          rotation-x={-Math.PI / 2}
-          scale={[16, 12, 1]}
-        />
-      </Environment>
-      <SceneEnvIntensity value={1.15} />
+      <directionalLight position={[-6, 3.5, -4.5]} intensity={0.3} color="#dfe7f2" />
+      <Environment
+        files="/hdr/cyclorama_hard_light_1k.hdr"
+        background={false}
+        environmentIntensity={1.9}
+        environmentRotation={[0, 0.42, 0]}
+      />
+      <SceneEnvIntensity value={1.9} />
     </>
   );
 }
@@ -133,8 +112,7 @@ function SceneEnvIntensity({ value }: { value: number }) {
 function StageEffects() {
   return (
     <EffectComposer multisampling={4}>
-      <N8AO halfRes quality="medium" aoRadius={0.45} intensity={1.15} distanceFalloff={0.9} color="#26303c" />
-      <Bloom luminanceThreshold={0.88} luminanceSmoothing={0.22} intensity={0.55} mipmapBlur />
+      <Bloom luminanceThreshold={0.85} luminanceSmoothing={0.25} intensity={0.4} mipmapBlur />
       <Vignette offset={0.32} darkness={0.28} />
     </EffectComposer>
   );

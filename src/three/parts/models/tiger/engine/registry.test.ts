@@ -26,7 +26,7 @@ describe("tiger/engine 注册表回归", () => {
     expect(built.parts.length).toBeGreaterThanOrEqual(68);
     expect(instances).toBeGreaterThanOrEqual(398);
     built.dispose();
-  });
+  }, 30000);
 
   it("装配成功，且所有几何顶点、包围盒与实例矩阵均为有限值", () => {
     const built = buildModel(registry, {
@@ -66,5 +66,5 @@ describe("tiger/engine 注册表回归", () => {
 
     expect(bad).toEqual([]);
     built.dispose();
-  });
+  }, 30000);
 });

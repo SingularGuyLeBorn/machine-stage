@@ -1,6 +1,10 @@
 import * as THREE from "three";
 import type { GeometryBuilder } from "../../assembler/geometry";
-import { mergeGeometries } from "../../kernel/geometry";
+import {
+  latheGeometry,
+  loftGeometry,
+  mergeGeometries,
+} from "../../kernel/geometry";
 import { box, cylinderX, cylinderY, cylinderZ, gun7Kits, plate, torusZ, tubeZ } from "./kits";
 
 // ============================================================================
@@ -32,49 +36,153 @@ function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
 // stockButt ??枪托后段 + 枪颈：按侧轮廓挤出，含托底斜面与握颈收腰??// 局部系??Z 枪口??Y 上；原点 = 枪托后端面中心（托底板前）??// ---------------------------------------------------------------------------
 const stockButt: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
-  const width = num(p, "width", 0.044);
-  const points = (p?.points as Array<[number, number]> | undefined) ?? [
-    [-0.55, -0.10],
-    [-0.55, -0.018],
-    [-0.42, -0.004],
-    [-0.30, -0.012],
-    [-0.22, -0.032],
-    [-0.16, -0.048],
-    [-0.18, -0.058],
-    [-0.30, -0.082],
-    [-0.44, -0.098],
-    [-0.55, -0.10],
+  // 真实枪托不是「侧面剪影 + 固定厚度」的木板：从托底到握颈，截面宽度、
+  // 上下缘、圆角都在连续变化。这里用超椭圆放样，托底宽而圆、握颈收窄、
+  // 托腮面微微下倾；托底板/背带环仍是独立零件。
+  const widthScale = num(p, "widthScale", 1);
+  const sections = [
+    { z: -0.552, width: 0.044 * widthScale, top: -0.008, bottom: -0.1, squareness: 0.56 },
+    { z: -0.545, width: 0.048 * widthScale, top: -0.004, bottom: -0.104, squareness: 0.58 },
+    { z: -0.5, width: 0.047 * widthScale, top: -0.005, bottom: -0.103, squareness: 0.6 },
+    { z: -0.44, width: 0.046 * widthScale, top: -0.006, bottom: -0.099, squareness: 0.6 },
+    { z: -0.39, width: 0.044 * widthScale, top: -0.007, bottom: -0.092, squareness: 0.58 },
+    { z: -0.345, width: 0.04 * widthScale, top: -0.012, bottom: -0.082, squareness: 0.52 },
+    { z: -0.305, width: 0.034 * widthScale, top: -0.022, bottom: -0.074, squareness: 0.46 },
+    { z: -0.275, width: 0.031 * widthScale, top: -0.03, bottom: -0.07, squareness: 0.42 },
+    { z: -0.24, width: 0.035 * widthScale, top: -0.031, bottom: -0.069, squareness: 0.45 },
   ];
-  return gun7Kits.sideProfile({
-    ...(spec as object),
-    params: { points, width, bevel: Math.min(0.003, width * 0.08) },
-  } as never, {} as never);
+  return loftGeometry(sections, 36, true, true);
 };
 
 // ---------------------------------------------------------------------------
 // foreEnd ??护木/前托 U 形剖壳：左右??+ 底板，顶面开放露出枪管??// 局部系：原??= 后端面中心、顶面；+Z 向前，壁向下??// ---------------------------------------------------------------------------
 const stockWrist: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
-  const width = num(p, "width", 0.044);
-  const wall = num(p, "wall", 0.0035);
-  const points = (p?.points as Array<[number, number]> | undefined) ?? [
-    [-0.2, -0.06],
-    [-0.2, -0.031],
-    [-0.06, -0.031],
-    [-0.06, -0.05],
-    [-0.12, -0.055],
-    [-0.2, -0.06],
+  const width = num(p, "width", 0.048);
+  const wall = num(p, "wall", 0.004);
+  // 枪颈两侧木墙：用极窄的超椭圆放样代替平板。它仍然是左右两片，
+  // 中间留出扳机/弹仓的让位腔，但外表面是圆的，不像两块胶合板。
+  // 只做到弹仓木侧板起始处（-0.158），再往前由弹仓侧板接手，
+  // 两段木料不重叠（真实枪托就是两段木料拼接）。
+  const sections = [
+    { z: -0.24, width: wall, top: -0.031, bottom: -0.07, squareness: 0.5 },
+    { z: -0.215, width: wall, top: -0.031, bottom: -0.071, squareness: 0.5 },
+    { z: -0.19, width: wall, top: -0.031, bottom: -0.068, squareness: 0.5 },
+    { z: -0.17, width: wall, top: -0.031, bottom: -0.064, squareness: 0.48 },
+    { z: -0.158, width: wall, top: -0.031, bottom: -0.062, squareness: 0.46 },
   ];
-  const panels: THREE.BufferGeometry[] = [];
+  const parts: THREE.BufferGeometry[] = [];
   for (const side of [-1, 1]) {
-    const panel = gun7Kits.sideProfile(
-      { params: { points, width: wall, bevel: 0.0008 } } as never,
-      {} as never,
-    );
+    const panel = loftGeometry(sections, 20, true, true);
     panel.translate(side * (width / 2 - wall / 2), 0, 0);
-    panels.push(panel);
+    parts.push(panel);
+    // 下缘木梁：分成左右两条，绕开中间的固定弹仓与扳机护圈。
+    const railSections = [
+      { z: -0.24, width: wall, top: -0.062, bottom: -0.072, squareness: 0.6 },
+      { z: -0.2, width: wall, top: -0.062, bottom: -0.073, squareness: 0.6 },
+      { z: -0.17, width: wall, top: -0.058, bottom: -0.067, squareness: 0.58 },
+      { z: -0.158, width: wall, top: -0.055, bottom: -0.064, squareness: 0.56 },
+    ];
+    const rail = loftGeometry(railSections, 16, true, true);
+    rail.translate(side * (width / 2 - wall / 2), 0, 0);
+    parts.push(rail);
   }
-  return merge(panels);
+  return merge(parts);
+};
+
+// ---------------------------------------------------------------------------
+// foreEndLoft —— 前托：整块木料放样 + 顶面枪管槽，不是 U 形三板拼盒。
+// 前端收窄、托底上翘，顶面有一条与枪管同轴的凹槽；枪管坐进槽里。
+// 局部系：原点 = 后端面、枪管轴线下方 18mm；+Z 枪口。
+// ---------------------------------------------------------------------------
+const foreEndLoft: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const len = num(p, "len", 0.355);
+  const w = num(p, "w", 0.044);
+  const bottom = num(p, "bottom", -0.04);
+  const sections = [
+    { z: 0.0, width: w, top: 0.0, bottom, squareness: 0.56, grooveWidth: 0.012, grooveDepth: 0.011 },
+    { z: 0.045, width: w * 0.985, top: -0.001, bottom: bottom * 0.985, squareness: 0.54, grooveWidth: 0.012, grooveDepth: 0.011 },
+    { z: 0.12, width: w * 0.95, top: -0.003, bottom: bottom * 0.94, squareness: 0.52, grooveWidth: 0.0115, grooveDepth: 0.01 },
+    { z: 0.22, width: w * 0.86, top: -0.006, bottom: bottom * 0.86, squareness: 0.48, grooveWidth: 0.011, grooveDepth: 0.008 },
+    { z: 0.3, width: w * 0.75, top: -0.01, bottom: bottom * 0.75, squareness: 0.46, grooveWidth: 0.01, grooveDepth: 0.006 },
+    { z: len - 0.008, width: w * 0.68, top: -0.013, bottom: bottom * 0.68, squareness: 0.44, grooveWidth: 0.0095, grooveDepth: 0.005 },
+    { z: len, width: w * 0.64, top: -0.015, bottom: bottom * 0.64, squareness: 0.42, grooveWidth: 0.009, grooveDepth: 0.004 },
+  ];
+  return loftGeometry(sections, 32, true, true);
+};
+
+// ---------------------------------------------------------------------------
+// woodSidePanel —— 木托侧板：按真实轮廓切出的薄板（不是一块方板）。
+// 轮廓点给在 (z, y) 平面上，板厚沿 X；两端收口，前缘斜切。
+// ---------------------------------------------------------------------------
+const woodSidePanel: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const thickness = num(p, "thickness", 0.003);
+  const offset = num(p, "offset", 0.0225);
+  const points = (p?.points as Array<[number, number]> | undefined) ?? [
+    [-0.155, -0.052],
+    [0.032, -0.042],
+    [0.032, -0.078],
+    [-0.02, -0.088],
+    [-0.09, -0.098],
+    [-0.155, -0.104],
+  ];
+  const shape = new THREE.Shape();
+  shape.moveTo(points[0][0], points[0][1]);
+  for (let i = 1; i < points.length; i++) shape.lineTo(points[i][0], points[i][1]);
+  shape.closePath();
+  const panel = new THREE.ExtrudeGeometry(shape, {
+    depth: thickness,
+    bevelEnabled: true,
+    bevelThickness: 0.0009,
+    bevelSize: 0.0009,
+    bevelSegments: 2,
+    curveSegments: 6,
+    steps: 1,
+  });
+  // shape 的 x 是枪身方向（z），挤出方向是板厚（x）。
+  panel.rotateY(-Math.PI / 2);
+  const parts: THREE.BufferGeometry[] = [];
+  for (const side of [-1, 1]) {
+    const copy = panel.clone();
+    copy.translate(side * offset + thickness / 2, 0, 0);
+    parts.push(copy);
+  }
+  panel.dispose();
+  return merge(parts);
+};
+
+// ---------------------------------------------------------------------------
+// feltPad —— 托架上的 V 形毛毡/软垫：底面是 V 形，正好坐进机加工 V 形托块，
+// 顶面平整托住枪身。原来是一个 40×30×32mm 的黑方块，接触面也是方的。
+// ---------------------------------------------------------------------------
+const feltPad: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const width = num(p, "width", 0.04);
+  const length = num(p, "length", 0.032);
+  const height = num(p, "height", 0.018);
+  const vDepth = num(p, "vDepth", 0.009);
+  const shape = new THREE.Shape();
+  shape.moveTo(-width / 2, 0);
+  shape.lineTo(0, vDepth);
+  shape.lineTo(width / 2, 0);
+  shape.lineTo(width / 2, height - 0.0016);
+  shape.lineTo(width / 2 - 0.0016, height);
+  shape.lineTo(-width / 2 + 0.0016, height);
+  shape.lineTo(-width / 2, height - 0.0016);
+  shape.closePath();
+  const pad = new THREE.ExtrudeGeometry(shape, {
+    depth: length,
+    bevelEnabled: true,
+    bevelThickness: 0.0012,
+    bevelSize: 0.0012,
+    bevelSegments: 2,
+    curveSegments: 4,
+    steps: 1,
+  });
+  pad.translate(0, 0, -length / 2);
+  return pad;
 };
 
 const foreEnd: GeometryBuilder = (spec) => {
@@ -497,19 +605,53 @@ const safetyDetent: GeometryBuilder = (spec) => {
 };
 
 // ---------------------------------------------------------------------------
-// standBase ??展示台底座：倒角长板 + 两条防滑槽??// 局部系：原??= 顶面中心??// ---------------------------------------------------------------------------
+// standBase —— 展示台底座：阶梯机加工底座 + 两个立柱安装凸台 + 铭牌座。
+// 局部系：原点 = 顶面中心。不是一块大木板——上层台面收窄、下层地脚外扩，
+// 安装凸台与铭牌都是独立几何，立柱从凸台中心穿过。
+// ---------------------------------------------------------------------------
 const standBase: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
   const w = num(p, "w", 0.15);
   const d = num(p, "d", 0.66);
   const h = num(p, "h", 0.02);
   const parts: THREE.BufferGeometry[] = [];
-  const base = box(w, h, d, 0.004);
-  base.translate(0, -h / 2, 0);
-  parts.push(base);
+  // 下层地脚：外扩 6mm，圆角 4mm
+  const foot = box(w, h * 0.5, d, 0.004);
+  foot.translate(0, -h + h * 0.25, 0);
+  parts.push(foot);
+  // 上层台面：收窄 8mm，顶部留 1.5mm 机加工亮边
+  const deck = box(w * 0.94, h * 0.5, d * 0.96, 0.0035);
+  deck.translate(0, -h * 0.25, 0);
+  parts.push(deck);
+  const topPlate = box(w * 0.86, 0.0016, d * 0.9, 0.0012);
+  topPlate.translate(0, 0.0008, 0);
+  parts.push(topPlate);
+  // 立柱安装凸台：与两个托架中心对应
+  for (const z of [-0.29, 0.25]) {
+    const boss = cylinderY(0.028, 0.007, 40);
+    boss.translate(0, 0.0035, z);
+    parts.push(boss);
+    const bossChamfer = latheGeometry(
+      [
+        [0.028, 0],
+        [0.028, 0.004],
+        [0.025, 0.007],
+        [0.02, 0.007],
+        [0, 0.007],
+      ],
+      40,
+    );
+    bossChamfer.translate(0, 0.0, z);
+    parts.push(bossChamfer);
+  }
+  // 前部铭牌座（黄铜铭牌由独立件提供时可直接放上去）
+  const plaque = box(0.085, 0.0018, 0.026, 0.0012);
+  plaque.translate(0, 0.001, d * 0.4);
+  parts.push(plaque);
+  // 防滑槽仍保留，但刻在下层地脚上，不再横穿台面
   for (const side of [-1, 1]) {
-    const groove = box(w * 0.82, 0.0012, 0.008, 0.0002);
-    groove.translate(0, -h + 0.0006, side * d * 0.32);
+    const groove = box(w * 0.8, 0.0012, 0.006, 0.0002);
+    groove.translate(0, -h + 0.0006, side * d * 0.28);
     parts.push(groove);
   }
   return merge(parts);
@@ -519,6 +661,9 @@ export const rifleKits: Record<string, GeometryBuilder> = {
   stockButt,
   stockWrist,
   foreEnd,
+  foreEndLoft,
+  woodSidePanel,
+  feltPad,
   noseCap,
   boltSleeve,
   firingPin,

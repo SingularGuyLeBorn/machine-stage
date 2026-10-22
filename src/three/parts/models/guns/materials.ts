@@ -13,87 +13,111 @@ import type { MaterialSpec } from "../../kernel/textures";
 
 /** 烤蓝钢（AK 系机匣 / 枪管 / 自动机）：发黑处理，深蓝近黑。 */
 const STEEL_BLUED: MaterialSpec = {
-  base: "#23262b",
-  metalness: 0.88,
-  roughness: 0.34,
+  base: "#d5dce4",
+  metalness: 1,
+  roughness: 0.26,
   preset: "steel",
+  pbr: "brushed",
+  anisotropy: 0.85,
   repeat: [3, 3],
-  envMapIntensity: 1.15,
+  envMapIntensity: 1.75,
 };
 
 /** 磷化钢（M249 / M2HB / M134 系）：哑光灰绿磷化膜。 */
 const STEEL_PHOSPHATE: MaterialSpec = {
-  base: "#4a4d4a",
-  metalness: 0.82,
-  roughness: 0.52,
+  base: "#ccd2c6",
+  metalness: 1,
+  roughness: 0.5,
   preset: "steel_rough",
+  pbr: "scratched",
+  anisotropy: 0.25,
   repeat: [3, 3],
-  envMapIntensity: 1,
+  envMapIntensity: 1.15,
 };
 
 /** 机加钢件（枪机 / 击针 / 阻铁 / 销）：亮钢色。 */
 const STEEL_MACHINED: MaterialSpec = {
-  base: "#8f959c",
-  metalness: 0.9,
-  roughness: 0.32,
+  base: "#e2e6ea",
+  metalness: 1,
+  roughness: 0.22,
   preset: "steel",
+  pbr: "brushed",
+  anisotropy: 1,
   repeat: [2, 2],
-  envMapIntensity: 1.1,
+  envMapIntensity: 1.4,
 };
 
 /** 使用磨损钢（高频摩擦面：抽壳钩 / 闭锁凸笋 / 供弹齿）。 */
 const STEEL_WORN: MaterialSpec = {
-  base: "#6f6a63",
-  metalness: 0.86,
-  roughness: 0.46,
+  base: "#d8d3c9",
+  metalness: 1,
+  roughness: 0.4,
   preset: "steel_rough",
-  repeat: [2, 2],
-};
-
-/** 簧件（复进簧 / 击锤簧 / 托弹簧）：磷化 + 高糙。 */
-const STEEL_SPRING: MaterialSpec = {
-  base: "#575b5e",
-  metalness: 0.8,
-  roughness: 0.55,
-  preset: "steel_rough",
-  repeat: [2, 2],
-};
-
-/** 黄铜（弹壳 / 闭锁环）：本色黄铜。 */
-const BRASS: MaterialSpec = {
-  base: "#b08a3c",
-  metalness: 0.92,
-  roughness: 0.28,
-  preset: "steel",
+  pbr: "scratched",
+  anisotropy: 0.35,
   repeat: [2, 2],
   envMapIntensity: 1.2,
 };
 
+/** 簧件（复进簧 / 击锤簧 / 托弹簧）：磷化 + 高糙。 */
+const STEEL_SPRING: MaterialSpec = {
+  base: "#d8dee4",
+  metalness: 1,
+  roughness: 0.48,
+  preset: "steel_rough",
+  pbr: "scratched",
+  anisotropy: 0.2,
+  repeat: [2, 2],
+  envMapIntensity: 1.1,
+};
+
+/** 黄铜（弹壳 / 闭锁环）：本色黄铜。 */
+const BRASS: MaterialSpec = {
+  base: "#e8b45c",
+  metalness: 1,
+  roughness: 0.24,
+  pbrColor: false,
+  preset: "steel",
+  pbr: "brushed",
+  anisotropy: 0.45,
+  repeat: [2, 2],
+  envMapIntensity: 1.35,
+};
+
 /** 馏青铜被甲（弹头被甲）。 */
 const COPPER: MaterialSpec = {
-  base: "#9a5f36",
-  metalness: 0.9,
-  roughness: 0.34,
+  base: "#c9813f",
+  metalness: 1,
+  roughness: 0.3,
+  pbrColor: false,
   preset: "steel",
+  pbr: "brushed",
+  anisotropy: 0.45,
   repeat: [1, 1],
+  envMapIntensity: 1.3,
 };
 
 /** 铅芯（弹头铅套）：暗灰蓝。 */
 const LEAD: MaterialSpec = {
-  base: "#77808c",
-  metalness: 0.62,
-  roughness: 0.52,
+  base: "#dbe1e8",
+  metalness: 1,
+  roughness: 0.48,
   preset: "steel_rough",
+  pbr: "scratched",
   repeat: [1, 1],
+  envMapIntensity: 1.15,
 };
 
 /** 钢芯（穿甲弹心）。 */
 const STEEL_CORE: MaterialSpec = {
-  base: "#9aa1a8",
-  metalness: 0.92,
-  roughness: 0.3,
+  base: "#e8ecef",
+  metalness: 1,
+  roughness: 0.24,
   preset: "steel",
+  pbr: "brushed",
+  anisotropy: 0.8,
   repeat: [1, 1],
+  envMapIntensity: 1.3,
 };
 
 /** 发射药（颗粒火药柱，断面可见）。 */
@@ -106,30 +130,39 @@ const PROPELLANT: MaterialSpec = {
 
 /** 底火（击发药）：黄铜底 + 火台。 */
 const PRIMER: MaterialSpec = {
-  base: "#c9a44e",
-  metalness: 0.9,
-  roughness: 0.35,
+  base: "#e8c274",
+  metalness: 1,
+  roughness: 0.3,
+  pbrColor: false,
   preset: "steel",
+  pbr: "brushed",
+  anisotropy: 0.4,
   repeat: [1, 1],
+  envMapIntensity: 1.25,
 };
 
 /** 木质件（AK 护木 / 握把 / 枪托）：层压桦木。 */
 const WOOD_FURNITURE: MaterialSpec = {
-  base: "#7a4a24",
-  metalness: 0.02,
-  roughness: 0.68,
+  base: "#e6d8c6",
+  metalness: 0,
+  roughness: 0.58,
   preset: "wood",
+  pbr: "wood",
+  normalScale: 0.7,
   repeat: [1.5, 1.5],
+  envMapIntensity: 0.55,
 };
 
 /** 握把磨亮（手汗 + 使用磨损：粗糙度低于新木）。 */
 const WOOD_WORN: MaterialSpec = {
-  base: "#8a5730",
-  metalness: 0.03,
-  roughness: 0.44,
+  base: "#e0d2c0",
+  metalness: 0,
+  roughness: 0.42,
   preset: "wood",
+  pbr: "wood",
+  normalScale: 0.65,
   repeat: [1.5, 1.5],
-  envMapIntensity: 1.1,
+  envMapIntensity: 0.6,
 };
 
 /** 橡胶握把（M249 握把 / 枪托缓冲）。 */

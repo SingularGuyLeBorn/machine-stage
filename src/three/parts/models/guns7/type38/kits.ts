@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { GeometryBuilder } from "../../../assembler/geometry";
-import { mergeGeometries } from "../../../kernel/geometry";
+import { latheGeometry, mergeGeometries } from "../../../kernel/geometry";
 import { ball, box, cylinderX, cylinderZ, cylinderY, plate, tubeZ } from "../kits";
 
 // ============================================================================
@@ -349,21 +349,85 @@ const standCradle: GeometryBuilder = (spec) => {
   const height = num(p, "height", 0.34);
   const width = num(p, "width", 0.076);
   const parts: THREE.BufferGeometry[] = [];
-  const stem = box(width * 0.72, height, 0.05, 0.0015);
-  stem.translate(0, -height / 2, 0);
-  parts.push(stem);
-  const foot = box(width, 0.018, 0.09, 0.0015);
-  foot.translate(0, -height + 0.009, 0);
+  const postH = Math.max(height - 0.045, 0.04);
+  // 车削圆立柱 + 底座法兰 + 上端轴环：展示架是机加工钢件，不是方木柱。
+  const post = cylinderY(0.0085, postH, 40);
+  post.translate(0, -0.028 - postH / 2, 0);
+  parts.push(post);
+  const foot = cylinderY(0.024, 0.012, 40);
+  foot.translate(0, -height + 0.006, 0);
   parts.push(foot);
-  for (const side of [-1, 1]) {
-    const arm = box(width * 0.5, 0.13, 0.012, 0.001);
-    arm.rotateX(THREE.MathUtils.degToRad(34) * side);
-    arm.translate(side * width * 0.22, -0.03, 0);
-    parts.push(arm);
+  const footChamfer = latheGeometry(
+    [
+      [0.024, 0],
+      [0.024, 0.006],
+      [0.021, 0.01],
+      [0.012, 0.012],
+      [0, 0.012],
+    ],
+    40,
+  );
+  footChamfer.translate(0, -height + 0.012, 0);
+  parts.push(footChamfer);
+  const collar = cylinderY(0.012, 0.01, 40);
+  collar.translate(0, -0.033, 0);
+  parts.push(collar);
+  const topCollar = cylinderY(0.011, 0.008, 40);
+  topCollar.translate(0, -0.009, 0);
+  parts.push(topCollar);
+  // 侧向锁紧手柄：圆柱 + 滚花环，固定在立柱上。
+  const knobStem = cylinderX(0.0035, 0.024, 20);
+  knobStem.translate(0.014, -0.055, 0);
+  parts.push(knobStem);
+  const knob = latheGeometry(
+    [
+      [0, -0.006],
+      [0.009, -0.006],
+      [0.011, -0.003],
+      [0.011, 0.003],
+      [0.009, 0.006],
+      [0, 0.006],
+    ],
+    24,
+  );
+  knob.rotateZ(Math.PI / 2);
+  knob.translate(0.032, -0.055, 0);
+  parts.push(knob);
+  for (let i = 0; i < 12; i++) {
+    const ridge = box(0.0012, 0.0012, 0.014, 0.0002);
+    const a = (i / 12) * Math.PI * 2;
+    ridge.rotateX(a);
+    ridge.translate(0.032 + Math.cos(a) * 0.0108, -0.055 + Math.sin(a) * 0.0108, 0);
+    parts.push(ridge);
   }
-  const felt = box(width * 0.5, 0.004, 0.04, 0.0005);
-  felt.translate(0, 0.002, 0);
-  parts.push(felt);
+
+  // V 形托块：按真实机加工 V 铁做侧轮廓挤出（V 槽横跨枪身宽度）。
+  const halfW = width / 2;
+  const shape = new THREE.Shape();
+  shape.moveTo(-halfW, -0.042);
+  shape.lineTo(halfW, -0.042);
+  shape.lineTo(halfW, 0.0);
+  shape.lineTo(0.014, 0.0);
+  shape.lineTo(0, -0.01);
+  shape.lineTo(-0.014, 0.0);
+  shape.lineTo(-halfW, 0.0);
+  shape.closePath();
+  const block = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.055,
+    bevelEnabled: true,
+    bevelThickness: 0.0012,
+    bevelSize: 0.0012,
+    bevelSegments: 2,
+    curveSegments: 8,
+    steps: 1,
+  });
+  block.translate(0, 0, -0.0275);
+  block.computeBoundingBox();
+  parts.push(block);
+  // 托块底部与立柱之间的机加工垫圈
+  const washer = cylinderY(0.018, 0.004, 32);
+  washer.translate(0, -0.044, 0);
+  parts.push(washer);
   return merge(parts);
 };
 
@@ -388,9 +452,12 @@ const brassTray: GeometryBuilder = (spec) => {
 };
 
 // ---------------------------------------------------------------------------
-// receiverShell —— 闭合机匣外壳：左右侧板 + 前/后顶板，右侧留拉机柄让位槽。
-// 三八大盖原有的半圆防尘盖仍露在顶面，作为标志性外观；外壳只补上
-// 机匣两侧和防尘盖前后未覆盖的开口。局部系与 receiver 相同（origin = 弹底）。
+// receiverShell —— 三八式机匣外壳：C 形圆角截面沿 Z 挤出，右侧留拉机柄槽。
+//
+// 旧版是左右两片平板 + 平顶板，从任何角度看都像一个铁盒子。真实三八式
+// 机匣是**圆角矩形/近圆柱**的锻钢件：顶部弧面与防尘盖贴合，两侧有圆角，
+// 右侧开一条窄槽让直拉枪机柄通过。这里用带缺口的 C 形截面挤出，壁厚 2.5mm，
+// 再补前节套环、侧壁螺钉和弹仓 cutoff 拨片。局部系与 receiver 相同。
 // ---------------------------------------------------------------------------
 const receiverShell: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
@@ -400,55 +467,85 @@ const receiverShell: GeometryBuilder = (spec) => {
   const z1 = num(p, "z1", 0.042);
   const bottom = num(p, "bottom", -0.036);
   const top = num(p, "top", 0.028);
-  const parts: THREE.BufferGeometry[] = [];
   const len = z1 - z0;
-  const zc = (z0 + z1) / 2;
-  const sideX = w / 2 - t / 2;
+  const parts: THREE.BufferGeometry[] = [];
 
-  // 左侧整块侧板
-  const left = box(t, top - bottom, len, 0.0005);
-  left.translate(-sideX, (top + bottom) / 2, zc);
-  parts.push(left);
-
-  // 右侧只留一条 13mm 高的拉机柄行程缝：缝上方、下方都是完整侧板，
-  // 不再把整个右上部 30mm 高、26mm 长地挖空。缝的长度按枪机 100mm 行程
-  // 留足，前后多余段补实板；从正常视角看只是一条窄槽，看不到机匣内腔。
-  const slotY0 = 0.004;
-  const slotY1 = 0.017;
-  const lowerH = slotY0 - bottom;
-  const lower = box(t, lowerH, len, 0.0005);
-  lower.translate(sideX, bottom + lowerH / 2, zc);
-  parts.push(lower);
-
-  const upperH = top - slotY1;
-  const upper = box(t, upperH, len, 0.0005);
-  upper.translate(sideX, (top + slotY1) / 2, zc);
-  parts.push(upper);
-
-  const slotZ0 = -0.245;
-  const slotZ1 = -0.115;
-  const slotFillY = (slotY0 + slotY1) / 2;
-  const slotFillH = slotY1 - slotY0;
-  const rearLen = slotZ0 - z0;
-  if (rearLen > 0.001) {
-    const rear = box(t, slotFillH, rearLen, 0.0005);
-    rear.translate(sideX, slotFillY, z0 + rearLen / 2);
-    parts.push(rear);
+  // 截面：超椭圆圆角矩形，右侧 y=0.004..0.017 挖出拉机柄槽。
+  const halfW = w / 2;
+  const cy = (top + bottom) / 2;
+  const halfTop = top - cy;
+  const halfBottom = cy - bottom;
+  const squareness = 0.56;
+  const exponent = 2 / (1 - squareness * 0.78);
+  const pointAt = (theta: number, inset: number): [number, number] => {
+    const c = Math.cos(theta);
+    const s = Math.sin(theta);
+    const hw = Math.max(halfW - inset, 0.004);
+    const ht = Math.max(halfTop - inset, 0.004);
+    const hb = Math.max(halfBottom - inset, 0.004);
+    const x = Math.sign(c) * Math.pow(Math.abs(c), exponent) * hw;
+    const y = cy + Math.sign(s) * Math.pow(Math.abs(s), exponent) * (s >= 0 ? ht : hb);
+    return [x, y];
+  };
+  const gapStart = 0.10; // 槽下缘（弧度）
+  const gapEnd = 0.43; // 槽上缘
+  const n = 72;
+  const outer: Array<[number, number]> = [];
+  const inner: Array<[number, number]> = [];
+  for (let i = 0; i <= n; i++) {
+    const a = gapEnd + ((Math.PI * 2 - (gapEnd - gapStart)) * i) / n;
+    outer.push(pointAt(a, 0));
+    inner.push(pointAt(a, t));
   }
-  const frontLen = z1 - slotZ1;
-  if (frontLen > 0.001) {
-    const frontSide = box(t, slotFillH, frontLen, 0.0005);
-    frontSide.translate(sideX, slotFillY, slotZ1 + frontLen / 2);
-    parts.push(frontSide);
+  // 截面：外弧 → 槽上切口 → 内弧回程 → 槽下切口。
+  const shape = new THREE.Shape();
+  shape.moveTo(outer[0][0], outer[0][1]);
+  for (let i = 1; i < outer.length; i++) shape.lineTo(outer[i][0], outer[i][1]);
+  for (let i = inner.length - 1; i >= 0; i--) shape.lineTo(inner[i][0], inner[i][1]);
+  // 内弧最后一端在槽下缘；沿槽下缘切口回到外弧起点。
+  shape.closePath();
+  const shell = new THREE.ExtrudeGeometry(shape, {
+    depth: len,
+    bevelEnabled: true,
+    bevelThickness: 0.0006,
+    bevelSize: 0.0006,
+    bevelSegments: 1,
+    curveSegments: 64,
+    steps: 1,
+  });
+  shell.translate(0, 0, z0);
+  parts.push(shell);
+
+  // 前节套环：机匣前端的锻钢环，外面能看到一圈台阶。
+  const ring = tubeZ(0.0245, 0.0185, 0.024, 48);
+  ring.translate(0, cy, 0.018);
+  parts.push(ring);
+  // 后桥/尾座环，托底板之前的结构。
+  const rearRing = tubeZ(0.0235, 0.019, 0.012, 48);
+  rearRing.translate(0, cy, z0 + 0.012);
+  parts.push(rearRing);
+
+  // 侧壁螺钉/铆钉：左侧两列，右下侧一列（右上让开拉机柄槽）。
+  for (const side of [-1, 1]) {
+    for (const z of [-0.23, -0.19, -0.15, -0.11, -0.07]) {
+      if (side > 0 && z > -0.14) continue;
+      const screw = cylinderX(0.0022, 0.0018, 16);
+      screw.translate(side * (halfW + 0.0007), cy - 0.014, z);
+      parts.push(screw);
+      const slot = box(0.0005, 0.001, 0.0028, 0.0002);
+      slot.translate(side * (halfW + 0.0017), cy - 0.014, z);
+      parts.push(slot);
+    }
   }
 
-  // 后顶板（防尘盖后方）与前顶板（防尘盖前方）
-  const rearTop = box(w, t, 0.045, 0.0005);
-  rearTop.translate(0, top, -0.2325);
-  parts.push(rearTop);
-  const frontTop = box(w, t, 0.037, 0.0005);
-  frontTop.translate(0, top, 0.0235);
-  parts.push(frontTop);
+  // 右侧弹仓 cutoff 拨片（三八式标志性小件）：底座 + 拨杆。
+  const cutoffBase = box(0.003, 0.012, 0.016, 0.0006);
+  cutoffBase.translate(halfW + 0.0015, -0.008, -0.085);
+  parts.push(cutoffBase);
+  const cutoffLever = box(0.0025, 0.0045, 0.035, 0.0005);
+  cutoffLever.rotateX(-0.35);
+  cutoffLever.translate(halfW + 0.004, -0.001, -0.075);
+  parts.push(cutoffLever);
 
   return merge(parts);
 };

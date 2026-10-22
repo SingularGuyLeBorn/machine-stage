@@ -1,0 +1,12 @@
+﻿# Metal PBR texture sources
+
+All texture sets in this directory are from ambientCG (https://ambientcg.com) and
+are released under CC0 1.0 Universal (public domain dedication):
+https://creativecommons.org/publicdomain/zero/1.0/
+
+- Metal009  - brushed steel with scratches (metalness / roughness / normal / color)
+- Metal038  - scratched steel
+- MetalPlates001 - brushed metal plates
+- Metal041B - aged / rusted steel
+
+Downloaded at 1K JPG resolution from the ambientCG `1K-JPG` archives.

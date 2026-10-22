@@ -98,9 +98,9 @@ export const AK47_EXTRA_CONSTANTS = {
 /** AK 材质：共享枪械库 + 本型号特需。 */
 export const AK47_MATERIALS: ModelRegistry["materials"] = {
   ...GUN_MATERIALS,
-  gunsteel: { base: "#3a3d42", metalness: 0.88, roughness: 0.42, preset: "steel", repeat: [3, 3] },
-  worn_blued: { base: "#2b2e33", metalness: 0.85, roughness: 0.5, preset: "steel_rough", repeat: [3, 3] },
-  ejector_steel: { base: "#9aa1a8", metalness: 0.92, roughness: 0.28, preset: "steel", repeat: [2, 2] },
+  gunsteel: { base: "#d5dce4", metalness: 1, roughness: 0.36, preset: "steel", pbr: "brushed", anisotropy: 0.7, repeat: [3, 3], envMapIntensity: 1.3 },
+  worn_blued: { base: "#c9d0d7", metalness: 1, roughness: 0.42, preset: "steel_rough", pbr: "scratched", anisotropy: 0.4, repeat: [3, 3], envMapIntensity: 1.2 },
+  ejector_steel: { base: "#e8ecef", metalness: 1, roughness: 0.24, preset: "steel", pbr: "brushed", anisotropy: 1, repeat: [2, 2], envMapIntensity: 1.45 },
 };
 
 export const AK47_BUILDERS: Record<string, GeometryBuilder> = {
