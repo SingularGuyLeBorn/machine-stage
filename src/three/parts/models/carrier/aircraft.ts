@@ -82,7 +82,8 @@ export function addAircraft(ctx: CarrierCtx): void {
   const deckTop = CV.DECK_Y + CV.DECK_T;
   const [parkX, parkZ] = CV.AIRCRAFT_PARK;
 
-  // J-15 真实全长 22m；编辑数据略长，节点沿机体轴压缩到 22/24.06。
+  // 以歼-20 的气动布局为结构参照（DSI/鸭翼/三角翼/全动外倾垂尾/锯齿喷口），
+  // 再叠加舰载化：折叠外翼、尾钩、加强起落架、弹射牵引杆。全长约 20.4m。
   ctx.node({ name: AIRCRAFT_NODE, parent: "root", pivot: [parkX, deckTop, parkZ], scale: [1, 1, AIRCRAFT_SCALE_Z], motion: "translate", axis: "z", note: "舰载机（弹射/拦阻闭环）" });
   ctx.node({ name: WING_FOLD_L, parent: AIRCRAFT_NODE, pivot: [-0.48, 0.28, 0.02], motion: "rotate", axis: "z", note: "左外翼折叠铰链" });
   ctx.node({ name: WING_FOLD_R, parent: AIRCRAFT_NODE, pivot: [0.48, 0.28, 0.02], motion: "rotate", axis: "z", note: "右外翼折叠铰链" });
@@ -220,6 +221,123 @@ export function addAircraft(ctx: CarrierCtx): void {
       node: AIRCRAFT_NODE,
       mate: A([side * 0.06, 0.43, 0.62]),
     });
+  }
+
+  // 歼-20 光电与隐身细节：EOTS 下颌窗 / 6 处 EODAS / 腹部弹舱门 / 背脊 / 放气百叶 / 侧操纵台。
+  add({
+    id: `${P}eots_window`,
+    name_cn: "EOTS 光电瞄准窗",
+    name_en: "EOTS window",
+    assembly: "aircraft",
+    build_layer: 5,
+    geometry: M({ type: "polygon", points: [[-0.07, 0.045], [0.07, 0.045], [0.09, 0.0], [0.055, -0.055], [-0.055, -0.055], [-0.09, 0.0]], depth: 0.035, bevel: 0.004 }),
+    material: "cv_canopy",
+    node: AIRCRAFT_NODE,
+    mate: A([0, 0.305, 0.98], [90, 0, 0]),
+  });
+  add({
+    id: `${P}eots_frame`,
+    name_cn: "EOTS 窗框",
+    name_en: "EOTS frame",
+    assembly: "aircraft",
+    build_layer: 5,
+    geometry: M({ type: "polygon", points: [[-0.085, 0.055], [0.085, 0.055], [0.105, 0.0], [0.065, -0.07], [-0.065, -0.07], [-0.105, 0.0]], depth: 0.012, bevel: 0.003 }),
+    material: "cv_aircraft_dark",
+    node: AIRCRAFT_NODE,
+    mate: A([0, 0.302, 0.985], [90, 0, 0]),
+  });
+  const eodasSpots: Array<[number, number, number, number, number]> = [
+    [0, 0.475, 0.86, 0, -20],
+    [0.115, 0.445, 0.62, 65, 0],
+    [-0.115, 0.445, 0.62, -65, 0],
+    [0, 0.66, 0.1, 0, 80],
+    [0.1, 0.56, -0.98, 50, 10],
+    [-0.1, 0.56, -0.98, -50, 10],
+  ];
+  eodasSpots.forEach(([x, y, z, yaw, pitch], index) => {
+    add({
+      id: `${P}eodas_${pad(index + 1)}`,
+      name_cn: `EODAS 光电窗 ${index + 1}`,
+      name_en: `EODAS window ${index + 1}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(C(0.026, 0.012, [0, 0, 0], 12), T(0.032, 0.026, 0.016, [0, 0, 0], 12)),
+      material: "cv_canopy",
+      node: AIRCRAFT_NODE,
+      mate: A([x, y, z], [pitch, yaw, 0]),
+    });
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}weapons_bay_${side === -1 ? "l" : "r"}`,
+      name_cn: `${side === -1 ? "左" : "右"}腹部弹舱门`,
+      name_en: `weapons bay door ${side === -1 ? "l" : "r"}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(B(0.17, 0.008, 0.68, [0, 0, 0], 0.003), B(0.012, 0.012, 0.68, [side * 0.085, 0.01, 0], 0.002)),
+      material: "cv_aircraft_belly",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.095, 0.338, -0.34]),
+    });
+    add({
+      id: `${P}bay_hinge_${side === -1 ? "l" : "r"}`,
+      name_cn: `${side === -1 ? "左" : "右"}弹舱铰链`,
+      name_en: `bay hinge ${side === -1 ? "l" : "r"}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(C(0.018, 0.1, [0, 0, 0], 10)),
+      material: "cv_steel_dark",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.18, 0.342, -0.05], [0, 0, 90]),
+    });
+    add({
+      id: `${P}side_console_${side === -1 ? "l" : "r"}`,
+      name_cn: `${side === -1 ? "左" : "右"}侧操纵台`,
+      name_en: `side console ${side === -1 ? "l" : "r"}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(B(0.05, 0.05, 0.28, [0, 0, 0], 0.004), B(0.035, 0.025, 0.07, [side * 0.005, 0.032, 0.02], 0.002)),
+      material: "cv_cockpit",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.105, 0.55, 0.4]),
+    });
+  }
+  add({
+    id: `${P}dorsal_spine`,
+    name_cn: "背脊整流/天线",
+    name_en: "dorsal spine fairing",
+    assembly: "aircraft",
+    build_layer: 5,
+    geometry: M(B(0.11, 0.05, 0.92, [0, 0, 0], 0.01), { type: "polygon", points: [[0, 0.09], [0.035, 0.0], [0.015, -0.09], [-0.015, -0.09], [-0.035, 0.0]], depth: 0.16, bevel: 0.004 }),
+    material: "cv_aircraft",
+    node: AIRCRAFT_NODE,
+    mate: A([0, 0.655, 0.02]),
+  });
+  add({
+    id: `${P}formation_light`,
+    name_cn: "编队灯",
+    name_en: "formation light",
+    assembly: "aircraft",
+    build_layer: 5,
+    geometry: M(B(0.012, 0.008, 0.2, [0, 0, 0], 0.0015)),
+    material: "cv_glow",
+    node: AIRCRAFT_NODE,
+    mate: A([0, 0.69, -0.15]),
+  });
+  for (let v = 0; v < 4; v++) {
+    for (const side of [-1, 1] as const) {
+      add({
+        id: `${P}vent_louvre_${side === -1 ? "l" : "r"}_${v + 1}`,
+        name_cn: `${side === -1 ? "左" : "右"}放气百叶 ${v + 1}`,
+        name_en: `vent louvre ${side === -1 ? "l" : "r"} ${v + 1}`,
+        assembly: "aircraft",
+        build_layer: 5,
+        geometry: M(B(0.07, 0.006, 0.028, [0, 0, 0], 0.0015)),
+        material: "cv_aircraft_dark",
+        node: AIRCRAFT_NODE,
+        mate: A([side * 0.07, 0.635, -0.34 - v * 0.05], [0, 0, side * 18]),
+      });
+    }
   }
 
   // 机身隔框/桁条。
@@ -393,10 +511,10 @@ export function addAircraft(ctx: CarrierCtx): void {
       name_en: `inner wing ${tag}`,
       assembly: "aircraft",
       build_layer: 5,
-      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.4, rootChord: 0.58, tipChord: 0.34, sweep: 0.1, thickness: 0.085, dihedralDeg: 2, sections: 10 }, mirror: side === -1 ? "x" : undefined },
+      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.44, rootChord: 0.76, tipChord: 0.44, sweep: 0.16, thickness: 0.082, dihedralDeg: 1, sections: 12 }, mirror: side === -1 ? "x" : undefined },
       material: "cv_aircraft",
       node: AIRCRAFT_NODE,
-      mate: A([side * 0.08, 0.3, 0.24]),
+      mate: A([side * 0.08, 0.3, 0.18]),
     });
     add({
       id: `${P}wing_fold_hinge_${tag}`,
@@ -439,10 +557,10 @@ export function addAircraft(ctx: CarrierCtx): void {
       name_en: `outer wing ${tag}`,
       assembly: "aircraft",
       build_layer: 5,
-      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.52, rootChord: 0.56, tipChord: 0.16, sweep: 0.36, thickness: 0.075, dihedralDeg: 3.5, sections: 12 }, mirror: side === -1 ? "x" : undefined },
+      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.43, rootChord: 0.44, tipChord: 0.1, sweep: 0.34, thickness: 0.062, dihedralDeg: 2, sections: 10 }, mirror: side === -1 ? "x" : undefined },
       material: "cv_aircraft",
       node: foldNode,
-      mate: A([0, -0.04, 0.24]),
+      mate: A([0, -0.04, 0.2]),
     });
     add({
       id: `${P}wingtip_${tag}`,
@@ -500,41 +618,42 @@ export function addAircraft(ctx: CarrierCtx): void {
       node: side === -1 ? WING_FOLD_L : WING_FOLD_R,
       mate: A([side * 0.35, -0.1, -0.05], [90, 0, 0]),
     });
-    add({
-      id: `${P}tailplane_${tag}`,
-      name_cn: `${tag === "l" ? "左" : "右"}平尾`,
-      name_en: `tailplane ${tag}`,
-      assembly: "aircraft",
-      build_layer: 5,
-      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.27, rootChord: 0.34, tipChord: 0.1, sweep: 0.18, thickness: 0.065, dihedralDeg: 3, sections: 8 }, mirror: side === -1 ? "x" : undefined },
-      material: "cv_aircraft",
-      node: AIRCRAFT_NODE,
-      mate: A([side * 0.18, 0.38, -0.92]),
-    });
+    // 全动外倾垂尾（歼-20 无平尾/无独立方向舵）。
     add({
       id: `${P}fin_${tag}`,
-      name_cn: `${tag === "l" ? "左" : "右"}垂尾`,
-      name_en: `vertical fin ${tag}`,
+      name_cn: `${tag === "l" ? "左" : "右"}全动外倾垂尾`,
+      name_en: `canted all-moving fin ${tag}`,
       assembly: "aircraft",
       build_layer: 5,
-      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.34, rootChord: 0.4, tipChord: 0.1, sweep: 0.26, thickness: 0.07, dihedralDeg: 0, sections: 8 }, mirror: side === -1 ? "x" : undefined },
+      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.44, rootChord: 0.54, tipChord: 0.12, sweep: 0.3, thickness: 0.066, dihedralDeg: 0, sections: 10 }, mirror: side === -1 ? "x" : undefined },
       material: "cv_aircraft",
       node: AIRCRAFT_NODE,
-      mate: A([side * 0.18, 0.44, -0.9], [0, 0, side * 90]),
+      mate: A([side * 0.16, 0.47, -0.92], [0, 0, side * 68]),
     });
     add({
-      id: `${P}rudder_${tag}`,
-      name_cn: `${tag === "l" ? "左" : "右"}方向舵`,
-      name_en: `rudder ${tag}`,
+      id: `${P}fin_root_fairing_${tag}`,
+      name_cn: `${tag === "l" ? "左" : "右"}垂尾根部整流`,
+      name_en: `fin root fairing ${tag}`,
       assembly: "aircraft",
       build_layer: 5,
-      geometry: M(B(0.035, 0.36, 0.1, [0, 0, 0], 0.004)),
+      geometry: M({ type: "latheZ", profile: [[0.06, -0.34], [0.09, -0.12], [0.08, 0.12], [0.03, 0.28]], segments: 14 }),
+      material: "cv_aircraft",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.17, 0.46, -0.9], [0, 0, side * 68]),
+    });
+    add({
+      id: `${P}ventral_fin_${tag}`,
+      name_cn: `${tag === "l" ? "左" : "右"}腹鳍`,
+      name_en: `ventral fin ${tag}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.12, rootChord: 0.2, tipChord: 0.05, sweep: 0.18, thickness: 0.038, dihedralDeg: 0, sections: 6 }, mirror: side === -1 ? "x" : undefined },
       material: "cv_aircraft_dark",
       node: AIRCRAFT_NODE,
-      mate: A([side * 0.25, 0.57, -1.16], [-8, side * 12, side * 6]),
+      mate: A([side * 0.17, 0.33, -0.98], [0, 0, side * -68]),
     });
   }
-  // 鸭翼（歼-15 特征）。
+  // 鸭翼 + 边条涡流控制面（歼-20 布局）。
   for (const side of [-1, 1] as const) {
     add({
       id: `${P}canard_${side === -1 ? "l" : "r"}`,
@@ -542,10 +661,21 @@ export function addAircraft(ctx: CarrierCtx): void {
       name_en: `canard ${side === -1 ? "l" : "r"}`,
       assembly: "aircraft",
       build_layer: 5,
-      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.22, rootChord: 0.24, tipChord: 0.06, sweep: 0.12, thickness: 0.055, dihedralDeg: 3, sections: 7 }, mirror: side === -1 ? "x" : undefined },
+      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.28, rootChord: 0.36, tipChord: 0.06, sweep: 0.18, thickness: 0.052, dihedralDeg: 2, sections: 8 }, mirror: side === -1 ? "x" : undefined },
       material: "cv_aircraft",
       node: AIRCRAFT_NODE,
-      mate: A([side * 0.2, 0.4, 0.62]),
+      mate: A([side * 0.17, 0.42, 0.56]),
+    });
+    add({
+      id: `${P}canard_actuator_${side === -1 ? "l" : "r"}`,
+      name_cn: `${side === -1 ? "左" : "右"}鸭翼作动筒`,
+      name_en: `canard actuator ${side === -1 ? "l" : "r"}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(C(0.022, 0.12, [0, 0, 0], 10)),
+      material: "cv_steel",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.12, 0.4, 0.5], [0, 0, side * 80]),
     });
     add({
       id: `${P}lerx_${side === -1 ? "l" : "r"}`,
@@ -553,10 +683,22 @@ export function addAircraft(ctx: CarrierCtx): void {
       name_en: `leading edge extension ${side === -1 ? "l" : "r"}`,
       assembly: "aircraft",
       build_layer: 5,
-      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.34, rootChord: 0.3, tipChord: 0.05, sweep: -0.3, thickness: 0.045, dihedralDeg: 1, sections: 8 }, mirror: side === -1 ? "x" : undefined },
+      geometry: { type: "kit", kit: "carrierWing", params: { span: 0.38, rootChord: 0.42, tipChord: 0.05, sweep: -0.34, thickness: 0.04, dihedralDeg: 0, sections: 9 }, mirror: side === -1 ? "x" : undefined },
       material: "cv_aircraft",
       node: AIRCRAFT_NODE,
-      mate: A([side * 0.1, 0.32, 0.28]),
+      mate: A([side * 0.08, 0.31, 0.3]),
+    });
+    // 侧棱线（歼-20 机身边条）：从机头延伸到翼根。
+    add({
+      id: `${P}chine_${side === -1 ? "l" : "r"}`,
+      name_cn: `${side === -1 ? "左" : "右"}机身棱线`,
+      name_en: `fuselage chine ${side === -1 ? "l" : "r"}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(B(0.022, 0.028, 1.72, [0, 0, 0], 0.004)),
+      material: "cv_aircraft_dark",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.135, 0.38, 0.2], [0, 0, side * -4]),
     });
   }
 

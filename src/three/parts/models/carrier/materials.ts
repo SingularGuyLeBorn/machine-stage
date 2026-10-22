@@ -34,9 +34,10 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_radar_dark: { base: "#596368", metalness: 0.35, roughness: 0.55, preset: "primer", envMapIntensity: 0.8 },
   cv_aesa: { base: "#354149", metalness: 0.18, roughness: 0.58, preset: "primer", envMapIntensity: 0.42 },
   cv_aesa_tile: { base: "#8a969c", metalness: 0.22, roughness: 0.42, preset: "primer", envMapIntensity: 0.55 },
-  cv_aircraft: { base: "#8b9498", metalness: 1, roughness: 0.68, preset: "none", clearcoat: 0.02, envMapIntensity: 0.35 },
-  cv_aircraft_dark: { base: "#4e585c", metalness: 1, roughness: 0.72, preset: "none", envMapIntensity: 0.35 },
-  cv_aircraft_belly: { base: "#a8b0b3", metalness: 1, roughness: 0.66, preset: "none", envMapIntensity: 0.35 },
+  // 隐身机是复合蒙皮 + 低可视涂装，不是裸金属；金属度压低以消除环境色偏和刺眼反光。
+  cv_aircraft: { base: "#8b9498", metalness: 0.5, roughness: 0.74, preset: "none", clearcoat: 0.02, envMapIntensity: 0.28 },
+  cv_aircraft_dark: { base: "#4e585c", metalness: 0.55, roughness: 0.76, preset: "none", envMapIntensity: 0.26 },
+  cv_aircraft_belly: { base: "#a8b0b3", metalness: 0.45, roughness: 0.72, preset: "none", envMapIntensity: 0.28 },
   cv_cockpit: { base: "#2a3d46", metalness: 0.4, roughness: 0.08, preset: "none", envMapIntensity: 1.8 },
   cv_rubber: { base: "#171918", metalness: 0.02, roughness: 0.94, preset: "rubber", envMapIntensity: 0.35 },
   cv_brass: { base: "#d2b47a", metalness: 1, roughness: 0.32, pbr: "brushed", repeat: [1, 1], anisotropy: 0.7, envMapIntensity: 1.35 },
