@@ -51,20 +51,7 @@ export function addSurface(ctx: CarrierCtx): void {
     mate: A([-(hullHalfBeamAt(11.55) + 0.015), 2.45, 11.55], [0, -90, 0]),
   });
 
-  // 做旧/锈迹/水线漆带。
-  for (let w = 0; w < 22; w++) {
-    const side = w % 2 === 0 ? -1 : 1;
-    add({
-      id: `${P}weathering_${pad(w + 1)}`,
-      name_cn: `舷侧做旧 ${w + 1}`,
-      name_en: `hull weathering ${w + 1}`,
-      assembly: ASSEMBLY,
-      build_layer: 5,
-      geometry: M(B(0.025, 0.18 + (w % 3) * 0.1, 0.7 + (w % 4) * 0.2, [0, 0, 0], 0.003)),
-      material: w % 3 === 0 ? "cv_hull_boot" : "cv_hull_dark",
-      mate: A([side * (hullHalfBeamAt(-13 + Math.floor(w / 2) * 2.4) + 0.01), 1.55 + (w % 4) * 0.18, -13 + Math.floor(w / 2) * 2.4]),
-    });
-  }
+  // 做旧交给 PBR 贴图；不再用外贴方块冒充锈迹（贴片边缘会露馅）。
   for (let wb = 0; wb < 20; wb++) {
     const z0 = -17.4 + wb * 1.62;
     const z1 = z0 + 1.62;
@@ -146,9 +133,9 @@ export function addSurface(ctx: CarrierCtx): void {
       name_en: `port catwalk post ${cw + 1}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(C(0.022, 0.62, [0, 0, 0], 8)),
+      geometry: M(C(0.022, 0.2, [0, 0, 0], 8)),
       material: "cv_steel",
-      mate: A([px - 0.24, deckY + 0.33, zc]),
+      mate: A([px - 0.24, deckY + 0.12, zc]),
     });
   }
   add({
@@ -159,7 +146,17 @@ export function addSurface(ctx: CarrierCtx): void {
     build_layer: 4,
     geometry: M(C(0.02, 35.5, [0, 0, 0], 8)),
     material: "cv_steel",
-    mate: A([-(hullHalfBeamAt(0) + 0.56), CV.DECK_Y - 0.01, 1.0], [90, 0, 0]),
+    mate: A([-(hullHalfBeamAt(0) + 0.56), CV.DECK_Y - 0.12, 1.0], [90, 0, 0]),
+  });
+  add({
+    id: `${P}catwalk_rail_mid`,
+    name_cn: "左舷外走道中扶手",
+    name_en: "port catwalk mid rail",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(C(0.016, 35.5, [0, 0, 0], 8)),
+    material: "cv_steel",
+    mate: A([-(hullHalfBeamAt(0) + 0.56), CV.DECK_Y - 0.22, 1.0], [90, 0, 0]),
   });
 
   // 甲板边缘栏杆/支柱（实例化）。
@@ -169,7 +166,7 @@ export function addSurface(ctx: CarrierCtx): void {
     name_en: "deck rail posts",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(B(0.045, 0.75, 0.045, [0, 0, 0], 0.004), C(0.05, 0.06, [0, 0.38, 0], 10)),
+    geometry: M(B(0.04, 0.2, 0.04, [0, 0, 0], 0.004), C(0.045, 0.04, [0, 0.11, 0], 10)),
     material: "cv_steel",
     mate: A([0, 0, 0]),
     instances: 36,
@@ -179,7 +176,7 @@ export function addSurface(ctx: CarrierCtx): void {
   ctx.layout("carrier.surface.railPost", ({ index }) => {
     const side = index % 2 === 0 ? -1 : 1;
     const row = Math.floor(index / 2);
-    return new THREE.Matrix4().makeTranslation(side * 4.66, deckTop + 0.36, -18 + row * 2.1);
+    return new THREE.Matrix4().makeTranslation(side * 4.66, deckTop + 0.1, -18 + row * 2.1);
   });
   add({
     id: `${P}deck_rail_l`,
@@ -187,9 +184,19 @@ export function addSurface(ctx: CarrierCtx): void {
     name_en: "port deck rail",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(C(0.025, 36.5, [0, 0, 0], 8)),
+    geometry: M(C(0.018, 36.5, [0, 0, 0], 8)),
     material: "cv_steel",
-    mate: A([-4.66, deckTop + 0.76, 0], [90, 0, 0]),
+    mate: A([-4.66, deckTop + 0.2, 0], [90, 0, 0]),
+  });
+  add({
+    id: `${P}deck_rail_l_mid`,
+    name_cn: "左舷甲板中栏杆",
+    name_en: "port deck mid rail",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(C(0.014, 36.5, [0, 0, 0], 8)),
+    material: "cv_steel",
+    mate: A([-4.66, deckTop + 0.1, 0], [90, 0, 0]),
   });
   add({
     id: `${P}deck_rail_r`,
@@ -197,9 +204,19 @@ export function addSurface(ctx: CarrierCtx): void {
     name_en: "starboard deck rail",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(C(0.025, 26.0, [0, 0, 0], 8)),
+    geometry: M(C(0.018, 26.0, [0, 0, 0], 8)),
     material: "cv_steel",
-    mate: A([4.66, deckTop + 0.76, -6], [90, 0, 0]),
+    mate: A([4.66, deckTop + 0.2, -6], [90, 0, 0]),
+  });
+  add({
+    id: `${P}deck_rail_r_mid`,
+    name_cn: "右舷甲板中栏杆",
+    name_en: "starboard deck mid rail",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(C(0.014, 26.0, [0, 0, 0], 8)),
+    material: "cv_steel",
+    mate: A([4.66, deckTop + 0.1, -6], [90, 0, 0]),
   });
 
   // 救生圈/救生筏/消防栓。
@@ -210,9 +227,9 @@ export function addSurface(ctx: CarrierCtx): void {
       name_en: `life ring ${l + 1}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M({ type: "torus", radius: 0.16, tube: 0.034, radialSegments: 10, tubularSegments: 28 }),
+      geometry: M({ type: "torus", radius: 0.06, tube: 0.014, radialSegments: 10, tubularSegments: 24 }),
       material: "cv_warning",
-      mate: A([(l % 2 === 0 ? -1 : 1) * 4.64, deckTop + 0.55, -12 + Math.floor(l / 2) * 3.2], [0, 90, 0]),
+      mate: A([(l % 2 === 0 ? -1 : 1) * 4.64, deckTop + 0.14, -12 + Math.floor(l / 2) * 3.2], [0, 90, 0]),
     });
   }
   add({

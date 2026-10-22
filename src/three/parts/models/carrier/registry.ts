@@ -15,7 +15,9 @@ import {
   carrierBottom,
   carrierFlightDeck,
   carrierHangarDeck,
+  carrierHullBilgeKeel,
   carrierHullShell,
+  carrierHullStrake,
   carrierLowerDeck,
   carrierPropeller,
   carrierRadarPanel,
@@ -618,6 +620,8 @@ export const carrierBuilders = {
   carrierTrTile,
   carrierPropeller,
   carrierWing,
+  carrierHullStrake,
+  carrierHullBilgeKeel,
 };
 
 export const CARRIER_CONSTANTS = CV;

@@ -62,7 +62,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
   // 舷侧分段合拢焊缝（垂直对接缝，实体焊道——不是贴图）。
   for (let i = 0; i < 24; i++) {
     const z = -16.8 + i * 1.45;
-    const half = Math.max(0.6, hullHalfBeamAt(z) - 0.035);
+    const half = Math.max(0.6, hullHalfBeamAt(z) + 0.004);
     for (const side of [-1, 1] as const) {
       add({
         id: `carrier.hull.detail_weld_${pad(i + 1)}_${side === -1 ? "l" : "r"}`,
@@ -70,7 +70,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
         name_en: `shell butt weld ${i + 1}-${side === -1 ? "l" : "r"}`,
         assembly: HULL,
         build_layer: 1,
-        geometry: M({ type: "weld", from: [side * half, 0.55, z], to: [side * half, 3.35, z], radius: 0.009, seed: i + 11 }),
+        geometry: M({ type: "weld", from: [side * half, 0.55, z], to: [side * half, 2.98, z], radius: 0.009, seed: i + 11 }),
         material: "cv_steel_dark",
         mate: A([0, 0, 0]),
       });
@@ -79,7 +79,8 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
   for (const side of [-1, 1] as const) {
     for (let zi = 0; zi < 16; zi++) {
       const z = -16.8 + zi * 2.2;
-      const half = Math.max(0.55, hullHalfBeamAt(z) - 0.06);
+      // 纵骨直段跨 2.2m，取分段内最小半宽，避免艏艉收窄处穿出外板。
+      const half = Math.max(0.55, Math.min(hullHalfBeamAt(z - 1.1), hullHalfBeamAt(z + 1.1)) - 0.06);
       for (let level = 0; level < 7; level++) {
         add({
           id: `carrier.hull.detail_stringer_${side === -1 ? "l" : "r"}_${pad(zi + 1)}_${level + 1}`,
@@ -205,6 +206,79 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
         geometry: M(B(0.035, 2.5, 0.08, [0, 0, 0], 0.003)),
         material: "cv_hull_dark",
         mate: A([side * (half + 0.01), 1.85, z]),
+      });
+    }
+  }
+  // 外板列板（水平板缝）：沿船壳曲线放样，外缘露出舷外，内缘搭在舷侧纵骨上。
+  const strakeLevels = [1.14, 1.6, 2.06, 2.52, 2.98];
+  for (const side of [-1, 1] as const) {
+    for (const level of strakeLevels) {
+      add({
+        id: `carrier.hull.detail_strake_${side === -1 ? "l" : "r"}_${Math.round(level * 100)}`,
+        name_cn: `舷侧列板 ${level}`,
+        name_en: `shell strake ${level}`,
+        assembly: HULL,
+        build_layer: 1,
+        geometry: { type: "kit", kit: "carrierHullStrake", params: { level, side } },
+        material: "cv_hull_dark",
+        mate: A([0, 0, 0]),
+      });
+    }
+  }
+  // 舭龙骨：沿舭部折角外伸的连续板，内缘与底部纵骨/舷侧纵骨搭接。
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `carrier.hull.detail_bilge_keel_${side === -1 ? "l" : "r"}`,
+      name_cn: `舭龙骨 ${side === -1 ? "左" : "右"}`,
+      name_en: `bilge keel ${side === -1 ? "port" : "starboard"}`,
+      assembly: HULL,
+      build_layer: 1,
+      geometry: { type: "kit", kit: "carrierHullBilgeKeel", params: { side } },
+      material: "cv_hull_dark",
+      mate: A([0, 0, 0]),
+    });
+  }
+  // 海水门/坞座：外板上的实体箱体 + 格栅 + 圆形坞座。
+  const chestZ = [6, -2, -10];
+  const plugZ = [-15, -9, -3, 3, 9, 15];
+  for (const side of [-1, 1] as const) {
+    for (let ci = 0; ci < chestZ.length; ci++) {
+      const z = chestZ[ci]!;
+      const half = hullHalfBeamAt(z);
+      add({
+        id: `carrier.hull.detail_sea_chest_${side === -1 ? "l" : "r"}_${ci + 1}`,
+        name_cn: `海水门 ${z}`,
+        name_en: `sea chest ${z}`,
+        assembly: HULL,
+        build_layer: 1,
+        geometry: M(B(0.3, 0.24, 0.4, [0, 0, 0], 0.006)),
+        material: "cv_steel_dark",
+        mate: A([side * (half - 0.04), 1.3, z]),
+      });
+      for (let g = 0; g < 4; g++) {
+        add({
+          id: `carrier.hull.detail_sea_chest_${side === -1 ? "l" : "r"}_${ci + 1}_grille_${g + 1}`,
+          name_cn: `海水门格栅 ${z}-${g + 1}`,
+          name_en: `sea chest grille ${z}-${g + 1}`,
+          assembly: HULL,
+          build_layer: 1,
+          geometry: M(B(0.02, 0.18, 0.045, [0, 0, 0], 0.002)),
+          material: "cv_steel",
+          mate: A([side * (half + 0.12), 1.3, z - 0.15 + g * 0.1]),
+        });
+      }
+    }
+    for (let pi = 0; pi < plugZ.length; pi++) {
+      const z = plugZ[pi]!;
+      add({
+        id: `carrier.hull.detail_docking_plug_${side === -1 ? "l" : "r"}_${pi + 1}`,
+        name_cn: `坞座 ${z}`,
+        name_en: `docking plug ${z}`,
+        assembly: HULL,
+        build_layer: 1,
+        geometry: M(C(0.05, 0.26, [0, 0, 0], 14)),
+        material: "cv_steel",
+        mate: A([side * (hullHalfBeamAt(z) - 0.11), 0.62, z], [0, 0, 90]),
       });
     }
   }
