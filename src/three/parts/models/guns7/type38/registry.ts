@@ -642,7 +642,7 @@ const parts: PartDefinition[] = [
     geometry: {
       type: "kit",
       kit: "dustCover",
-      params: { len: 0.22, r: 0.031, t: 0.0011, slotZ: 0.075, slotLen: 0.03 },
+      params: { len: 0.22, r: 0.031, t: 0.0011, slotZ: 0.075, slotLen: 0.016 },
     },
     material: "blued_wear",
     node: boltNode,

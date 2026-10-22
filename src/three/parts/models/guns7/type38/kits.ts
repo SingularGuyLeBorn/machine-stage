@@ -142,22 +142,28 @@ const dustCover: GeometryBuilder = (spec) => {
   const slotZ = num(p, "slotZ", -1);
   const slotLen = num(p, "slotLen", 0.03);
   const parts: THREE.BufferGeometry[] = [];
-  // 拉机柄让位槽：把盖分成前后两段，槽内不铺壳片（真实三八式防尘盖的柄槽）
-  const spans: Array<[number, number]> =
-    slotZ >= 0
+  // 拉机柄让位槽：只切右侧到顶部扫掠弧的 8 条窄带，不再整条横切开顶盖。
+  // 旧做法把整个半圆弧都断开 30mm，从上方能直接看进机匣；现在只保留
+  // 拉机柄上抬/后拉必须经过的一条 16mm 窄缝，盖顶左半仍是完整一片。
+  const strips = 13;
+  const slotStart = slotZ - slotLen / 2;
+  const slotEnd = slotZ + slotLen / 2;
+  for (let i = 0; i < strips; i++) {
+    const a = -Math.PI * 0.36 + (i / (strips - 1)) * Math.PI * 0.72;
+    const x = Math.sin(a) * r;
+    const y = Math.cos(a) * r;
+    // 拉机柄上抬 90° 时，柄杆会从右边缘扫过顶盖中心；让位槽必须覆盖
+    // 这条扫掠弧（约 -22°..+65°），但只在 z 向开一条窄缝，不能整圈切断。
+    const cutSide = slotZ >= 0 && i >= 4;
+    const segments: Array<[number, number]> = cutSide
       ? [
-          [0, Math.max(0.002, slotZ - slotLen / 2)],
-          [Math.min(len - 0.002, slotZ + slotLen / 2), len],
+          [0, Math.max(0.002, slotStart)],
+          [Math.min(len - 0.002, slotEnd), len],
         ]
       : [[0, len]];
-  const strips = 13;
-  for (const [z0, z1] of spans) {
-    const span = z1 - z0;
-    if (span <= 0.001) continue;
-    for (let i = 0; i < strips; i++) {
-      const a = -Math.PI * 0.36 + (i / (strips - 1)) * Math.PI * 0.72;
-      const x = Math.sin(a) * r;
-      const y = Math.cos(a) * r;
+    for (const [z0, z1] of segments) {
+      const span = z1 - z0;
+      if (span <= 0.001) continue;
       const seg = box(Math.PI * r * 0.09, t, span, 0.0002);
       seg.rotateZ(-a);
       seg.translate(x, y, z0 + span / 2);
@@ -404,28 +410,37 @@ const receiverShell: GeometryBuilder = (spec) => {
   left.translate(-sideX, (top + bottom) / 2, zc);
   parts.push(left);
 
-  // 右侧下段：拉机柄槽以下整条
-  const lowerH = 0.034;
+  // 右侧只留一条 13mm 高的拉机柄行程缝：缝上方、下方都是完整侧板，
+  // 不再把整个右上部 30mm 高、26mm 长地挖空。缝的长度按枪机 100mm 行程
+  // 留足，前后多余段补实板；从正常视角看只是一条窄槽，看不到机匣内腔。
+  const slotY0 = 0.004;
+  const slotY1 = 0.017;
+  const lowerH = slotY0 - bottom;
   const lower = box(t, lowerH, len, 0.0005);
   lower.translate(sideX, bottom + lowerH / 2, zc);
   parts.push(lower);
 
-  // 右侧上段：在拉机柄行程处断开，只保留槽前、槽后和槽顶三条
-  const slotZ0 = -0.148;
-  const slotZ1 = -0.122;
-  const upperH = top + 0.002;
-  const upperY = (top - 0.002) / 2;
+  const upperH = top - slotY1;
+  const upper = box(t, upperH, len, 0.0005);
+  upper.translate(sideX, (top + slotY1) / 2, zc);
+  parts.push(upper);
+
+  const slotZ0 = -0.245;
+  const slotZ1 = -0.115;
+  const slotFillY = (slotY0 + slotY1) / 2;
+  const slotFillH = slotY1 - slotY0;
   const rearLen = slotZ0 - z0;
-  const rear = box(t, upperH, rearLen, 0.0005);
-  rear.translate(sideX, upperY, z0 + rearLen / 2);
-  parts.push(rear);
+  if (rearLen > 0.001) {
+    const rear = box(t, slotFillH, rearLen, 0.0005);
+    rear.translate(sideX, slotFillY, z0 + rearLen / 2);
+    parts.push(rear);
+  }
   const frontLen = z1 - slotZ1;
-  const frontSide = box(t, upperH, frontLen, 0.0005);
-  frontSide.translate(sideX, upperY, slotZ1 + frontLen / 2);
-  parts.push(frontSide);
-  const bridge = box(t, 0.010, slotZ1 - slotZ0, 0.0005);
-  bridge.translate(sideX, top - 0.005, (slotZ0 + slotZ1) / 2);
-  parts.push(bridge);
+  if (frontLen > 0.001) {
+    const frontSide = box(t, slotFillH, frontLen, 0.0005);
+    frontSide.translate(sideX, slotFillY, slotZ1 + frontLen / 2);
+    parts.push(frontSide);
+  }
 
   // 后顶板（防尘盖后方）与前顶板（防尘盖前方）
   const rearTop = box(w, t, 0.045, 0.0005);
