@@ -335,6 +335,34 @@ export function weldBeadGeometry(
   return geometry;
 }
 
+/** mergeGeometries 保留的叶子子块顶点区间（用于 kit 内部自连通检查）。 */
+interface MergedPieceRange {
+  start: number;
+  count: number;
+}
+
+const mergedRanges = new WeakMap<THREE.BufferGeometry, MergedPieceRange[]>();
+
+/**
+ * 取合并几何的子块 AABB；非合并件返回 undefined。
+ * 按最终顶点现算（而不是合并时缓存盒子），这样合并后的整体旋转/平移/镜像不会让包围盒过期。
+ */
+export function getMergedPieces(geometry: THREE.BufferGeometry): readonly THREE.Box3[] | undefined {
+  const ranges = mergedRanges.get(geometry);
+  if (!ranges) return undefined;
+  const position = geometry.getAttribute("position") as THREE.BufferAttribute | undefined;
+  if (!position) return undefined;
+  const point = new THREE.Vector3();
+  const boxes: THREE.Box3[] = [];
+  for (const range of ranges) {
+    const box = new THREE.Box3();
+    const end = Math.min(position.count, range.start + range.count);
+    for (let i = range.start; i < end; i++) box.expandByPoint(point.fromBufferAttribute(position, i));
+    if (!box.isEmpty()) boxes.push(box);
+  }
+  return boxes;
+}
+
 /** 几何镜像：沿指定轴取反位置与法线并修正三角形绕序（代替 scale=-1 的错误光照）。 */
 export function mirrorGeometry(
   geometry: THREE.BufferGeometry,
@@ -394,6 +422,8 @@ export function mirrorGeometry(
   }
   g.computeBoundingBox();
   g.computeBoundingSphere();
+  const sourceRanges = mergedRanges.get(geometry);
+  if (sourceRanges) mergedRanges.set(g, sourceRanges); // 顶点顺序不变，区间继续有效
   return g;
 }
 
@@ -448,7 +478,18 @@ export function spurGearGeometry(
 
 export function mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry {
   if (geometries.length === 0) throw new Error("kernel.mergeGeometries：空数组");
-  if (geometries.length === 1) return geometries[0].clone();
+  if (geometries.length === 1) {
+    const source = geometries[0]!;
+    const merged = source.clone();
+    const nested = mergedRanges.get(source);
+    if (nested) {
+      mergedRanges.set(merged, nested.map((range) => ({ ...range })));
+    } else {
+      const count = source.getAttribute("position")?.count ?? 0;
+      mergedRanges.set(merged, count > 0 ? [{ start: 0, count }] : []);
+    }
+    return merged;
+  }
   const prepared = geometries.map((geometry) => (geometry.index ? geometry.toNonIndexed() : geometry));
   for (const geometry of prepared) {
     if (!geometry.getAttribute("normal")) geometry.computeVertexNormals();
@@ -460,11 +501,24 @@ export function mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.Buffe
       if (name !== "position" && name !== "normal" && name !== "uv") geometry.deleteAttribute(name);
     }
   }
+  const ranges: MergedPieceRange[] = [];
+  let offset = 0;
+  for (let i = 0; i < prepared.length; i++) {
+    const count = prepared[i]!.getAttribute("position")?.count ?? 0;
+    const nested = mergedRanges.get(geometries[i]!);
+    if (nested) {
+      for (const range of nested) ranges.push({ start: range.start + offset, count: range.count });
+    } else if (count > 0) {
+      ranges.push({ start: offset, count });
+    }
+    offset += count;
+  }
   const merged = mergeGeometriesRaw(prepared, false);
   if (!merged) throw new Error("kernel.mergeGeometries：几何属性不一致，合并失败");
   for (let i = 0; i < prepared.length; i++) {
     if (prepared[i] !== geometries[i]) prepared[i].dispose();
   }
+  mergedRanges.set(merged, ranges);
   merged.computeBoundingSphere();
   merged.computeBoundingBox();
   return merged;
