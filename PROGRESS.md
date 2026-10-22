@@ -20,7 +20,7 @@ npx tsx scripts/diag-edrive.ts
 
 ```
 npx tsc --noEmit            # 0 错
-npx vitest run              # 247 passed / 1 skipped（ED-90 12 项 + 渲染内部件 2 项）
+npx vitest run              # 248 passed / 1 skipped（ED-90 12 项 + 渲染内部件 2 项 + 扫描竞态 1 项）
 ```
 
 截图：`docs/qa/ed90-hero.jpeg`、`ed90-rear.jpeg`、`ed90-drive.jpeg`、`ed90-charging.jpeg`、`ed90-battery-hit.jpeg`、`ed90-xray-pack.jpeg`、`ed90-cockpit-xray.jpeg`、`ed90-regen.jpeg`。
@@ -48,9 +48,16 @@ npx vitest run              # 247 passed / 1 skipped（ED-90 12 项 + 渲染内�
 | `thermal_runaway` | 热失控持续燃烧/冒烟、电量骤降 |
 | `aim/loading/fire` | 复用 MBT 炮塔/自动装弹机/120mm 滑膛炮演示 |
 
-## 切换性能（本轮一并修复）
+## 切换性能（模型缓存 + 后台扫描）
 
-自动 `attach` 静态扫描在 MBT 上单次 41s，是切模型卡顿主因。改为**按需扫描**（ClippingPanel/面板重扫），切换只做装配。浏览器同会话实测：MBT 冷 859ms / 热 715ms，Tiger 热 919ms；首次 Tiger 5.6s 为材质/着色器首编译。MBT 与 ED 的门禁扫描仍离线完整执行。
+自动 `attach` 静态扫描在 MBT 上单次 41–52s，是切模型/拖动卡死的主因。现在的处理链：
+
+1. 切模型只装配，扫描仍按需触发；
+2. 装配缓存（最多 3 个，键 = model/variant/damageSeed/overrides）：冷装配后来回切只换根节点，不重建几何/材质；仅卸载时 dispose；
+3. 首帧后 `requestIdleCallback` + `gl.compileAsync` 预热隐藏内部件/FX 材质，避免第一次点动作才编译着色器；
+4. 扫描移到 Web Worker（`app/state/scan.worker.ts`）：后台重建无材质装配并跑 `detectStatic`/`detectSweep`；切模型/重扫/卸载会 `terminate` 旧 Worker 并作废旧 token，主线程只接收报告。无 Worker 环境（jsdom/测试）保留同步兜底。
+
+浏览器实测（1600×1000 CSS、dpr 1.5、RTX 5070 Ti）：MBT 冷切换 **1.51s**、ED 冷 **0.59s**；缓存命中 MBT **0.19–0.20s**、ED **0.17s**。MBT 全车静态扫描后台运行期间，拖动采样 90 帧/1.5s（**60fps**，p95 17ms，max 33ms，零长任务）；扫描中点「行进演示」0ms 返回；测试模型扫描结果 37ms 回传并正确显示 1 条报告。生产构建（`vite preview`）Worker 同样正常：测试模型重扫 97ms，含首次 Worker 加载约 2s。生产构建（`vite preview`）Worker 同样正常：测试模型重扫 97ms，含首次 Worker 加载约 2s。
 
 ## 渲染性能分析 / 优化（2026-10-22）
 
@@ -74,7 +81,7 @@ npx vitest run              # 247 passed / 1 skipped（ED-90 12 项 + 渲染内�
 
 - 电驱外观复用 MBT 车体（同族底盘）；电池/电机/电控在装甲内部，需透视/爆炸视图查看；外部以充电口、尾部散热器、青色新能源涂装、橙色高压件区分。
 - 电池包/电机为展示级几何，电芯/线圈/磁钢逐件但非 CFD/热仿真；热失控用 FX 表达。
-- 静态扫描 52s 左右，按需触发；切模型不自动扫。
+- 静态扫描 52s 左右（MBT），按需触发；已放到 Worker，切模型/重扫会自动取消；主线程不再冻结。
 
 ---
 

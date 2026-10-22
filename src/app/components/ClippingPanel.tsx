@@ -182,7 +182,7 @@ export function ClippingPanel() {
         </span>
         <span className="clip__scan">
           {scanning
-            ? "扫描中…"
+            ? "后台扫描中…可继续拖动"
             : scanMs !== null
               ? `${scanKind === "sweep" ? "扫掠" : "静态"} · ${scanMs} ms`
               : "待扫描"}
@@ -196,7 +196,7 @@ export function ClippingPanel() {
       {activeCount === 0 ? (
         <div className="clip__ok">
           {scanning ? (
-            <span>正在逐对检查实例级干涉…</span>
+            <span>正在后台逐对检查实例级干涉…可继续拖动、切动作或切模型。</span>
           ) : buildIndex === 0 ? (
             <span>未开始构建：把进度滑杆往右拖，报告会随装配件数重算。</span>
           ) : (

@@ -263,6 +263,24 @@ export function filterReportsByProgress(
 
 const initialModel = findModel("test");
 
+interface ScanWorkerResult {
+  reports?: ClippingReport[];
+  scanMs?: number;
+  error?: string;
+}
+
+let scanWorker: Worker | null = null;
+let scanEpoch = 0;
+
+/** 取消在跑的扫描（切模型 / 重建 / 重新扫描）：旧结果一律作废。 */
+function cancelScanWorker() {
+  scanEpoch += 1;
+  if (scanWorker) {
+    scanWorker.terminate();
+    scanWorker = null;
+  }
+}
+
 export const useStageStore = create<StageState>((set, get) => ({
   modelId: initialModel.id,
   variantId: initialModel.variants?.[0]?.id ?? "",
@@ -309,6 +327,7 @@ export const useStageStore = create<StageState>((set, get) => ({
   setModel: (modelId) => {
     const model = findModel(modelId);
     if (model.status !== "ready" || model.id === get().modelId) return;
+    cancelScanWorker();
     setDamageSeed(0);
     resetTigerLidPose();
     set({
@@ -355,6 +374,8 @@ export const useStageStore = create<StageState>((set, get) => ({
   attach: (assembled) => {
     // 切换模型时不再自动跑整机静态扫描：MBT 级模型一次扫描数十秒，
     // 会把主线程卡住。改为按需扫描（ClippingPanel / 动画面板手动触发）。
+    cancelScanWorker();
+    const state = get();
     set({
       assembled,
       scanPhase: "idle",
@@ -363,10 +384,18 @@ export const useStageStore = create<StageState>((set, get) => ({
       reports: [],
       reportPartition: { active: [], expected: [] },
       scanMs: null,
+      // 装配/重建会取消扫描：别把状态机留在 scanning（旧装配的扫描已作废）。
+      machineState:
+        state.machineState === "scanning"
+          ? (findModel(state.modelId).states?.[0]?.id ?? "idle")
+          : state.machineState,
     });
   },
 
-  detach: () => set({ assembled: null, stats: null }),
+  detach: () => {
+    cancelScanWorker();
+    set({ assembled: null, stats: null, scanPhase: "idle", scanKind: null });
+  },
 
   setStats: (stats) => set({ stats }),
 
@@ -531,11 +560,14 @@ export const useStageStore = create<StageState>((set, get) => ({
   },
 
   runScan: (kind) => {
-    const { assembled, machineState, modelId, buildIndex } = get();
+    const { assembled, machineState, modelId, variantId, overrides, buildIndex } = get();
     if (!assembled) return;
+    // 切模型瞬间 modelId 已更新、旧装配还没卸下：此时扫描会用错进度/错模型。
+    if (assembled.root.name !== modelId) return;
     const model = findModel(modelId);
     const previousState = machineState === "scanning" ? "idle" : machineState;
-    const filter = buildFilterOf(modelId, buildIndex) ?? undefined;
+    cancelScanWorker();
+    const epoch = scanEpoch;
     set({
       scanPhase: "scanning",
       scanKind: kind,
@@ -544,8 +576,72 @@ export const useStageStore = create<StageState>((set, get) => ({
       notice: null,
       machineState: "scanning",
     });
-    // 检测是同步纯计算：先让浏览器画出「扫描中」，再跑检测。
+
+    const finish = (raw: ClippingReport[], scanMs: number) => {
+      const state = useStageStore.getState();
+      if (state.modelId !== modelId || state.assembled !== assembled) return;
+      const reports = filterReportsByProgress(raw, modelId, state.buildIndex);
+      set({
+        allReports: raw,
+        reports,
+        reportPartition: splitReports(modelId, reports),
+        scanPhase: "ready",
+        scanKind: kind,
+        scanMs,
+        machineState: state.machineState === "scanning" ? previousState : state.machineState,
+      });
+    };
+
+    const fail = (error: unknown) => {
+      useStageStore.getState().reportFault(faultFromError("穿模检测", error));
+      finish([], 0);
+    };
+
+    // 有 Worker：检测在后台重建 + 跑 BVH，主线程全程可拖动。
+    if (typeof Worker !== "undefined" && import.meta.env.MODE !== "test") {
+      try {
+        const worker = new Worker(new URL("./scan.worker.ts", import.meta.url), { type: "module" });
+        scanWorker = worker;
+        worker.onmessage = (event: MessageEvent<ScanWorkerResult>) => {
+          if (epoch !== scanEpoch) return;
+          worker.terminate();
+          if (scanWorker === worker) scanWorker = null;
+          const data = event.data;
+          if (data.error !== undefined) {
+            fail(new Error(data.error));
+            return;
+          }
+          finish(data.reports ?? [], data.scanMs ?? 0);
+        };
+        worker.onerror = (event) => {
+          if (epoch !== scanEpoch) return;
+          event.preventDefault();
+          worker.terminate();
+          if (scanWorker === worker) scanWorker = null;
+          fail(new Error(event.message || "扫描 Worker 异常"));
+        };
+        worker.postMessage({
+          modelId,
+          variantId,
+          overrides,
+          kind,
+          state: previousState,
+          buildIndex,
+        });
+        return;
+      } catch {
+        if (scanWorker) {
+          scanWorker.terminate();
+          scanWorker = null;
+        }
+        // Worker 创建失败（旧浏览器 / 非模块环境）→ 走下面的主线程兜底。
+      }
+    }
+
+    // 无 Worker 环境（jsdom / 测试）：主线程同步检测，先让浏览器画出「扫描中」。
+    const filter = buildFilterOf(modelId, buildIndex) ?? undefined;
     setTimeout(() => {
+      if (epoch !== scanEpoch) return; // 已切换模型 / 重新扫描
       const state = useStageStore.getState();
       if (state.assembled !== assembled) return; // 模型已重建/卸载
       const started = performance.now();
@@ -572,16 +668,7 @@ export const useStageStore = create<StageState>((set, get) => ({
       }
       assembled.resetNodes();
       if (model.animate) model.animate(assembled, 0);
-      const reports = filterReportsByProgress(raw, modelId, state.buildIndex);
-      set({
-        allReports: raw,
-        reports,
-        reportPartition: splitReports(modelId, reports),
-        scanPhase: "ready",
-        scanKind: kind,
-        scanMs: Math.round(performance.now() - started),
-        machineState: previousState,
-      });
+      finish(raw, Math.round(performance.now() - started));
     }, 0);
   },
 
