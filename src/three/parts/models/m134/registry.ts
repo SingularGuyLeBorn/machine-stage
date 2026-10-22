@@ -479,7 +479,7 @@ export function makeM134Registry(): ModelRegistry {
       { family: "m134-rotor", a: "m134.rotor.*", b: "m134.bolt.*", reason: "枪机导销在转子凸轮槽内（转管核心配合）", maxDepthMm: 12, allowDisplaced: true, allowSuspect: true },
       { family: "m134-barrel", a: "m134.barrel.*", b: "m134.barrel.*", reason: "6 根枪管与中箍/枪口箍/准星同轴装配", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
       { family: "m134-drive", a: "m134.housing.*", b: "m134.drive.*", reason: "电机/减速齿轮固定在机匣尾部", maxDepthMm: 20, allowDisplaced: true, allowSuspect: true },
-      { family: "m134-mount", a: "m134.housing.*", b: "m134.mount.*", reason: "固定机匣坐在枪架立柱上", maxDepthMm: 8, allowDisplaced: true, allowSuspect: true },
+      { family: "m134-mount", a: "m134.housing.*", b: "m134.mount.*", reason: "固定机匣坐在枪架立柱上", maxDepthMm: 15, allowDisplaced: true, allowSuspect: true },
       { family: "m134-rotor", a: "m134.rotor.*", b: "m134.housing.*", reason: "转子的前后轴承在固定机匣内", maxDepthMm: 10, allowDisplaced: true, allowSuspect: true },
       { family: "m134-barrel", a: "m134.barrel.*", b: "m134.rotor.*", reason: "枪管穿过转子前端孔座", maxDepthMm: 10, allowDisplaced: true, allowSuspect: true },
       { family: "m134-bolt", a: "m134.bolt.*", b: "m134.bolt.*", reason: "枪机框/击针/抽壳钩/导销/滚轮同组装配", maxDepthMm: 10, allowDisplaced: true, allowSuspect: true },

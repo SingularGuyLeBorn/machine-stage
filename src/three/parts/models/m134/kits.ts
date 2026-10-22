@@ -6,6 +6,7 @@ import {
   mergeGeometries,
   tubeGeometry,
 } from "../../kernel/geometry";
+import { box, cylinderX, cylinderY } from "@/three/parts/models/guns7/kits";
 
 type Params = Record<string, unknown>;
 
@@ -384,31 +385,76 @@ const m134Delinker: GeometryBuilder = (spec) => {
 // m134Mount —— 枪架（立柱 + 耳轴座）：加特林装在载具/三脚架上。
 // 局部系：origin = 枪架顶（耳轴中心）。
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// m134Mount —— 铳架/基座（取代原来的绿色圆盘）。
+//
+// 真实 M134 的支架是**枪架**（pintle）：底板 + 垂直立柱 + 两叉耳（trunnion）
+// + 锁紧手柄，枪机座在叉耳之间俯仰。这里做机加工钢件，不是圆盘。
+// 局部系：origin = 机匣底座下的安装面，+Y 向上。
+// ---------------------------------------------------------------------------
 const m134Mount: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
   const drop = num(p, "drop", 0.18);
   const parts: THREE.BufferGeometry[] = [];
+  // 底板：阶梯机加工底板
+  const foot = box(0.16, 0.008, 0.06, 0.002);
+  foot.translate(0, -0.012, 0);
+  parts.push(foot);
+  const deck = box(0.14, 0.006, 0.048, 0.0015);
+  deck.translate(0, -0.003, 0);
+  parts.push(deck);
+  const topPlate = box(0.12, 0.002, 0.04, 0.001);
+  topPlate.translate(0, 0.002, 0);
+  parts.push(topPlate);
   // 立柱
-  const post = new THREE.CylinderGeometry(0.022, 0.026, drop, 14);
-  post.translate(0, -drop / 2, 0);
+  const postH = Math.max(drop - 0.16, 0.03);
+  const post = cylinderY(0.014, postH, 32);
+  post.translate(0, -0.012 + postH / 2, 0);
   parts.push(post);
-  // 耳轴座（顶部 U 形叉）
+  const footFlange = cylinderY(0.024, 0.008, 32);
+  footFlange.translate(0, -0.008, 0);
+  parts.push(footFlange);
+  const topFlange = cylinderY(0.020, 0.006, 32);
+  topFlange.translate(0, -0.012 + postH, 0);
+  parts.push(topFlange);
+  // 叉耳（trunnion）：左右两片，包住机匣尾部
   for (const side of [-1, 1]) {
-    const fork = new THREE.BoxGeometry(0.008, 0.05, 0.03);
-    fork.translate(side * 0.06, 0.012, 0);
+    const fork = box(0.006, 0.055, 0.04, 0.001);
+    fork.translate(side * 0.062, -0.012 + postH + 0.015, 0);
     parts.push(fork);
+    const cap = box(0.006, 0.008, 0.04, 0.0006);
+    cap.translate(side * 0.062, -0.012 + postH + 0.046, 0);
+    parts.push(cap);
   }
-  const base = new THREE.BoxGeometry(0.13, 0.008, 0.05);
-  base.translate(0, -0.012, 0);
-  parts.push(base);
-  // 底板（圆形底座）
-  const plate = new THREE.CylinderGeometry(0.09, 0.09, 0.012, 16);
-  plate.translate(0, -drop + 0.006, 0);
-  parts.push(plate);
+  // 锁紧手柄
+  const knobStem = cylinderX(0.0035, 0.024, 20);
+  knobStem.translate(0.016, -0.012 + postH * 0.5, 0);
+  parts.push(knobStem);
+  const knob = latheGeometry(
+    [
+      [0, -0.006],
+      [0.009, -0.006],
+      [0.011, -0.003],
+      [0.011, 0.003],
+      [0.009, 0.006],
+      [0, 0.006],
+    ],
+    24,
+  );
+  knob.rotateZ(Math.PI / 2);
+  knob.translate(0.030, -0.012 + postH * 0.5, 0);
+  parts.push(knob);
+  // 铆钉列
+  for (const z of [-0.015, 0, 0.015]) {
+    const rivet = cylinderY(0.002, 0.004, 12);
+    rivet.translate(0.055, -0.006, z);
+    parts.push(rivet);
+  }
   const merged = mergeGeometries(parts);
   for (const piece of parts) piece.dispose();
   return merged;
-};
+};;
+
 
 export const m134KitBuilders: Record<string, GeometryBuilder> = {
   m134Rotor,
