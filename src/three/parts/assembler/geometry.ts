@@ -77,6 +77,13 @@ const BUILTIN: Record<string, GeometryBuilder> = {
     const s = spec as { profile: [number, number][]; segments?: number };
     return latheGeometry(s.profile, s.segments ?? 32);
   },
+  latheZ: (spec) => {
+    const s = spec as { profile: [number, number][]; segments?: number };
+    const geometry = latheGeometry(s.profile, s.segments ?? 32);
+    geometry.rotateX(Math.PI / 2);
+    geometry.computeVertexNormals();
+    return geometry;
+  },
   polygon: (spec) => {
     const s = spec as { points: [number, number][]; depth: number; bevel?: number };
     return polygonExtrudeGeometry(s.points, s.depth, s.bevel ?? 0.004);

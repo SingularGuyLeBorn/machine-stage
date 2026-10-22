@@ -59,6 +59,13 @@ import { M2HB_BUILDERS, makeM2hbLayouts, makeM2hbRegistry } from "@/three/parts/
 import { M2HB_MOTION_PARTS, animateM2hb, getM2hbMode } from "@/three/parts/models/m2hb/motion";
 import { M134_BUILDERS, makeM134Layouts, makeM134Registry } from "@/three/parts/models/m134/registry";
 import { M134_MOTION_PARTS, animateM134, getM134Mode } from "@/three/parts/models/m134/motion";
+import { makeCarrierRegistry, CARRIER_LAYOUTS, carrierBuilders } from "@/three/parts/models/carrier/registry";
+import {
+  animateCarrier,
+  CARRIER_ANIMATED_STATES,
+  CARRIER_STATE_LABELS,
+  carrierBounds,
+} from "@/three/parts/models/carrier/motion";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -876,6 +883,43 @@ export const CATALOG: StageModel[] = [
       "外能源：加特林没有导气/后坐自动机，全靠电机经 36:10 减速齿轮组驱动转子；射速 = 6 × 转子转速（真机 1000rpm → 6000 发/分）。",
       "枪口焰只在击发位（正上方那根枪管）闪——与 AK/M249/M2HB 的「每发必闪」不同。",
       "弹壳瀑布：6 管轮流抛壳，从左侧抛壳口连续抛出（14 槽弹壳池循环）。",
+    ],
+  },
+  {
+    id: "carrier",
+    title: "福建舰 · 电磁弹射航母",
+    subtitle: "1:8 · 电磁弹射 / 拦阻降落 / 相控阵 / 1130 近防 / 核动力",
+    milestone: "CV-1",
+    status: "ready",
+    registry: makeCarrierRegistry(),
+    layouts: CARRIER_LAYOUTS,
+    builders: carrierBuilders,
+    animate: animateCarrier,
+    framingBounds: carrierBounds,
+    animatedStates: [...CARRIER_ANIMATED_STATES],
+    states: [
+      ...CARRIER_STATE_LABELS.map((state) => ({ id: state.id as string, label: state.label, hint: state.hint })),
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "cv-engine", group: "动力", label: "动力运转", kind: "machine-state", state: "engine" },
+      { id: "cv-flight", group: "航空", label: "弹射/拦阻闭环", kind: "machine-state", state: "flight_ops" },
+      { id: "cv-hangar", group: "机库", label: "机库作业", kind: "machine-state", state: "hangar" },
+      { id: "cv-ciws", group: "武器", label: "近防拦截", kind: "machine-state", state: "ciws" },
+      { id: "cv-idle", group: "机构", label: "系泊检查", kind: "machine-state", state: "idle" },
+      { id: "cv-explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "cv-xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "cv-labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "cv-reset", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "cv-scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "cv-scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "福建舰 1:8 展示尺度：舰体 40m、飞行甲板 9.6m；真实约 320m×78m。",
+      "核心闭环：舰载机 30s 循环——折叠翼展开 → 滑行到 2 号弹射位 → 挡焰板升起 → 电磁弹射滑跑 → 离舰爬升 → 航线回转 → 放下尾钩进近 → 钩住第 2 道拦阻索 → 减速停住 → 折叠翼系留。",
+      "动力：压水堆 8 组燃料组件（16 根棒/组件）/控制棒驱动/蒸汽发生器/一回路主泵 → 高低压蒸汽轮机 → 减速齿轮 → 双轴双桨；红区剖面可看堆芯。",
+      "舰岛：三层舰桥 + 四面固定相控阵（8×8 T/R 单元/面）+ 旋转搜索雷达 + 1130 近防炮（11 管/11 枪机）。",
+      "甲板：3 条电磁弹射器（定子/线圈/水冷/飞轮储能）、4 道拦阻索（左右半索+滑轮+液压拦阻机）、2 部舷侧升降机、系留点/边灯/标线。",
     ],
   },
   {

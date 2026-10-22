@@ -1,8 +1,9 @@
-import { ContactShadows, Environment, Grid, Html, Lightformer, OrbitControls } from "@react-three/drei";
+import { ContactShadows, Grid, Html, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Bloom, EffectComposer, N8AO, Vignette } from "@react-three/postprocessing";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import {
   buildModel,
   createMaterialLibrary,
@@ -90,16 +91,43 @@ export function StageCanvas() {
   );
 }
 
-/** 程序化 studio 环境：三面柔光箱 + 顶部条形光 + 暗底，无外部 HDR 资产。
- *  明暗对比是金属感的来源——环境若是一块均匀灰，金属反射出来就是灰塑料。 */
+/** HDRI 环境反射：aerodynamics_workshop（Poly Haven, CC0）。
+ *  金属感的关键不是灯，而是 scene.environment 里真实环境的明暗反射。 */
+function HdrEnvironment() {
+  const scene = useThree((state) => state.scene);
+  useEffect(() => {
+    let cancelled = false;
+    let texture: THREE.DataTexture | THREE.Texture | null = null;
+    new RGBELoader().load("/hdr/aerodynamics_workshop_2k.hdr", (hdr) => {
+      if (cancelled) {
+        hdr.dispose();
+        return;
+      }
+      hdr.mapping = THREE.EquirectangularReflectionMapping;
+      texture = hdr;
+      scene.environment = hdr;
+      scene.environmentIntensity = 1.12;
+    });
+    return () => {
+      cancelled = true;
+      if (texture) {
+        scene.environment = null;
+        texture.dispose();
+      }
+    };
+  }, [scene]);
+  return null;
+}
+
 function Studio() {
   return (
     <>
-      <ambientLight intensity={0.3} />
+      <ambientLight intensity={0.12} />
+      <hemisphereLight args={["#dfe7ef", "#1b2025", 0.2]} />
       <directionalLight
         castShadow
         position={[5.5, 8.5, 4.5]}
-        intensity={1.9}
+        intensity={1.6}
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0006}
         shadow-normalBias={0.012}
@@ -107,41 +135,8 @@ function Studio() {
         <orthographicCamera attach="shadow-camera" args={[-5, 5, 5, -5, 0.1, 40]} />
       </directionalLight>
       <directionalLight position={[-6, 3.5, -4.5]} intensity={0.34} color="#dfe7f2" />
-      <Environment resolution={128} frames={1}>
-        <color attach="background" args={["#aab2bc"]} />
-        <Lightformer
-          form="rect"
-          intensity={3.4}
-          position={[0, 6.5, 1.5]}
-          rotation-x={Math.PI / 2}
-          scale={[9, 5, 1]}
-        />
-        <Lightformer
-          form="rect"
-          intensity={2.0}
-          position={[-6.5, 3, 2]}
-          rotation-y={Math.PI / 2}
-          scale={[6, 4, 1]}
-        />
-        <Lightformer
-          form="rect"
-          intensity={1.4}
-          position={[6.5, 2.5, -2]}
-          rotation-y={-Math.PI / 2}
-          scale={[6, 4, 1]}
-        />
-        <Lightformer form="ring" intensity={1.1} position={[0, 3, -7]} scale={4} />
-        {/* 暗底：给金属一条明确的地平线，反射里才有明暗分界 */}
-        <Lightformer
-          form="rect"
-          color="#1d2126"
-          intensity={0.16}
-          position={[0, -3.2, 0]}
-          rotation-x={-Math.PI / 2}
-          scale={[16, 12, 1]}
-        />
-      </Environment>
-      <SceneEnvIntensity value={1.4} />
+      <HdrEnvironment />
+      <SceneEnvIntensity value={1.12} />
     </>
   );
 }

@@ -12,6 +12,8 @@ import { applyArmourSurface } from "./armourSurface";
 // 预设（preset）按用途区分 seed / 密度 / 磨损强度；同一预设全局缓存，只生成一次。
 // ============================================================================
 
+export type PbrTextureKind = "brushed" | "scratched" | "rust" | "plates";
+
 export type TexturePreset =
   | "armor"
   | "armor_dark"
@@ -31,7 +33,11 @@ export interface MaterialSpec {
   metalness: number;
   roughness: number;
   preset?: TexturePreset;
+  /** 真实金属 PBR 贴图组（Poly Haven CC0）：拉丝/划痕/锈蚀/金属板。 */
+  pbr?: PbrTextureKind;
   repeat?: [number, number];
+  /** 各向异性强度（拉丝金属/机加件），仅对 MeshPhysicalMaterial 生效。 */
+  anisotropy?: number;
   opacity?: number;
   /** 透明件是否写深度（烟尘默认 false，避免遮挡后面的火星）。 */
   depthWrite?: boolean;
@@ -649,6 +655,51 @@ function decalTexture(text: string): THREE.CanvasTexture | null {
   return texture;
 }
 
+const PBR_FILES: Record<PbrTextureKind, { base: string; metal?: boolean }> = {
+  brushed: { base: "metal_plate_02", metal: true },
+  scratched: { base: "blue_metal_plate", metal: false },
+  rust: { base: "rust_coarse_01", metal: false },
+  plates: { base: "metal_plate", metal: true },
+};
+
+interface PbrSet {
+  map: THREE.Texture;
+  normalMap: THREE.Texture;
+  roughnessMap: THREE.Texture;
+  metalnessMap?: THREE.Texture;
+}
+
+const pbrCache = new Map<string, PbrSet>();
+const loader = new THREE.TextureLoader();
+
+function loadMetalMap(base: string, suffix: string, colorSpace: THREE.ColorSpace): THREE.Texture {
+  const texture = loader.load(`/textures/metal/${base}_${suffix}.jpg`);
+  texture.colorSpace = colorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.anisotropy = 8;
+  return texture;
+}
+
+/** 真实金属 PBR 贴图组（1K，Poly Haven CC0）。同材质参数共享，避免重复上传。 */
+export function pbrMetalTextures(kind: PbrTextureKind, repeat: [number, number]): PbrSet {
+  const key = `${kind}:${repeat[0]}x${repeat[1]}`;
+  const hit = pbrCache.get(key);
+  if (hit) return hit;
+  const files = PBR_FILES[kind];
+  const set: PbrSet = {
+    map: loadMetalMap(files.base, "diff_1k", THREE.SRGBColorSpace),
+    normalMap: loadMetalMap(files.base, "nor_gl_1k", THREE.NoColorSpace),
+    roughnessMap: loadMetalMap(files.base, "rough_1k", THREE.NoColorSpace),
+  };
+  if (files.metal) set.metalnessMap = loadMetalMap(files.base, "metal_1k", THREE.NoColorSpace);
+  for (const texture of Object.values(set)) {
+    if (!texture) continue;
+    texture.repeat.set(repeat[0], repeat[1]);
+  }
+  pbrCache.set(key, set);
+  return set;
+}
+
 /** 由材质声明批量构建 THREE 材质库；返回 dispose 统一释放。
  *  金属三要素都在这里落地：metalness 分档 / roughness 不与全场一致 / envMapIntensity 让反射可见。 */
 export function createMaterialLibrary(specs: Record<string, MaterialSpec>): {
@@ -676,11 +727,12 @@ export function createMaterialLibrary(specs: Record<string, MaterialSpec>): {
     };
     // 漆面用 physical（clearcoat）：标准材质给不出清漆的二次高光。
     const material =
-      spec.clearcoat && spec.clearcoat > 0
+      (spec.clearcoat && spec.clearcoat > 0) || spec.anisotropy
         ? new THREE.MeshPhysicalMaterial({
             ...params,
-            clearcoat: spec.clearcoat,
+            clearcoat: spec.clearcoat ?? 0,
             clearcoatRoughness: spec.clearcoatRoughness ?? 0.3,
+            ...(spec.anisotropy ? { anisotropy: spec.anisotropy } : {}),
           })
         : new THREE.MeshStandardMaterial(params);
     if (spec.emissive) {
@@ -696,6 +748,19 @@ export function createMaterialLibrary(specs: Record<string, MaterialSpec>): {
       usedTextures.add(set.map);
       usedTextures.add(set.roughnessMap);
       usedTextures.add(set.normalMap);
+    }
+    if (spec.pbr) {
+      const set = pbrMetalTextures(spec.pbr, spec.repeat ?? [2, 2]);
+      // 除锈蚀外，颜色仍由海军灰基色主导；贴图只提供法线/粗糙/金属度细节。
+      if (spec.pbr === "rust") material.map = set.map;
+      material.normalMap = set.normalMap;
+      material.roughnessMap = set.roughnessMap;
+      if (set.metalnessMap) material.metalnessMap = set.metalnessMap;
+      material.normalScale.set(0.7, 0.7);
+      if (spec.pbr === "rust") usedTextures.add(set.map);
+      usedTextures.add(set.normalMap);
+      usedTextures.add(set.roughnessMap);
+      if (set.metalnessMap) usedTextures.add(set.metalnessMap);
     }
     material.name = name;
     if (spec.decal) {
