@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { CV } from "./constants";
+import { CV, hullHalfBeamAt } from "./constants";
 import { A, B, C, M, T, pad, type CarrierCtx } from "./common";
 
 // ============================================================================
@@ -38,7 +38,7 @@ export function addSurface(ctx: CarrierCtx): void {
     build_layer: 5,
     geometry: digit(1),
     material: "cv_deck_line",
-    mate: A([-4.02, 2.45, 12.2], [0, -90, 0]),
+    mate: A([-(hullHalfBeamAt(12.2) + 0.015), 2.45, 12.2], [0, -90, 0]),
   });
   add({
     id: `${P}hull_number_8`,
@@ -48,7 +48,7 @@ export function addSurface(ctx: CarrierCtx): void {
     build_layer: 5,
     geometry: digit(8),
     material: "cv_deck_line",
-    mate: A([-4.02, 2.45, 11.55], [0, -90, 0]),
+    mate: A([-(hullHalfBeamAt(11.55) + 0.015), 2.45, 11.55], [0, -90, 0]),
   });
 
   // 做旧/锈迹/水线漆带。
@@ -62,20 +62,29 @@ export function addSurface(ctx: CarrierCtx): void {
       build_layer: 5,
       geometry: M(B(0.025, 0.18 + (w % 3) * 0.1, 0.7 + (w % 4) * 0.2, [0, 0, 0], 0.003)),
       material: w % 3 === 0 ? "cv_hull_boot" : "cv_hull_dark",
-      mate: A([side * 4.035, 1.55 + (w % 4) * 0.18, -13 + Math.floor(w / 2) * 2.4]),
+      mate: A([side * (hullHalfBeamAt(-13 + Math.floor(w / 2) * 2.4) + 0.01), 1.55 + (w % 4) * 0.18, -13 + Math.floor(w / 2) * 2.4]),
     });
   }
-  add({
-    id: `${P}waterline_band`,
-    name_cn: "水线漆带",
-    name_en: "waterline band",
-    assembly: ASSEMBLY,
-    build_layer: 5,
-    geometry: M(B(0.03, 0.16, 33, [0, 0, 0], 0.004)),
-    material: "cv_hull_boot",
-    mate: A([0, 0.98, -1], [0, 0, 0]),
-    dual: true,
-  });
+  for (let wb = 0; wb < 20; wb++) {
+    const z0 = -17.4 + wb * 1.62;
+    const z1 = z0 + 1.62;
+    const zc = (z0 + z1) / 2;
+    for (const side of [-1, 1] as const) {
+      const xa = side * (hullHalfBeamAt(z0) + 0.012);
+      const xb = side * (hullHalfBeamAt(z1) + 0.012);
+      const yaw = Math.atan2(xb - xa, z1 - z0);
+      add({
+        id: `${P}waterline_band_${pad(wb + 1)}_${side === -1 ? "l" : "r"}`,
+        name_cn: `水线漆带 ${wb + 1} ${side === -1 ? "左" : "右"}`,
+        name_en: `waterline band ${wb + 1} ${side === -1 ? "l" : "r"}`,
+        assembly: ASSEMBLY,
+        build_layer: 5,
+        geometry: M(B(0.025, 0.16, 1.66, [0, 0, 0], 0.003)),
+        material: "cv_hull_boot",
+        mate: A([(xa + xb) / 2, 0.98, zc], [0, yaw, 0]),
+      });
+    }
+  }
 
   // 锚 + 锚链 + 锚穴（舰艏两舷）。
   for (const side of [-1, 1] as const) {
@@ -88,7 +97,7 @@ export function addSurface(ctx: CarrierCtx): void {
       build_layer: 5,
       geometry: M(B(0.12, 0.55, 0.08, [0, 0, 0], 0.01), B(0.46, 0.1, 0.08, [0, -0.3, 0], 0.01), B(0.28, 0.1, 0.08, [0, 0.28, 0], 0.01)),
       material: "cv_steel_dark",
-      mate: A([side * 2.3, 1.25, 17.9], [0, 0, side * 10]),
+      mate: A([side * (hullHalfBeamAt(17.9) + 0.07), 1.25, 17.9], [0, 0, side * 10]),
     });
     add({
       id: `${P}anchor_chain_${tag}`,
@@ -98,9 +107,60 @@ export function addSurface(ctx: CarrierCtx): void {
       build_layer: 5,
       geometry: M(C(0.035, 1.0, [0, 0, 0], 8), C(0.05, 0.1, [0, 0.45, 0], 10)),
       material: "cv_steel",
-      mate: A([side * 2.28, 1.9, 17.3], [20, 0, 0]),
+      mate: A([side * (hullHalfBeamAt(17.3) + 0.05), 1.9, 17.3], [20, 0, 0]),
     });
   }
+
+  // 左舷外走道：沿船壳曲线分段，格栅板 + 双托架 + 立柱 + 扶手（补齐甲板下空档）。
+  for (let cw = 0; cw < 18; cw++) {
+    const z0 = CV.DECK_Z_STERN + 1.0 + cw * 2.0;
+    const zc = z0 + 1.0;
+    const half = hullHalfBeamAt(zc);
+    const px = -(half + 0.32);
+    const deckY = CV.DECK_Y - 0.34;
+    add({
+      id: `${P}catwalk_${pad(cw + 1)}`,
+      name_cn: `左舷外走道格栅 ${cw + 1}`,
+      name_en: `port catwalk grating ${cw + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.56, 0.04, 1.94, [0, 0, 0], 0.003)),
+      material: "cv_grate",
+      mate: A([px, deckY, zc]),
+    });
+    for (const dz of [-0.65, 0.65] as const) {
+      add({
+        id: `${P}catwalk_bracket_${pad(cw + 1)}_${dz < 0 ? "f" : "a"}`,
+        name_cn: `左舷外走道托架 ${cw + 1}-${dz < 0 ? "前" : "后"}`,
+        name_en: `port catwalk bracket ${cw + 1}-${dz < 0 ? "f" : "a"}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(0.9, 0.08, 0.12, [0, 0, 0], 0.004), B(0.12, 0.34, 0.1, [0.38, -0.18, 0], 0.003)),
+        material: "cv_steel_dark",
+        mate: A([-(half + 0.14), deckY - 0.06, zc + dz]),
+      });
+    }
+    add({
+      id: `${P}catwalk_post_${pad(cw + 1)}`,
+      name_cn: `左舷外走道立柱 ${cw + 1}`,
+      name_en: `port catwalk post ${cw + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(C(0.022, 0.62, [0, 0, 0], 8)),
+      material: "cv_steel",
+      mate: A([px - 0.24, deckY + 0.33, zc]),
+    });
+  }
+  add({
+    id: `${P}catwalk_rail`,
+    name_cn: "左舷外走道扶手",
+    name_en: "port catwalk handrail",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(C(0.02, 35.5, [0, 0, 0], 8)),
+    material: "cv_steel",
+    mate: A([-(hullHalfBeamAt(0) + 0.56), CV.DECK_Y - 0.01, 1.0], [90, 0, 0]),
+  });
 
   // 甲板边缘栏杆/支柱（实例化）。
   add({

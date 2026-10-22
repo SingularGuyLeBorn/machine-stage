@@ -33,7 +33,7 @@ console.log(`  三角面 ${Math.round(triangles).toLocaleString("en-US")}`);
 console.log(`  注册表校验：${errors.length} 错`);
 for (const issue of errors.slice(0, 12)) console.log(`    ${issue.code} ${issue.path ?? ""} ${issue.message}`);
 
-const support = detectUnsupportedParts(built, { maxGapM: 0.02 });
+const support = detectUnsupportedParts(built, { maxGapM: 0.02, ignoreDonorPartIds: ["carrier.hull.hull_shell"] });
 console.log(`  悬空：${support.length} 条`);
 for (const row of support) console.log(`    ${row.ref} 距最近 ${row.nearest} ${row.gap_mm.toFixed(1)}mm`);
 

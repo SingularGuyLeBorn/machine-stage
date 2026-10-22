@@ -177,7 +177,7 @@ describe("福建舰 · 整机", () => {
   });
 
   it("零悬空：3660+ 实例每个都在 20mm 内有支撑邻居，且无悬空孤岛", () => {
-    const unsupported = detectUnsupportedParts(built, { maxGapM: 0.02 });
+    const unsupported = detectUnsupportedParts(built, { maxGapM: 0.02, ignoreDonorPartIds: ["carrier.hull.hull_shell"] });
     expect(unsupported.map((r) => `${r.ref} ${r.gap_mm.toFixed(1)}mm`)).toEqual([]);
     const islands = detectFloatingIslands(built, { maxGapM: 0.02 });
     expect(islands.islands).toHaveLength(0);
