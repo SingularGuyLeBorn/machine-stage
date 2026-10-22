@@ -55,9 +55,9 @@ import {
 } from "@/three/parts/models/guns7/m60/registry";
 import { M60_MOTION_PARTS, animateM60 } from "@/three/parts/models/guns7/m60/motion";
 import { M2HB_BUILDERS, makeM2hbLayouts, makeM2hbRegistry } from "@/three/parts/models/m2hb/registry";
-import { M2HB_MOTION_PARTS, animateM2hb, getM2hbMode } from "@/three/parts/models/m2hb/motion";
+import { M2HB_MOTION_PARTS, animateM2hb } from "@/three/parts/models/m2hb/motion";
 import { M134_BUILDERS, makeM134Layouts, makeM134Registry } from "@/three/parts/models/m134/registry";
-import { M134_MOTION_PARTS, animateM134, getM134Mode } from "@/three/parts/models/m134/motion";
+import { M134_MOTION_PARTS, animateM134 } from "@/three/parts/models/m134/motion";
 import {
   type38Builders,
   type38Layouts,
@@ -609,8 +609,12 @@ export const CATALOG: StageModel[] = [
     layouts: makeM2hbLayouts(),
     builders: M2HB_BUILDERS,
     motionParts: M2HB_MOTION_PARTS,
-    animate: (assembled, seconds) => {
-      animateM2hb(assembled, seconds, getM2hbMode());
+    animate: (assembled, seconds, state) => {
+      animateM2hb(
+        assembled,
+        seconds,
+        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
+      );
     },
     readouts: () => [
       { label: "自动原理", value: "枪管短后坐 + 半自由枪机" },
@@ -751,8 +755,12 @@ export const CATALOG: StageModel[] = [
     layouts: makeM134Layouts(),
     builders: M134_BUILDERS,
     motionParts: M134_MOTION_PARTS,
-    animate: (assembled, seconds) => {
-      animateM134(assembled, seconds, getM134Mode());
+    animate: (assembled, seconds, state) => {
+      animateM134(
+        assembled,
+        seconds,
+        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
+      );
     },
     readouts: () => [
       { label: "自动原理", value: "转管式（外能源电机）" },
@@ -797,6 +805,17 @@ export const CATALOG: StageModel[] = [
     status: "planned",
   },
 ];
+
+// 枪械按自动原理顺序展示：栓动 → 自由枪机 → 导气/回转闭锁 → 轻机枪 →
+// 通用机枪 → 枪管短后坐重机枪 → 转管。只重排这 7 个 ready 枪械，
+// 不改变坦克/飞机等其它条目的相对位置。
+const GUN_ORDER = ["type38", "bison", "ak47", "rpk", "m60", "m2hb", "m134"];
+CATALOG.sort((a, b) => {
+  const ia = GUN_ORDER.indexOf(a.id);
+  const ib = GUN_ORDER.indexOf(b.id);
+  if (ia >= 0 && ib >= 0) return ia - ib;
+  return 0;
+});
 
 export function findModel(modelId: string): StageModel {
   const found = CATALOG.find((model) => model.id === modelId);

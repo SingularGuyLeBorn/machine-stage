@@ -65,10 +65,7 @@ const barrelDetail = (
   geometry,
   material,
   node: "M134Rotor",
-  mate:
-    id === "m134.barrel.front_sight"
-      ? { type: "absolute" }
-      : { type: "absolute", rotation: [90, 0, 0] },
+  mate: { type: "absolute" },
   source,
 });
 
@@ -85,11 +82,12 @@ const barrelOffsets: Record<string, number> = {
 export const m134BarrelDetail: InstanceLayout = ({ index, count, partId }) => {
   const angle = (index / count) * Math.PI * 2;
   const z = barrelOffsets[partId] ?? 0;
-  return new THREE.Matrix4().makeTranslation(
-    Math.cos(angle) * RING_R,
-    Math.sin(angle) * RING_R + SY,
-    z,
-  );
+  // 车削几何沿局部 +Y 生长；先绕 X 转 90° 对齐枪管 +Z，再平移到
+  // 对应枪管中心。旋转必须放进实例矩阵，不能放进 mate——否则布局
+  // 的 z 偏移会被 mate 旋转成 -Y，子件会沿枪管轴线“掉”到台面。
+  const m = new THREE.Matrix4().makeRotationX(Math.PI / 2);
+  m.setPosition(Math.cos(angle) * RING_R, Math.sin(angle) * RING_R + SY, z);
+  return m;
 };
 
 /** 减速大齿轮 36 齿：半径 46mm、z=-0.20；随 M134Gear 节点旋转。 */

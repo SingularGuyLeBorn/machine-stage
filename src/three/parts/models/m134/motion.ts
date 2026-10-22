@@ -124,12 +124,24 @@ export function animateM134(
   const sinceShot = (t * shotsPerSec) % 1;
   const firing = mode !== "idle" && sinceShot < 0.35; // 击发瞬间的焰光脉冲
 
-  // 枪口焰 / 曳光：只在击发位闪
+  // 枪口焰 / 曳光：只在击发位闪。静止时必须缩到 0，否则 1m 长的
+  // 曳光柱会平躺在枪口前方，看起来像一段悬空的弹链。
+  const fxPos = new THREE.Vector3(0, 0.032 + SY, 0.62);
+  const fxQuat = new THREE.Quaternion();
   const flash = assembled.getPart("m134.fx.muzzle_flash");
   if (flash) {
     const s = firing ? 1 : 0.0001;
-    matrix.makeScale(s, s, s);
+    matrix.compose(fxPos, fxQuat, new THREE.Vector3(s, s, s));
     flash.setInstanceMatrix(0, matrix);
+  }
+  const tracer = assembled.getPart("m134.fx.tracer");
+  if (tracer) {
+    // 曳光柱几何沿局部 +Y 生长，绕 X 转 90° 后沿枪管 +Z 出膛。
+    const tracerQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
+    const tracerPos = new THREE.Vector3(0, 0.032 + SY, 0.64);
+    const s = firing ? 1 : 0.0001;
+    matrix.compose(tracerPos, tracerQuat, new THREE.Vector3(s, s, s));
+    tracer.setInstanceMatrix(0, matrix);
   }
 
   // ---- 供弹：弹链随射速步进（每发一节）----
@@ -207,4 +219,5 @@ export const M134_MOTION_PARTS = [
   "m134.feed.propellant",
   "m134.fx.brass",
   "m134.fx.muzzle_flash",
+  "m134.fx.tracer",
 ];
