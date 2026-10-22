@@ -221,20 +221,29 @@ export function addHangar(ctx: CarrierCtx): void {
     name_en: "hangar aircraft folded",
     assembly: ASSEMBLY,
     build_layer: 5,
-    geometry: M(B(0.3, 0.28, 2.0, [0, 0, 0], 0.02), B(0.24, 0.2, 0.55, [0, 0.02, 1.1], 0.012), B(0.05, 0.55, 0.32, [0, 0.42, -0.72], 0.008), B(0.05, 0.45, 0.25, [0, 0.4, -0.95], 0.006)),
+    geometry: M({ type: "latheZ", profile: [[0.06, -1.0], [0.14, -0.82], [0.16, -0.25], [0.17, 0.35], [0.13, 0.78], [0.04, 1.0]], segments: 28 }),
     material: "cv_aircraft",
-    mate: A([-1.1, deckY + 0.24, 9.0]),
+    mate: A([-1.1, deckY + 0.28, 9.0]),
   });
   add({
-    id: `${P}spare_aircraft_wing_folded`,
-    name_cn: "机库舰载机折叠外翼",
-    name_en: "hangar aircraft folded wings",
+    id: `${P}spare_aircraft_wing_folded_l`,
+    name_cn: "机库舰载机折叠外翼 左",
+    name_en: "hangar aircraft folded wing left",
     assembly: ASSEMBLY,
     build_layer: 5,
-    geometry: M(B(0.95, 0.36, 0.42, [0, 0, 0], 0.012)),
+    geometry: { type: "kit", kit: "carrierWing", params: { span: 0.9, rootChord: 0.5, tipChord: 0.24, sweep: 0.04, thickness: 0.09, dihedralDeg: 0, sections: 8 }, mirror: "x" },
     material: "cv_aircraft_dark",
-    mate: A([-1.1, deckY + 0.56, 8.8]),
-    dual: true,
+    mate: A([-1.2, deckY + 0.72, 8.8], [0, 0, -90]),
+  });
+  add({
+    id: `${P}spare_aircraft_wing_folded_r`,
+    name_cn: "机库舰载机折叠外翼 右",
+    name_en: "hangar aircraft folded wing right",
+    assembly: ASSEMBLY,
+    build_layer: 5,
+    geometry: { type: "kit", kit: "carrierWing", params: { span: 0.9, rootChord: 0.5, tipChord: 0.24, sweep: 0.04, thickness: 0.09, dihedralDeg: 0, sections: 8 } },
+    material: "cv_aircraft_dark",
+    mate: A([-1.0, deckY + 0.72, 8.8], [0, 0, 90]),
   });
   add({
     id: `${P}spare_aircraft_gear`,

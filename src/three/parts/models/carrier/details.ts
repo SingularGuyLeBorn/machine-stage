@@ -380,19 +380,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
       mate: A([-2.85 + (e % 2) * 1.3, CV.HANGAR_Y + 0.55, -6.7 + Math.floor(e / 2) * 0.3]),
     });
   }
-  for (let a = 0; a < 30; a++) {
-    const x = -1.1;
-    add({
-      id: `carrier.hangar.detail_spare_skin_${pad(a + 1)}`,
-      name_cn: `机库舰载机蒙皮 ${a + 1}`,
-      name_en: `hangar aircraft skin ${a + 1}`,
-      assembly: HANGAR,
-      build_layer: 5,
-      geometry: M(B(0.12 + (a % 3) * 0.03, 0.02, 0.4 + (a % 4) * 0.1, [0, 0, 0], 0.003)),
-      material: a % 3 === 0 ? "cv_aircraft_dark" : "cv_aircraft",
-      mate: A([x + (a % 2 === 0 ? -0.16 : 0.16), CV.HANGAR_Y + 0.24 + (a % 5) * 0.05, 8.1 + (a % 15) * 0.12]),
-    });
-  }
+  // 机库停放机的蒙皮板随真实机身一起取消程序化贴片；保留实体机身/翼/起落架。
   for (let l = 0; l < 12; l++) {
     add({
       id: `carrier.hangar.detail_light_${pad(l + 1)}`,
