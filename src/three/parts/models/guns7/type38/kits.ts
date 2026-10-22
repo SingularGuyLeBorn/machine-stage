@@ -381,6 +381,63 @@ const brassTray: GeometryBuilder = (spec) => {
   return merge(parts);
 };
 
+// ---------------------------------------------------------------------------
+// receiverShell —— 闭合机匣外壳：左右侧板 + 前/后顶板，右侧留拉机柄让位槽。
+// 三八大盖原有的半圆防尘盖仍露在顶面，作为标志性外观；外壳只补上
+// 机匣两侧和防尘盖前后未覆盖的开口。局部系与 receiver 相同（origin = 弹底）。
+// ---------------------------------------------------------------------------
+const receiverShell: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.046);
+  const t = num(p, "t", 0.0025);
+  const z0 = num(p, "z0", -0.255);
+  const z1 = num(p, "z1", 0.042);
+  const bottom = num(p, "bottom", -0.036);
+  const top = num(p, "top", 0.028);
+  const parts: THREE.BufferGeometry[] = [];
+  const len = z1 - z0;
+  const zc = (z0 + z1) / 2;
+  const sideX = w / 2 - t / 2;
+
+  // 左侧整块侧板
+  const left = box(t, top - bottom, len, 0.0005);
+  left.translate(-sideX, (top + bottom) / 2, zc);
+  parts.push(left);
+
+  // 右侧下段：拉机柄槽以下整条
+  const lowerH = 0.034;
+  const lower = box(t, lowerH, len, 0.0005);
+  lower.translate(sideX, bottom + lowerH / 2, zc);
+  parts.push(lower);
+
+  // 右侧上段：在拉机柄行程处断开，只保留槽前、槽后和槽顶三条
+  const slotZ0 = -0.148;
+  const slotZ1 = -0.122;
+  const upperH = top + 0.002;
+  const upperY = (top - 0.002) / 2;
+  const rearLen = slotZ0 - z0;
+  const rear = box(t, upperH, rearLen, 0.0005);
+  rear.translate(sideX, upperY, z0 + rearLen / 2);
+  parts.push(rear);
+  const frontLen = z1 - slotZ1;
+  const frontSide = box(t, upperH, frontLen, 0.0005);
+  frontSide.translate(sideX, upperY, slotZ1 + frontLen / 2);
+  parts.push(frontSide);
+  const bridge = box(t, 0.010, slotZ1 - slotZ0, 0.0005);
+  bridge.translate(sideX, top - 0.005, (slotZ0 + slotZ1) / 2);
+  parts.push(bridge);
+
+  // 后顶板（防尘盖后方）与前顶板（防尘盖前方）
+  const rearTop = box(w, t, 0.045, 0.0005);
+  rearTop.translate(0, top, -0.2325);
+  parts.push(rearTop);
+  const frontTop = box(w, t, 0.037, 0.0005);
+  frontTop.translate(0, top, 0.0235);
+  parts.push(frontTop);
+
+  return merge(parts);
+};
+
 export const type38Kits: Record<string, GeometryBuilder> = {
   boltBody,
   boltHead,
@@ -390,6 +447,7 @@ export const type38Kits: Record<string, GeometryBuilder> = {
   extractor,
   dustCover,
   receiver,
+  receiverShell,
   magBody,
   frontSight,
   rearSightBase,

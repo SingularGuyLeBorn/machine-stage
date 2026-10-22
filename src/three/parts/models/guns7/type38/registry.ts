@@ -338,6 +338,22 @@ const parts: PartDefinition[] = [
     source: "机匣：前环、两侧墙、开放顶、供弹口、后 tang；右侧开观察窗。",
   }),
   part({
+    id: "type38.receiver.shell",
+    name_cn: "机匣闭合外壳",
+    name_en: "Closed receiver shell",
+    assembly: "receiver",
+    build_layer: 5,
+    geometry: {
+      type: "kit",
+      kit: "receiverShell",
+      params: { w: 0.046, t: 0.0025, z0: -0.255, z1: 0.042, bottom: -0.036, top: 0.028 },
+    },
+    material: "blued_deep",
+    node: gunNode,
+    mate: { type: "absolute" },
+    source: "闭合机匣外壳：左右侧板补上原开框机匣的侧面，前、后顶板补上防尘盖前后开口；右侧留出拉机柄行程槽。半圆防尘盖仍露在顶面，作为三八大盖的标志性外观。",
+  }),
+  part({
     id: "type38.receiver.ejector",
     name_cn: "抛壳挺",
     name_en: "Ejector",
@@ -915,6 +931,24 @@ const parts: PartDefinition[] = [
     source: "机匣下护木：右侧开窗露出弹仓，便于观察 5 发弹；与前后木件拼接。",
   }),
   part({
+    id: "type38.stock.magazine_cover",
+    name_cn: "弹仓木侧板",
+    name_en: "Magazine side cover",
+    assembly: "stock",
+    build_layer: 5,
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.003, h: 0.073, d: 0.187, bevel: 0.0008, at: [-0.0225, -0.0685, -0.0615] },
+        { type: "box", w: 0.003, h: 0.073, d: 0.187, bevel: 0.0008, at: [0.0225, -0.0685, -0.0615] },
+      ],
+    },
+    material: "wood_t38",
+    node: gunNode,
+    mate: { type: "absolute" },
+    source: "弹仓木侧板：补齐固定弹仓左右两侧和机匣下护木右侧的开口；把 5 发弹和托弹板完全包在木托内，只保留弹仓底板卡榫在底部。",
+  }),
+  part({
     id: "type38.stock.nose_cap",
     name_cn: "前托端帽",
     name_en: "Fore-end nose cap",
@@ -1143,6 +1177,8 @@ const C = (
 ): ExpectedContactRule => ({ family, a, b, reason, maxDepthMm, allowDisplaced, allowSuspect: true });
 
 const contacts: ExpectedContactRule[] = [
+  C("type38-shell", "type38.receiver.shell", "type38.*", "闭合机匣外壳包住枪机、击发机构和机匣内腔（封闭代理体）", 40),
+  C("type38-shell", "type38.stock.magazine_cover", "type38.*", "弹仓木侧板包住固定弹仓、托弹板和 5 发弹（木托为封闭代理体）", 20),
   ...ammoExpectedContacts("type38"),
   C("type38-ammo-in-gun", "type38.ammo.*", "type38.barrel.barrel", "膛内弹：弹壳坐在弹膛、弹头挤进膛线，属于真实闭锁/导向配合", 6),
   C("type38-ammo-in-gun", "type38.ammo.*", "type38.barrel.muzzle_carbon", "弹头出膛瞬间穿过枪口积碳环", 5),
