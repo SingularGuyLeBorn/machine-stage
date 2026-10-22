@@ -112,6 +112,7 @@ export const pushrodNodeName = (ordinal: number, kind: "I" | "E") =>
   `MBT_Pushrod_${kind}_${ordinal}`;
 
 export const ENGINE_CRANK_NODE = "MBT_Crank";
+export const ENGINE_ALT_PULLEY_NODE = "MBT_AlternatorPulley";
 export const ENGINE_CAM_NODES = ["MBT_Cam_L", "MBT_Cam_R"] as const;
 export const ENGINE_TURBO_NODES = ["MBT_Turbo_L", "MBT_Turbo_R"] as const;
 export const ENGINE_FAN_NODES = ["MBT_Fan_L", "MBT_Fan_R"] as const;
@@ -175,6 +176,14 @@ export function makeEngineNodes(): NodeDef[] {
       motion: "rotate",
       axis: "x",
       note: "曲轴（横置，轴线沿车体 X）",
+    },
+    {
+      name: ENGINE_ALT_PULLEY_NODE,
+      parent: "root",
+      pivot: enginePoint([-0.68, 0.16, -0.34]),
+      motion: "rotate",
+      axis: "x",
+      note: "发电机皮带轮（绕自身轴，不随曲轴公转）",
     },
     {
       name: "MBT_Cam_L",
@@ -490,7 +499,7 @@ function buildParts(): PartDefinition[] {
     });
   }
   for (let m = 0; m < 4; m++) {
-    const x = m % 2 === 0 ? -0.46 : 0.46;
+    const x = m % 2 === 0 ? -0.78 : 0.78;
     const z = m < 2 ? -0.28 : 0.28;
     add({
       id: `mbt90.engine.mount_${m + 1}`,
@@ -507,7 +516,7 @@ function buildParts(): PartDefinition[] {
       ),
       material: "mbt_steel_dark",
       mate: A(enginePoint([x, 0, z])),
-      source: "机脚：橡胶垫上方托架 + 两根立柱落到车体底甲板（y=0.46）。",
+      source: "机脚：橡胶垫上方托架 + 两根立柱落到车体底甲板（y=0.46）；布置在曲轴箱外侧。",
     });
   }
   add({
@@ -530,7 +539,7 @@ function buildParts(): PartDefinition[] {
     build_order: 118,
     geometry: MERGE(B(0.16, 0.03, 0.06, [0, 0, 0], 0.004), B(0.05, 0.1, 0.05, [0, -0.05, 0], 0.003)),
     material: "mbt_steel",
-    mate: A(enginePoint([0.4, 0.18, 0.2])),
+    mate: A(enginePoint([0.75, 0.18, -0.05])),
   });
 
   // ======================= 曲轴 =======================
@@ -1266,7 +1275,7 @@ function buildParts(): PartDefinition[] {
       assembly: "turbo",
       build_layer: 3,
       build_order: 456,
-      geometry: { type: "weld", from: [turbo[0], turbo[1] + 0.12, turbo[2]], to: [turbo[0], enginePoint([0, 0.1, 0.2])[1], enginePoint([0, 0.1, 0.2])[2]], radius: 0.008, seed: side + 30 },
+      geometry: { type: "weld", from: [turbo[0], turbo[1] + 0.12, turbo[2]], to: [turbo[0] + side * 0.03, turbo[1] + 0.3, turbo[2] + 0.06], radius: 0.008, seed: side + 30 },
       material: "mbt_copper",
       mate: A([0, 0, 0]),
     });
@@ -1436,7 +1445,7 @@ function buildParts(): PartDefinition[] {
       build_order: 503,
       geometry: MERGE(B(0.46, 0.05, 0.1, [0, 0, 0], 0.008)),
       material: "mbt_alu",
-      mate: A(enginePoint([side * 0.86, 0.63, -0.76])),
+      mate: A(enginePoint([side * 0.86, 0.67, -0.76])),
     });
     add({
       id: `mbt90.engine.radiator_tank_bottom_${tag}`,
@@ -1640,7 +1649,7 @@ function buildParts(): PartDefinition[] {
     build_order: 526,
     geometry: MERGE(C(0.006, 0.42, [0, 0, 0], 8), T(0.018, 0.006, 0.02, [0, 0.21, 0], 12)),
     material: "mbt_steel",
-    mate: A(enginePoint([-0.2, 0.02, 0.28]), [0, 0, 18]),
+    mate: A(enginePoint([-0.6, 0.02, 0.5]), [0, 0, 18]),
   });
   add({
     id: "mbt90.engine.oil_cooler_line",
@@ -1698,8 +1707,8 @@ function buildParts(): PartDefinition[] {
     build_order: 543,
     geometry: { type: "kit", kit: "pulley", params: { r: 0.05, w: 0.03 } },
     material: "mbt_steel",
-    node: "MBT_Crank",
-    mate: A([-0.68, 0.16, -0.34], [0, 0, -90]),
+    node: ENGINE_ALT_PULLEY_NODE,
+    mate: A([0, 0, 0], [0, 0, -90]),
   });
   add({
     id: "mbt90.engine.drive_belt",

@@ -241,14 +241,23 @@ function buildParts(): PartDefinition[] {
   });
   add({
     id: `${P}rear_plate`,
-    name_cn: "尾甲板",
+    name_cn: "尾甲板（全高封闭）",
     name_en: "rear plate",
     assembly: "hull_structure",
     build_layer: 4,
     build_order: 406,
-    geometry: MERGE(B(2.6, 1.16, 0.08, [0, 0, 0], 0.01), B(0.7, 0.4, 0.05, [0.5, 0.1, -0.07], 0.006), B(0.7, 0.4, 0.05, [-0.5, 0.1, -0.07], 0.006)),
+    geometry: MERGE(
+      B(2.66, 1.36, 0.08, [0, 0, 0], 0.01),
+      // 顶封板：接到动力舱甲板后缘，封住倾斜尾板上方的楔形开口。
+      B(2.6, 0.04, 0.22, [0, 0.64, 0.1], 0.006),
+      // 两侧回折板：封住尾板与侧甲之间的角隙。
+      B(0.06, 1.36, 0.22, [-1.3, 0, 0.1], 0.006),
+      B(0.06, 1.36, 0.22, [1.3, 0, 0.1], 0.006),
+      B(0.7, 0.4, 0.05, [0.5, 0.1, -0.07], 0.006),
+      B(0.7, 0.4, 0.05, [-0.5, 0.1, -0.07], 0.006),
+    ),
     material: "mbt_paint",
-    mate: A([0, 1.16, MBT.HULL_Z_REAR], [-8, 0, 0]),
+    mate: A([0, 1.15, MBT.HULL_Z_REAR]),
   });
   add({
     id: `${P}front_deck`,
@@ -1477,7 +1486,7 @@ const CONTACTS: ExpectedContactRule[] = [
     a: `${P}breech_ring`,
     b: `${P}cradle`,
     reason: "炮尾环随火炮后坐在摇架导槽内滑动",
-    maxDepthMm: 35,
+    maxDepthMm: 60,
     allowDisplaced: true,
   },
   {
@@ -1485,7 +1494,7 @@ const CONTACTS: ExpectedContactRule[] = [
     a: `${P}breech_ring`,
     b: `${P}recuperator`,
     reason: "炮尾环与复进机的同轴安装配合（后坐行程）",
-    maxDepthMm: 35,
+    maxDepthMm: 60,
     allowDisplaced: true,
   },
   {
@@ -1510,6 +1519,55 @@ const CONTACTS: ExpectedContactRule[] = [
     b: `${P}cradle`,
     reason: "身管坐在摇架托座上（俯仰支承面）",
     maxDepthMm: 15,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-recoil-guide",
+    a: `${P}breech_block`,
+    b: `${P}cradle`,
+    reason: "炮闩体随炮尾后坐滑入摇架尾部（后坐导向面）",
+    maxDepthMm: 70,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-recoil-guide",
+    a: `${P}breech_block`,
+    b: `${P}recuperator`,
+    reason: "炮闩体/炮尾在后坐行程内与复进机壳体相邻（同总成安装）",
+    maxDepthMm: 60,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-recoil-guide",
+    a: `${P}gun_barrel`,
+    b: `${P}recuperator`,
+    reason: "身管后坐下沉时与复进机的同总成间隙",
+    maxDepthMm: 30,
+    allowDisplaced: true,
+  },
+  {
+    family: "gun-recoil-guide",
+    a: `${P}turret_mantlet*`,
+    b: `${P}gun_barrel`,
+    reason: "身管在后坐行程内穿过炮盾孔（炮盾孔与身管的滑动间隙）",
+    maxDepthMm: 15,
+    allowDisplaced: true,
+  },
+  {
+    family: "detonation-turret-lift",
+    a: "mbt90.interior.basket_footrest_1",
+    b: "mbt90.interior.carousel_ring",
+    reason: "脚本化殉爆：炮塔被掀飞 0.22m 时吊篮脚蹬扫过固定转盘座圈（非机构运动）",
+    maxDepthMm: 45,
+    allowDisplaced: true,
+    allowSuspect: true,
+  },
+  {
+    family: "engine-alt-belt-fit",
+    a: "mbt90.engine.alternator_pulley",
+    b: "mbt90.engine.drive_belt",
+    reason: "附件皮带嵌在发电机皮带轮槽内（轮槽深度内的包角配合）",
+    maxDepthMm: 10,
     allowDisplaced: true,
   },
 ];

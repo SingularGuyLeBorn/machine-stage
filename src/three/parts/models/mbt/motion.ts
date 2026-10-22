@@ -13,6 +13,7 @@ import {
 import {
   ENGINE_CAM_NODES,
   ENGINE_CRANK_NODE,
+  ENGINE_ALT_PULLEY_NODE,
   ENGINE_FAN_NODES,
   ENGINE_IDLER_NODE,
   ENGINE_TURBO_NODES,
@@ -196,6 +197,8 @@ function animateEngine(assembled: AssembledModel, t: number, state: string): voi
   }
   const idler = assembled.getNode(ENGINE_IDLER_NODE);
   if (idler) idler.rotation.x = -angle * 0.7;
+  const altPulley = assembled.getNode(ENGINE_ALT_PULLEY_NODE);
+  if (altPulley) altPulley.rotation.x = -angle * 1.7;
   for (const name of ENGINE_TURBO_NODES) {
     const turbo = assembled.getNode(name);
     if (turbo) turbo.rotation.x = angle * 4.2;
@@ -434,7 +437,7 @@ function animateBlowout(assembled: AssembledModel, t: number, detonation: boolea
 
 function animateHunterKiller(assembled: AssembledModel, t: number): void {
   const citv = assembled.getNode(CITV_NODE);
-  if (citv) citv.rotation.y = Math.sin(Math.min(t, 2.2) * 2.2) * 0.7;
+  if (citv) citv.rotation.y = Math.sin(Math.min(t, 2.2) * 2.2) * 0.35;
   const turret = assembled.getNode("Turret");
   if (turret) {
     const target = t < 2.6 ? 0 : 0.42;

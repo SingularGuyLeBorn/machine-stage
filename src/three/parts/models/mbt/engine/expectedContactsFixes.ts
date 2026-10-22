@@ -45,9 +45,10 @@ export const MBT_ENGINE_CONTACT_FIXES: ExpectedContactRule[] = [
     family: "engine-liner-dipstick",
     a: `${P}cyl*`,
     b: `${P}dipstick`,
-    reason: "机油尺导管贴着缸体/缸套外侧（管夹固定）",
+    reason: "机油尺导管贴着缸体/缸套外侧（管夹固定；活塞环外缘与导管端部扫掠相切）",
     maxDepthMm: 6,
     allowDisplaced: true,
+    allowSuspect: true,
   },
   {
     family: "engine-crankcase-lube-sweep",

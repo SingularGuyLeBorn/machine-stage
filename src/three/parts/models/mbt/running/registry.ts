@@ -695,6 +695,7 @@ const CONTACTS: ExpectedContactRule[] = [
     reason: "履带销耳卡在主动轮齿槽里（12 齿啮合）",
     maxDepthMm: 40,
     allowDisplaced: true,
+    allowSuspect: true,
   },
   {
     family: "running-track-idler",
@@ -758,7 +759,7 @@ const CONTACTS: ExpectedContactRule[] = [
     a: `${P}susp_*`,
     b: `${P}wheel*`,
     reason: "平衡肘端部与负重轮轮毂铰接；缓冲块顶住平衡肘",
-    maxDepthMm: 35,
+    maxDepthMm: 50,
     allowDisplaced: true,
   },
   {

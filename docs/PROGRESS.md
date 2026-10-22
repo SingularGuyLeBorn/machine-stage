@@ -2157,3 +2157,12 @@ npx vitest run src/three/parts/models/mbt/mbt.test.ts src/three/parts/solver/whi
 npm test        # 302 passed / 1 skipped
 npm run build
 ```
+
+### P0 补丁：尾舱封闭 + 发动机干涉 + 合体真正的三维飞行（2026-10-22 晚）
+
+- **MBT 尾舱**：尾甲板改为全高板（0.47–1.83m），补顶封板接到动力舱甲板后缘、两侧回折板；从车后不再能直接看进发动机舱。
+- **发动机 P0**：发电机皮带轮改挂独立节点 `MBT_AlternatorPulley`，只绕自身轴转，不再随曲轴公转扫穿高压泵/水分离器/滤清器；机油尺移到曲轴箱外侧（避开 10 号缸活塞）；机脚移到曲轴箱外侧（避开连杆）；后吊耳移到飞轮壳外侧；涡轮进油管改为短管，避免横穿缸内。
+- **全状态门禁**：新增 `scripts/diag-mbt-sweep.ts`。aim / loading / fire / drive / suspension / engine_start / running / era_hit / blowout / detonation / hunter_killer 全部扫掠 **未豁免 0**；静态 7497 报告 / 未豁免 0；悬空 / 孤岛 / kit 断开 0。
+- **金古桥合体**：等待模块改为真正三维靠拢——横向/纵深插值持续到本轮对接前 0.25s；中途有 0.8–1.6m 飞行弧线抬升；双频浮动 0.12–0.24m；飞行倾斜（俯仰/滚转/偏航约 ±5°/±2.6°）。不是只上下动，也不再在 1.4s 内全部钉到轴上。
+- **证据**：`docs/qa/mbt-rear-closed.jpg`、`kingjoe-combine-approach.jpg`（四体分散飞行）、`kingjoe-combine-hover.jpg`（下体已对接、胸/头悬空倾斜）。
+- **验证**：`npm test` 302 passed / 1 skipped；`npm run build` ✓；`diag-mbt.ts` 静态 0、支撑 0。

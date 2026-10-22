@@ -72,7 +72,7 @@ function buildNodes() {
     { name: EJECTED_CASE_NODE, parent: "Turret", pivot: [0, MBT.GUN_Y, 0.6] as [number, number, number], motion: "translate" as const, axis: "z" as const, note: "抛壳（fx，随炮塔回转）" },
     { name: BLOWOUT_L, parent: "Turret", pivot: TL(-1.02, 2.47, -1.62), motion: "rotate" as const, axis: "z" as const, note: "左泄压板铰链" },
     { name: BLOWOUT_R, parent: "Turret", pivot: TL(1.02, 2.47, -1.62), motion: "rotate" as const, axis: "z" as const, note: "右泄压板铰链" },
-    { name: CITV_NODE, parent: "Turret", pivot: TL(1.08, 2.7, -0.25), motion: "rotate" as const, axis: "y" as const, note: "车长独立热像仪（猎-歼）" },
+    { name: CITV_NODE, parent: "Turret", pivot: TL(1.25, 2.74, -0.25), motion: "rotate" as const, axis: "y" as const, note: "车长独立热像仪（猎-歼）" },
   ];
 }
 

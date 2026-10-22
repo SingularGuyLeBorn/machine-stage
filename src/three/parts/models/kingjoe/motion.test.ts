@@ -105,6 +105,31 @@ describe("kingjoe motion", () => {
     expect(chestWait.slope).toBeLessThan(-0.05);
     expect(shipWait.slope).toBeLessThan(-0.03);
     expect(c.ship.y).toBeLessThan(a.ship.y + 0.05);
+    // 合体前段必须是三维靠拢：从编队位横向/纵深飞向对接轴，而不是原地垂直升降。
+    const poseAt = (t: number) => {
+      model.resetNodes();
+      animateKingJoe(model, t, "combining");
+      return {
+        chest: model.getNode("chest")!.position.clone(),
+        ship: model.getNode("ship")!.position.clone(),
+        chestRot: model.getNode("chest")!.rotation.clone(),
+        shipRot: model.getNode("ship")!.rotation.clone(),
+      };
+    };
+    const horizontal = (p: { x: number; z: number }, q: { x: number; z: number }) =>
+      Math.abs(p.x - q.x) + Math.abs(p.z - q.z);
+    const early = poseAt(0.2);
+    const arrive = poseAt(1.3);
+    expect(horizontal(early.chest, arrive.chest)).toBeGreaterThan(0.5);
+    expect(horizontal(early.ship, arrive.ship)).toBeGreaterThan(0.3);
+    // 等待期间保持飞行倾斜（俯仰/滚转/偏航），而不是冻结姿态。
+    const waitA = poseAt(2.2);
+    const tilt =
+      Math.abs(waitA.chestRot.x) +
+      Math.abs(waitA.chestRot.z) +
+      Math.abs(waitA.shipRot.x) +
+      Math.abs(waitA.shipRot.z);
+    expect(tilt).toBeGreaterThan(0.05);
     model.dispose();
   }, 120_000);
 
