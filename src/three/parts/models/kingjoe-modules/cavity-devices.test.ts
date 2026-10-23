@@ -24,6 +24,7 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
       ...exchangeMaterials,
       pedan_gel: registry.materials.pedan_gel,
       pedan_hand_field: registry.materials.pedan_hand_field,
+      pedan_hand_flow: registry.materials.pedan_hand_flow,
     });
     model = buildModel(registry, { builders: kingjoeModuleBuilders, materials: library.materials });
   }, 20000);
@@ -193,6 +194,13 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
         expect(endA.getWorldPosition(new THREE.Vector3()).distanceTo(a)).toBeLessThan(1e-6);
         expect(endB.getWorldPosition(new THREE.Vector3()).distanceTo(b)).toBeLessThan(1e-6);
         if (!route.feed && !route.redFeed) expect(endA.scale.equals(endB.scale)).toBe(true);
+        if (route.faceLabel && route.owner.startsWith("joint_") && route.mode === "rings") {
+          // 行程中段至少有一个环保持端面半径，防止统一缩放把它再次缩进轮毂。
+          const largest = Math.max(
+            ...[0, 1, 2].map((k) => model.getNode(`Exchange_${i}_packet_${k}`)!.scale.x),
+          );
+          expect(largest).toBeGreaterThanOrEqual(1);
+        }
       }
     }
     for (const part of model.parts.filter(
