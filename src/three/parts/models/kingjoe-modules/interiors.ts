@@ -10,10 +10,13 @@ import { addEnergyExchange } from "./energy-exchange";
 import { addJointDrives } from "./joint-drives";
 import { CUFF } from "./joint-covers";
 import { flexibleFrame } from "./flex-frame";
+import { addOrbitalCore, orbitalMaterials } from "./orbital-cores";
+import { CORE_MODES } from "./core-dynamics.mjs";
 
 // 用户已批准的原创佩丹技术：磁约束能源、计算晶核、场调制器与悬浮线圈。
 // [OM-FREEPLAY] 尺寸由实际壳内设备舱派生；配色、线圈匝数及支架布局为原创机械解释。
 export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
+  ...orbitalMaterials,
   // [OM-FREEPLAY] 柔性段使用低亮青铜金属，与金色硬肋区分，依靠褶皱而非高亮表达连接。
   pedan_flex: {
     base: "#5c8177",
@@ -400,9 +403,22 @@ export function makeInteriors(): Pick<ModelRegistry, "parts" | "nodes" | "consta
       add(
         "crystal",
         room.key === "brain" ? "佩丹计算晶核" : "磁约束能量晶核",
-        { type: "kit", kit: "pedanCrystal", params: { r: r * 0.65 } },
+        { type: "kit", kit: "pedanCrystal", params: { r: r * 0.12 } },
         powerMaterial(room.key, module),
         [0, 0, 0],
+      );
+      const seed = 400 + data.rooms.indexOf(room);
+      addOrbitalCore(
+        {
+          key: `room_${room.key}`,
+          parent: node,
+          module,
+          radius: r * 1.5,
+          seed,
+          mode: CORE_MODES[seed % CORE_MODES.length],
+        },
+        parts,
+        nodes,
       );
       for (let ring = 0; ring < 3; ring++)
         add(

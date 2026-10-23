@@ -5,6 +5,8 @@ import type { ModelRegistry, PartDefinition } from "../../registry/types";
 import type { AssembledModel } from "../../assembler/assembler";
 import type { PedanActivity } from "./machinery";
 import data from "./pedan.generated.json";
+import { addOrbitalCore } from "./orbital-cores";
+import { CORE_MODES } from "./core-dynamics.mjs";
 type V3 = [number, number, number];
 export interface CavityDevice {
   owner: string;
@@ -167,6 +169,8 @@ export function addCavityDevices(
       });
     };
     const family = i % 3;
+    // [OM-FREEPLAY] 小于 9cm 的安装球保留紧凑晶核，避免伴核缩成不可辨的像素。
+    const hasOrbit = family === 0 && r >= 0.09;
     // 手部交由连续指节网络连接，不再用一个个独立胶囊；其余新设备保留柔性场包覆。
     if (device.infill && !device.owner.startsWith("fore")) {
       add(
@@ -181,13 +185,19 @@ export function addCavityDevices(
         [r * 0.9, r * 1.6, r * 0.9],
       );
     }
-    // 主体占据安装球的大部分体积；不要只给小晶核加一圈细骨架。
+    // 固态设备保留主体体积；多体反应堆腾出公转空间，由中央能量团与伴核共同占据。
     add(
       "body",
-      family === 0 ? "多面场反应堆" : family === 1 ? "脉冲储能罐" : "层叠相位运算体",
+      hasOrbit
+        ? "多体能量团内约束种子"
+        : family === 0
+          ? "多面场反应堆"
+          : family === 1
+            ? "脉冲储能罐"
+            : "层叠相位运算体",
       family === 0 ? "pedanCrystal" : family === 1 ? "pedanCylinder" : "pedanBox",
       family === 0
-        ? { r: r * 0.72 }
+        ? { r: r * (hasOrbit ? 0.07 : 0.72) }
         : family === 1
           ? { r: r * 0.5, h: r * 1.3 }
           : { w: r * 0.95, h: r * 1.3, d: r * 0.95 },
@@ -234,7 +244,10 @@ export function addCavityDevices(
         `vanes_${parity}`,
         family === 1 ? "环列高压蓄能瓶" : family === 2 ? "外缘换热叠片" : "磁流偏转翼",
         family === 1 ? "pedanCylinder" : "pedanBox",
-        family === 1 ? { r: r * 0.11, h: r * 0.85 } : { w: r * 0.24, h: r * 0.65, d: r * 0.1 },
+        // [OM-FREEPLAY] 实机近景中宽叶片遮住公转路径；仅多体设备收窄叶片，保留八片和外圈。
+        family === 1
+          ? { r: r * 0.11, h: r * 0.85 }
+          : { w: r * (hasOrbit ? 0.12 : 0.24), h: r * (hasOrbit ? 0.5 : 0.65), d: r * 0.1 },
         parity ? "pedan_titanium" : "pedan_red",
       );
       Object.assign(parts[parts.length - 1], {
@@ -253,6 +266,19 @@ export function addCavityDevices(
       [0, 0, 0],
       [90, 0, 0],
     );
+    if (hasOrbit)
+      addOrbitalCore(
+        {
+          key: `cavity_${i}`,
+          parent: base,
+          module,
+          radius: r,
+          seed: i,
+          mode: CORE_MODES[Math.floor(i / 3) % CORE_MODES.length],
+        },
+        parts,
+        nodes,
+      );
   }
   // 器件间交换由 energy-exchange / hand-couplings 统一规划，避免旧胶桥叠在新光环上。
 }

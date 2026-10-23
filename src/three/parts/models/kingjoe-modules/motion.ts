@@ -6,6 +6,7 @@ import { updatePedanRays } from "./rays";
 import { updateCavityDevices, planCavityDevices } from "./cavity-devices";
 import { updateEnergyExchange } from "./energy-exchange";
 import { updateFlexibleFrame } from "./flex-frame";
+import { updateOrbitalCores } from "./orbital-cores";
 import { updateHandCouplings } from "./hand-couplings";
 import { updateJointDrives } from "./joint-drives";
 import { updatePedanMachinery, type PedanActivity } from "./machinery";
@@ -311,6 +312,7 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
   };
   updatePedanMachinery(model, seconds, activity);
   updateCavityDevices(model, seconds, activity);
+  updateOrbitalCores(model, seconds, activity);
   updateHandCouplings(model, seconds, activity.charge);
   updateEnergyExchange(model, planCavityDevices(new Map()), seconds, activity.charge);
   updateFlexibleFrame(model, seconds);
