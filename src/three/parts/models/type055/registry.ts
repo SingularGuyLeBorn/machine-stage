@@ -3,17 +3,33 @@ import type { InstanceLayout } from "../../assembler/assembler";
 import type { ExpectedContactRule, ModelRegistry } from "../../registry/types";
 import { A, B, C, M, S, T, carrierContext, pad } from "../carrier/common";
 import { CV_MATERIALS } from "../carrier/materials";
-import { T55, T55_CONSTANTS, t55DeckHalf, t55HalfAt } from "./constants";
+import {
+  T55,
+  T55_CONSTANTS,
+  t55DeckHalf,
+  t55DeckTop,
+  t55HalfAt,
+} from "./constants";
 import {
   type055AesaPanel,
+  type055BootTop,
+  type055BulbousBow,
+  type055Bulwark,
   type055Deck,
+  type055DeckDashes,
   type055DeckUnderside,
+  type055DeckWalkLines,
   type055Frustum,
   type055GunTurret,
   type055Helipad,
+  type055HullNumber,
   type055HullShell,
   type055HullUnderwater,
   type055Propeller,
+  type055Rhib,
+  type055VlsFlame,
+  type055VlsHatch,
+  type055VlsMissile,
 } from "./kits";
 
 // ============================================================================
@@ -36,7 +52,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     assembly: "hull",
     build_layer: 1,
     geometry: { type: "kit", kit: "type055HullShell" },
-    material: "cv_hull",
+    material: "cv_055_hull",
     mate: A([0, 0, 0]),
     source: "60 站放样；水线以上舷侧内倾 18%，甲板宽小于水线宽。",
   });
@@ -62,13 +78,14 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
   });
   add({
     id: `${P}hull.bow_sonar_dome`,
-    name_cn: "球鼻艏/舰壳声呐罩",
-    name_en: "bow sonar dome",
+    name_cn: "球鼻艏/舰壳声呐导流罩",
+    name_en: "bulbous bow sonar dome",
     assembly: "hull",
     build_layer: 1,
-    geometry: M(S(1.8, [0, 0, 0], 24)),
+    geometry: { type: "kit", kit: "type055BulbousBow" },
     material: "cv_antifouling",
-    mate: A([0, 4.2, 87.5]),
+    mate: A([0, 0, 0]),
+    source: "球鼻艏前伸至艏柱之前，内置舰壳声呐；与防污漆同为水下涂层。",
   });
   add({
     id: `${P}hull.sonar_array`,
@@ -76,10 +93,33 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     name_en: "hull sonar array",
     assembly: "hull",
     build_layer: 1,
-    geometry: M(T(1.0, 0.8, 0.35, [0, 0, 0], 24), C(0.75, 0.08, [0, 0, 0], 20)),
+    geometry: M(T(0.9, 0.7, 0.3, [0, 0, 0], 28), C(0.62, 0.08, [0, 0, 0], 20)),
     material: "cv_steel_dark",
-    mate: A([0, 3.2, 89.5], [90, 0, 0]),
+    mate: A([0, 4.3, 87.85], [90, 0, 0]),
   });
+  add({
+    id: `${P}hull.boot_top`,
+    name_cn: "水线漆带",
+    name_en: "boot top stripe",
+    assembly: "hull",
+    build_layer: 1,
+    geometry: { type: "kit", kit: "type055BootTop" },
+    material: "cv_hull_boot",
+    mate: A([0, 0, 0]),
+  });
+  const numberX = t55HalfAt(68.5, 9.3) + 0.02;
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}surface.hull_number_${side === -1 ? "l" : "r"}`,
+      name_cn: `舷号 101 ${side === -1 ? "左" : "右"}`,
+      name_en: `hull number 101 ${side === -1 ? "l" : "r"}`,
+      assembly: "surface",
+      build_layer: 5,
+      geometry: { type: "kit", kit: "type055HullNumber" },
+      material: "cv_deck_line",
+      mate: A([side * numberX, 9.3, 68.5], [0, side * 90, 0]),
+    });
+  }
 
   // 横向肋板/舱壁/纵桁
   for (let i = 0; i < 24; i++) {
@@ -154,6 +194,27 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     material: "cv_deck_plate",
     mate: A([0, 0, 0]),
   });
+  add({
+    id: `${P}deck.walk_lines`,
+    name_cn: "甲板安全走道线",
+    name_en: "deck walkway lines",
+    assembly: "deck",
+    build_layer: 4,
+    geometry: { type: "kit", kit: "type055DeckWalkLines" },
+    material: "cv_deck_line",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}deck.vls_dashes`,
+    name_cn: "垂发危险区虚线",
+    name_en: "VLS danger-zone dashes",
+    assembly: "deck",
+    build_layer: 4,
+    geometry: { type: "kit", kit: "type055DeckDashes" },
+    material: "cv_deck_yellow",
+    mate: A([0, 0, 0]),
+  });
+
   // 舷侧走道/栏杆/甲板灯
   for (const side of [-1, 1] as const) {
     for (let i = 0; i < 18; i++) {
@@ -167,7 +228,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
         build_layer: 4,
         geometry: M(C(0.035, 1.0, [0, 0, 0], 8)),
         material: "cv_steel_dark",
-        mate: A([x, DECK + 0.5, z]),
+        mate: A([x, t55DeckTop(z) + 0.5, z]),
       });
     }
     add({
@@ -177,8 +238,9 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       assembly: "surface",
       build_layer: 4,
       geometry: M(
-        { type: "weld", from: [side * t55DeckHalf(-84), DECK + 1.0, -84], to: [side * t55DeckHalf(-30), DECK + 1.0, -30], radius: 0.035 },
-        { type: "weld", from: [side * t55DeckHalf(-30), DECK + 1.0, -30], to: [side * t55DeckHalf(50), DECK + 1.0, 50], radius: 0.035 },
+        { type: "weld", from: [side * t55DeckHalf(-84), t55DeckTop(-84) + 1.0, -84], to: [side * t55DeckHalf(-41), t55DeckTop(-41) + 1.0, -41], radius: 0.035 },
+        { type: "weld", from: [side * t55DeckHalf(-35), t55DeckTop(-35) + 1.0, -35], to: [side * t55DeckHalf(-30), t55DeckTop(-30) + 1.0, -30], radius: 0.035 },
+        { type: "weld", from: [side * t55DeckHalf(-30), t55DeckTop(-30) + 1.0, -30], to: [side * t55DeckHalf(50), t55DeckTop(50) + 1.0, 50], radius: 0.035 },
       ),
       material: "cv_steel_dark",
       mate: A([0, 0, 0]),
@@ -193,7 +255,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     assembly: "superstructure",
     build_layer: 4,
     geometry: { type: "kit", kit: "type055Frustum", params: { w0: 13.6, d0: 34, w1: 11.2, d1: 30, h: 7.4 } },
-    material: "cv_hull",
+    material: "cv_055_hull",
     mate: A([0, DECK, 22]),
   });
   add({
@@ -203,7 +265,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     assembly: "superstructure",
     build_layer: 4,
     geometry: { type: "kit", kit: "type055Frustum", params: { w0: 9.6, d0: 15, w1: 8.2, d1: 12.5, h: 5.5 } },
-    material: "cv_hull",
+    material: "cv_055_hull",
     mate: A([0, DECK + 7.4, 26]),
   });
   add({
@@ -213,7 +275,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     assembly: "hangar",
     build_layer: 4,
     geometry: { type: "kit", kit: "type055Frustum", params: { w0: 12.6, d0: 18, w1: 11.2, d1: 16, h: 6.4 } },
-    material: "cv_hull",
+    material: "cv_055_hull",
     mate: A([0, DECK, -63]),
   });
   add({
@@ -223,7 +285,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     assembly: "radar",
     build_layer: 4,
     geometry: { type: "kit", kit: "type055Frustum", params: { w0: 6.0, d0: 8.6, w1: 2.4, d1: 4.4, h: 13 } },
-    material: "cv_hull",
+    material: "cv_055_hull",
     mate: A([0, DECK + 12.9, 20]),
   });
   // 舰桥窗带
@@ -239,7 +301,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       assembly: "superstructure",
       build_layer: 4,
       geometry: M(B(tag === "front" ? 8.2 : 10.5, 1.1, 0.08, [0, 0, 0], 0.004)),
-      material: "cv_bridge_glass",
+      material: "cv_glass",
       mate: A([x, DECK + 11.1, z], [0, yaw, 0]),
     });
   }
@@ -250,7 +312,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     assembly: "superstructure",
     build_layer: 4,
     geometry: { type: "kit", kit: "type055Frustum", params: { w0: 11.0, d0: 18, w1: 9.8, d1: 16, h: 5.8 } },
-    material: "cv_hull",
+    material: "cv_055_hull",
     mate: A([0, DECK, -13]),
   });
   // 烟囱（内倾、红外抑制）
@@ -308,6 +370,36 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       mate: A([pos[0] - Math.sin(rad) * 0.3, pos[1], pos[2] - Math.cos(rad) * 0.3], [0, yaw, 0]),
     });
   }
+  // 346B 的 8×8 T/R 模块：4 面 × 64 块，做成实例族便于逐模块检查/高亮。
+  ctx.layout("type055.aesaTiles", ({ index }) => {
+    const panel = Math.floor(index / 64);
+    const localIndex = index % 64;
+    const row = Math.floor(localIndex / 8);
+    const col = localIndex % 8;
+    const [tag, pos, yaw] = arrays[panel]!;
+    void tag;
+    const lx = -2.4 + (4.8 * (col + 0.75)) / 8.6;
+    const ly = -1.9 + (3.8 * (row + 0.75)) / 8.6;
+    const rad = (yaw * Math.PI) / 180;
+    return new THREE.Matrix4()
+      .makeTranslation(pos[0], pos[1], pos[2])
+      .multiply(new THREE.Matrix4().makeRotationY(rad))
+      .multiply(new THREE.Matrix4().makeTranslation(lx, ly, -0.2));
+  });
+  add({
+    id: `${P}radar.aesa_tiles`,
+    name_cn: "346B T/R 组件（阵面内侧）×256",
+    name_en: "346B T/R modules (rear side) ×256",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(B(0.42, 0.36, 0.08, [0, 0, 0], 0), B(0.36, 0.06, 0.3, [0, 0.12, -0.18], 0)),
+    material: "cv_055_aesa_tile",
+    instances: 256,
+    indexed: true,
+    instance_layout: "type055.aesaTiles",
+    mate: A([0, 0, 0]),
+  });
+
   // 旋转导航雷达 / 卫通 / ESM
   ctx.node({ name: "CV_055_Radar", parent: "root", pivot: [0, DECK + 26.05, 20], motion: "rotate", axis: "y", note: "旋转导航雷达" });
   add({
@@ -344,23 +436,567 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     });
   }
 
+  // ---------------- 上层建筑分面/舷窗/门/舷梯/艇库 ----------------
+  add({
+    id: `${P}super.connector`,
+    name_cn: "前部上建连接段",
+    name_en: "forward deckhouse connector",
+    assembly: "superstructure",
+    build_layer: 4,
+    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 11.6, d0: 9, w1: 11.0, d1: 8.4, h: 4.4 } },
+    material: "cv_055_hull",
+    mate: A([0, t55DeckTop(0.5), 0.5]),
+  });
+  add({
+    id: `${P}super.aft_deckhouse`,
+    name_cn: "后部上层建筑",
+    name_en: "aft deckhouse",
+    assembly: "superstructure",
+    build_layer: 4,
+    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 12.2, d0: 22, w1: 11.2, d1: 20.4, h: 4.8 } },
+    material: "cv_055_hull",
+    mate: A([0, t55DeckTop(-33), -33]),
+  });
+
+  // 舰桥两翼平台 + 斜撑 + 栏杆（直升机指挥/靠泊观察位）
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}super.bridge_wing_${side === -1 ? "l" : "r"}`,
+      name_cn: `舰桥翼台 ${side === -1 ? "左" : "右"}`,
+      name_en: `bridge wing ${side === -1 ? "l" : "r"}`,
+      assembly: "superstructure",
+      build_layer: 4,
+      geometry: M(B(5.4, 0.26, 5.2, [0, 0, 0], 0.02), B(5.2, 0.1, 0.12, [0, 0.05, 2.58], 0.006)),
+      material: "cv_055_hull",
+      mate: A([side * 7.2, 21.73, 28.0]),
+    });
+    for (const [i, z] of [25.7, 28.0, 30.3].entries()) {
+      add({
+        id: `${P}super.bridge_wing_post_${side === -1 ? "l" : "r"}_${i + 1}`,
+        name_cn: `翼台栏杆立柱 ${side === -1 ? "左" : "右"} ${i + 1}`,
+        name_en: `bridge wing post ${side === -1 ? "l" : "r"} ${i + 1}`,
+        assembly: "superstructure",
+        build_layer: 4,
+        geometry: M(C(0.035, 1.0, [0, 0, 0], 8)),
+        material: "cv_steel_dark",
+        mate: A([side * 9.78, 22.36, z]),
+      });
+    }
+    add({
+      id: `${P}super.bridge_wing_rail_${side === -1 ? "l" : "r"}`,
+      name_cn: `翼台栏杆 ${side === -1 ? "左" : "右"}`,
+      name_en: `bridge wing rail ${side === -1 ? "l" : "r"}`,
+      assembly: "superstructure",
+      build_layer: 4,
+      geometry: M(
+        { type: "weld", from: [side * 9.78, 22.86, 25.7], to: [side * 9.78, 22.86, 30.3], radius: 0.035 },
+        { type: "weld", from: [side * 9.78, 22.86, 30.4], to: [side * 4.6, 22.86, 30.4], radius: 0.035 },
+      ),
+      material: "cv_steel_dark",
+      mate: A([0, 0, 0]),
+    });
+    for (const [i, z] of [26.5, 29.5].entries()) {
+      add({
+        id: `${P}super.bridge_wing_strut_${side === -1 ? "l" : "r"}_${i + 1}`,
+        name_cn: `翼台斜撑 ${side === -1 ? "左" : "右"} ${i + 1}`,
+        name_en: `bridge wing strut ${side === -1 ? "l" : "r"} ${i + 1}`,
+        assembly: "superstructure",
+        build_layer: 4,
+        geometry: M({ type: "weld", from: [side * 9.6, 21.55, z], to: [side * 6.34, 17.4, z], radius: 0.09 }),
+        material: "cv_steel_dark",
+        mate: A([0, 0, 0]),
+      });
+    }
+  }
+  // 舰桥正面窗框
+  for (let i = 0; i < 6; i++) {
+    add({
+      id: `${P}super.bridge_mullion_${i + 1}`,
+      name_cn: `舰桥窗框 ${i + 1}`,
+      name_en: `bridge window mullion ${i + 1}`,
+      assembly: "superstructure",
+      build_layer: 4,
+      geometry: M(B(0.1, 1.25, 0.1, [0, 0, 0], 0.004)),
+      material: "cv_steel_dark",
+      mate: A([-3.0 + i * 1.2, 25.4, 32.92]),
+    });
+  }
+
+  // 舷窗/窗带（实例族）：主上建两层、后上建一层
+  interface PanelSpot {
+    x: number;
+    y: number;
+    z: number;
+    yaw: number;
+  }
+  const windowSpots: PanelSpot[] = [];
+  for (const side of [-1, 1] as const) {
+    for (let i = 0; i < 12; i++) {
+      const z = 8 + i * 2.4;
+      windowSpots.push({ x: side * 6.33, y: 17.2, z, yaw: side * 90 });
+      windowSpots.push({ x: side * 6.04, y: 19.0, z, yaw: side * 90 });
+    }
+    for (let i = 0; i < 7; i++) {
+      windowSpots.push({ x: side * 5.83, y: 17.2, z: -42 + i * 2.7, yaw: side * 90 });
+    }
+  }
+  ctx.layout("type055.windows", ({ index }) => {
+    const spot = windowSpots[index]!;
+    return new THREE.Matrix4()
+      .makeTranslation(spot.x, spot.y, spot.z)
+      .multiply(new THREE.Matrix4().makeRotationY((spot.yaw * Math.PI) / 180));
+  });
+  add({
+    id: `${P}super.windows`,
+    name_cn: "上建舷窗 ×62",
+    name_en: "deckhouse windows ×62",
+    assembly: "superstructure",
+    build_layer: 4,
+    geometry: M(B(1.14, 0.6, 0.07, [0, 0, 0], 0.012), B(1.24, 0.7, 0.04, [0, 0, -0.03], 0.006)),
+    material: "cv_glass",
+    instances: 62,
+    indexed: true,
+    instance_layout: "type055.windows",
+    mate: A([0, 0, 0]),
+  });
+
+  // 水密门（实例族）
+  const doorSpots: PanelSpot[] = [];
+  for (const side of [-1, 1] as const) {
+    for (const z of [10, 20, 33]) doorSpots.push({ x: side * 6.56, y: t55DeckTop(z) + 1.05, z, yaw: side * 90 });
+    for (const z of [-28, -40]) doorSpots.push({ x: side * 5.92, y: t55DeckTop(z) + 1.05, z, yaw: side * 90 });
+  }
+  ctx.layout("type055.doors", ({ index }) => {
+    const spot = doorSpots[index]!;
+    return new THREE.Matrix4()
+      .makeTranslation(spot.x, spot.y, spot.z)
+      .multiply(new THREE.Matrix4().makeRotationY((spot.yaw * Math.PI) / 180));
+  });
+  add({
+    id: `${P}super.doors`,
+    name_cn: "上建水密门 ×10",
+    name_en: "deckhouse watertight doors ×10",
+    assembly: "superstructure",
+    build_layer: 4,
+    geometry: M(B(0.95, 2.1, 0.1, [0, 0, 0], 0.02), B(1.15, 2.26, 0.06, [0, 0, -0.03], 0.01)),
+    material: "cv_hull_dark",
+    instances: 10,
+    indexed: true,
+    instance_layout: "type055.doors",
+    mate: A([0, 0, 0]),
+  });
+
+  // 舷侧百叶/通风口（实例族）
+  const louverSpots: PanelSpot[] = [];
+  for (const side of [-1, 1] as const) {
+    for (const z of [-42, -36, -30, -24]) louverSpots.push({ x: side * 5.66, y: 18.6, z, yaw: side * 90 });
+    for (const z of [14, 26]) louverSpots.push({ x: side * 6.07, y: 18.8, z, yaw: side * 90 });
+  }
+  ctx.layout("type055.louvers", ({ index }) => {
+    const spot = louverSpots[index]!;
+    return new THREE.Matrix4()
+      .makeTranslation(spot.x, spot.y, spot.z)
+      .multiply(new THREE.Matrix4().makeRotationY((spot.yaw * Math.PI) / 180));
+  });
+  add({
+    id: `${P}super.louvers`,
+    name_cn: "舷侧通风百叶 ×12",
+    name_en: "deckhouse louvers ×12",
+    assembly: "superstructure",
+    build_layer: 4,
+    geometry: M(
+      B(0.8, 0.5, 0.08, [0, 0, 0], 0.006),
+      B(0.72, 0.04, 0.1, [0, 0.16, 0.01], 0.003),
+      B(0.72, 0.04, 0.1, [0, 0.02, 0.01], 0.003),
+      B(0.72, 0.04, 0.1, [0, -0.12, 0.01], 0.003),
+    ),
+    material: "cv_grate",
+    instances: 12,
+    indexed: true,
+    instance_layout: "type055.louvers",
+    mate: A([0, 0, 0]),
+  });
+
+  // 烟囱顶盖/排气格栅/侧百叶
+  for (const [i, z] of [-6, -18].entries()) {
+    add({
+      id: `${P}super.funnel_cap_dark_${i + 1}`,
+      name_cn: `烟囱顶盖 ${i + 1}`,
+      name_en: `funnel cap ${i + 1}`,
+      assembly: "superstructure",
+      build_layer: 4,
+      geometry: M(B(3.2, 0.2, 4.2, [0, 0, 0], 0.02), B(3.0, 0.06, 4.0, [0, 0.12, 0], 0.006)),
+      material: "cv_steel_dark",
+      mate: A([0, 26.25, z]),
+    });
+    const slats: Array<Parameters<typeof M>[0]> = [];
+    for (let s = 0; s < 5; s++) slats.push(B(2.1, 0.06, 0.18, [0, 0.16, -0.8 + s * 0.4], 0.004));
+    add({
+      id: `${P}super.funnel_grille_${i + 1}`,
+      name_cn: `烟囱排气格栅 ${i + 1}`,
+      name_en: `funnel exhaust grille ${i + 1}`,
+      assembly: "superstructure",
+      build_layer: 4,
+      geometry: M(...slats),
+      material: "cv_grate",
+      mate: A([0, 26.22, z]),
+    });
+    for (const side of [-1, 1] as const) {
+      add({
+        id: `${P}super.funnel_louver_${i + 1}_${side === -1 ? "l" : "r"}`,
+        name_cn: `烟囱侧百叶 ${i + 1} ${side === -1 ? "左" : "右"}`,
+        name_en: `funnel louver ${i + 1} ${side === -1 ? "l" : "r"}`,
+        assembly: "superstructure",
+        build_layer: 4,
+        geometry: M(B(0.1, 2.0, 2.4, [0, 0, 0], 0.01)),
+        material: "cv_grate",
+        mate: A([side * 1.83, 24.0, z]),
+      });
+    }
+  }
+
+  // 桅顶平台/横桁/天线/电子战/导航灯
+  add({
+    id: `${P}radar.mast_platform`,
+    name_cn: "桅顶平台",
+    name_en: "mast top platform",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(B(6.4, 0.26, 5.0, [0, 0, 0], 0.02), B(6.0, 0.1, 0.12, [0, 0.16, 2.44], 0.006)),
+    material: "cv_steel",
+    mate: A([0, 40.15, 20]),
+  });
+  add({
+    id: `${P}radar.yardarm`,
+    name_cn: "桅横桁",
+    name_en: "mast yardarm",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(B(4.05, 0.16, 0.16, [3.475, 0, 0], 0.01), B(4.05, 0.16, 0.16, [-3.475, 0, 0], 0.01), C(0.12, 0.3, [-5.35, 0, 0], 10), C(0.12, 0.3, [5.35, 0, 0], 10)),
+    material: "cv_steel_dark",
+    mate: A([0, 38.6, 20]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}radar.whip_${side === -1 ? "l" : "r"}`,
+      name_cn: `鞭状天线 ${side === -1 ? "左" : "右"}`,
+      name_en: `whip antenna ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(C(0.04, 3.2, [0, 0, 0], 8), C(0.1, 0.18, [0, -1.55, 0], 8)),
+      material: "cv_radar_dark",
+      mate: A([side * 2.9, 41.55, 20]),
+    });
+    add({
+      id: `${P}radar.nav_light_${side === -1 ? "l" : "r"}`,
+      name_cn: `航行灯 ${side === -1 ? "红" : "绿"}`,
+      name_en: `nav light ${side === -1 ? "red" : "green"}`,
+      assembly: "radar",
+      build_layer: 5,
+      geometry: M(B(0.2, 0.2, 0.2, [0, 0, 0], 0.01)),
+      material: side === -1 ? "cv_deck_red" : "cv_glow",
+      mate: A([side * 3.15, 40.38, 20]),
+    });
+    add({
+      id: `${P}radar.ecm_${side === -1 ? "l" : "r"}`,
+      name_cn: `电子战阵面 ${side === -1 ? "左" : "右"}`,
+      name_en: `ECM panel ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(0.5, 1.6, 0.18, [0, 0, 0], 0.01)),
+      material: "cv_aesa",
+      mate: A([side * 2.05, 34.6, 20], [0, side * 90, 0]),
+    });
+  }
+  for (const [tag, z, yaw] of [
+    ["fwd", 23.1, 0],
+    ["aft", 16.9, 180],
+  ] as const) {
+    add({
+      id: `${P}radar.xband_${tag}`,
+      name_cn: `X 波段阵面 ${tag}`,
+      name_en: `X-band array ${tag}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(1.2, 1.0, 0.14, [0, 0, 0], 0.01)),
+      material: "cv_aesa",
+      mate: A([0, 35.4, z], [0, yaw, 0]),
+    });
+  }
+  // 桅顶平台栏杆
+  for (let i = 0; i < 4; i++) {
+    add({
+      id: `${P}radar.mast_post_${i + 1}`,
+      name_cn: `桅顶栏杆立柱 ${i + 1}`,
+      name_en: `mast rail post ${i + 1}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(C(0.03, 0.9, [0, 0, 0], 6)),
+      material: "cv_steel_dark",
+      mate: A([i % 2 === 0 ? -3.1 : 3.1, 40.73, i < 2 ? 17.6 : 22.4]),
+    });
+  }
+
+  // 舷侧刚性充气艇 + 吊艇架
+  for (const side of [-1, 1] as const) {
+    const deckY = t55DeckTop(-38);
+    add({
+      id: `${P}hangar.rhib_cradle_${side === -1 ? "l" : "r"}`,
+      name_cn: `救生艇托架 ${side === -1 ? "左" : "右"}`,
+      name_en: `RHIB cradle ${side === -1 ? "l" : "r"}`,
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(B(2.2, 0.3, 4.8, [0, 0, 0], 0.02), B(2.0, 0.08, 0.3, [0, 0.18, -1.8], 0.006), B(2.0, 0.08, 0.3, [0, 0.18, 1.8], 0.006)),
+      material: "cv_steel_dark",
+      mate: A([side * 7.1, deckY + 0.15, -38]),
+    });
+    add({
+      id: `${P}hangar.rhib_${side === -1 ? "l" : "r"}`,
+      name_cn: `刚性充气艇 ${side === -1 ? "左" : "右"}`,
+      name_en: `RHIB ${side === -1 ? "l" : "r"}`,
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: { type: "kit", kit: "type055Rhib" },
+      material: "cv_canvas",
+      mate: A([side * 7.1, deckY + 0.5, -38]),
+    });
+    add({
+      id: `${P}hangar.davit_post_${side === -1 ? "l" : "r"}`,
+      name_cn: `吊艇架立柱 ${side === -1 ? "左" : "右"}`,
+      name_en: `davit post ${side === -1 ? "l" : "r"}`,
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(C(0.13, 4.2, [0, 0, 0], 10), B(0.5, 0.16, 0.5, [0, -1.9, 0], 0.01)),
+      material: "cv_steel_dark",
+      mate: A([side * 6.1, deckY + 2.1, -41.2]),
+    });
+    add({
+      id: `${P}hangar.davit_arm_${side === -1 ? "l" : "r"}`,
+      name_cn: `吊艇架吊臂 ${side === -1 ? "左" : "右"}`,
+      name_en: `davit arm ${side === -1 ? "l" : "r"}`,
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(
+        { type: "weld", from: [side * 6.1, deckY + 4.2, -41.2], to: [side * 7.1, deckY + 4.45, -38], radius: 0.1 },
+        { type: "weld", from: [side * 7.1, deckY + 4.45, -38], to: [side * 7.1, deckY + 2.2, -38], radius: 0.02 },
+        C(0.12, 0.2, [side * 7.1, deckY + 2.15, -38], 10),
+      ),
+      material: "cv_steel_dark",
+      mate: A([0, 0, 0]),
+    });
+  }
+
+  // ---------------- 甲板设备/系泊/锚机 ----------------
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}surface.windlass_${side === -1 ? "l" : "r"}`,
+      name_cn: `锚机/绞盘 ${side === -1 ? "左" : "右"}`,
+      name_en: `anchor windlass ${side === -1 ? "l" : "r"}`,
+      assembly: "surface",
+      build_layer: 5,
+      geometry: M(C(0.42, 0.7, [0, 0, 0], 16), C(0.5, 0.12, [0, 0.38, 0], 16), B(0.9, 0.3, 0.9, [0, -0.2, 0], 0.02)),
+      material: "cv_055_fitting",
+      mate: A([side * 1.5, t55DeckTop(83) + 0.35, 83]),
+    });
+  }
+  ctx.layout("type055.chain", ({ index }) => {
+    const side = index < 24 ? -1 : 1;
+    const i = index % 24;
+    const u = i / 23;
+    const x = side * (3.9 - u * 2.4);
+    const z = 78.0 + u * 5.0;
+    const angle = Math.atan2(side * -2.4, 5.0);
+    return new THREE.Matrix4()
+      .makeTranslation(x, t55DeckTop(z) + 0.08, z)
+      .multiply(new THREE.Matrix4().makeRotationY(angle));
+  });
+  add({
+    id: `${P}surface.anchor_chain`,
+    name_cn: "锚链 ×48",
+    name_en: "anchor chain links ×48",
+    assembly: "surface",
+    build_layer: 5,
+    geometry: M(T(0.11, 0.06, 0.26, [0, 0, 0], 10), B(0.04, 0.06, 0.26, [0, 0, 0], 0.002)),
+    material: "cv_055_fitting",
+    instances: 48,
+    indexed: true,
+    instance_layout: "type055.chain",
+    mate: A([0, 0, 0]),
+  });
+
+  const bollardZ = [-42, -28, 0, 14, 28, 42, 56, 70, 86];
+  ctx.layout("type055.bollards", ({ index }) => {
+    const side = index < bollardZ.length ? -1 : 1;
+    const z = bollardZ[index % bollardZ.length]!;
+    return new THREE.Matrix4().makeTranslation(side * (t55DeckHalf(z) - 0.62), t55DeckTop(z) + 0.3, z);
+  });
+  add({
+    id: `${P}surface.bollards`,
+    name_cn: "系缆桩 ×18",
+    name_en: "bollards ×18",
+    assembly: "surface",
+    build_layer: 5,
+    geometry: M(
+      C(0.14, 0.55, [0, 0, -0.3], 10),
+      C(0.14, 0.55, [0, 0, 0.3], 10),
+      B(0.95, 0.14, 0.16, [0, -0.2, 0], 0.01),
+    ),
+    material: "cv_055_fitting",
+    instances: 18,
+    indexed: true,
+    instance_layout: "type055.bollards",
+    mate: A([0, 0, 0]),
+  });
+
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}surface.mooring_winch_${side === -1 ? "l" : "r"}`,
+      name_cn: `系泊绞车 ${side === -1 ? "左" : "右"}`,
+      name_en: `mooring winch ${side === -1 ? "l" : "r"}`,
+      assembly: "surface",
+      build_layer: 5,
+      geometry: M(B(1.8, 0.8, 1.4, [0, 0, 0], 0.03), C(0.32, 1.5, [0, 0.1, 0], 16)),
+      material: "cv_055_fitting",
+      mate: A([side * 4.2, t55DeckTop(-89) + 0.4, -89]),
+    });
+  }
+  for (const [tag, z, sign] of [
+    ["jack", 88.6, 1],
+    ["flag", -89.4, -1],
+  ] as const) {
+    add({
+      id: `${P}surface.${tag}staff`,
+      name_cn: tag === "jack" ? "艏旗杆" : "艉旗杆",
+      name_en: tag === "jack" ? "jackstaff" : "flagstaff",
+      assembly: "surface",
+      build_layer: 5,
+      geometry: M(C(0.06, 3.2, [0, 0, 0], 8), C(0.12, 0.16, [0, -1.55, 0], 8)),
+      material: "cv_steel",
+      mate: A([0, t55DeckTop(z) + 1.6, z]),
+    });
+    add({
+      id: `${P}surface.${tag}flag`,
+      name_cn: tag === "jack" ? "海军旗" : "舰尾旗",
+      name_en: tag === "jack" ? "naval ensign" : "ensign",
+      assembly: "surface",
+      build_layer: 5,
+      geometry: M(B(1.5, 0.9, 0.02, [0, 0, 0], 0.002)),
+      material: "cv_deck_red",
+      mate: A([sign * 0.8, t55DeckTop(z) + 2.6, z - sign * 0.05]),
+    });
+  }
+  for (let i = 0; i < 6; i++) {
+    add({
+      id: `${P}surface.vent_${i + 1}`,
+      name_cn: `蘑菇形通风筒 ${i + 1}`,
+      name_en: `mushroom vent ${i + 1}`,
+      assembly: "surface",
+      build_layer: 5,
+      geometry: M(C(0.16, 0.6, [0, 0, 0], 10), S(0.34, [0, 0.36, 0], 12)),
+      material: "cv_steel",
+      mate: A([i < 3 ? -7.2 : 7.2, t55DeckTop(-46 + (i % 3) * 19) + 0.3, -46 + (i % 3) * 19]),
+    });
+  }
+
+  // 飞行甲板系留点/安全网
+  const tieDowns: Array<[number, number]> = [];
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    tieDowns.push([Math.cos(a) * 5.2, T55.HELIPAD_Z + Math.sin(a) * 5.2]);
+  }
+  ctx.layout("type055.helipadTieDown", ({ index }) => {
+    const [x, z] = tieDowns[index]!;
+    return new THREE.Matrix4().makeTranslation(x, t55DeckTop(z) + 0.025, z);
+  });
+  add({
+    id: `${P}hangar.tie_down`,
+    name_cn: "直升机甲板系留点 ×16",
+    name_en: "helipad tie-downs ×16",
+    assembly: "hangar",
+    build_layer: 5,
+    geometry: T(0.18, 0.1, 0.05, [0, 0, 0], 12),
+    material: "cv_steel_dark",
+    instances: 16,
+    indexed: true,
+    instance_layout: "type055.helipadTieDown",
+    mate: A([0, 0, 0]),
+  });
+
+  // 垂发阵列围框（抬高的防浪围板）
+  for (const [tag, z0, z1] of [
+    ["fwd", 43.15, 53.45],
+    ["aft", -52.65, -44.6],
+  ] as const) {
+    const zc = (z0 + z1) / 2;
+    const len = z1 - z0;
+    add({
+      id: `${P}vls.coaming_${tag}`,
+      name_cn: `垂发阵列围板 ${tag}`,
+      name_en: `VLS coaming ${tag}`,
+      assembly: "vls",
+      build_layer: 4,
+      geometry: M(
+        B(10.8, 0.16, 0.18, [0, 0, -len / 2], 0.006),
+        B(10.8, 0.16, 0.18, [0, 0, len / 2], 0.006),
+        B(0.18, 0.16, len, [-5.31, 0, 0], 0.006),
+        B(0.18, 0.16, len, [5.31, 0, 0], 0.006),
+      ),
+      material: "cv_steel_dark",
+      mate: A([0, t55DeckTop(zc) + 0.08, zc]),
+    });
+  }
+
+  // 舷侧舷窗（实例族）与艏部舷墙
+  const portholeSpots: PanelSpot[] = [];
+  for (const side of [-1, 1] as const) {
+    for (let i = 0; i < 20; i++) {
+      const z = -68 + i * 5.2;
+      portholeSpots.push({ x: side * (t55HalfAt(z, 11.8) + 0.02), y: 11.8, z, yaw: side * 90 });
+    }
+  }
+  ctx.layout("type055.portholes", ({ index }) => {
+    const spot = portholeSpots[index]!;
+    return new THREE.Matrix4()
+      .makeTranslation(spot.x, spot.y, spot.z)
+      .multiply(new THREE.Matrix4().makeRotationY((spot.yaw * Math.PI) / 180));
+  });
+  add({
+    id: `${P}surface.portholes`,
+    name_cn: "舷窗 ×40",
+    name_en: "portholes ×40",
+    assembly: "surface",
+    build_layer: 5,
+    geometry: M(T(0.24, 0.15, 0.06, [0, 0, 0], 16), C(0.14, 0.05, [0, 0, 0.03], 16)),
+    material: "cv_steel_dark",
+    instances: 40,
+    indexed: true,
+    instance_layout: "type055.portholes",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}hull.bulwark`,
+    name_cn: "艏部舷墙",
+    name_en: "forecastle bulwark",
+    assembly: "hull",
+    build_layer: 4,
+    geometry: { type: "kit", kit: "type055Bulwark" },
+    material: "cv_055_hull",
+    mate: A([0, 0, 0]),
+  });
+
   // ---------------- 112 单元 VLS ----------------
   ctx.node({ name: "CV_055_VlsHatch", parent: "root", pivot: [0, DECK + 0.06, 0], note: "VLS 井盖阵列" });
   const vlsHatch = (x: number, z: number) =>
-    new THREE.Matrix4().makeTranslation(x, DECK + 0.04, z);
+    new THREE.Matrix4().makeTranslation(x, t55DeckTop(z) + 0.005, z);
   add({
     id: `${P}vls.hatch`,
-    name_cn: "通用垂发井盖 ×112",
-    name_en: "VLS hatch ×112",
+    name_cn: "通用垂发井盖 ×106（另 6 格为可开启动态井盖）",
+    name_en: "VLS hatch ×106",
     assembly: "vls",
     build_layer: 4,
-    geometry: M(
-      B(1.04, 0.09, 1.04, [0, 0, 0], 0.006),
-      B(0.9, 0.035, 0.9, [0, 0.06, 0], 0.004),
-      B(0.12, 0.14, 0.08, [-0.4, 0.02, 0.38], 0.003),
-    ),
-    material: "cv_steel",
-    instances: 112,
+    geometry: { type: "kit", kit: "type055VlsHatch" },
+    material: "cv_vls_hatch",
+    instances: 106,
     indexed: true,
     instance_layout: "type055.vlsHatch",
     mate: A([0, 0, 0]),
@@ -379,14 +1015,171 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     mate: A([0, 0, 0]),
   });
   // 前 64（8×8）+ 后 48（8×6）
-  const hatchPositions: Array<[number, number]> = [];
-  for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) hatchPositions.push([-4.4 + c * 1.25, 44 + r * 1.25]);
-  for (let r = 0; r < 6; r++) for (let c = 0; c < 8; c++) hatchPositions.push([-4.4 + c * 1.25, -52 + r * 1.25]);
-  ctx.layout("type055.vlsHatch", ({ index }) => vlsHatch(hatchPositions[index]![0], hatchPositions[index]![1]));
-  ctx.layout("type055.vlsTube", ({ index }) => {
-    const [x, z] = hatchPositions[index]!;
-    return new THREE.Matrix4().makeTranslation(x, 12.0, z);
+  interface VlsCell {
+    x: number;
+    z: number;
+    bank: "fwd" | "aft";
+    row: number;
+    col: number;
+  }
+  const vlsCells: VlsCell[] = [];
+  for (let r = 0; r < 8; r++)
+    for (let c = 0; c < 8; c++) vlsCells.push({ x: -4.4 + c * 1.25, z: 44 + r * 1.25, bank: "fwd", row: r, col: c });
+  for (let r = 0; r < 6; r++)
+    for (let c = 0; c < 8; c++) vlsCells.push({ x: -4.4 + c * 1.25, z: -52 + r * 1.25, bank: "aft", row: r, col: c });
+
+  // 首尾各 3 格做成可开启动态井盖 + 冷发射弹，其余 106 格静态井盖；
+  // 总格数仍是 112，井筒 112 个全保留。
+  const heroSpec = [
+    { bank: "fwd" as const, row: 7, col: 2 },
+    { bank: "fwd" as const, row: 7, col: 3 },
+    { bank: "fwd" as const, row: 7, col: 4 },
+    { bank: "aft" as const, row: 0, col: 2 },
+    { bank: "aft" as const, row: 0, col: 3 },
+    { bank: "aft" as const, row: 0, col: 4 },
+  ];
+  const heroKey = (bank: string, row: number, col: number) => `${bank}-${row}-${col}`;
+  const heroKeys = new Set(heroSpec.map((cell) => heroKey(cell.bank, cell.row, cell.col)));
+  const staticCells = vlsCells.filter((cell) => !heroKeys.has(heroKey(cell.bank, cell.row, cell.col)));
+
+  ctx.layout("type055.vlsHatch", ({ index }) => {
+    const cell = staticCells[index]!;
+    return vlsHatch(cell.x, cell.z);
   });
+  ctx.layout("type055.vlsTube", ({ index }) => {
+    const cell = vlsCells[index]!;
+    return new THREE.Matrix4().makeTranslation(cell.x, 12.0, cell.z);
+  });
+  ctx.layout("type055.vlsCanister", ({ index }) => {
+    const cell = vlsCells[index]!;
+    return new THREE.Matrix4().makeTranslation(cell.x, 10.2, cell.z);
+  });
+  ctx.layout("type055.vlsShockRing", ({ index }) => {
+    const cell = vlsCells[index]!;
+    return new THREE.Matrix4().makeTranslation(cell.x, 13.7, cell.z);
+  });
+  ctx.layout("type055.vlsActuator", ({ index }) => {
+    const cell = vlsCells[index]!;
+    return new THREE.Matrix4().makeTranslation(cell.x + 0.42, t55DeckTop(cell.z) - 0.72, cell.z + 0.42);
+  });
+  ctx.layout("type055.vlsGasGen", ({ index }) => {
+    const cell = vlsCells[index]!;
+    return new THREE.Matrix4().makeTranslation(cell.x, 9.35, cell.z);
+  });
+
+  // 每格一整套发射筒内部件（实例族），总物理件数按实例计。
+  add({
+    id: `${P}vls.canister`,
+    name_cn: "垂发发射筒 ×112",
+    name_en: "VLS canister ×112",
+    assembly: "vls",
+    build_layer: 3,
+    geometry: M(C(0.42, 7.6, [0, 0, 0], 20), T(0.46, 0.38, 0.14, [0, 3.85, 0], 20)),
+    material: "cv_steel_dark",
+    instances: 112,
+    indexed: true,
+    instance_layout: "type055.vlsCanister",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}vls.shock_ring`,
+    name_cn: "发射筒减震环 ×112",
+    name_en: "canister shock ring ×112",
+    assembly: "vls",
+    build_layer: 3,
+    geometry: T(0.46, 0.35, 0.16, [0, 0, 0], 20),
+    material: "cv_steel",
+    instances: 112,
+    indexed: true,
+    instance_layout: "type055.vlsShockRing",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}vls.hatch_actuator`,
+    name_cn: "井盖作动筒 ×112",
+    name_en: "hatch actuator ×112",
+    assembly: "vls",
+    build_layer: 3,
+    geometry: M(C(0.09, 0.55, [0, 0, 0], 10), C(0.05, 0.4, [0, 0.42, 0], 8)),
+    material: "cv_055_fitting",
+    instances: 112,
+    indexed: true,
+    instance_layout: "type055.vlsActuator",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}vls.gas_generator`,
+    name_cn: "冷发射燃气发生器 ×112",
+    name_en: "cold-launch gas generator ×112",
+    assembly: "vls",
+    build_layer: 3,
+    geometry: M(C(0.22, 0.6, [0, 0, 0], 12), T(0.26, 0.12, 0.18, [0, 0.36, 0], 12)),
+    material: "cv_steel_dark",
+    instances: 112,
+    indexed: true,
+    instance_layout: "type055.vlsGasGen",
+    mate: A([0, 0, 0]),
+  });
+
+  // 动态发射格：井盖绕艉侧铰链翻起，导弹冷弹射后再点火。
+  for (const spec of heroSpec) {
+    const cell = vlsCells.find(
+      (item) => item.bank === spec.bank && item.row === spec.row && item.col === spec.col,
+    )!;
+    const tag = `${cell.bank}_${cell.col}`;
+    const deckY = t55DeckTop(cell.z);
+    const lidNode = `CV_055_VlsLid_${tag}`;
+    ctx.node({
+      name: lidNode,
+      parent: "root",
+      pivot: [cell.x, deckY + 0.045, cell.z - 0.52],
+      motion: "rotate",
+      axis: "x",
+      note: `VLS 井盖 ${tag} 开启`,
+    });
+    add({
+      id: `${P}vls.hatch_hero_${tag}`,
+      name_cn: `可开启垂发井盖 ${tag}`,
+      name_en: `opening VLS hatch ${tag}`,
+      assembly: "vls",
+      build_layer: 4,
+      geometry: { type: "kit", kit: "type055VlsHatch" },
+      material: "cv_vls_hatch",
+      node: lidNode,
+      mate: A([0, 0, 0.52]),
+    });
+    const missileNode = `CV_055_VlsMissile_${tag}`;
+    ctx.node({
+      name: missileNode,
+      parent: "root",
+      pivot: [cell.x, 10.4, cell.z],
+      motion: "translate",
+      note: `冷发射导弹 ${tag}`,
+    });
+    add({
+      id: `${P}vls.missile_${tag}`,
+      name_cn: `冷发射导弹 ${tag}`,
+      name_en: `cold-launch missile ${tag}`,
+      assembly: "vls",
+      build_layer: 3,
+      geometry: { type: "kit", kit: "type055VlsMissile" },
+      material: "cv_steel_dark",
+      node: missileNode,
+      mate: A([0, 0, 0]),
+    });
+    add({
+      id: `${P}vls.flame_${tag}`,
+      name_cn: `导弹尾焰 ${tag}`,
+      name_en: `missile exhaust ${tag}`,
+      assembly: "vls",
+      build_layer: 5,
+      geometry: { type: "kit", kit: "type055VlsFlame" },
+      material: "cv_flame",
+      node: missileNode,
+      mate: A([0, 0, 0]),
+      tags: ["fx"],
+    });
+  }
   // 阵列框/燃气排导/冷发射燃气发生器
   for (const [tag, z0, rows] of [["fwd", 44, 8], ["aft", -52, 6]] as const) {
     const len = rows * 1.25;
@@ -431,8 +1224,8 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
   }
 
   // ---------------- 主炮 ----------------
-  ctx.node({ name: "CV_055_Gun", parent: "root", pivot: [0, DECK, T55.GUN_Z], motion: "rotate", axis: "y", note: "130mm 炮塔旋回" });
-  ctx.node({ name: "CV_055_GunBarrel", parent: "CV_055_Gun", pivot: [0, 1.9, 1.2], motion: "rotate", axis: "x", note: "130mm 身管俯仰" });
+  ctx.node({ name: "CV_055_Gun", parent: "root", pivot: [0, t55DeckTop(T55.GUN_Z), T55.GUN_Z], motion: "rotate", axis: "y", note: "130mm 炮塔旋回" });
+  ctx.node({ name: "CV_055_GunBarrel", parent: "CV_055_Gun", pivot: [0, 1.35, 1.3], motion: "rotate", axis: "x", note: "130mm 身管俯仰" });
   add({
     id: `${P}gun.turret`,
     name_cn: "130mm 隐身炮塔",
@@ -440,7 +1233,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     assembly: "weapons",
     build_layer: 4,
     geometry: { type: "kit", kit: "type055GunTurret" },
-    material: "cv_hull",
+    material: "cv_055_hull",
     node: "CV_055_Gun",
     mate: A([0, 0, 0]),
   });
@@ -453,7 +1246,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     geometry: M(C(0.17, 8.2, [0, 0, 0], 18), C(0.24, 0.5, [0, -3.7, 0], 18), C(0.22, 0.7, [0, 4.4, 0], 18)),
     material: "cv_steel_dark",
     node: "CV_055_GunBarrel",
-    mate: A([0, 0.3, 3.4], [90, 0, 0]),
+    mate: A([0, 0.3, 3.7], [90, 0, 0]),
   });
   add({
     id: `${P}gun.mount`,
@@ -519,7 +1312,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       assembly: "weapons",
       build_layer: 4,
       geometry: M(C(0.75, 0.9, [0, 0, 0], 20), B(0.9, 0.6, 1.1, [0, 0.4, 0.1], 0.03), S(0.38, [0, 0.9, -0.25], 20)),
-      material: "cv_hull",
+      material: "cv_055_hull",
       node: `CV_055_Ciws_${tag}`,
       mate: A([0, 0.45, 0]),
     });
@@ -550,7 +1343,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       assembly: "weapons",
       build_layer: 4,
       geometry: M(B(2.2, 1.5, 1.4, [0, 0, 0], 0.04), B(1.9, 1.2, 0.1, [0, 0, 0.72], 0.02)),
-      material: "cv_hull",
+      material: "cv_055_hull",
       mate: A([0, tag === "fwd" ? DECK + 0.75 : DECK + 7.15, z], [0, tag === "fwd" ? 180 : 0, 0]),
     });
     for (let i = 0; i < 12; i++) {
@@ -602,7 +1395,17 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     build_layer: 4,
     geometry: { type: "kit", kit: "type055Helipad" },
     material: "cv_deck_line",
-    mate: A([0, DECK + 0.03, T55.HELIPAD_Z]),
+    mate: A([0, t55DeckTop(T55.HELIPAD_Z) + 0.09, T55.HELIPAD_Z]),
+  });
+  add({
+    id: `${P}hangar.helipad_disc`,
+    name_cn: "直升机甲板防滑圆盘",
+    name_en: "helipad non-skid disc",
+    assembly: "hangar",
+    build_layer: 4,
+    geometry: M(C(6.8, 0.05, [0, 0, 0], 48)),
+    material: "cv_runway",
+    mate: A([0, t55DeckTop(T55.HELIPAD_Z) + 0.02, T55.HELIPAD_Z]),
   });
   for (const side of [-1, 1] as const) {
     add({
@@ -613,7 +1416,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 4,
       geometry: M(B(5.2, 4.6, 0.18, [0, 0, 0], 0.01)),
       material: "cv_steel_dark",
-      mate: A([side * 2.9, DECK + 2.5, -72.1]),
+      mate: A([side * 2.9, t55DeckTop(-72.1) + 2.3, -72.1]),
     });
   }
   add({
@@ -624,7 +1427,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     build_layer: 4,
     geometry: M(B(0.16, 0.06, 16, [-2.4, 0, 0], 0.004), B(0.16, 0.06, 16, [2.4, 0, 0], 0.004)),
     material: "cv_steel_dark",
-    mate: A([0, DECK + 0.04, -80]),
+    mate: A([0, t55DeckTop(-80) + 0.04, -80]),
   });
 
   // ---------------- 动力：4 燃 + 并车齿轮 + 双轴双桨 ----------------
@@ -769,15 +1572,26 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
 
   // ---------------- 表面：锚/救生/舷号 ----------------
   for (const side of [-1, 1] as const) {
+    const hullX = t55HalfAt(78, 10.5);
     add({
       id: `${P}surface.anchor_${side === -1 ? "l" : "r"}`,
       name_cn: `锚 ${side === -1 ? "左" : "右"}`,
       name_en: `anchor ${side === -1 ? "l" : "r"}`,
       assembly: "surface",
       build_layer: 5,
-      geometry: M(B(0.4, 1.4, 0.24, [0, 0, 0], 0.02), B(1.3, 0.24, 0.24, [0, -0.75, 0], 0.02)),
-      material: "cv_steel_dark",
-      mate: A([side * 3.6, 10.5, 78]),
+      geometry: M(C(0.1, 1.3, [0, 0, 0], 10), B(1.1, 0.16, 0.14, [0, 0.5, 0], 0.02), B(0.5, 0.42, 0.12, [-0.42, -0.62, 0], 0.02), B(0.5, 0.42, 0.12, [0.42, -0.62, 0], 0.02), T(0.18, 0.1, 0.16, [0, 0.86, 0], 12)),
+      material: "cv_055_fitting",
+      mate: A([side * (hullX + 0.08), 11.0, 79], [0, side * 90, 0]),
+    });
+    add({
+      id: `${P}surface.hawse_${side === -1 ? "l" : "r"}`,
+      name_cn: `锚链孔 ${side === -1 ? "左" : "右"}`,
+      name_en: `hawse ${side === -1 ? "l" : "r"}`,
+      assembly: "surface",
+      build_layer: 5,
+      geometry: M(T(0.42, 0.28, 0.18, [0, 0, 0], 18)),
+      material: "cv_hull_dark",
+      mate: A([side * (hullX - 0.02), 11.4, 77.6], [0, 0, 90]),
     });
   }
   add({
@@ -788,18 +1602,19 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     build_layer: 4,
     geometry: M(B(7.2, 0.9, 0.2, [0, 0, 0], 0.02)),
     material: "cv_steel_dark",
-    mate: A([0, DECK + 0.45, 60], [-18, 0, 0]),
+    mate: A([0, t55DeckTop(60) + 0.45, 60], [-18, 0, 0]),
   });
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 20; i++) {
+    const z = -70 + Math.floor(i / 2) * 2.2;
     add({
       id: `${P}surface.life_raft_${pad(i + 1)}`,
       name_cn: `救生筏 ${i + 1}`,
       name_en: `life raft ${i + 1}`,
       assembly: "surface",
       build_layer: 5,
-      geometry: M(C(0.5, 0.8, [0, 0, 0], 16)),
+      geometry: M(C(0.5, 0.8, [0, 0, 0], 16), B(1.2, 0.1, 0.16, [0, 0.45, 0], 0.01)),
       material: "cv_canvas",
-      mate: A([(i % 2 === 0 ? -1 : 1) * (t55DeckHalf(-20) - 0.8), DECK + 0.4, -20 + Math.floor(i / 2) * 1.2]),
+      mate: A([(i % 2 === 0 ? -1 : 1) * (t55DeckHalf(z) - 0.45), t55DeckTop(z) + 0.4, z]),
     });
   }
   // 舷号/舰名标牌后续按真实字体补充（不用方块拼数字）。
@@ -844,7 +1659,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     staticOnly("t55-hangar-self", "type055.hangar.*", "type055.hangar.*", "机库/直升机甲板/牵引轨道安装", 120),
     staticOnly("t55-surface-hull", "type055.surface.*", "type055.hull.*", "锚/栏杆/救生设备与舰体安装", 150),
     staticOnly("t55-surface-deck", "type055.surface.*", "type055.deck.*", "舷号/栏杆/救生设备与甲板安装", 100),
-    staticOnly("t55-surface-self", "type055.surface.*", "type055.surface.*", "栏杆/救生筏/锚装配", 60),
+    staticOnly("t55-surface-self", "type055.surface.*", "type055.surface.*", "栏杆/救生筏/锚/锚链孔装配", 90),
   ];
 
   const registry: ModelRegistry = {
@@ -889,10 +1704,20 @@ export const TYPE055_BUILDERS = {
   type055HullShell,
   type055HullUnderwater,
   type055Deck,
+  type055DeckDashes,
   type055DeckUnderside,
+  type055DeckWalkLines,
   type055Frustum,
   type055AesaPanel,
   type055Propeller,
+  type055Rhib,
   type055Helipad,
   type055GunTurret,
+  type055BootTop,
+  type055BulbousBow,
+  type055Bulwark,
+  type055HullNumber,
+  type055VlsHatch,
+  type055VlsMissile,
+  type055VlsFlame,
 };

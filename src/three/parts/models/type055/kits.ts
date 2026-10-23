@@ -1,32 +1,30 @@
 import * as THREE from "three";
 import type { GeometryBuilder } from "../../assembler/geometry";
-import { T55, t55DeckPlan, t55HalfAt } from "./constants";
+import { T55, t55DeckHalf, t55DeckY, t55HalfAt, t55StemRake } from "./constants";
 
 // ============================================================================
 // models/type055/kits —— 055 舰体/甲板/上层建筑/阵面/螺旋桨专用几何
 // 展示 1 单位 = 1 米。
 // ============================================================================
 
-const RING_YS = [T55.WATERLINE, 9.0, 11.5, T55.DECK_Y];
+const STATIONS = 72;
 
+function stationZ(index: number): number {
+  return T55.STERN_Z + ((T55.BOW_Z - T55.STERN_Z) * index) / (STATIONS - 1);
+}
+
+/** 单个横剖面：port→starboard，每个高度按艏柱前倾量回收 z。 */
 function hullRing(z: number, ys: number[]): THREE.Vector3[] {
-  const port = ys.map((y) => new THREE.Vector3(-t55HalfAt(z, y), y, z)).reverse();
-  const starboard = ys.map((y) => new THREE.Vector3(t55HalfAt(z, y), y, z));
+  const port = ys
+    .map((y) => new THREE.Vector3(-t55HalfAt(z, y), y, z + t55StemRake(z, y)))
+    .reverse();
+  const starboard = ys.map((y) => new THREE.Vector3(t55HalfAt(z, y), y, z + t55StemRake(z, y)));
   return [...port, ...starboard];
 }
 
-function loft(
-  ys: number[],
-  cap: boolean,
-  heightFilter?: (y: number) => boolean,
-): THREE.BufferGeometry {
-  const stations = 60;
+function loft(ringYsAt: (z: number) => number[], cap: boolean): THREE.BufferGeometry {
   const rings: THREE.Vector3[][] = [];
-  for (let i = 0; i < stations; i++) {
-    const z = T55.STERN_Z + ((T55.BOW_Z - T55.STERN_Z) * i) / (stations - 1);
-    const ringYs = heightFilter ? ys.filter(heightFilter) : ys;
-    rings.push(hullRing(z, ringYs));
-  }
+  for (let i = 0; i < STATIONS; i++) rings.push(hullRing(stationZ(i), ringYsAt(stationZ(i))));
   const n = rings[0]!.length;
   const positions: number[] = [];
   const indices: number[] = [];
@@ -64,35 +62,331 @@ function loft(
   return geometry;
 }
 
-/** 水线以上隐身内倾外板（水线→主甲板）。 */
-export const type055HullShell: GeometryBuilder = () => loft(RING_YS, true, (y) => y >= T55.WATERLINE);
+/** 水线以上隐身内倾外板（水线→随脊弧抬升的主甲板）。 */
+export const type055HullShell: GeometryBuilder = () =>
+  loft((z) => {
+    const top = t55DeckY(z);
+    return [T55.WATERLINE, T55.WATERLINE + (top - T55.WATERLINE) * 0.36, T55.WATERLINE + (top - T55.WATERLINE) * 0.7, top];
+  }, true);
 
 /** 水线以下防污漆壳体（龙骨→水线以上 0.03 重叠）。 */
 export const type055HullUnderwater: GeometryBuilder = () =>
-  loft([0.4, 1.6, 3.0, 4.6, 6.0, T55.WATERLINE + 0.03], true, (y) => y <= T55.WATERLINE + 0.03);
+  loft(() => [0.4, 1.6, 3.0, 4.6, 6.0, T55.WATERLINE + 0.03], true);
 
-function planShape(points: Array<[number, number]>): THREE.Shape {
-  return new THREE.Shape(points.map(([x, z]) => new THREE.Vector2(x, z)));
-}
-
-function extrudedPlan(points: Array<[number, number]>, thickness: number, topY: number): THREE.BufferGeometry {
-  const geometry = new THREE.ExtrudeGeometry(planShape(points), {
-    depth: thickness,
-    bevelEnabled: false,
-    curveSegments: 1,
-    steps: 1,
-  });
-  geometry.rotateX(Math.PI / 2);
-  geometry.translate(0, topY, 0);
+/**
+ * 甲板网格：沿脊弧逐站抬升，横向留 55mm 拱度（中间高、舷边低），
+ * 上下面 + 舷边围板一次成形，避免平甲板插进抬高的艏部船壳。
+ */
+function deckGrid(topOffset: number, thickness: number): THREE.BufferGeometry {
+  const nx = 20;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const topY = (z: number, f: number) => t55DeckY(z) + topOffset - 0.055 * f * f;
+  for (let i = 0; i < STATIONS; i++) {
+    const z = stationZ(i);
+    const half = t55DeckHalf(z);
+    for (let j = 0; j <= nx; j++) {
+      const f = (j / nx) * 2 - 1;
+      positions.push(f * half, topY(z, f), z);
+    }
+  }
+  const stride = nx + 1;
+  const topStart = 0;
+  for (let i = 0; i < STATIONS - 1; i++) {
+    for (let j = 0; j < nx; j++) {
+      const a = topStart + i * stride + j;
+      const b = a + 1;
+      const d = a + stride;
+      const c = d + 1;
+      indices.push(a, c, b, a, d, c);
+    }
+  }
+  // 底面
+  const bottomStart = positions.length / 3;
+  for (let i = 0; i < STATIONS; i++) {
+    const z = stationZ(i);
+    const half = t55DeckHalf(z);
+    for (let j = 0; j <= nx; j++) {
+      const f = (j / nx) * 2 - 1;
+      positions.push(f * half, topY(z, f) - thickness, z);
+    }
+  }
+  for (let i = 0; i < STATIONS - 1; i++) {
+    for (let j = 0; j < nx; j++) {
+      const a = bottomStart + i * stride + j;
+      const b = a + 1;
+      const d = a + stride;
+      const c = d + 1;
+      indices.push(a, b, c, a, c, d);
+    }
+  }
+  // 舷边围板（左右）
+  for (const side of [0, nx]) {
+    for (let i = 0; i < STATIONS - 1; i++) {
+      const t0 = topStart + i * stride + side;
+      const t1 = topStart + (i + 1) * stride + side;
+      const b0 = bottomStart + i * stride + side;
+      const b1 = bottomStart + (i + 1) * stride + side;
+      if (side === 0) indices.push(t0, b0, b1, t0, b1, t1);
+      else indices.push(t0, t1, b1, t0, b1, b0);
+    }
+  }
+  // 艏/艉端面
+  for (const [i, flip] of [[0, false], [STATIONS - 1, true]] as const) {
+    for (let j = 0; j < nx; j++) {
+      const t0 = topStart + i * stride + j;
+      const t1 = t0 + 1;
+      const b0 = bottomStart + i * stride + j;
+      const b1 = b0 + 1;
+      if (flip) indices.push(t0, b1, t1, t0, b0, b1);
+      else indices.push(t0, t1, b1, t0, b1, b0);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
 }
 
-/** 主甲板：顶面 y=14.2、厚 0.35，按内倾后的甲板轮廓。 */
-export const type055Deck: GeometryBuilder = () => extrudedPlan(t55DeckPlan(), 0.35, 14.2);
+/** 主甲板：顶面随脊弧（舰中 14.2m）、板厚 0.2m。 */
+export const type055Deck: GeometryBuilder = () => deckGrid(0.2, 0.2);
 
 /** 甲板底封板：仰视不穿帮。 */
-export const type055DeckUnderside: GeometryBuilder = () => extrudedPlan(t55DeckPlan(), 0.08, 13.75);
+export const type055DeckUnderside: GeometryBuilder = () => deckGrid(0.0, 0.06);
+
+/** 水线漆带：6.25→7.15m 黑色环带，贴壳外 25mm。 */
+export const type055BootTop: GeometryBuilder = () => {
+  const stations = 56;
+  const ys = [6.25, 6.75, 7.15];
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (let i = 0; i < stations; i++) {
+    const z = T55.STERN_Z + ((T55.BOW_Z - T55.STERN_Z) * i) / (stations - 1);
+    for (const y of ys) {
+      positions.push(-(t55HalfAt(z, y) + 0.025), y, z + t55StemRake(z, y));
+    }
+    for (const y of [...ys].reverse()) {
+      positions.push(t55HalfAt(z, y) + 0.025, y, z + t55StemRake(z, y));
+    }
+  }
+  const n = ys.length * 2;
+  for (let i = 0; i < stations - 1; i++) {
+    for (let j = 0; j < n - 1; j++) {
+      const a = i * n + j;
+      const b = a + 1;
+      const c = (i + 1) * n + j + 1;
+      const d = (i + 1) * n + j;
+      indices.push(a, b, c, a, c, d);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+/** 球鼻艏：前伸的低阻声呐导流罩，和艏柱前倾一起形成前踵。 */
+export const type055BulbousBow: GeometryBuilder = () => {
+  const bulb = new THREE.SphereGeometry(1, 30, 20);
+  bulb.scale(1.55, 1.85, 4.35);
+  bulb.translate(0, 4.35, 84.3);
+  return bulb;
+};
+
+/** 舷号 101：白漆挤出数字（真字形轮廓，不是方块拼数）。 */
+export const type055HullNumber: GeometryBuilder = () => {
+  const one = () => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-0.34, 0);
+    shape.lineTo(0.16, 0);
+    shape.lineTo(0.16, 1.98);
+    shape.lineTo(0.58, 1.98);
+    shape.lineTo(0.58, 2.4);
+    shape.lineTo(0.02, 2.4);
+    shape.lineTo(-0.34, 2.06);
+    shape.lineTo(-0.34, 0);
+    return shape;
+  };
+  const zero = () => {
+    const shape = new THREE.Shape();
+    shape.absellipse(0, 1.2, 0.52, 1.2, 0, Math.PI * 2, false, 0);
+    const hole = new THREE.Path();
+    hole.absellipse(0, 1.2, 0.32, 0.98, 0, Math.PI * 2, true, 0);
+    shape.holes.push(hole);
+    return shape;
+  };
+  const digits: Array<[THREE.Shape, number]> = [
+    [one(), -1.15],
+    [zero(), 0],
+    [one(), 0.83],
+  ];
+  // 数字底部用一条细基线与三个数字相连（单件，不留白色底板）。
+  const baseline = new THREE.BoxGeometry(3.3, 0.07, 0.04);
+  baseline.translate(0, 0.035, -0.01);
+  const parts = digits.map(([shape, x]) => {
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.06,
+      bevelEnabled: false,
+      curveSegments: 16,
+      steps: 1,
+    });
+    geometry.translate(x, 0, 0);
+    return geometry;
+  });
+  return merge([baseline, ...parts]);
+};
+
+/** 通用垂发井盖：盖板 + 加强筋 + 锁钩。 */
+export const type055VlsHatch: GeometryBuilder = () =>
+  merge([
+    new THREE.BoxGeometry(1.04, 0.08, 1.04).translate(0, 0, 0),
+    new THREE.BoxGeometry(0.88, 0.03, 0.88).translate(0, 0.055, 0),
+    new THREE.BoxGeometry(0.12, 0.13, 0.08).translate(-0.4, 0.03, 0.4),
+    new THREE.BoxGeometry(0.12, 0.13, 0.08).translate(0.4, 0.03, 0.4),
+  ]);
+
+/** 冷发射导弹：弹体 + 头锥 + 尾翼 + 底部燃气发生器。原点在弹体中心。 */
+export const type055VlsMissile: GeometryBuilder = () => {
+  const fins: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    const fin = new THREE.CylinderGeometry(0.03, 0.11, 0.62, 5);
+    fin.rotateZ(a);
+    fin.rotateX(Math.PI / 2);
+    fin.translate(Math.cos(a) * 0.34, -2.15, Math.sin(a) * 0.34);
+    fins.push(fin);
+  }
+  return merge([
+    new THREE.CylinderGeometry(0.28, 0.28, 5.2, 20),
+    new THREE.CylinderGeometry(0.02, 0.28, 1.05, 20).translate(0, 3.12, 0),
+    new THREE.CylinderGeometry(0.3, 0.3, 0.16, 20).translate(0, -2.66, 0),
+    ...fins,
+  ]);
+};
+
+/** 导弹尾焰（挂在弹体节点上，静止时藏在发射筒内）。 */
+export const type055VlsFlame: GeometryBuilder = () =>
+  new THREE.CylinderGeometry(0.32, 0.04, 3.0, 14, 1, true).translate(0, -4.2, 0);
+
+/** 艏部舷墙：沿脊弧从 52m 到 88.5m，两侧 0.75m 高、顶部内倾 0.12m。 */
+export const type055Bulwark: GeometryBuilder = () => {
+  const stations = 22;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (const side of [-1, 1] as const) {
+    const start = positions.length / 3;
+    for (let i = 0; i < stations; i++) {
+      const z = 52 + ((88.5 - 52) * i) / (stations - 1);
+      const x = side * (t55DeckHalf(z) - 0.02);
+      const y = t55DeckY(z) + 0.2;
+      positions.push(x, y, z, x - side * 0.12, y + 0.75, z);
+    }
+    for (let i = 0; i < stations - 1; i++) {
+      const a = start + i * 2;
+      const b = a + 1;
+      const c = a + 3;
+      const d = a + 2;
+      if (side > 0) indices.push(a, b, c, a, c, d);
+      else indices.push(a, d, c, a, c, b);
+    }
+  }
+  // 艏端横向舷墙，把左右两侧连成一件。
+  const zBow = 88.5;
+  const halfBow = t55DeckHalf(zBow) - 0.02;
+  const yBow = t55DeckY(zBow) + 0.2;
+  const bowStart = positions.length / 3;
+  positions.push(-halfBow, yBow, zBow, halfBow, yBow, zBow, halfBow - 0.12, yBow + 0.75, zBow, -halfBow + 0.12, yBow + 0.75, zBow);
+  indices.push(bowStart, bowStart + 2, bowStart + 1, bowStart, bowStart + 3, bowStart + 2);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+function stripePositions(x0: number, x1: number, z0: number, z1: number, width: number): number[] {
+  const y0 = t55DeckY(z0) + 0.212;
+  const y1 = t55DeckY(z1) + 0.212;
+  const hw = width / 2;
+  return [x0 - hw, y0, z0, x0 + hw, y0, z0, x1 + hw, y1, z1, x1 - hw, y1, z1];
+}
+
+/** 甲板纵向安全走道线（随脊弧分成短段）。 */
+export const type055DeckWalkLines: GeometryBuilder = () => {
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (const side of [-1, 1] as const) {
+    for (let s = 0; s < 10; s++) {
+      const z0 = -38 + s * 9.2;
+      const z1 = z0 + 9.2;
+      const quad = stripePositions(
+        side * (t55DeckHalf(z0) - 1.05),
+        side * (t55DeckHalf(z1) - 1.05),
+        z0,
+        z1,
+        0.1,
+      );
+      const base = positions.length / 3;
+      positions.push(...quad);
+      indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+/** 垂发危险区黄色虚线（前后两阵左右各一列）。 */
+export const type055DeckDashes: GeometryBuilder = () => {
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const addDash = (x0: number, x1: number, z0: number, z1: number) => {
+    const quad = stripePositions(x0, x1, z0, z1, 0.12);
+    const base = positions.length / 3;
+    positions.push(...quad);
+    indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  };
+  for (const [z0, z1] of [
+    [42.8, 54.1],
+    [-53.0, -44.0],
+  ] as const) {
+    for (const side of [-1, 1] as const) {
+      for (let z = z0; z < z1; z += 1.4) addDash(side * 5.75, side * 5.75, z, Math.min(z + 0.85, z1));
+    }
+    for (let x = -5.4; x < 5.4; x += 1.4) {
+      addDash(x, Math.min(x + 0.85, 5.4), z0, z1);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+/** 刚性充气艇：艇体 + 两侧浮筒 + 操控台 + 舷外机。原点在艇底中心。 */
+export const type055Rhib: GeometryBuilder = () => {
+  const hull = new THREE.SphereGeometry(1, 20, 12);
+  hull.scale(1.05, 0.55, 2.5);
+  hull.translate(0, 0.35, 0);
+  const tubes: THREE.BufferGeometry[] = [];
+  for (const side of [-1, 1]) {
+    const tube = new THREE.CylinderGeometry(0.24, 0.24, 4.5, 12);
+    tube.rotateX(Math.PI / 2);
+    tube.translate(side * 0.95, 0.55, 0);
+    tubes.push(tube);
+  }
+  return merge([
+    hull,
+    ...tubes,
+    new THREE.BoxGeometry(0.9, 0.55, 1.0).translate(0, 0.8, 0.35),
+    new THREE.BoxGeometry(0.7, 0.65, 0.5).translate(0, 0.7, -2.35),
+  ]);
+};
 
 /** 四棱台（隐身内倾上层建筑/桅杆/炮塔壳体）；原点在底面中心。 */
 export const type055Frustum: GeometryBuilder = (spec) => {
@@ -135,26 +429,28 @@ export const type055Frustum: GeometryBuilder = (spec) => {
   return geometry;
 };
 
-/** 346B 阵面：底板 + 边框 + 8×8 T/R 模块阵列（1 件，几何内实例化）。 */
+/**
+ * 346B 阵面：暗色底板 + 外框 + 四角安装螺栓。
+ * 阵元凸台不再单独建几何——深色小凸台在斜视高光下会被 bloom 洗成一片白块；
+ * 阵元以 256 个内侧 T/R 组件实例表达，正面保持整块低反射阵列。
+ */
 export const type055AesaPanel: GeometryBuilder = (spec) => {
   const p = (spec as { params?: { w?: number; h?: number } }).params ?? {};
   const w = p.w ?? 4.2;
   const h = p.h ?? 3.4;
-  const tiles: THREE.BufferGeometry[] = [];
-  const base = new THREE.BoxGeometry(w, h, 0.16);
-  tiles.push(base);
-  for (let r = 0; r < 8; r++) {
-    for (let c = 0; c < 8; c++) {
-      const tile = new THREE.BoxGeometry(w / 9.2, h / 9.2, 0.1);
-      tile.translate(-w / 2 + (w * (c + 0.75)) / 8.6, -h / 2 + (h * (r + 0.75)) / 8.6, 0.12);
-      tiles.push(tile);
+  const parts: THREE.BufferGeometry[] = [
+    new THREE.BoxGeometry(w, h, 0.16),
+    new THREE.BoxGeometry(w + 0.22, h + 0.22, 0.12).translate(0, 0, 0.02),
+  ];
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      const bolt = new THREE.CylinderGeometry(0.07, 0.07, 0.06, 8);
+      bolt.rotateX(Math.PI / 2);
+      bolt.translate(sx * (w / 2 - 0.16), sy * (h / 2 - 0.16), 0.12);
+      parts.push(bolt);
     }
   }
-  const frame = new THREE.BoxGeometry(w + 0.22, h + 0.22, 0.1);
-  frame.translate(0, 0, 0.02);
-  tiles.push(frame);
-  const merged = merge(tiles);
-  return merged;
+  return merge(parts);
 };
 
 function merge(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry {
@@ -214,14 +510,22 @@ export const type055Helipad: GeometryBuilder = () => {
   const h2b = h2.clone();
   h2b.translate(3.0, 0, 0);
   parts.push(h1, h2b, h3);
+  // 中线把 H 与圆圈连成一件，避免合并件内部孤岛。
+  const centreFore = new THREE.BoxGeometry(0.14, 0.04, 4.2);
+  centreFore.translate(0, 0.02, 4.7);
+  const centreAft = centreFore.clone();
+  centreAft.translate(0, 0, -9.4);
+  parts.push(centreFore, centreAft);
   return merge(parts);
 };
 
 /** 130mm 主炮炮塔：内倾多面体（四棱台）+ 炮座。 */
 export const type055GunTurret: GeometryBuilder = () => {
-  const body = new THREE.CylinderGeometry(1.7, 2.2, 1.9, 6);
-  body.translate(0, 0.95, 0);
-  const roof = new THREE.BoxGeometry(2.5, 0.16, 3.0);
-  roof.translate(0, 1.95, -0.1);
-  return merge([body, roof]);
+  const body = new THREE.CylinderGeometry(1.9, 2.35, 2.3, 6);
+  body.translate(0, 1.15, 0);
+  const roof = new THREE.BoxGeometry(2.9, 0.18, 3.4);
+  roof.translate(0, 2.22, -0.1);
+  const mantlet = new THREE.BoxGeometry(1.3, 0.95, 0.6);
+  mantlet.translate(0, 1.35, 1.55);
+  return merge([body, roof, mantlet]);
 };
