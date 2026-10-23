@@ -5,6 +5,8 @@ import {
   type InstanceLayout,
   type ModelRegistry,
 } from "@/three/parts";
+import { makeHmtRegistry } from "@/three/parts/models/hmt/registry";
+import { hmtBuilders } from "@/three/parts/models/hmt/geometry";
 import type { GeometryBuilder } from "@/three/parts/assembler/geometry";
 import type { DamageState } from "@/three/parts";
 import { makeTigerLayouts, makeTigerRegistry, tigerBuilders } from "@/three/parts/models/tiger/registry";
@@ -215,6 +217,33 @@ export function activeLayoutsOf(
 }
 
 export const CATALOG: StageModel[] = [
+  {
+    id: "hmt",
+    title: "HMT · 双足机器人",
+    subtitle: "Bulgarov · 人形头 / 三节腰椎 / 开窗护甲 / 分趾脚",
+    milestone: "参考重建",
+    status: "ready",
+    registry: makeHmtRegistry(),
+    builders: hmtBuilders,
+    states: [{ id: "idle", label: "站立展示", hint: "旋转查看外形，选中零件可隔离与拆解" }],
+    actions: [
+      { id: "hmt-explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "hmt-xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "hmt-labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "hmt-reset", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "hmt-scan", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+    ],
+    readouts: (a) => [
+      { label: "展示尺度", value: `${a.constants.HEIGHT.toFixed(2)} m（估算）` },
+      { label: "可选零件", value: `${a.parts.length} 件` },
+      { label: "总成", value: `${a.registry.assemblies.length} 组` },
+    ],
+    notes: [
+      "按用户选定的深灰红色 2-xm-robotdesign 方案重建；同款白模用于核对开窗、背面和头颈关系。",
+      "参考作者：Vitaly Bulgarov / Hankook Mirae Technology。比例由图片估算，2.4m 是展示尺度，并非真实规格或制造图纸。",
+      "支持旋转、逐件构建、零件隔离与爆炸拆解；当前为静态展示模型。",
+    ],
+  },
   {
     id: "t800",
     title: "T-800 内骨骼",

@@ -225,11 +225,13 @@ function StageRuntime() {
     const warmShaders = (target: AssembledModel) => {
       const warm = () => {
         if (useStageStore.getState().assembled !== target) return;
-        gl.compileAsync(rootScene, camera).catch(() => {});
+        // compileAsync 的延迟轮询会持有已经释放的材质，切换模型或阴影重建时
+        // 可能在 Three 内部计时器抛错。预热只在本次空闲回调内编译，不跨材质生命周期。
+        gl.compile(rootScene, camera);
         const cached = cache.get(key);
         if (cached) cached.warmed = true;
       };
-      // 在首帧/交互之后再异步预热隐藏的 FX/内部件材质，避免点动作时才编译着色器。
+      // 在首帧/交互之后预热隐藏的 FX/内部件材质，避免点动作时才编译着色器。
       if (typeof window.requestIdleCallback === "function") {
         window.requestIdleCallback(warm, { timeout: 1500 });
       } else {

@@ -62,6 +62,8 @@ export function explodeOffsetOf(
         ? EXPLODE_STEP_M
         : Number(resolveSpec(handle.def.explode.distance, assembled.constants));
     scratchVector.set(resolved[0], resolved[1], resolved[2]);
+    // dual 的几何与装配沿 X 镜像，沿装配方向拆开时位移也必须同源镜像。
+    if (handle.mirrored) scratchVector.x *= -1;
     if (scratchVector.lengthSq() === 0) scratchVector.set(0, 1, 0);
     return scratchVector.normalize().multiplyScalar(distance * factor);
   }

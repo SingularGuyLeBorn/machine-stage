@@ -345,6 +345,9 @@ export const useStageStore = create<StageState>((set, get) => ({
     resetTigerLidPose();
     set({
       modelId,
+      // 切换模型时旧装配已失去归属；读数与零件面板只能读取当前模型的装配。
+      assembled: null,
+      stats: null,
       overrides: {},
       rebuildToken: get().rebuildToken + 1,
       buildIndex: buildOrdersOf(modelId).length,
