@@ -231,12 +231,13 @@ export const carrierBootStripe: GeometryBuilder = () => {
   return geometry;
 };
 
-/** 舰岛一体化隐身塔：八折角内倾体，承接相控阵/桅杆，不再叠方形楼层。 */
+/** 舰岛传感器甲板室：近垂直八折角舱室（不是大斜坡顶棚），四面嵌相控阵，顶部做雷达平台。 */
 export const carrierIslandTower: GeometryBuilder = () => {
   const sections = [
-    { y: 0, w: 0.76, l: 2.45, c: 0.22 },
-    { y: 0.72, w: 0.62, l: 2.02, c: 0.2 },
-    { y: 1.34, w: 0.48, l: 1.56, c: 0.17 },
+    { y: 0, w: 0.78, l: 2.46, c: 0.18 },
+    { y: 0.58, w: 0.78, l: 2.46, c: 0.18 },
+    { y: 0.86, w: 0.76, l: 2.4, c: 0.17 },
+    { y: 1.0, w: 0.68, l: 2.28, c: 0.15 },
   ];
   const ring = (s: { w: number; l: number; c: number }) => [
     [-s.w + s.c, -s.l], [s.w - s.c, -s.l], [s.w, -s.l + s.c], [s.w, s.l - s.c],
@@ -394,13 +395,125 @@ export const carrierDsiBump: GeometryBuilder = () => {
 // ---- 海面与尾流（fx） ------------------------------------------------------
 const SEA_LEVEL = 1.8;
 
-/** 透明海面：真实起伏的低幅涌浪，透出下方红色舰底与桨舵。 */
+// ---- FFT 海面：Phillips 谱 + 2D 逆 FFT，多尺度涌浪取代单组正弦波 ----
+const OCEAN_N = 128;
+function fft1d(re: Float64Array, im: Float64Array): void {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      const tr = re[i]!; re[i] = re[j]!; re[j] = tr;
+      const ti = im[i]!; im[i] = im[j]!; im[j] = ti;
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const angle = (2 * Math.PI) / len;
+    const wr = Math.cos(angle);
+    const wi = Math.sin(angle);
+    for (let i = 0; i < n; i += len) {
+      let cr = 1;
+      let ci = 0;
+      for (let j = 0; j < len / 2; j++) {
+        const ar = re[i + j]!;
+        const ai = im[i + j]!;
+        const br = re[i + j + len / 2]! * cr - im[i + j + len / 2]! * ci;
+        const bi = re[i + j + len / 2]! * ci + im[i + j + len / 2]! * cr;
+        re[i + j] = ar + br;
+        im[i + j] = ai + bi;
+        re[i + j + len / 2] = ar - br;
+        im[i + j + len / 2] = ai - bi;
+        const nr = cr * wr - ci * wi;
+        ci = cr * wi + ci * wr;
+        cr = nr;
+      }
+    }
+  }
+}
+
+/** FFT 海面高度场（静态时刻的谱合成）：真实多方向涌浪 + 细碎波峰，返回 N×N 高度。 */
+function fftOceanHeights(size: number, spanX: number, spanZ: number, time: number): Float32Array {
+  const n = OCEAN_N;
+  const re = new Float64Array(n * n);
+  const im = new Float64Array(n * n);
+  const seed = (() => {
+    let s = 20261023;
+    return () => {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+  })();
+  const windX = Math.cos(0.42);
+  const windZ = Math.sin(0.42);
+  for (let ky = 0; ky < n; ky++) {
+    const mz = ky < n / 2 ? ky : ky - n;
+    for (let kx = 0; kx < n; kx++) {
+      const mx = kx < n / 2 ? kx : kx - n;
+      const wx = (2 * Math.PI * mx) / spanX;
+      const wz = (2 * Math.PI * mz) / spanZ;
+      const kLen = Math.hypot(wx, wz);
+      if (kLen < 0.12) continue;
+      const dir = (wx / kLen) * windX + (wz / kLen) * windZ;
+      if (dir <= 0.05) continue;
+      const amp =
+        (0.0011 * dir * dir * Math.exp(-1 / (kLen * kLen * 1.4))) /
+        Math.pow(kLen, 2.15);
+      const omega = Math.sqrt(9.81 * kLen);
+      const phase = seed() * Math.PI * 2 + omega * time;
+      const i = ky * n + kx;
+      re[i] = amp * Math.cos(phase);
+      im[i] = amp * Math.sin(phase);
+      const m = ((n - ky) % n) * n + ((n - kx) % n);
+      re[m] = re[i]!;
+      im[m] = -im[i]!;
+    }
+  }
+  for (let y = 0; y < n; y++) fft1d(re.subarray(y * n, y * n + n), im.subarray(y * n, y * n + n));
+  const colRe = new Float64Array(n);
+  const colIm = new Float64Array(n);
+  for (let x = 0; x < n; x++) {
+    for (let y = 0; y < n; y++) {
+      colRe[y] = re[y * n + x]!;
+      colIm[y] = im[y * n + x]!;
+    }
+    fft1d(colRe, colIm);
+    for (let y = 0; y < n; y++) {
+      re[y * n + x] = colRe[y]!;
+      im[y * n + x] = colIm[y]!;
+    }
+  }
+  const out = new Float32Array(size * size);
+  let energy = 0;
+  let count = 0;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const sx = Math.floor((x / size) * n);
+      const sy = Math.floor((y / size) * n);
+      const v = re[sy * n + sx]! / (n * n);
+      out[y * size + x] = v;
+      energy += v * v;
+      count += 1;
+    }
+  }
+  // 按 RMS 归一化（而不是单个峰值），避免低频单峰把其余涌浪压平；再限幅防止尖刺。
+  const rms = Math.sqrt(energy / Math.max(1, count)) || 1;
+  const scale = 0.18 / rms;
+  for (let i = 0; i < out.length; i++) {
+    out[i] = Math.max(-0.45, Math.min(0.45, out[i]! * scale));
+  }
+  return out;
+}
+
+/** 透明海面：FFT 多尺度涌浪，透出下方红色舰底与桨舵。 */
 export const carrierSeaSurface: GeometryBuilder = () => {
-  const width = 44;
-  const zStern = -52;
-  const zBow = 30;
-  const nx = 44;
-  const nz = 88;
+  // 海面要铺到视野尽头，否则矩形边缘会像一块灰垫子。舰体在中心，四周留出千米级海面。
+  const width = 300;
+  const zStern = -260;
+  const zBow = 200;
+  const nx = 96;
+  const nz = 96;
+  const heights = fftOceanHeights(nx + 1, width, zBow - zStern, 7.5);
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
@@ -408,7 +521,7 @@ export const carrierSeaSurface: GeometryBuilder = () => {
     const z = zStern + ((zBow - zStern) * iz) / nz;
     for (let ix = 0; ix <= nx; ix++) {
       const x = -width / 2 + (width * ix) / nx;
-      const y = SEA_LEVEL + 0.055 * Math.sin(x * 0.85 + z * 0.33) + 0.03 * Math.cos(z * 1.15 - x * 0.5);
+      const y = SEA_LEVEL + heights[iz * (nx + 1) + ix]!;
       positions.push(x, y, z);
       uvs.push(x * 0.12, z * 0.12);
     }
@@ -425,6 +538,49 @@ export const carrierSeaSurface: GeometryBuilder = () => {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+/** FFT 波峰白浪：按高度/坡度挑选浪峰，铺少量白色泡沫片（不是满屏噪点）。 */
+export const carrierSeaFoam: GeometryBuilder = () => {
+  const width = 300;
+  const zStern = -260;
+  const zBow = 200;
+  const n = 97;
+  const heights = fftOceanHeights(n, width, zBow - zStern, 7.5);
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const cellX = width / (n - 1);
+  const cellZ = (zBow - zStern) / (n - 1);
+  let seed = 71023;
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  for (let iz = 1; iz < n - 2; iz++) {
+    for (let ix = 1; ix < n - 2; ix++) {
+      const h = heights[iz * n + ix]!;
+      const slope = Math.max(
+        Math.abs(h - heights[iz * n + ix + 1]!),
+        Math.abs(h - heights[(iz + 1) * n + ix]!),
+        Math.abs(h - heights[iz * n + ix - 1]!),
+        Math.abs(h - heights[(iz - 1) * n + ix]!),
+      );
+      if (h < 0.02 || slope < 0.004 || rand() > 0.72) continue;
+      const x = -width / 2 + ix * cellX + (rand() - 0.5) * cellX * 0.5;
+      const z = zStern + iz * cellZ + (rand() - 0.5) * cellZ * 0.5;
+      const y = SEA_LEVEL + h + 0.012;
+      const half = 0.8 + rand() * 1.8;
+      const skew = 0.4 + rand() * 0.5;
+      const base = positions.length / 3;
+      positions.push(x - half, y, z - half * skew, x + half, y, z - half * 0.2, x + half * 0.7, y, z + half, x - half * 0.6, y, z + half * skew);
+      indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -461,12 +617,12 @@ export const carrierBowWave: GeometryBuilder = () => {
 export const carrierSternWake: GeometryBuilder = () => {
   const positions: number[] = [];
   const indices: number[] = [];
-  const segments = 22;
+  const segments = 26;
   const strip = (center: (t: number) => number, halfAt: (t: number) => number, baseY: number) => {
     const start = positions.length / 3;
     for (let i = 0; i <= segments; i++) {
       const t = i / segments;
-      const z = -18.4 - 17.5 * t;
+      const z = -18.4 - 70 * t;
       const half = halfAt(t);
       const y = baseY + 0.02 * Math.sin(t * 16 + center(t));
       const cx = center(t);
@@ -477,9 +633,9 @@ export const carrierSternWake: GeometryBuilder = () => {
       indices.push(a, a + 2, a + 3, a, a + 3, a + 1);
     }
   };
-  strip(() => 0, (t) => 1.2 + 3.3 * t + 0.18 * Math.sin(t * 19), SEA_LEVEL + 0.06);
+  strip(() => 0, (t) => 1.4 + 5.6 * t + 0.24 * Math.sin(t * 19), SEA_LEVEL + 0.06);
   for (const side of [-1, 1] as const) {
-    strip((t) => side * (2.6 + 4.6 * t), (t) => 0.18 + 0.14 * t, SEA_LEVEL + 0.045);
+    strip((t) => side * (2.8 + 9.0 * t), (t) => 0.22 + 0.2 * t, SEA_LEVEL + 0.045);
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));

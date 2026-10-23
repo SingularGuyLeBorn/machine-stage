@@ -491,12 +491,12 @@ export function presetTextures(preset: Exclude<TexturePreset, "none">, repeat: [
         const shallow = Math.max(0, h - 0.74) * 3.2;
         const foam = Math.min(1, shallow * (0.55 + rand() * 0.7));
         const i = (y * size + x) * 4;
-        const shade = 150 + h * 55;
-        colorImg.data[i] = Math.min(255, shade + foam * 90);
-        colorImg.data[i + 1] = Math.min(255, shade + 6 + foam * 95);
-        colorImg.data[i + 2] = Math.min(255, shade + 10 + foam * 98);
+        const shade = 128 + h * 38;
+        colorImg.data[i] = Math.min(255, shade + foam * 58);
+        colorImg.data[i + 1] = Math.min(255, shade + 6 + foam * 62);
+        colorImg.data[i + 2] = Math.min(255, shade + 10 + foam * 65);
         colorImg.data[i + 3] = 255;
-        const rough = 0.12 + (1 - h) * 0.52 + foam * 0.3;
+        const rough = 0.36 + (1 - h) * 0.42 + foam * 0.22;
         const rv = Math.round(rough * 255);
         roughImg.data[i] = roughImg.data[i + 1] = roughImg.data[i + 2] = rv;
         roughImg.data[i + 3] = 255;
@@ -517,7 +517,7 @@ export function presetTextures(preset: Exclude<TexturePreset, "none">, repeat: [
     roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
     roughnessMap.anisotropy = 8;
     roughnessMap.repeat.set(repeat[0], repeat[1]);
-    const normalMap = heightToNormalMap(heightCanvas, 1.8);
+    const normalMap = heightToNormalMap(heightCanvas, 1.0);
     const set = { map, roughnessMap, normalMap, repeat };
     textureCache.set(key, set);
     return set;

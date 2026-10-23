@@ -168,6 +168,8 @@ interface StageState {
   scanPhase: ScanPhase;
   scanKind: "static" | "sweep" | null;
   scanMs: number | null;
+  /** 大型模型首帧着色器编译中（DOM 层显示加载提示）。 */
+  shaderWarming: boolean;
 
   views: Record<ViewKey, boolean>;
   layout: PanelLayout;
@@ -226,6 +228,7 @@ interface StageState {
   setHome(center: [number, number, number], radius: number): void;
   requestViewReset(instant?: boolean): void;
   runScan(kind: "static" | "sweep"): void;
+  setShaderWarming(warming: boolean): void;
   setNotice(notice: string | null): void;
   /** 记录运行故障（错误面板数据源）。 */
   reportFault(input: { scope: string; message: string; stack?: string }): void;
@@ -309,6 +312,7 @@ export const useStageStore = create<StageState>((set, get) => ({
   scanPhase: "idle",
   scanKind: null,
   scanMs: null,
+  shaderWarming: false,
 
   views: { ...VIEWS_DEFAULT },
   layout: {
@@ -728,6 +732,7 @@ export const useStageStore = create<StageState>((set, get) => ({
     }, 0);
   },
 
+  setShaderWarming: (warming) => set({ shaderWarming: warming }),
   setNotice: (notice) => set({ notice }),
 
   reportFault: ({ scope, message, stack }) => set({ fault: { scope, message, stack, at: Date.now() } }),

@@ -217,7 +217,7 @@ export function addIsland(ctx: CarrierCtx): void {
       assembly: ASSEMBLY,
       build_layer: 4,
       geometry: M(B(width + 0.15, 0.05, len + 0.15, [0, 0, 0], 0.006)),
-      material: "cv_hull_dark",
+      material: "cv_hull",
       mate: A([x, y + 0.74, z]),
     });
   }
@@ -230,7 +230,7 @@ export function addIsland(ctx: CarrierCtx): void {
     assembly: ASSEMBLY,
     build_layer: 4,
     geometry: { type: "kit", kit: "carrierIslandTower" },
-    material: "cv_hull_dark",
+    material: "cv_hull",
     mate: A([x, baseY + 1.97, z]),
   });
   add({
@@ -253,6 +253,119 @@ export function addIsland(ctx: CarrierCtx): void {
       geometry: M(B(0.025, 0.06, 1.5, [0, 0, 0], 0.003)),
       material: "cv_glass",
       mate: A([x + side * 0.65, baseY + 2.72, z]),
+    });
+  }
+
+  // 传感器甲板室顶部：结构式雷达平台 + 围栏 + 设备柜 + 桅杆基座（不是黑色斜坡顶棚）。
+  const roofY = baseY + 2.97;
+  add({
+    id: `${P}sensor_roof_deck`,
+    name_cn: "传感器舱顶雷达平台",
+    name_en: "sensor house roof radar platform",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(1.36, 0.06, 4.5, [0, 0, 0], 0.006)),
+    material: "cv_deck_plate",
+    mate: A([x, roofY, z]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}sensor_roof_coaming_${side === -1 ? "p" : "s"}`,
+      name_cn: `传感器舱顶围板 ${side === -1 ? "左" : "右"}`,
+      name_en: `sensor roof coaming ${side === -1 ? "p" : "s"}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.05, 0.1, 4.5, [0, 0, 0], 0.004)),
+      material: "cv_steel_dark",
+      mate: A([x + side * 0.655, roofY + 0.08, z]),
+    });
+    for (const pz of [-1.85, -0.62, 0.62, 1.85] as const) {
+      add({
+        id: `${P}sensor_rail_post_${side === -1 ? "p" : "s"}_${String(pz).replace("-", "m").replace(".", "_")}`,
+        name_cn: `传感器平台栏杆立柱 ${side === -1 ? "左" : "右"} ${pz}`,
+        name_en: `sensor platform rail post ${side === -1 ? "p" : "s"} ${pz}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(C(0.03, 0.42, [0, 0, 0], 8)),
+        material: "cv_steel",
+        mate: A([x + side * 0.64, roofY + 0.24, z + pz]),
+      });
+    }
+    for (const [level, h] of [[0.2, 0.035], [0.4, 0.03]] as const) {
+      add({
+        id: `${P}sensor_rail_${side === -1 ? "p" : "s"}_${level === 0.2 ? "low" : "high"}`,
+        name_cn: `传感器平台横栏 ${side === -1 ? "左" : "右"} ${level}`,
+        name_en: `sensor platform rail ${side === -1 ? "p" : "s"} ${level}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(h, h, 4.1, [0, 0, 0], 0.002)),
+        material: "cv_steel",
+        mate: A([x + side * 0.64, roofY + 0.04 + level, z]),
+      });
+    }
+  }
+  for (const pz of [-2.24, 2.24] as const) {
+    add({
+      id: `${P}sensor_rail_cross_${String(pz).replace("-", "m").replace(".", "_")}`,
+      name_cn: `传感器平台端栏 ${pz}`,
+      name_en: `sensor platform end rail ${pz}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(1.3, 0.035, 0.035, [0, 0, 0], 0.002)),
+      material: "cv_steel",
+      mate: A([x, roofY + 0.44, z + pz]),
+    });
+  }
+  add({
+    id: `${P}sensor_cabinet_a`,
+    name_cn: "传感器舱顶设备柜 A",
+    name_en: "sensor roof cabinet A",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.34, 0.3, 0.26, [0, 0, 0], 0.006), B(0.26, 0.02, 0.2, [0, 0.16, 0], 0.003)),
+    material: "cv_steel_dark",
+    mate: A([x - 0.4, roofY + 0.18, z - 1.55]),
+  });
+  add({
+    id: `${P}sensor_cabinet_b`,
+    name_cn: "传感器舱顶设备柜 B",
+    name_en: "sensor roof cabinet B",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.3, 0.28, 0.32, [0, 0, 0], 0.006)),
+    material: "cv_hull_dark",
+    mate: A([x + 0.38, roofY + 0.17, z + 1.4]),
+  });
+  add({
+    id: `${P}sensor_blade_antenna`,
+    name_cn: "传感器平台刀形天线",
+    name_en: "sensor platform blade antenna",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.035, 0.48, 0.05, [0, 0, 0], 0.003), B(0.08, 0.04, 0.1, [0, -0.22, 0], 0.004)),
+    material: "cv_steel_dark",
+    mate: A([x - 0.4, roofY + 0.28, z + 1.95]),
+  });
+  add({
+    id: `${P}sensor_mast_plinth`,
+    name_cn: "桅杆基座（雷达平台）",
+    name_en: "mast plinth on radar platform",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(C(0.42, 0.28, [0, 0, 0], 8), C(0.5, 0.06, [0, -0.11, 0], 8)),
+    material: "cv_hull",
+    mate: A([x, roofY + 0.2, z - 0.4]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}sensor_mast_gusset_${side === -1 ? "p" : "s"}`,
+      name_cn: `桅杆基座斜撑 ${side === -1 ? "左" : "右"}`,
+      name_en: `mast plinth gusset ${side === -1 ? "p" : "s"}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M({ type: "weld", from: [x + side * 0.62, roofY + 0.02, z - 0.4], to: [x + side * 0.16, roofY + 0.24, z - 0.4], radius: 0.035 }),
+      material: "cv_steel_dark",
+      mate: A([0, 0, 0]),
     });
   }
 
@@ -502,6 +615,17 @@ export function addIsland(ctx: CarrierCtx): void {
     node: RADAR_NODE,
     mate: A([0, 0, 0]),
   });
+  // 卫通罩：桥楼甲板上的基座 + 安装环，罩体不再悬在舱顶上方。
+  add({
+    id: `${P}satcom_base`,
+    name_cn: "卫通天线基座",
+    name_en: "satcom pedestal",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.34, 0.06, 0.34, [0, 0.03, 0], 0.004), C(0.13, 0.34, [0, 0.23, 0], 14), C(0.2, 0.05, [0, 0.42, 0], 16)),
+    material: "cv_hull",
+    mate: A([x + 0.52, baseY + 1.97, z + 2.72]),
+  });
   add({
     id: `${P}satcom_dome`,
     name_cn: "卫通天线罩",
@@ -510,17 +634,18 @@ export function addIsland(ctx: CarrierCtx): void {
     build_layer: 4,
     geometry: M(S(0.24, [0, 0, 0], 24), C(0.28, 0.08, [0, -0.22, 0], 24)),
     material: "cv_radar",
-    mate: A([x + 0.52, baseY + 3.55, z + 2.45]),
+    mate: A([x + 0.52, baseY + 2.55, z + 2.72]),
   });
+  // 烟囱：垂直结构件 + 排气帽/两根排气管，去掉倾斜的大黑箱。
   add({
     id: `${P}chimney`,
-    name_cn: "烟囱（内倾/红外抑制）",
+    name_cn: "烟囱（垂直/红外抑制）",
     name_en: "funnel",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(B(0.66, 1.75, 0.78, [0, 0, 0], 0.02), B(0.48, 0.16, 0.58, [0, 0.92, 0], 0.012), B(0.6, 0.18, 0.7, [0, 0.3, 0], 0.008)),
-    material: "cv_hull_dark",
-    mate: A([x + 0.1, baseY + 2.55, z - 2.45], [-12, 0, 0]),
+    geometry: M(B(0.56, 1.2, 0.66, [0, 0, 0], 0.02), B(0.64, 0.12, 0.74, [0, 0.64, 0], 0.012), C(0.1, 0.26, [-0.15, 0.78, 0], 12), C(0.1, 0.26, [0.15, 0.78, 0], 12)),
+    material: "cv_hull",
+    mate: A([x + 0.16, baseY + 2.62, z - 2.72]),
   });
 
   // 1130 近防炮 ×2：炮塔回转 + 俯仰 + 11 管转管。
@@ -542,16 +667,56 @@ export function addIsland(ctx: CarrierCtx): void {
       material: "cv_grate",
       mate: A([spot[0], platformY, spot[2]]),
     });
-    for (const dz of [-0.65, 0.65] as const) {
+    // 独立支撑柱 + 法兰 + 四根斜撑：炮位到传感器舱顶是可见的实体连接。
+    add({
+      id: `${P}ciws_${tag}_pedestal`,
+      name_cn: `1130 近防炮 ${index + 1} 支撑柱`,
+      name_en: `CIWS ${index + 1} support pedestal`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(C(0.24, 0.56, [0, 0, 0], 12, 0.18), C(0.34, 0.06, [0, -0.27, 0], 12), C(0.4, 0.06, [0, 0.27, 0], 12)),
+      material: "cv_hull",
+      mate: A([spot[0], platformY - 0.33, spot[2]]),
+    });
+    for (const dx of [-0.62, 0.62] as const) {
+      for (const dz of [-0.42, 0.42] as const) {
+        add({
+          id: `${P}ciws_${tag}_gusset_${dx < 0 ? "p" : "s"}${dz < 0 ? "a" : "f"}`,
+          name_cn: `1130 近防炮 ${index + 1} 平台斜撑 ${dx < 0 ? "左" : "右"}${dz < 0 ? "后" : "前"}`,
+          name_en: `CIWS ${index + 1} platform gusset ${dx < 0 ? "p" : "s"}${dz < 0 ? "a" : "f"}`,
+          assembly: ASSEMBLY,
+          build_layer: 4,
+          geometry: M({ type: "weld", from: [spot[0] + dx * 0.65, platformY - 0.48, spot[2] + dz * 0.75], to: [spot[0] + dx * 0.36, platformY - 0.05, spot[2] + dz * 0.42], radius: 0.042 }),
+          material: "cv_steel_dark",
+          mate: A([0, 0, 0]),
+        });
+      }
+    }
+    // 炮位平台围栏（三面），让平台和炮座看起来是舰体结构而不是悬空圆盘。
+    for (const dz of [-0.42, 0.42] as const) {
+      for (const side of [-1, 0.4] as const) {
+        add({
+          id: `${P}ciws_${tag}_rail_post_${side === -1 ? "p" : "s"}_${dz < 0 ? "a" : "f"}`,
+          name_cn: `1130 近防炮 ${index + 1} 平台栏杆立柱`,
+          name_en: `CIWS ${index + 1} platform rail post`,
+          assembly: ASSEMBLY,
+          build_layer: 4,
+          geometry: M(C(0.022, 0.34, [0, 0, 0], 8)),
+          material: "cv_steel",
+          mate: A([spot[0] + side * 0.4, platformY + 0.2, spot[2] + dz]),
+        });
+      }
+    }
+    for (const side of [-1, 0.4] as const) {
       add({
-        id: `${P}ciws_${tag}_brace_${dz < 0 ? "a" : "f"}`,
-        name_cn: `1130 近防炮 ${index + 1} 平台斜撑 ${dz < 0 ? "后" : "前"}`,
-        name_en: `CIWS ${index + 1} platform brace ${dz < 0 ? "a" : "f"}`,
+        id: `${P}ciws_${tag}_rail_${side === -1 ? "p" : "s"}`,
+        name_cn: `1130 近防炮 ${index + 1} 平台横栏`,
+        name_en: `CIWS ${index + 1} platform rail`,
         assembly: ASSEMBLY,
         build_layer: 4,
-        geometry: M({ type: "weld", from: [x, baseY + 3.28, z + Math.sign(spot[2] - z) * 1.35], to: [spot[0], platformY - 0.02, spot[2] + dz], radius: 0.04 }),
-        material: "cv_steel_dark",
-        mate: A([0, 0, 0]),
+        geometry: M(B(0.03, 0.03, 0.88, [0, 0, 0], 0.002)),
+        material: "cv_steel",
+        mate: A([spot[0] + side * 0.4, platformY + 0.36, spot[2]]),
       });
     }
     add({

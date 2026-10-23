@@ -73,21 +73,63 @@ interface CachedBuild {
 }
 
 export function StageCanvas() {
+  const heavy = useStageStore((state) => state.modelId === "carrier");
   return (
-    <Canvas
-      shadows
-      dpr={[1, 1.5]}
-      camera={{ position: [4.6, 3.4, 5.2], fov: 34, near: 0.05, far: 4000 }}
-      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <Canvas
+        shadows
+        dpr={heavy ? [0.9, 1.1] : [1, 1.5]}
+        camera={{ position: [4.6, 3.4, 5.2], fov: 34, near: 0.05, far: 4000 }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
+      >
+        <color attach="background" args={["#e9ecf0"]} />
+        <Studio />
+        <StageFog />
+        <StageRuntime />
+        <TigerVfx />
+        <MbtVfx />
+        <CameraRig />
+        <StageEffects />
+      </Canvas>
+      <WarmupOverlay />
+    </div>
+  );
+}
+
+/** 重模型首帧着色器编译提示：编译期间用 DOM 层盖住画面，避免低端 GPU 看起来像卡死/黑屏。 */
+function WarmupOverlay() {
+  const active = useStageStore((state) => state.shaderWarming);
+  if (!active) return null;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 6,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(12, 20, 28, 0.34)",
+        color: "#eef6fb",
+        font: "500 14px/1.6 'Microsoft YaHei', sans-serif",
+        letterSpacing: "0.05em",
+        pointerEvents: "none",
+      }}
     >
-      <color attach="background" args={["#e9ecf0"]} />
-      <Studio />
-      <StageRuntime />
-      <TigerVfx />
-      <MbtVfx />
-      <CameraRig />
-      <StageEffects />
-    </Canvas>
+      <div
+        style={{
+          padding: "14px 22px",
+          borderRadius: 10,
+          border: "1px solid rgba(160, 200, 220, 0.28)",
+          background: "rgba(8, 16, 22, 0.72)",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: 15, marginBottom: 4 }}>舰体着色器编译中…</div>
+        <div style={{ opacity: 0.7, fontSize: 12 }}>首次加载 2.6M 三角面，低端 GPU 需要数秒</div>
+      </div>
+    </div>
   );
 }
 
@@ -176,6 +218,23 @@ function SceneExposure({ value }: { value: number }) {
   return null;
 }
 
+/** 航母海面铺到千米级，远处用与背景同色的大气雾把海面矩形边缘化开，形成海天线。 */
+function StageFog() {
+  const scene = useThree((state) => state.scene);
+  const modelId = useStageStore((state) => state.modelId);
+  useEffect(() => {
+    if (modelId !== "carrier") {
+      scene.fog = null;
+      return;
+    }
+    scene.fog = new THREE.Fog("#e9ecf0", 620, 2200);
+    return () => {
+      scene.fog = null;
+    };
+  }, [scene, modelId]);
+  return null;
+}
+
 /** 环境反射总强度（three r163+ 的 Scene.environmentIntensity）。 */
 function SceneEnvIntensity({ value }: { value: number }) {
   const scene = useThree((state) => state.scene);
@@ -187,11 +246,15 @@ function SceneEnvIntensity({ value }: { value: number }) {
 
 function StageEffects() {
   const xray = useStageStore((state) => state.views.xray);
+  // 航母是 260 万三角面 + 4000+ 件；全屏 AO 在低端 GPU 首帧/拖动时会明显卡顿，降为不跑 N8AO。
+  const heavy = useStageStore((state) => state.modelId === "carrier");
   // 透视时物体大量重叠，AO/Bloom 意义不大且会放大混合开销；直接走默认帧缓冲。
   if (xray) return null;
   return (
-    <EffectComposer multisampling={4}>
-      <N8AO halfRes quality="medium" aoRadius={0.45} intensity={1.15} distanceFalloff={0.9} color="#26303c" />
+    <EffectComposer multisampling={heavy ? 0 : 4}>
+      {heavy ? null : (
+        <N8AO halfRes quality="medium" aoRadius={0.45} intensity={1.15} distanceFalloff={0.9} color="#26303c" />
+      )}
       <Bloom luminanceThreshold={0.88} luminanceSmoothing={0.22} intensity={0.55} mipmapBlur />
       <Vignette offset={0.32} darkness={0.28} />
     </EffectComposer>
@@ -240,18 +303,30 @@ function StageRuntime() {
     setBuildError(null);
 
     const warmShaders = (target: AssembledModel) => {
-      const warm = () => {
-        if (useStageStore.getState().assembled !== target) return;
-        void gl.compileAsync(rootScene, camera).catch(() => {});
+      const store = useStageStore.getState();
+      store.setShaderWarming(true);
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
         const cached = cache.get(key);
         if (cached) cached.warmed = true;
+        if (useStageStore.getState().assembled === target) {
+          useStageStore.getState().setShaderWarming(false);
+        }
       };
-      // 在首帧/交互之后再异步预热隐藏的 FX/内部件材质，避免点动作时才编译着色器。
-      if (typeof window.requestIdleCallback === "function") {
-        window.requestIdleCallback(warm, { timeout: 1500 });
-      } else {
-        window.setTimeout(warm, 160);
-      }
+      const warm = () => {
+        if (useStageStore.getState().assembled !== target) {
+          finish();
+          return;
+        }
+        // compileAsync 会一次性编译全部可见/隐藏材质；DOM 提示层先绘制，再开始编译。
+        void gl.compileAsync(rootScene, camera).catch(() => {}).finally(() => window.setTimeout(finish, 140));
+      };
+      // 先让加载提示完成一帧绘制，再开始编译，避免低端 GPU 看起来像直接卡死。
+      window.setTimeout(warm, 80);
+      // 兜底：驱动异常/编译 Promise 不返回时不把提示层永久留在画面上。
+      window.setTimeout(finish, 12000);
     };
 
     const mount = (
@@ -861,9 +936,9 @@ function CameraRig() {
     if (direction.lengthSq() < 1e-8) direction.copy(HOME_DIRECTION);
     direction.normalize();
     // 航母这类百米级包围球若沿用 34° 视场，复位距离会拉到 ~700m，首帧容易落在背景穹顶之外。
-    // 大模型重置时切到 48° 取景，把复位距离压到 430m 级别，既装得下全舰也不会黑屏。
+    // 大模型重置时切到 56° 取景，把复位距离压到 ~410m，既装得下全舰也不会黑屏。
     const baseFov = (camera as THREE.PerspectiveCamera).fov ?? 34;
-    const fov = focus.radius > 60 ? Math.max(baseFov, 48) : baseFov;
+    const fov = focus.radius > 60 ? Math.max(baseFov, 56) : baseFov;
     if ((camera as THREE.PerspectiveCamera).fov !== fov) {
       (camera as THREE.PerspectiveCamera).fov = fov;
       (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
