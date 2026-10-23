@@ -135,7 +135,8 @@ export function firstPersonView(
   }
 
   if (isCarrierInteriorMode(mode)) {
-    const spec = CARRIER_INTERIOR_VIEWS[mode];
+    const views = assembled.registry.model === "type055" ? TYPE055_INTERIOR_VIEWS : CARRIER_INTERIOR_VIEWS;
+    const spec = views[mode];
     if (!spec) return null;
     const eyeHandle = assembled.getPart(spec.eyePart);
     const targetHandle = assembled.getPart(spec.targetPart);
@@ -176,6 +177,41 @@ interface CarrierInteriorViewSpec {
   targetOffset?: [number, number, number];
   fov: number;
 }
+
+const TYPE055_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec>> = {
+  bridge: {
+    eyePart: "type055.interior.console_bridge_3",
+    eye: [0, 0.55, 0],
+    targetPart: "type055.gun.turret",
+    targetOffset: [0, 8, 40],
+    fov: 62,
+  },
+  cic: {
+    eyePart: "type055.interior.console_cic_5",
+    eye: [0, 0.8, 0],
+    targetPart: "type055.interior.screen_cic_5",
+    targetOffset: [0, 0, -6],
+    fov: 66,
+  },
+  engine_room: {
+    eyePart: "type055.power.turbine_1_casing",
+    eye: [0, 2.4, 4.0],
+    targetPart: "type055.power.gearbox_l",
+    fov: 76,
+  },
+  hangar: {
+    eyePart: "type055.hangar.door_header",
+    eye: [0, -2.8, 4.0],
+    targetPart: "type055.hangar.z20_hangar_r_cabin_upper",
+    fov: 70,
+  },
+  magazine: {
+    eyePart: "type055.gun.magazine",
+    eye: [0, -0.55, 2.2],
+    targetPart: "type055.gun.shell_01",
+    fov: 70,
+  },
+};
 
 const CARRIER_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec>> = {
   bridge: {

@@ -989,6 +989,7 @@ export const CATALOG: StageModel[] = [
     animate: animateType055,
     presentationScale: [1, 1, 1],
     animatedStates: [...TYPE055_ANIMATED_STATES],
+    cameras: ["orbit", "bridge", "cic", "engine_room", "hangar", "magazine"],
     states: [
       ...TYPE055_STATE_LABELS.map((state) => ({ ...state })),
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },

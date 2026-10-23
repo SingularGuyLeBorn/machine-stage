@@ -22,6 +22,7 @@ import {
   type055DeckWalkLines,
   type055Frustum,
   type055GunTurret,
+  type055BridgeShell,
   type055HangarShell,
   type055Helipad,
   type055HullNumber,
@@ -266,9 +267,10 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     name_en: "bridge",
     assembly: "superstructure",
     build_layer: 4,
-    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 9.6, d0: 15, w1: 8.2, d1: 12.5, h: 5.5 } },
+    geometry: { type: "kit", kit: "type055BridgeShell" },
     material: "cv_055_hull",
     mate: A([0, DECK + 7.4, 26]),
+    source: "空腔舰桥壳：正面窗洞 + 透明前窗，内部显控台可从第一人称看到。",
   });
   add({
     id: `${P}super.hangar_block`,
@@ -291,21 +293,40 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     material: "cv_055_hull",
     mate: A([0, DECK + 12.9, 20]),
   });
-  // 舰桥窗带
-  for (const [tag, x, z, yaw] of [
-    ["front", 0, 33.05, 0],
-    ["port", -4.32, 27, 90],
-    ["starboard", 4.32, 27, -90],
-  ] as const) {
+  // 舰桥前窗（透明，第一人称可看出去）+ 两侧暗玻璃带
+  add({
+    id: `${P}super.bridge_glass_front`,
+    name_cn: "舰桥前窗",
+    name_en: "bridge front window",
+    assembly: "superstructure",
+    build_layer: 4,
+    geometry: M(B(6.8, 2.3, 0.05, [0, 0, 0], 0.004)),
+    material: "cv_bridge_glass",
+    mate: A([0, DECK + 9.6, 33.04], [-12.8, 0, 0]),
+  });
+  for (const side of [-1, 1] as const) {
     add({
-      id: `${P}super.bridge_glass_${tag}`,
-      name_cn: `舰桥窗带 ${tag}`,
-      name_en: `bridge window band ${tag}`,
+      id: `${P}super.bridge_glass_${side === -1 ? "l" : "r"}`,
+      name_cn: `舰桥侧窗 ${side === -1 ? "左" : "右"}`,
+      name_en: `bridge side window ${side === -1 ? "l" : "r"}`,
       assembly: "superstructure",
       build_layer: 4,
-      geometry: M(B(tag === "front" ? 8.2 : 10.5, 1.1, 0.08, [0, 0, 0], 0.004)),
+      geometry: M(B(0.06, 0.9, 7.0, [0, 0, 0], 0.004)),
       material: "cv_glass",
-      mate: A([x, DECK + 11.1, z], [0, yaw, 0]),
+      mate: A([side * 4.52, DECK + 9.6, 26.3]),
+    });
+  }
+  // 舰桥顶灯
+  for (const [i, zz] of [24, 28].entries()) {
+    add({
+      id: `${P}super.bridge_light_${i + 1}`,
+      name_cn: `舰桥顶灯 ${i + 1}`,
+      name_en: `bridge ceiling light ${i + 1}`,
+      assembly: "superstructure",
+      build_layer: 5,
+      geometry: M(B(2.4, 0.05, 0.2, [0, 0, 0], 0.004)),
+      material: "cv_glow",
+      mate: A([0, DECK + 12.7, zz]),
     });
   }
   add({
@@ -521,7 +542,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 4,
       geometry: M(B(0.1, 1.25, 0.1, [0, 0, 0], 0.004)),
       material: "cv_steel_dark",
-      mate: A([-3.0 + i * 1.2, 25.4, 32.92]),
+      mate: A([-3.0 + i * 1.2, DECK + 9.6, 33.07]),
     });
   }
 
@@ -987,6 +1008,19 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     mate: A([0, 0, 0]),
   });
 
+  for (const [i, z] of [63, 65].entries()) {
+    add({
+      id: `${P}interior.magazine_light_${i + 1}`,
+      name_cn: `弹药库灯 ${i + 1}`,
+      name_en: `magazine light ${i + 1}`,
+      assembly: "interior",
+      build_layer: 5,
+      geometry: M(B(0.3, 0.04, 1.1, [0, 0, 0], 0.004)),
+      material: "cv_warning",
+      mate: A([i === 0 ? -1.7 : 1.7, DECK - 7.45, z]),
+    });
+  }
+
   // ---------------- 112 单元 VLS ----------------
   ctx.node({ name: "CV_055_VlsHatch", parent: "root", pivot: [0, DECK + 0.06, 0], note: "VLS 井盖阵列" });
   const vlsHatch = (x: number, z: number) =>
@@ -1289,11 +1323,22 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       name_en: `130mm shell ${i + 1}`,
       assembly: "weapons",
       build_layer: 2,
-      geometry: M(C(0.08, 1.0, [0, 0, 0], 12), C(0.1, 0.12, [0, 0.5, 0], 12)),
-      material: "cv_brass",
+      geometry: M({ type: "weld", from: [0, 0, -0.55], to: [0, 0, 0.55], radius: 0.08 }, S(0.1, [0, 0, 0.6], 10)),
+      material: "cv_055_shell",
       mate: A([-1.5 + (i % 4) * 0.9, 5.6, T55.GUN_Z - 10.5 + Math.floor(i / 4) * 1.4]),
     });
   }
+
+  add({
+    id: `${P}gun.shell_rack`,
+    name_cn: "130mm 弹药架",
+    name_en: "130mm shell rack",
+    assembly: "weapons",
+    build_layer: 2,
+    geometry: M(B(4.2, 0.1, 5.2, [0, 0, 0], 0.01), B(0.12, 1.2, 5.2, [-2.0, 0.55, 0], 0.01), B(0.12, 1.2, 5.2, [2.0, 0.55, 0], 0.01)),
+    material: "cv_steel_dark",
+    mate: A([-0.15, 5.45, T55.GUN_Z - 9.2]),
+  });
 
   // ---------------- 近防/导弹 ----------------
   for (const [tag, z, y] of [["fwd", 35, DECK + 7.7], ["aft", -58, DECK + 6.7]] as const) {
@@ -1685,7 +1730,51 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     });
   };
   for (let i = 0; i < 6; i++) consoleAt(-4.6 + i * 1.8, DECK + 7.9, 27, `bridge_${i + 1}`);
-  for (let i = 0; i < 8; i++) consoleAt(-5.0 + (i % 4) * 2.5, DECK + 6.91, 14 + Math.floor(i / 4) * 4, `cic_${i + 1}`);
+  for (let i = 0; i < 8; i++) consoleAt(-5.0 + (i % 4) * 2.5, DECK + 5.2, 14 + Math.floor(i / 4) * 4, `cic_${i + 1}`);
+  const seatSpots: Array<[number, number, number]> = [];
+  for (const [i, x] of [-3.0, -1.0, 1.0, 3.0].entries()) seatSpots.push([x, DECK + 7.42, 27.6 + (i % 2) * 0.1]);
+  for (const z of [15, 19]) for (const x of [-5.0, -2.5, 0, 2.5]) seatSpots.push([x, DECK + 4.72, z]);
+  ctx.layout("type055.seats", ({ index }) => {
+    const [x, y, z] = seatSpots[index]!;
+    return new THREE.Matrix4().makeTranslation(x, y, z);
+  });
+  add({
+    id: `${P}interior.seats`,
+    name_cn: "舰桥/CIC 座椅 ×12",
+    name_en: "bridge/CIC seats ×12",
+    assembly: "interior",
+    build_layer: 2,
+    geometry: M(B(0.55, 0.12, 0.5, [0, 0.4, 0], 0.02), B(0.55, 0.72, 0.12, [0, 0.78, -0.22], 0.02), B(0.08, 0.42, 0.08, [0, 0.16, 0], 0.006)),
+    material: "cv_upholstery",
+    instances: 12,
+    indexed: true,
+    instance_layout: "type055.seats",
+    mate: A([0, 0, 0]),
+  });
+
+  add({
+    id: `${P}interior.bridge_dashboard`,
+    name_cn: "舰桥前显控台",
+    name_en: "bridge dashboard",
+    assembly: "interior",
+    build_layer: 2,
+    geometry: M(B(7.4, 0.55, 0.65, [0, 0, 0], 0.02), B(0.9, 0.4, 0.06, [-2.1, 0.45, -0.33], 0.004), B(0.9, 0.4, 0.06, [0, 0.45, -0.33], 0.004), B(0.9, 0.4, 0.06, [2.1, 0.45, -0.33], 0.004)),
+    material: "cv_hull_dark",
+    mate: A([0, DECK + 8.55, 31.5]),
+  });
+  for (const [i, x] of [-2.1, 0, 2.1].entries()) {
+    add({
+      id: `${P}interior.bridge_dash_screen_${i + 1}`,
+      name_cn: `舰桥前屏 ${i + 1}`,
+      name_en: `bridge dash screen ${i + 1}`,
+      assembly: "interior",
+      build_layer: 2,
+      geometry: M(B(0.8, 0.34, 0.03, [0, 0, 0], 0.002)),
+      material: "cv_screen",
+      mate: A([x, DECK + 9.02, 31.16], [-18, 0, 0]),
+    });
+  }
+
   add({
     id: `${P}interior.bridge_floor`,
     name_cn: "舰桥地板",
@@ -1704,7 +1793,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     build_layer: 2,
     geometry: M(B(11.0, 0.12, 20, [0, 0, 0], 0.01)),
     material: "cv_deck_plate",
-    mate: A([0, DECK + 6.4, 18]),
+    mate: A([0, DECK + 4.7, 18]),
   });
 
   // ---------------- 表面：锚/救生/舷号 ----------------
@@ -1788,7 +1877,8 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     staticOnly("t55-interior-self", "type055.interior.*", "type055.interior.*", "显控台/地板/座椅装配"),
     staticOnly("t55-gun-deck", "type055.gun.*", "type055.deck.*", "主炮炮座/弹药库与甲板安装", 400),
     staticOnly("t55-gun-hull", "type055.gun.*", "type055.hull.*", "扬弹机/弹药库与舰体安装", 700),
-    staticOnly("t55-gun-self", "type055.gun.*", "type055.gun.*", "炮塔/身管/炮座/扬弹机装配", 400),
+    staticOnly("t55-gun-self", "type055.gun.*", "type055.gun.*", "炮塔/身管/炮座/扬弹机/弹架装配", 400),
+    staticOnly("t55-magazine-rack", "type055.gun.shell_rack", "type055.gun.magazine", "弹药架置于弹药库内（库体为实体近似）", 1700),
     staticOnly("t55-ciws-super", "type055.ciws.*", "type055.super.*", "近防炮与上建安装", 300),
     staticOnly("t55-ciws-self", "type055.ciws.*", "type055.ciws.*", "近防炮塔/炮管/基座装配", 300),
     staticOnly("t55-vls-hull", "type055.vls.*", "type055.hull.*", "VLS 井筒/框架与舰体结构安装", 400),
@@ -1883,6 +1973,7 @@ export const TYPE055_BUILDERS = {
   type055Rhib,
   type055Helipad,
   type055GunTurret,
+  type055BridgeShell,
   type055HangarShell,
   type055BootTop,
   type055BulbousBow,

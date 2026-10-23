@@ -299,6 +299,59 @@ export const type055HangarShell: GeometryBuilder = () => {
   return geometry;
 };
 
+/**
+ * 舰桥壳体：两侧壁/后壁/顶盖 + 前壁窗框（下槛/上楣/两侧立柱），正面留窗洞。
+ * 旧版舰桥是实心四棱台，第一人称坐进去只能看到一堵实心墙；改成空腔后
+ * 舰桥内能看见显控台，并能透过前窗看到舰艏。
+ */
+export const type055BridgeShell: GeometryBuilder = () => {
+  const h = 5.5;
+  const wb = 4.8;
+  const wt = 4.1;
+  const db = 7.5;
+  const dt = 6.25;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const quad = (
+    a: [number, number, number],
+    b: [number, number, number],
+    c: [number, number, number],
+    d: [number, number, number],
+  ) => {
+    const base = positions.length / 3;
+    positions.push(...a, ...b, ...c, ...d);
+    indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  };
+  // 两侧壁
+  quad([-wb, 0, -db], [-wt, h, -dt], [-wt, h, dt], [-wb, 0, db]);
+  quad([wb, 0, -db], [wb, 0, db], [wt, h, dt], [wt, h, -dt]);
+  // 后壁 + 顶盖
+  quad([-wb, 0, -db], [wb, 0, -db], [wt, h, -dt], [-wt, h, -dt]);
+  quad([-wt, h, -dt], [wt, h, -dt], [wt, h, dt], [-wt, h, dt]);
+  // 前壁下槛
+  const y0 = 1.05;
+  const y1 = 3.35;
+  const xAt = (y: number) => wb - (wb - wt) * (y / h);
+  const zAt = (y: number) => db - (db - dt) * (y / h);
+  quad([-wb, 0, db], [wb, 0, db], [xAt(y0), y0, zAt(y0)], [-xAt(y0), y0, zAt(y0)]);
+  // 前壁上楣
+  quad([-xAt(y1), y1, zAt(y1)], [xAt(y1), y1, zAt(y1)], [wt, h, dt], [-wt, h, dt]);
+  // 前壁左右立柱
+  for (const side of [-1, 1] as const) {
+    quad(
+      [side * 3.4, y0, zAt(y0)],
+      [side * xAt(y0), y0, zAt(y0)],
+      [side * xAt(y1), y1, zAt(y1)],
+      [side * 3.4, y1, zAt(y1)],
+    );
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
 /** 艏部舷墙：沿脊弧从 52m 到 88.5m，两侧 0.75m 高、顶部内倾 0.12m。 */
 export const type055Bulwark: GeometryBuilder = () => {
   const stations = 22;
