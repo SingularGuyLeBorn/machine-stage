@@ -656,6 +656,113 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     });
   }
 
+  // 桅顶电子战半圆罩
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}radar.mast_ecm_${side === -1 ? "l" : "r"}`,
+      name_cn: `桅顶电子战半圆罩 ${side === -1 ? "左" : "右"}`,
+      name_en: `mast ECM pod ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(C(0.24, 1.1, [0, 0, 0], 12), C(0.28, 0.1, [0, 0.55, 0], 12)),
+      material: "cv_radar_dark",
+      mate: A([side * 1.55, 38.8, 20]),
+    });
+  }
+
+  // 舰桥/上建平板阵：IFF 环、CEC 数据链、电子战大阵面、光电转塔、舰桥侧救生筏
+  add({
+    id: `${P}radar.iff_front`,
+    name_cn: "敌我识别阵列（前）",
+    name_en: "IFF array (front)",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(B(7.2, 0.55, 0.16, [0, 0, 0], 0.01)),
+    material: "cv_aesa",
+    mate: A([0, 22.25, 39.25]),
+  });
+  add({
+    id: `${P}radar.iff_aft`,
+    name_cn: "敌我识别阵列（后）",
+    name_en: "IFF array (aft)",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(B(7.2, 0.55, 0.16, [0, 0, 0], 0.01)),
+    material: "cv_aesa",
+    mate: A([0, 22.25, 4.75], [0, 180, 0]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}radar.iff_${side === -1 ? "l" : "r"}`,
+      name_cn: `敌我识别阵列 ${side === -1 ? "左" : "右"}`,
+      name_en: `IFF array ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(7.2, 0.55, 0.16, [0, 0, 0], 0.01)),
+      material: "cv_aesa",
+      mate: A([side * 6.95, 22.25, 22], [0, side * 90, 0]),
+    });
+    add({
+      id: `${P}radar.ew_panel_${side === -1 ? "l" : "r"}`,
+      name_cn: `电子战大阵面 ${side === -1 ? "左" : "右"}`,
+      name_en: `EW large array ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(0.14, 1.8, 2.4, [0, 0, 0], 0.01)),
+      material: "cv_aesa",
+      mate: A([side * 6.55, 18.0, 22]),
+    });
+    for (const [tag, x, z] of [
+      ["front", side * 8.4, 29.2],
+      ["aft", side * 8.4, 26.6],
+    ] as const) {
+      add({
+        id: `${P}radar.cec_${side === -1 ? "l" : "r"}_${tag}`,
+        name_cn: `CEC 数据链阵面 ${side === -1 ? "左" : "右"} ${tag}`,
+        name_en: `CEC array ${side === -1 ? "l" : "r"} ${tag}`,
+        assembly: "radar",
+        build_layer: 4,
+        geometry: M(B(0.14, 0.5, 0.82, [0, 0, 0], 0.01)),
+        material: "cv_aesa",
+        mate: A([x, 22.1, z]),
+      });
+    }
+    for (const [i, z] of [8, 16, 24].entries()) {
+      add({
+        id: `${P}surface.bridge_liferaft_${side === -1 ? "l" : "r"}_${i + 1}`,
+        name_cn: `舰桥侧救生筏 ${side === -1 ? "左" : "右"} ${i + 1}`,
+        name_en: `bridge life raft ${side === -1 ? "l" : "r"} ${i + 1}`,
+        assembly: "surface",
+        build_layer: 5,
+        geometry: M(C(0.45, 1.5, [0, 0, 0], 14), B(1.0, 0.08, 0.12, [0, 0.8, 0], 0.006)),
+        material: "cv_canvas",
+        mate: A([side * 6.1, 22.05, z], [90, 0, 0]),
+      });
+    }
+    add({
+      id: `${P}radar.bridge_eo_${side === -1 ? "l" : "r"}`,
+      name_cn: `舰桥光电转塔 ${side === -1 ? "左" : "右"}`,
+      name_en: `bridge EO turret ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(S(0.3, [0, 0.35, 0], 14), C(0.18, 0.35, [0, 0, 0], 12)),
+      material: "cv_radar_dark",
+      mate: A([side * 2.5, 27.1, 28.5]),
+    });
+  }
+  for (const [i, x] of [-2.4, 0, 2.4].entries()) {
+    add({
+      id: `${P}radar.bridge_face_${i + 1}`,
+      name_cn: `舰桥正面小阵 ${i + 1}`,
+      name_en: `bridge face array ${i + 1}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(1.6, 0.6, 0.12, [0, 0, 0], 0.01)),
+      material: "cv_aesa",
+      mate: A([x, 26.6, 33.02]),
+    });
+  }
+
   // 舷窗/窗带（实例族）：主上建两层、后上建一层
   interface PanelSpot {
     x: number;
@@ -879,7 +986,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 4,
       geometry: M(B(0.12, 2.6, 3.0, [0, 0, 0], 0.01)),
       material: "cv_aesa",
-      mate: A([side * 2.3, 31.5, 20], [0, side * 90, 0]),
+      mate: A([side * 2.3, 31.5, 20]),
     });
   }
   for (const [tag, z, yaw] of [
@@ -1564,19 +1671,23 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
   // 前甲板垂发海上再装填吊车（折叠收藏位）
   add({
     id: `${P}vls.reload_crane`,
-    name_cn: "垂发海上再装填吊车（收藏）",
-    name_en: "VLS reloading crane (stowed)",
+    name_cn: "垂发海上再装填装置（折叠收藏）",
+    name_en: "VLS at-sea reloading system (stowed)",
     assembly: "vls",
     build_layer: 4,
     geometry: M(
-      C(0.46, 0.5, [0, 0, 0], 14),
-      C(0.18, 2.4, [0, 1.3, 0], 12),
-      { type: "weld", from: [0, 2.5, 0], to: [0, 2.9, 3.9], radius: 0.09 },
-      { type: "weld", from: [0, 2.9, 3.9], to: [0, 1.7, 3.9], radius: 0.025 },
-      T(0.14, 0.08, 0.2, [0, 1.6, 3.9], 12),
+      B(3.2, 0.14, 2.2, [0, 0, 0], 0.02),
+      B(2.8, 0.2, 1.8, [0, -0.18, 0], 0.02),
+      { type: "weld", from: [0, 0, -0.7], to: [-1.05, 0.9, 0.15], radius: 0.12 },
+      { type: "weld", from: [0, 0, -0.7], to: [1.05, 0.9, 0.15], radius: 0.12 },
+      { type: "weld", from: [-1.05, 0.9, 0.15], to: [0, 1.0, 1.0], radius: 0.09 },
+      { type: "weld", from: [1.05, 0.9, 0.15], to: [0, 1.0, 1.0], radius: 0.09 },
+      B(2.0, 0.18, 0.2, [0, 1.0, 1.0], 0.02),
+      B(0.16, 0.16, 1.3, [-0.9, 0.55, 0.0], 0.01),
+      B(0.16, 0.16, 1.3, [0.9, 0.55, 0.0], 0.01),
     ),
     material: "cv_055_fitting",
-    mate: A([-5.0, t55DeckTop(55) + 0.25, 55]),
+    mate: A([-5.0, t55DeckTop(55) + 0.07, 55]),
   });
 
   // ---------------- 主炮 ----------------
@@ -2501,6 +2612,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     staticOnly("t55-radar-self", "type055.radar.*", "type055.radar.*", "阵面/天线/安装框装配"),
     staticOnly("t55-radar-mast-panel", "type055.radar.mast_panel_*", "type055.super.mast*", "桅身相控阵/电子战面板嵌入综合桅杆表面", 2200),
     staticOnly("t55-radar-mast-ecm", "type055.radar.ecm_*", "type055.super.mast*", "电子战阵面贴装桅杆侧面", 400),
+    staticOnly("t55-radar-deckhouse", "type055.radar.ew_panel_*", "type055.super.main_block", "电子战大阵面贴装上建侧壁", 1200),
     staticOnly("t55-vls-deck", "type055.vls.*", "type055.deck.*", "VLS 井口/框架与甲板安装", 150),
     staticOnly("t55-vls-self", "type055.vls.*", "type055.vls.*", "井筒/井盖/框架/燃气排导安装"),
     staticOnly("t55-weapons-deck", "type055.weapons.*", "type055.deck.*", "主炮/近防/导弹/鱼雷与甲板安装", 150),
