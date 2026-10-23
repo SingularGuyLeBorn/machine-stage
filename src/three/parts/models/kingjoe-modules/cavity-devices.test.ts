@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import * as THREE from "three";
+import { MeshBVH } from "three-mesh-bvh";
+import { opticalContactFaces } from "./optical-interiors";
 import { createMaterialLibrary } from "../../kernel/textures";
 import { buildModel } from "../../assembler/assembler";
 import { makeKingJoeModuleRegistry, kingjoeModuleBuilders } from "./registry";
@@ -39,7 +41,8 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
     const packets = model.parts.filter((p) => /_(packets)$/.test(p.partId));
     expect(FLOW_PACKET_COUNT).toBe(5);
     expect(packets.length).toBeGreaterThan(100);
-    for (const part of packets) expect(part.instances.length).toBe(5);
+    for (const part of packets)
+      expect(part.instances.length).toBe(part.def.tags?.includes("interface-coupling") ? 3 : 5);
     for (const phase of [0.12, 0.3, 0.5, 0.7, 0.88]) expect(flowPacketScale(phase)).toBeCloseTo(1);
     expect(flowPacketScale(0)).toBeLessThan(0.001);
     expect(flowPacketScale(1)).toBeLessThan(0.001);
@@ -63,6 +66,34 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
       expect(part.geometry.getAttribute("flexProfile").count).toBe(
         part.geometry.getAttribute("position").count,
       );
+    }
+  });
+  it("光学接口落在实体连接面，短程耦合不会变成悬空装饰", () => {
+    for (const contact of opticalContactFaces) {
+      for (const [i, point] of [contact.a, contact.b].entries()) {
+        const part = model.getPart(contact.faces[i]!)!;
+        expect(part, contact.label).toBeDefined();
+        const tree = new MeshBVH(part.geometry);
+        expect(tree.closestPointToPoint(new THREE.Vector3(...point))!.distance, contact.label).toBeLessThan(
+          0.001,
+        );
+      }
+      const gap = new THREE.Vector3(...contact.a).distanceTo(new THREE.Vector3(...contact.b));
+      expect(gap).toBeGreaterThan(0.01);
+      expect(gap).toBeLessThan(0.08);
+    }
+    model.resetNodes();
+    animateKingJoeModules(model, 0.2, "beam");
+    const routes = planEnergyExchange(planCavityDevices(new Map()));
+    for (const [i, route] of routes.entries()) {
+      if (!route.faceLabel) continue;
+      const a = model.getNode(`Exchange_${i}_end_0`)!;
+      const b = model.getNode(`Exchange_${i}_end_1`)!;
+      expect(a.scale.toArray()).toEqual([1, 1, 1]);
+      expect(b.scale.toArray()).toEqual([1, 1, 1]);
+      expect(
+        a.getWorldPosition(new THREE.Vector3()).distanceTo(b.getWorldPosition(new THREE.Vector3())),
+      ).toBeGreaterThan(0.01);
     }
   });
   it("手部和全身光环的实际实例法线始终沿截面传递方向", () => {
@@ -99,7 +130,9 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
     const routes = planEnergyExchange(planCavityDevices(new Map()));
     expect(new Set(routes.map((r) => r.mode)).size).toBe(4);
     expect(routes.filter((r) => r.mode === "membrane").length / routes.length).toBeLessThan(0.25);
-    expect(routes.filter((r) => r.anchors).length).toBe(8);
+    expect(routes.filter((r) => r.anchors && !r.faceLabel).length).toBe(8);
+    expect(routes.filter((r) => r.anchors && r.faceLabel).length).toBe(8);
+    expect(routes.filter((r) => r.faceLabel).length).toBe(32);
     for (const owner of ["legs", "pelvis", "chest", "head_arms", "upper_l", "upper_r"])
       expect(routes.some((r) => r.owner === owner)).toBe(true);
     for (const time of [0, 1.7, 3.4]) {
