@@ -12,6 +12,11 @@ describe("贴合发光外观的分件光学内构", () => {
   it("轮廓来自现有窗面，所有零件内退、可在仅内部模式显示并跟随所属分体", () => {
     const registry = makeKingJoeModuleRegistry();
     expect(validateRegistry(registry).filter((e) => e.level === "error")).toEqual([]);
+    expect(
+      registry.parts.filter((part) => /\.chest\.(?:internal|flex)_chest_rib_/.test(part.id)),
+    ).toHaveLength(0);
+    expect(registry.parts.some((part) => part.id.includes("internal_chest_rail_"))).toBe(true);
+    expect(registry.parts.some((part) => part.id.includes("internal_pelvis_rib_"))).toBe(true);
     const model = buildModel(registry, { builders: kingjoeModuleBuilders });
     try {
       expect(opticalParts).toHaveLength(140);

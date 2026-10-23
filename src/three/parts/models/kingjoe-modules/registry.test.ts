@@ -199,7 +199,9 @@ describe("参考图四模块闭合分体", () => {
         { constants: {}, builders: kingjoeModuleBuilders },
       );
       const tree = new MeshBVH(shell);
-      const pieces = pedan.structure.filter((p) => p.owner === owner.key);
+      const pieces = pedan.structure.filter(
+        (p) => p.owner === owner.key && !(p.owner === "chest" && p.kind === "rib"),
+      );
       expect(pieces.length, owner.key).toBeGreaterThan(10);
       for (const piece of pieces) {
         const part = model.parts.find((p) => p.partId.endsWith(`.internal_${piece.key}`))!;

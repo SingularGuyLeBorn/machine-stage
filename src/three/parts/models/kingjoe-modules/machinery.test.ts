@@ -25,9 +25,10 @@ describe("佩丹内部联动与输能", () => {
         ),
     );
     for (const [module, before] of Object.entries({ legs: 990, pelvis: 245, chest: 513, head_arms: 1016 })) {
+      // 胸甲外围的 17 根环绕横肋按用户要求移除，设备附件密度保持原值。
       expect(
         internal.filter((p) => p.assembly === module).reduce((sum, p) => sum + (p.instances ?? 1), 0),
-      ).toBe(before * 2);
+      ).toBe(before * 2 - (module === "chest" ? 17 : 0));
     }
     const model = buildModel(registry, { builders: kingjoeModuleBuilders });
     try {

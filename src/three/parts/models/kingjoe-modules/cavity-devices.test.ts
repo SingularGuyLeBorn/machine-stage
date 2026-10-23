@@ -53,6 +53,11 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
         expect(flexProfile(zone.center, [zone])[0]).toBeCloseTo(1);
       }
       const part = model.parts.find((p) => p.partId.endsWith(`.flex_${piece.key}`))!;
+      // 胸部环绕横肋及配套柔性接头已按用户要求移除，其他部位继续验证。
+      if (piece.owner === "chest" && piece.key.startsWith("chest_rib_")) {
+        expect(part).toBeUndefined();
+        continue;
+      }
       expect(part).toBeDefined();
       expect(part.def.tags).toContain("internal");
       expect(part.geometry.getAttribute("flexProfile").count).toBe(
