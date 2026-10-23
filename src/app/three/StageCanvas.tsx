@@ -347,6 +347,7 @@ function StageRuntime() {
       stats: { parts: number; triangles: number },
       home: { center: [number, number, number]; radius: number } | null,
       floor: { y: number; footprint: number } | null,
+      warm = true,
     ) => {
       seqRef.current += 1;
       setScene({ assembled: target, seq: seqRef.current });
@@ -368,7 +369,10 @@ function StageRuntime() {
       clockRef.current = 0;
       lastStateRef.current = null;
       currentKeyRef.current = key;
-      warmShaders(target);
+      // 小模型（测试台/枪械）不需要整场景 compileAsync：它们首帧本来就不慢，
+      // 反而会让“着色器编译中”提示无故停留十几秒。缓存已预热的模型也不重复编译。
+      if (warm && stats.parts >= 1000) warmShaders(target);
+      else store.setShaderWarming(false);
     };
 
     const cleanupFor = (target: AssembledModel) => () => {
@@ -388,7 +392,7 @@ function StageRuntime() {
       cached.assembled.root.position.set(0, 0, 0);
       cached.assembled.root.rotation.set(0, 0, 0);
       cached.assembled.root.updateMatrixWorld(true);
-      mount(cached.assembled, cached.stats, cached.home, cached.floor);
+      mount(cached.assembled, cached.stats, cached.home, cached.floor, !cached.warmed);
       console.log(`[perf] 缓存命中 ${model.title}（${cache.size} 个模型）`);
       return cleanupFor(cached.assembled);
     }
