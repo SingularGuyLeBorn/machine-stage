@@ -13,6 +13,8 @@ import {
   DOCK_DELAYS,
 } from "./motion";
 import { CONTACT_PAIRS, contactTriangles, randomSurfacePoint, getModuleEffects } from "./effects";
+import { createMaterialLibrary } from "../../kernel/textures";
+import { exchangeMaterials } from "./energy-exchange";
 import skin from "../kingjoe-skin/segments.generated.json";
 import { exteriorGeometry } from "./test-geometry";
 
@@ -49,22 +51,24 @@ describe("分体、吸合和接触面电弧", () => {
       animateKingJoeModules(model, start, `ray_${key}`);
       animateKingJoeModules(model, start + 2.9, `ray_${key}`);
       expect(model.root.getObjectByName("kingjoe-pedan-z-rays")!.visible).toBe(false);
-      animateKingJoeModules(model, start + 3.5, `ray_${key}`);
+      animateKingJoeModules(model, start + 3.9, `ray_${key}`);
       const rays = model.root.getObjectByName("kingjoe-pedan-z-rays")!;
       expect(rays.visible).toBe(true);
-      expect(rays.children).toHaveLength(24);
-      const origins = rays.children.map((child) => {
-        const p = (child as THREE.Mesh).geometry.getAttribute("position");
-        return new THREE.Vector3(
-          (p.getX(0) + p.getX(1)) / 2,
-          (p.getY(0) + p.getY(1)) / 2,
-          (p.getZ(0) + p.getZ(1)) / 2,
-        );
-      });
+      expect(rays.children.filter((child) => child.visible)).toHaveLength(2);
+      const origins = rays.children
+        .filter((child) => child.visible)
+        .map((child) => {
+          const p = (child as THREE.Mesh).geometry.getAttribute("position");
+          return new THREE.Vector3(
+            (p.getX(0) + p.getX(1) + p.getX(2) + p.getX(3)) / 4,
+            (p.getY(0) + p.getY(1) + p.getY(2) + p.getY(3)) / 4,
+            (p.getZ(0) + p.getZ(1) + p.getZ(2) + p.getZ(3)) / 4,
+          );
+        });
       expect(origins[0].distanceTo(origins[1])).toBeGreaterThan(0.1);
       origins.forEach((point, i) => expect(point.distanceTo(origins[i % 2])).toBeLessThan(1e-5));
       const p = (rays.children[0] as THREE.Mesh).geometry.getAttribute("position");
-      const bends = Array.from({ length: 10 }, (_, j) => p.getX((j + 5) * 2) - p.getX((j + 4) * 2));
+      const bends = Array.from({ length: 10 }, (_, j) => p.getX((j + 5) * 4) - p.getX((j + 4) * 4));
       expect(bends.filter((n) => n > 0).length).toBeGreaterThan(2);
       expect(bends.filter((n) => n < 0).length).toBeGreaterThan(2);
     }
@@ -77,10 +81,91 @@ describe("分体、吸合和接触面电弧", () => {
     const bent = model.getNode("Joint_fore_l")!.rotation.x;
     animateKingJoeModules(model, 34.1, "beam");
     expect(rays.visible).toBe(true);
+    const yellowGeometry = (rays.children[2] as THREE.Mesh).geometry.getAttribute("position");
+    expect(rays.children.filter((child) => child.visible)).toHaveLength(1);
+    const midpoint = (index: number) =>
+      new THREE.Vector3(
+        (yellowGeometry.getX(index) +
+          yellowGeometry.getX(index + 1) +
+          yellowGeometry.getX(index + 2) +
+          yellowGeometry.getX(index + 3)) /
+          4,
+        (yellowGeometry.getY(index) +
+          yellowGeometry.getY(index + 1) +
+          yellowGeometry.getY(index + 2) +
+          yellowGeometry.getY(index + 3)) /
+          4,
+        (yellowGeometry.getZ(index) +
+          yellowGeometry.getZ(index + 1) +
+          yellowGeometry.getZ(index + 2) +
+          yellowGeometry.getZ(index + 3)) /
+          4,
+      );
+    const screen = model.root.worldToLocal(
+      model.getNode("Module_head_arms")!.localToWorld(new THREE.Vector3(0, 6.195, 0.66)),
+    );
+    expect(midpoint(0).distanceTo(screen)).toBeLessThan(1e-5);
+    const target = midpoint(yellowGeometry.count - 4).sub(midpoint(0));
+    expect(target.y).toBeCloseTo(-1.3, 5);
+    expect(target.z).toBeCloseTo(3.8, 5);
+    const edge = new THREE.Vector3().fromBufferAttribute(yellowGeometry, 32);
+    expect(edge.distanceTo(new THREE.Vector3().fromBufferAttribute(yellowGeometry, 33))).toBeGreaterThan(
+      0.024,
+    );
     expect(model.getNode("Joint_fore_l")!.rotation.x).toBeGreaterThan(bent);
     animateKingJoeModules(model, 38, "beam");
     expect(rays.visible).toBe(false);
     model.dispose();
+  }, 20000);
+  it("加力不重启红束，单条 Z 的截面从根部向尖端变粗，内部材质增强后可恢复", () => {
+    const library = createMaterialLibrary(exchangeMaterials);
+    const model = buildModel(makeKingJoeModuleRegistry(), {
+      builders: kingjoeModuleBuilders,
+      materials: library.materials,
+    });
+    try {
+      animateKingJoeModules(model, 0, "ray_chest");
+      animateKingJoeModules(model, 4, "ray_chest");
+      const rays = model.root.getObjectByName("kingjoe-pedan-z-rays")!;
+      const width = (tip: boolean) => {
+        const p = (rays.children[0] as THREE.Mesh).geometry.getAttribute("position");
+        const index = tip ? p.count - 4 : 0;
+        return new THREE.Vector3()
+          .fromBufferAttribute(p, index)
+          .distanceTo(new THREE.Vector3().fromBufferAttribute(p, index + 1));
+      };
+      const baseWidth = width(false);
+      animateKingJoeModules(model, 4, "ray_chest", false, 2);
+      expect(width(false)).toBeCloseTo(baseWidth * 2, 5);
+      animateKingJoeModules(model, 4, "ray_chest", false, 1);
+      expect(width(false)).toBeCloseTo(baseWidth, 5);
+      animateKingJoeModules(model, 5, "ray_chest", true);
+      expect(width(false)).toBeCloseTo(baseWidth);
+      for (let frame = 501; frame <= 570; frame++)
+        animateKingJoeModules(model, frame / 100, "ray_chest", true);
+      expect(rays.visible).toBe(true);
+      expect(rays.children.filter((child) => child.visible)).toHaveLength(2);
+      expect(width(false)).toBeGreaterThan(width(true) * 1.5);
+      const feed = model.parts.find((part) => part.def.material === "pedan_redfeed_chest")!;
+      expect((feed.object.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(0.5);
+      for (let frame = 571; frame <= 730; frame++)
+        animateKingJoeModules(model, frame / 100, "ray_chest", true);
+      expect(width(true)).toBeCloseTo(baseWidth * 2.1, 5);
+      const beforeOff = width(true);
+      animateKingJoeModules(model, 7.3, "ray_chest", false);
+      expect(width(true)).toBeCloseTo(beforeOff, 5);
+      for (let frame = 731; frame <= 960; frame++)
+        animateKingJoeModules(model, frame / 100, "ray_chest", false);
+      expect(width(true)).toBeCloseTo(baseWidth, 5);
+      expect((feed.object.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeLessThanOrEqual(
+        0.42,
+      );
+      animateKingJoeModules(model, 10, "closed", true);
+      expect(rays.visible).toBe(false);
+    } finally {
+      model.dispose();
+      library.dispose();
+    }
   }, 20000);
   it("待对接模块持续悬浮、预靠近且带倾角，近场恢复直立", () => {
     const model = create();

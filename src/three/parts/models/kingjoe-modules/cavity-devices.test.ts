@@ -41,7 +41,13 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
     expect(FLOW_PACKET_COUNT).toBe(5);
     expect(packets.length).toBeGreaterThan(100);
     for (const part of packets)
-      expect(part.instances.length).toBe(part.def.tags?.includes("interface-coupling") ? 3 : 5);
+      expect(part.instances.length).toBe(
+        part.def.material.startsWith("pedan_redfeed_")
+          ? 9
+          : part.def.tags?.includes("interface-coupling")
+            ? 3
+            : 5,
+      );
     for (const phase of [0.12, 0.3, 0.5, 0.7, 0.88]) expect(flowPacketScale(phase)).toBeCloseTo(1);
     expect(flowPacketScale(0)).toBeLessThan(0.001);
     expect(flowPacketScale(1)).toBeLessThan(0.001);
@@ -204,7 +210,7 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
       const start = 100 + ownerIndex * 10;
       const motion = `ray_${owner}` as "ray_legs";
       animateKingJoeModules(model, start, motion);
-      for (const elapsed of [2.1, 2.4, 2.8, 3.1, 3.5]) {
+      for (const elapsed of [2.1, 2.4, 2.8, 3.1, 3.5, 3.9]) {
         animateKingJoeModules(model, start + elapsed, motion);
         for (const { route, index } of feeds) {
           const end = model.getNode(`Exchange_${index}_end_1`)!;
@@ -217,7 +223,7 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
                 candidate.route.redFeed!.side !== route.redFeed!.side,
             )!;
             expect(end.scale.x).toBe(model.getNode(`Exchange_${twin.index}_end_1`)!.scale.x);
-            for (let packet = 0; packet < 5; packet++)
+            for (let packet = 0; packet < 9; packet++)
               expect(model.getNode(`Exchange_${index}_packet_${packet}`)!.scale.x).toBeCloseTo(
                 model.getNode(`Exchange_${twin.index}_packet_${packet}`)!.scale.x,
                 10,

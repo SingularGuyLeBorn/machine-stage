@@ -4,7 +4,7 @@ import { buildModel } from "../../assembler/assembler";
 import { kingjoeModuleBuilders, makeKingJoeModuleRegistry } from "./registry";
 import { animateKingJoeModules } from "./motion";
 import { pedanPower, QUIET_ACTIVITY } from "./machinery";
-import { redRayEnd } from "./rays";
+import { redRayEnd, yellowRayEnd } from "./rays";
 
 describe("佩丹内部联动与输能", () => {
   it("四分体内部实例各翻倍，新增附件扫掠留在原设备安全球内", () => {
@@ -112,9 +112,12 @@ describe("佩丹内部联动与输能", () => {
         up = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation);
       const a = redRayEnd(left, right, forward, up),
         b = redRayEnd(right, left, forward, up);
-      expect(a.distanceTo(b)).toBeCloseTo(left.distanceTo(right) * 0.72, 8);
-      expect(a.clone().sub(left).dot(up)).toBeCloseTo(-0.32, 8);
-      expect(b.clone().sub(right).dot(forward)).toBeCloseTo(4.5, 8);
+      expect(a.distanceTo(b)).toBeCloseTo(left.distanceTo(right) * 0.46, 8);
+      expect(a.clone().sub(left).dot(up)).toBeCloseTo(-0.7, 8);
+      expect(b.clone().sub(right).dot(forward)).toBeCloseTo(3.2, 8);
+      const yellow = yellowRayEnd(left, forward, up, 1).sub(left);
+      expect(yellow.dot(forward)).toBeCloseTo(3.8, 8);
+      expect(yellow.dot(up)).toBeCloseTo(-1.3, 8);
     }
   });
 });

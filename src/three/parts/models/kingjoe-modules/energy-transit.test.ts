@@ -6,6 +6,11 @@ import {
   sampleRedTransit,
   redRayPower,
   RED_FEED_DELAY,
+  redGather,
+  createBoostClock,
+  advanceBoostClock,
+  boostAt,
+  redPacketPosition,
 } from "./energy-transit.mjs";
 
 describe("核心到灯窗的传能时序", () => {
@@ -43,7 +48,24 @@ describe("分体双天线的共同蓄能时钟", () => {
     expect(sampleRedTransit(1.1, RED_FEED_DELAY.tip)).toBe(1);
     expect(redRayPower(1.1)).toBe(0);
     expect(redRayPower(RED_FEED_DELAY.fire)).toBe(0);
-    expect(redRayPower(1.4)).toBe(1);
+    expect(redRayPower(1.8)).toBe(1);
+  });
+  it("蓄能环列逐渐向尖端收拢，同亮停留后恢复传递", () => {
+    for (const phase of [0.1, 0.3, 0.7, 0.9]) {
+      expect(redPacketPosition(phase, 0)).toBe(phase);
+      expect(redPacketPosition(phase, 0.7)).toBeGreaterThan(phase);
+      expect(redPacketPosition(phase, 1.1)).toBeGreaterThanOrEqual(0.72);
+      expect(redPacketPosition(phase, 1.4)).toBe(redPacketPosition(phase, 1.1));
+      expect(redPacketPosition(phase, 2.1)).toBe(phase);
+    }
+    expect(redRayPower(1.5)).toBe(0);
+    expect(redGather(null)).toBe(0);
+    let previous = 0;
+    for (let frame = 0; frame <= 300; frame++) {
+      const value = redGather(frame / 100);
+      expect(Math.abs(value - previous)).toBeLessThan(0.04);
+      previous = value;
+    }
   });
   it("退出后归零，持续发射有界且没有尖跳", () => {
     for (const delay of [0, RED_FEED_DELAY.mount, RED_FEED_DELAY.tip]) {
@@ -59,5 +81,33 @@ describe("分体双天线的共同蓄能时钟", () => {
       }
     }
     expect(redRayPower(null)).toBe(0);
+  });
+});
+
+describe("加力传播与连续相位", () => {
+  it("先提升内部速度，外束从根到尖依次收到加力，快速反向也连续", () => {
+    const clock = createBoostClock(0);
+    advanceBoostClock(clock, 0, true);
+    for (let frame = 1; frame <= 100; frame++) advanceBoostClock(clock, frame / 100, true);
+    expect(clock.flowTime).toBeGreaterThan(1.8);
+    expect(boostAt(clock, 1, 0.3)).toBe(1);
+    expect(boostAt(clock, 1, 1.45)).toBe(0);
+    const old = clock.flowTime,
+      level = boostAt(clock, 1);
+    advanceBoostClock(clock, 1, false);
+    expect(clock.flowTime).toBe(old);
+    expect(boostAt(clock, 1)).toBe(level);
+    advanceBoostClock(clock, 1.2, false);
+    const turning = boostAt(clock, 1.2);
+    advanceBoostClock(clock, 1.2, true);
+    expect(boostAt(clock, 1.2)).toBe(turning);
+    for (let frame = 121; frame <= 400; frame++) advanceBoostClock(clock, frame / 100, true);
+    expect(boostAt(clock, 4, 1.45)).toBe(1);
+    advanceBoostClock(clock, 4, false);
+    for (let frame = 401; frame <= 700; frame++) advanceBoostClock(clock, frame / 100, false);
+    expect(boostAt(clock, 7, 1.45)).toBe(0);
+    const stopped = clock.flowTime;
+    advanceBoostClock(clock, 7.1, false);
+    expect(clock.flowTime - stopped).toBeCloseTo(0.1);
   });
 });

@@ -566,3 +566,30 @@ describe("内部观察模式互斥", () => {
     }
   });
 });
+
+describe("光线加力开关", () => {
+  it("加力保持当前发射状态与模型实例，换模型清零且不支持的模型不能开启", () => {
+    const store = useStageStore.getState();
+    store.setModel("kingjoemodules");
+    store.setMachineState("ray_chest");
+    const before = useStageStore.getState().assembled;
+    store.setEnergyWidth(1.8);
+    expect(useStageStore.getState().energyWidth).toBe(1.8);
+    store.setEnergyWidth(Number.NaN);
+    expect(useStageStore.getState().energyWidth).toBe(1.8);
+    store.setEnergyWidth(9);
+    expect(useStageStore.getState().energyWidth).toBe(3);
+    store.toggleEnergyBoost();
+    expect(useStageStore.getState().energyBoost).toBe(true);
+    expect(useStageStore.getState().machineState).toBe("ray_chest");
+    expect(useStageStore.getState().assembled).toBe(before);
+    store.toggleEnergyBoost();
+    expect(useStageStore.getState().energyBoost).toBe(false);
+    store.toggleEnergyBoost();
+    store.setModel("test");
+    expect(useStageStore.getState().energyWidth).toBe(1);
+    expect(useStageStore.getState().energyBoost).toBe(false);
+    store.toggleEnergyBoost();
+    expect(useStageStore.getState().energyBoost).toBe(false);
+  });
+});
