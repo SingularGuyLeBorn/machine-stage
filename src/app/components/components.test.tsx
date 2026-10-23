@@ -93,6 +93,18 @@ describe("ModelList", () => {
     const j20 = screen.getByText("歼-20").closest("button")!;
     expect(j20.disabled).toBe(true);
   });
+
+  it("分类标签只显示对应类别的模型", () => {
+    render(<ModelList />);
+    fireEvent.click(screen.getByRole("tab", { name: /坦克/ }));
+    expect(screen.getByText("虎式坦克 Tiger I")).toBeDefined();
+    expect(screen.queryByText("AK-47 突击步枪")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: /舰船/ }));
+    expect(screen.getByText("福建舰 · 电磁弹射航母")).toBeDefined();
+    expect(screen.queryByText("虎式坦克 Tiger I")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: /全部/ }));
+    expect(screen.getByText("AK-47 突击步枪")).toBeDefined();
+  });
 });
 
 describe("PartTree", () => {

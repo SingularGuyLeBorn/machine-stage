@@ -120,9 +120,23 @@ export interface StageVariant {
   readouts?: (assembled: AssembledModel) => Array<{ label: string; value: string }>;
 }
 
+export type ModelCategory = "ship" | "aircraft" | "armor" | "firearm" | "mech" | "framework";
+
+export const MODEL_CATEGORY_LABELS: Record<ModelCategory, string> = {
+  ship: "舰船",
+  aircraft: "战机",
+  armor: "坦克",
+  firearm: "枪械",
+  mech: "机甲",
+  framework: "框架",
+};
+
+export const MODEL_CATEGORY_ORDER: ModelCategory[] = ["ship", "aircraft", "armor", "firearm", "mech", "framework"];
+
 export interface StageModel {
   id: string;
   title: string;
+  category: ModelCategory;
   subtitle: string;
   /** 里程碑标记（左栏卡片角标）。 */
   milestone: string;
@@ -198,6 +212,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "t800",
     title: "T-800 内骨骼",
+    category: "mech",
     subtitle: "M-G：真实网格按蒙皮切分（原型 245 件 / 机械拆解版 3067 件）",
     milestone: "M-G",
     status: "ready",
@@ -253,6 +268,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoemodules",
     title: "金古桥 · 参考图分体",
+    category: "mech",
     subtitle: "头肩与完整双臂 / 胸甲 / 腹盆 / 腿部 · 原 GLB 细节",
     milestone: "四模块",
     status: "ready",
@@ -300,6 +316,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "test",
     title: "框架自检台",
+    category: "framework",
     subtitle: "3 零件 · 实例级穿模报告 · M-A 验收",
     milestone: "M-A",
     status: "ready",
@@ -348,6 +365,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "tiger",
     title: "虎式坦克 Tiger I",
+    category: "armor",
     subtitle: "L1–L5 全层 · 主炮闩 / 中空炮管 / 车长塔枪座 · 表面质感",
     milestone: "M-C",
     status: "ready",
@@ -481,6 +499,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "mbt90",
     title: "MBT-90 主战坦克",
+    category: "armor",
     subtitle: "V12 双涡轮 / 液气悬挂 / 转盘自动装弹机 / 复合装甲 + ERA / 120mm 滑膛炮 · 自内向外零件级",
     milestone: "M-D",
     status: "ready",
@@ -537,6 +556,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "ed90",
     title: "ED-90 电驱坦克",
+    category: "armor",
     subtitle: "6×800V 动力电池 / 双电机独立驱动 / SiC 电控 / 快充 + 能量回收 / 静音 · 瞬时扭矩 · 热失控",
     milestone: "M-F",
     status: "ready",
@@ -593,6 +613,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "m249",
     title: "M249 班用自动武器",
+    category: "firearm",
     subtitle: "导气式 + 弹链供弹 · M27 可散链步进 · 快拆枪管",
     milestone: "M-E",
     status: "ready",
@@ -637,6 +658,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoe",
     title: "金古桥 King Joe",
+    category: "mech",
     subtitle: "真实网格皮 · 四体分离合体 · 锥销/锁环 · 彩虹胸 · 反重力 · 怪光线",
     milestone: "M-G·R3",
     status: "ready",
@@ -681,6 +703,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoeskin",
     title: "金古桥 King Joe · 真实网格分件",
+    category: "mech",
     subtitle: "578 源件 · 四段飞船 · 四体分件查看 · 哑光银灰 + 彩虹胸 · 个人参考",
     milestone: "M-G·R3",
     status: "ready",
@@ -724,6 +747,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoewhole",
     title: "金古桥 King Joe · 整体实心（单件）",
+    category: "mech",
     subtitle: "原皮表面 + 内部闭合实心核 + 缝隙补面 · 1 个 partId · 不是中空壳",
     milestone: "M-G·R3.1",
     status: "ready",
@@ -765,6 +789,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "m2hb",
     title: "M2HB 重机枪",
+    category: "firearm",
     subtitle: "枪管短后坐 + 半自由枪机 · M3 三脚架 + T&E · 重力排壳",
     milestone: "M-D",
     status: "ready",
@@ -810,6 +835,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "ak47",
     title: "AK-47 突击步枪",
+    category: "firearm",
     subtitle: "导气式 + 枪机回转闭锁 · 30 发弹匣零件化 · 完整射击循环",
     milestone: "M-E",
     status: "ready",
@@ -853,6 +879,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "m134",
     title: "M134 加特林",
+    category: "firearm",
     subtitle: "6 管旋转 · 每管独立枪机依次击发 · 外能源电机驱动",
     milestone: "M-G",
     status: "ready",
@@ -897,6 +924,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "carrier",
     title: "福建舰 · 电磁弹射航母",
+    category: "ship",
     subtitle: "1:8 · 电磁弹射 / 拦阻降落 / 相控阵 / 1130 近防 / 核动力",
     milestone: "CV-1",
     status: "ready",
@@ -949,6 +977,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "j20",
     title: "歼-20",
+    category: "aircraft",
     subtitle: "M-F：主承力框 + 弹舱滑轨",
     milestone: "M-F",
     status: "planned",
