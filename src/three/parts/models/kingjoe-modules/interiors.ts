@@ -27,13 +27,14 @@ export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
   },
   // [OM-FREEPLAY] 四组错相的低亮能量端环，避免全机齐闪；每一对仍严格同步。
   ...Object.fromEntries(
-    ["#6e9da7", "#839fa9", "#b39b70", "#628999"].map((color, i) => [
+    // [OM-FREEPLAY] 颜色集中到输能通道，提升色彩辨识度；承力金属仍保持钛灰与暗铜。
+    ["#38b7b3", "#7f89cb", "#c59b54", "#4c98c4"].map((color, i) => [
       `pedan_exchange_${i}`,
-      { base: color, metalness: 0.28, roughness: 0.42, emissive: color, emissiveIntensity: 0.2 },
+      { base: color, metalness: 0.12, roughness: 0.42, emissive: color, emissiveIntensity: 0.2 },
     ]),
   ),
   pedan_hand_gel: {
-    base: "#577f8a",
+    base: "#3d9ca9",
     metalness: 0.1,
     roughness: 0.38,
     opacity: 0.5,
@@ -42,24 +43,24 @@ export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
     clearcoatRoughness: 0.35,
   },
   pedan_hand_field: {
-    base: "#547985",
+    base: "#398f9d",
     metalness: 0.35,
     roughness: 0.4,
-    emissive: "#79a0aa",
+    emissive: "#48abb9",
     emissiveIntensity: 0.2,
   },
   pedan_hand_flow: {
-    base: "#7ca7b2",
+    base: "#48c1cb",
     metalness: 0.15,
     roughness: 0.45,
-    emissive: "#709ba7",
-    emissiveIntensity: 0.25,
-    opacity: 0.46,
+    emissive: "#39aebb",
+    emissiveIntensity: 0.35,
+    opacity: 0.62,
     depthWrite: false,
   },
   pedan_chrome: { base: "#a6afb3", metalness: 0.82, roughness: 0.32 },
   pedan_gel: {
-    base: "#648d97",
+    base: "#408f9b",
     metalness: 0.18,
     roughness: 0.34,
     opacity: 0.38,
@@ -74,22 +75,22 @@ export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
   pedan_red: { base: "#795340", metalness: 0.65, roughness: 0.4 },
   pedan_titanium: { base: "#6d8590", metalness: 0.75, roughness: 0.34 },
   pedan_core: {
-    base: "#78a7ad",
+    base: "#47b9b5",
     metalness: 0.4,
     roughness: 0.2,
-    emissive: "#6095a2",
+    emissive: "#2ca6ad",
     emissiveIntensity: 0.5,
   },
   pedan_crystal: {
-    base: "#9dbac5",
+    base: "#72bfd4",
     metalness: 0.35,
     roughness: 0.18,
-    emissive: "#618eaa",
+    emissive: "#3a9fb8",
     emissiveIntensity: 0.4,
   },
 };
 for (const channel of ["brain", "modulator_l", "modulator_r", "legs", "pelvis", "chest", "head_arms"]) {
-  const color = channel === "brain" ? "#c8a167" : channel.startsWith("modulator") ? "#83b6bc" : "#bd8c54";
+  const color = channel === "brain" ? "#d9aa58" : channel.startsWith("modulator") ? "#49b7bc" : "#c28d46";
   INTERIOR_MATERIALS[`pedan_power_${channel}`] = {
     base: color,
     emissive: color,

@@ -324,16 +324,16 @@ export function updateCavityDevices(model: AssembledModel, seconds: number, acti
           "#include <emissivemap_fragment>",
           `#include <emissivemap_fragment>
           float flow=gelPoint.y*9.0-gelTime*(0.55+gelCharge*1.8)+sin(gelPoint.x*3.0+gelPoint.z*4.0);
-          // 低饱和青灰薄膜，少量暖色流纹；不再整片循环红绿紫的彩虹色。
+          // 青蓝薄膜带少量蓝紫流纹；颜色集中在能量连接，不扩散到结构金属。
           float ripple=0.5+0.5*sin(flow);
-          vec3 film=mix(vec3(0.13,0.27,0.31),vec3(0.38,0.33,0.22),ripple*0.28);
+          vec3 film=mix(vec3(0.06,0.32,0.36),vec3(0.25,0.21,0.46),ripple*0.45);
           diffuseColor.rgb=mix(diffuseColor.rgb,film,0.6);
           diffuseColor.a*=0.58+0.34*pow(0.5+0.5*sin(flow*1.7),2.0);
           totalEmissiveRadiance+=film*(0.07+gelCharge*0.18);
         `,
         );
       };
-      material.customProgramCacheKey = () => "pedan-fluid-field-v3";
+      material.customProgramCacheKey = () => "pedan-fluid-field-v4";
       material.needsUpdate = true;
       gels.push({ material, time, charge });
     }

@@ -76,7 +76,7 @@ export function addOrbitalCore(rig: CoreRig, parts: PartDefinition[], nodes: Mod
       instances[0],
       "pedanCrystal",
       { r: rig.radius * sample.bodies[0].radius },
-      parity ? "pedan_orbit_satellite" : "pedan_violet",
+      parity ? "pedan_orbit_satellite" : "pedan_orbit_satellite_cool",
     );
     if (instances.length > 1)
       Object.assign(part, { instances: instances.length, indexed: true, instance_nodes: instances });
@@ -89,7 +89,7 @@ export function addOrbitalCore(rig: CoreRig, parts: PartDefinition[], nodes: Mod
 // [OM-FREEPLAY] 四组低亮色相、透明度与粒面参数为原创视觉选择；黄色金属外壳不受影响。
 export const orbitalMaterials: ModelRegistry["materials"] = {
   ...Object.fromEntries(
-    ["#81afb6", "#c3a46f", "#8cabbc", "#76a0b5"].map((color, i) => [
+    ["#3cbfae", "#dca65b", "#887cd4", "#469dc9"].map((color, i) => [
       `pedan_orbit_core_${i}`,
       {
         base: color,
@@ -103,19 +103,27 @@ export const orbitalMaterials: ModelRegistry["materials"] = {
     ]),
   ),
   pedan_orbit_haze: {
-    base: "#779ca7",
-    emissive: "#688d97",
+    base: "#56aeb9",
+    emissive: "#408baf",
     emissiveIntensity: 0.15,
-    opacity: 0.12,
+    opacity: 0.16,
     depthWrite: false,
     metalness: 0.05,
     roughness: 0.6,
   },
   pedan_orbit_satellite: {
-    base: "#b29b70",
-    emissive: "#927a4e",
-    emissiveIntensity: 0.24,
-    metalness: 0.58,
+    base: "#d0a04d",
+    emissive: "#b47d31",
+    emissiveIntensity: 0.3,
+    metalness: 0.25,
+    roughness: 0.3,
+  },
+  // [OM-FREEPLAY] 伴核独立于结构金属配色，用少量蓝紫与琥珀区分同组运动体。
+  pedan_orbit_satellite_cool: {
+    base: "#7d86c9",
+    emissive: "#646bc0",
+    emissiveIntensity: 0.3,
+    metalness: 0.25,
     roughness: 0.3,
   },
   pedan_orbit_arc: {
