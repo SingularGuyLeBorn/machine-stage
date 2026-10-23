@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { cloneDisplayMaterial } from "@/three/parts/kernel/displayMaterial";
 import {
   instanceKey,
   parseInstanceKey,
@@ -205,7 +206,7 @@ export function applyXray(
       if (!(material instanceof THREE.MeshStandardMaterial)) return material;
       const cached = cloneOf.get(material);
       if (cached) return cached;
-      const clone = material.clone();
+      const clone = cloneDisplayMaterial(material);
       clone.transparent = true;
       clone.opacity = 0.16;
       clone.depthWrite = false;
@@ -293,7 +294,11 @@ export function applyHighlight(
     let materials: THREE.Material[];
     if (!isClone) {
       object.userData.__originalMaterial = current;
-      materials = originals.map((material) => material.clone());
+      materials = originals.map((material) => {
+        const clone = cloneDisplayMaterial(material);
+        // 高亮层必须继承金属表面和局部透视的着色器，不能把观察窗重新堵住。
+        return clone;
+      });
       object.userData.__highlight = true;
       object.material = Array.isArray(current) ? materials : materials[0]!;
     } else {

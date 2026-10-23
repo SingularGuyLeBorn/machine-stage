@@ -209,16 +209,28 @@ export function Viewport() {
             透视
           </button>
           {model.id === "kingjoemodules" ? (
-            <button
-              type="button"
-              className="btn btn--sm"
-              aria-pressed={views.internalsOnly}
-              title="隐藏外壳和外部护套，只显示可点选的内部机构；再次点击恢复外观"
-              onClick={() => toggleView("internalsOnly")}
-            >
-              <Boxes size={13} aria-hidden />
-              仅内部零件
-            </button>
+            <>
+              <button
+                type="button"
+                className="btn btn--sm"
+                aria-pressed={views.localXray}
+                title="鼠标移到模型上，局部穿透外壳查看内部；拖动时暂时收起"
+                onClick={() => toggleView("localXray")}
+              >
+                <Crosshair size={13} aria-hidden />
+                局部 X 光
+              </button>
+              <button
+                type="button"
+                className="btn btn--sm"
+                aria-pressed={views.internalsOnly}
+                title="隐藏外壳和外部护套，只显示可点选的内部机构；再次点击恢复外观"
+                onClick={() => toggleView("internalsOnly")}
+              >
+                <Boxes size={13} aria-hidden />
+                仅内部零件
+              </button>
+            </>
           ) : null}
           {crewLids.length > 0 ? (
             <button

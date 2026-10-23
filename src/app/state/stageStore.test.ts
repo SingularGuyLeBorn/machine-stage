@@ -61,6 +61,7 @@ const resetStore = () => {
       explode: false,
       xray: false,
       internalsOnly: false,
+      localXray: false,
       labels: false,
       grid: false,
       shadow: true,
@@ -292,6 +293,7 @@ describe("stageStore 模型切换", () => {
         explode: true,
         xray: true,
         internalsOnly: true,
+        localXray: true,
         labels: true,
         grid: true,
         shadow: false,
@@ -307,6 +309,7 @@ describe("stageStore 模型切换", () => {
       explode: false,
       xray: false,
       internalsOnly: false,
+      localXray: false,
       labels: false,
       grid: false,
       shadow: true,
@@ -542,5 +545,24 @@ describe("stageStore 实例检查器（负重轮单拆）", () => {
     useStageStore.getState().toggleDetach("tiger.suspension.wheel", 20);
     expect(useStageStore.getState().detached).toHaveLength(0);
     assembled.dispose();
+  });
+});
+
+describe("内部观察模式互斥", () => {
+  beforeEach(resetStore);
+  it("任何入口启用一种模式都关闭另两种，关闭自身不改变其他视图", () => {
+    const modes = ["localXray", "xray", "internalsOnly"] as const;
+    useStageStore.getState().toggleView("grid");
+    for (const from of modes) {
+      for (const to of modes) {
+        resetStore();
+        useStageStore.getState().toggleView("grid");
+        useStageStore.getState().toggleView(from);
+        useStageStore.getState().toggleView(to);
+        const views = useStageStore.getState().views;
+        for (const mode of modes) expect(views[mode]).toBe(from !== to && mode === to);
+        expect(views.grid).toBe(true);
+      }
+    }
   });
 });

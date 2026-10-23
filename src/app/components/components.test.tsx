@@ -42,6 +42,7 @@ const resetStore = () => {
       explode: false,
       xray: false,
       internalsOnly: false,
+      localXray: false,
       labels: false,
       grid: false,
       shadow: true,

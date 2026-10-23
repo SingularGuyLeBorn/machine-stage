@@ -1,4 +1,5 @@
 import { MeshStandardMaterial } from "three";
+import { displayMaterialSource } from "../../kernel/displayMaterial";
 import { VISOR_GRID, visorHighlights } from "./visor-grid";
 import type { AssembledModel } from "../../assembler/assembler";
 import { pedanPower, QUIET_ACTIVITY, type PedanActivity } from "./machinery";
@@ -22,7 +23,8 @@ export function updateModuleIllumination(
     const part = model.getPart(`kingjoemodules.${id}`);
     if (!part) continue;
     const materials = Array.isArray(part.object.material) ? part.object.material : [part.object.material];
-    for (const material of materials) {
+    for (const displayed of materials) {
+      const material = displayMaterialSource(displayed);
       if (!(material instanceof MeshStandardMaterial)) continue;
       let clock = clocks.get(material);
       if (!clock) {

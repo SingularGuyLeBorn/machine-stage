@@ -14,6 +14,7 @@ import { findModel, type StageModel } from "../catalog";
 import { buildOrdersOf, faultFromError, useStageStore } from "../state/stageStore";
 import { applyDamage, applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
 import { applyInternalVisibility, isInternalPart, isXrayShellPart } from "./internal";
+import { createLocalXray } from "./localXray";
 import { Weather } from "./Weather";
 import { setArmourWet } from "@/three/parts/kernel/armourSurface";
 import { TigerVfx } from "./vfx/TigerVfx";
@@ -147,7 +148,8 @@ function SceneEnvIntensity({ value }: { value: number }) {
 function StageEffects() {
   const xray = useStageStore((state) => state.views.xray);
   // 透视时物体大量重叠，AO/Bloom 意义不大且会放大混合开销；直接走默认帧缓冲。
-  if (xray) return null;
+  const localXray = useStageStore((state) => state.views.localXray);
+  if (xray || localXray) return null;
   return (
     <EffectComposer multisampling={4}>
       <N8AO halfRes quality="medium" aoRadius={0.45} intensity={1.15} distanceFalloff={0.9} color="#26303c" />
@@ -177,6 +179,7 @@ function StageRuntime() {
   // 模型「地面」：包围盒底 + 水平footprint（接触阴影与网格都锚在这里，避免
   // 阴影板切在机体中间、网格从模型腰部穿出）。
   const [stageFloor, setStageFloor] = useState<{ y: number; footprint: number } | null>(null);
+  const localXrayRef = useRef<ReturnType<typeof createLocalXray> | null>(null);
   const clockRef = useRef(0);
   const realTimeRef = useRef(0);
   const lastStateRef = useRef<string | null>(null);
@@ -433,21 +436,38 @@ function StageRuntime() {
       });
     }
     assembled.root.updateMatrixWorld(true);
+    localXrayRef.current?.update(camera, gl);
   });
+  const selectedXray = useMemo(() => {
+    const part = selectedPart ? assembled?.getPart(selectedPart) : undefined;
+    return !views.localXray && !!part && isInternalPart(modelId, part);
+  }, [assembled, selectedPart, modelId, views.localXray]);
   // ---- 透视 / 战损 / 高亮 ----
   useEffect(() => {
     if (!assembled) return;
+    applyHighlight(assembled, null, null);
     // 外壳才做幽灵壳；内部件保持不透明，避免近千层透明混合。
     // 选中内部件时自动幽灵化外壳，保证从零件树聚焦内部件时能看见。
-    const selectedHandle = selectedPart ? assembled.getPart(selectedPart) : undefined;
-    const selectedInternal = selectedHandle ? isInternalPart(modelId, selectedHandle) : false;
     applyXray(
       assembled,
-      !views.internalsOnly && (views.xray || selectedInternal),
+      !views.internalsOnly && !views.localXray && (views.xray || selectedXray),
       (handle) => !isInternalPart(modelId, handle) || isXrayShellPart(modelId, handle),
     );
-    return () => applyXray(assembled, false);
-  }, [assembled, views.xray, views.internalsOnly, modelId, selectedPart]);
+    const lens =
+      views.localXray && modelId === "kingjoemodules"
+        ? createLocalXray(
+            assembled.parts.filter((part) => !isInternalPart(modelId, part)).map((part) => part.object),
+            gl.domElement,
+          )
+        : null;
+    localXrayRef.current = lens;
+    return () => {
+      applyHighlight(assembled, null, null);
+      lens?.dispose();
+      if (localXrayRef.current === lens) localXrayRef.current = null;
+      applyXray(assembled, false);
+    };
+  }, [assembled, views.xray, views.localXray, views.internalsOnly, modelId, selectedXray, gl]);
 
   const damage = useStageStore((state) => state.damage);
   useEffect(() => {
@@ -460,8 +480,23 @@ function StageRuntime() {
   const hoveredInstance = useStageStore((state) => state.hoveredInstance);
   useEffect(() => {
     if (!assembled) return;
-    applyHighlight(assembled, selectedPart, hoveredPart, selectedInstance, hoveredInstance);
-  }, [assembled, selectedPart, selectedInstance, hoveredPart, hoveredInstance]);
+    applyHighlight(
+      assembled,
+      selectedPart,
+      views.localXray ? null : hoveredPart,
+      selectedInstance,
+      hoveredInstance,
+    );
+  }, [
+    assembled,
+    selectedPart,
+    selectedInstance,
+    hoveredPart,
+    hoveredInstance,
+    views.localXray,
+    views.xray,
+    views.internalsOnly,
+  ]);
 
   // ---- 总成标签 ----
   useEffect(() => {
@@ -508,11 +543,25 @@ function StageRuntime() {
     const selectedHandle = selectedPart ? assembled.getPart(selectedPart) : undefined;
     const selectedInternal = selectedHandle ? isInternalPart(modelId, selectedHandle) : false;
     const showInternals =
-      views.xray || views.explode || buildIndex < buildOrdersOf(modelId).length || selectedInternal;
+      views.xray ||
+      views.localXray ||
+      views.explode ||
+      buildIndex < buildOrdersOf(modelId).length ||
+      selectedInternal;
     camera.layers.enable(0);
     camera.layers.disable(2);
     applyInternalVisibility(modelId, assembled, showInternals, views.internalsOnly);
-  }, [assembled, modelId, camera, views.xray, views.internalsOnly, views.explode, buildIndex, selectedPart]);
+  }, [
+    assembled,
+    modelId,
+    camera,
+    views.xray,
+    views.localXray,
+    views.internalsOnly,
+    views.explode,
+    buildIndex,
+    selectedPart,
+  ]);
 
   // QA 钩子：开发模式或 ?qa=1 时暴露只读场景引用，用于自动化截图/录屏/相机机位。
   const three = useThree();

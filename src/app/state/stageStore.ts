@@ -123,6 +123,7 @@ const VIEWS_DEFAULT: Record<ViewKey, boolean> = {
   explode: false,
   xray: false,
   internalsOnly: false,
+  localXray: false,
   labels: false,
   grid: false,
   shadow: true,
@@ -451,7 +452,18 @@ export const useStageStore = create<StageState>((set, get) => ({
       };
     }),
 
-  toggleView: (key) => set((state) => ({ views: { ...state.views, [key]: !state.views[key] } })),
+  toggleView: (key) =>
+    set((state) => {
+      const enabled = !state.views[key];
+      const views = { ...state.views, [key]: enabled };
+      // [OM-FREEPLAY] 三种内部观察方式互斥，避免外壳已隐藏时局部观察窗失去意义。
+      if (enabled && ["xray", "localXray", "internalsOnly"].includes(key)) {
+        views.xray = key === "xray";
+        views.localXray = key === "localXray";
+        views.internalsOnly = key === "internalsOnly";
+      }
+      return { views };
+    }),
   setView: (key, value) => set((state) => ({ views: { ...state.views, [key]: value } })),
 
   setColumnWidth: (side, width) =>

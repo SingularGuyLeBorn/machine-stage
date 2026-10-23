@@ -69,7 +69,7 @@ import { M134_MOTION_PARTS, animateM134, getM134Mode } from "@/three/parts/model
 // ============================================================================
 
 export type ViewKey =
-  "explode" | "xray" | "internalsOnly" | "labels" | "grid" | "shadow" | "rain" | "thermal";
+  "explode" | "xray" | "localXray" | "internalsOnly" | "labels" | "grid" | "shadow" | "rain" | "thermal";
 
 export type StageAction =
   | { id: string; group: string; label: string; kind: "machine-state"; state: string }
