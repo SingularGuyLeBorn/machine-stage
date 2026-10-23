@@ -330,6 +330,6 @@ export function addHangar(ctx: CarrierCtx): void {
     build_layer: 2,
     geometry: M(B(0.14, 0.1, 0.18, [0, 0, 0], 0.006), B(0.03, 0.03, 0.12, [0, -0.09, 0.1], 0.002)),
     material: "cv_steel_dark",
-    mate: A([0, CV.HANGAR_Y + 0.55, -1.0]),
+    mate: A([1.8, CV.HANGAR_Y + 0.85, 0.0]),
   });
 }

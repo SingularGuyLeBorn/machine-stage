@@ -1268,16 +1268,28 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   const edgeLine = (x0: number, z0: number, x1: number, z1: number, id: string, label: string) => {
     const dx = x1 - x0;
     const dz = z1 - z0;
+    const yaw = (Math.atan2(dx, dz) * 180) / Math.PI;
+    // 真图甲板外缘是红/白双色边带：先铺一条更宽的红边，再压白色主边线。
+    add({
+      id: `${P}${id}_red`,
+      name_cn: `${label} 红边`,
+      name_en: `${label} red band`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.18, 0.006, Math.hypot(dx, dz), [0, 0, 0], 0.0012)),
+      material: "cv_deck_red",
+      mate: A([(x0 + x1) / 2, deckTop + 0.0025, (z0 + z1) / 2], [0, yaw, 0]),
+    });
     add({
       id: `${P}${id}`,
       name_cn: label,
       name_en: label,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(0.1, 0.006, Math.hypot(dx, dz), [0, 0, 0], 0.0015)),
+      geometry: M(B(0.09, 0.006, Math.hypot(dx, dz), [0, 0, 0], 0.0015)),
       material: "cv_deck_line",
       // 线压在甲板真实外缘上：线内外不再出现“装甲板超出外缘线”的视觉。
-      mate: A([(x0 + x1) / 2, deckTop + 0.004, (z0 + z1) / 2], [0, (Math.atan2(dx, dz) * 180) / Math.PI, 0]),
+      mate: A([(x0 + x1) / 2, deckTop + 0.0055, (z0 + z1) / 2], [0, yaw, 0]),
     });
   };
   let stbdEdgeIndex = 0;
