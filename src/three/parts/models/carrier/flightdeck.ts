@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { CAT_TRACKS, CV, catAcross, catPoint } from "./constants";
 import { deckEdgeAt, deckPlan, hullSurfaceHalfAt } from "./kits";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
+import type { GeometrySpec } from "../../registry/types";
 
 // ============================================================================
 // L3 飞行甲板：装甲甲板 + 防滑层 + 3 条电磁弹射器（定子/线圈/冷却/滑梭/
@@ -1148,17 +1149,26 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     }
   }
   const oilSpots: Array<[number, number, number]> = [
-    [2.2, -15.8, 0.26], [-2.4, -11.5, 0.24], [-2.4, -14.4, 0.24], [-2.0, -16.8, 0.24],
-    [1.2, 4.0, 0.18], [0.4, 8.0, 0.18], [-3.0, 2.0, 0.18], [0.8, -2.0, 0.16],
+    [-3.0, -8.3, 0.3], [-3.15, -11.2, 0.28], [-3.0, -14.2, 0.26], [-2.55, -16.2, 0.24],
+    [2.95, 8.8, 0.2], [2.2, 5.0, 0.2], [1.0, -1.0, 0.17], [2.2, 2.0, 0.16],
   ];
   oilSpots.forEach(([x, z, r], index) => {
+    // 油污不是正圆：用 6 个不同半径/偏移的扁圆叠成不规则油渍，再拖一小滴流痕。
+    const blobs: GeometrySpec[] = [];
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2 + index * 0.83;
+      const rr = r * (0.32 + 0.2 * (((index * 7 + i * 3) % 5) / 4));
+      blobs.push(C(rr, 0.002, [Math.cos(angle) * r * 0.55, 0, Math.sin(angle) * r * 0.45], 14));
+    }
+    blobs.push(C(r * 0.52, 0.002, [0, 0, 0], 12));
+    blobs.push(C(r * 0.18, 0.002, [Math.cos(index * 1.7) * r * 1.2, 0, Math.sin(index * 2.3) * r * 1.0], 10));
     add({
       id: `${P}oil_stain_${pad(index + 1)}`,
       name_cn: `甲板油污 ${index + 1}`,
       name_en: `deck oil stain ${index + 1}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(C(r, 0.002, [0, 0, 0], 20), C(r * 0.45, 0.002, [r * 0.5, 0, r * 0.35], 14)),
+      geometry: M(...blobs),
       material: "cv_deck_wear",
       mate: A([x, deckTop + 0.009, z]),
     });
@@ -1204,7 +1214,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   }
   // 停机位框线 + 编号（七段数字），全部贴在甲板上；避开斜角着舰跑道。
   const parkingSpots: Array<[number, number, number]> = [
-    [2.2, -15.8, 1], [-2.4, -11.5, 2], [-2.4, -14.4, 3], [-2.0, -16.8, 4],
+    [-3.0, -8.3, 1], [-3.15, -11.2, 2], [-3.0, -14.2, 3], [-2.55, -16.2, 4],
+    // 5 号是现役演示机位：艏部右舷弹射跑道外侧，不压着舰跑道/拦阻网。
+    [2.95, 8.8, 5],
   ];
   const digitSegments: Record<string, string[]> = {
     "1": ["b", "c"], "2": ["a", "b", "g", "e", "d"], "3": ["a", "b", "g", "c", "d"],
@@ -1234,20 +1246,21 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       });
     }
   };
-  parkingSpots.forEach(([sx, sz, n], index) => {
-    const w = 1.2;
-    const d = 1.7;
+  parkingSpots.forEach(([sx, sz, n]) => {
+    // 5 号位停现役 J20（20.4m），框线按 2.2×3.0；艉部停放位用 1.9×2.6。
+    const w = n === 5 ? 2.2 : 1.9;
+    const d = n === 5 ? 3.0 : 2.6;
     add({
-      id: `${P}parking_box_${pad(index + 1)}`,
+      id: `${P}parking_box_${pad(n)}`,
       name_cn: `停机位框线 ${n}`,
       name_en: `parking spot box ${n}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(w, 0.006, 0.05, [0, 0, 0], 0.0015), B(w, 0.006, 0.05, [0, 0, -d], 0.0015), B(0.05, 0.006, d, [-w / 2, 0, -d / 2], 0.0015), B(0.05, 0.006, d, [w / 2, 0, -d / 2], 0.0015)),
+      geometry: M(B(w, 0.006, 0.05, [0, 0, d / 2], 0.0015), B(w, 0.006, 0.05, [0, 0, -d / 2], 0.0015), B(0.05, 0.006, d, [-w / 2, 0, 0], 0.0015), B(0.05, 0.006, d, [w / 2, 0, 0], 0.0015)),
       material: "cv_deck_yellow",
-      mate: A([sx, markY + 0.003, sz + d / 2]),
+      mate: A([sx, markY + 0.003, sz]),
     });
-    drawDigit(String(n), `parking_num_${n}`, sx + w / 2 - 0.16, sz + 0.52, 0.36);
+    drawDigit(String(n), `parking_num_${n}`, sx + w / 2 + 0.22, sz + d / 2 + 0.14, 0.36);
   });
   // 甲板外缘线：直接沿真实 deckPlan 折线勾边，向甲板内侧偏 0.05。
   // 旧版用的是改轮廓之前的硬编码折线（还带升降机缺口），线画在甲板里面，
@@ -1306,7 +1319,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     build_layer: 4,
     geometry: M({ type: "torus", radius: 0.58, tube: 0.032, radialSegments: 8, tubularSegments: 32 }),
     material: "cv_deck_line",
-    mate: A([-3.2, markY + 0.006, 1.0], [90, 0, 0]),
+    mate: A([0.8, markY + 0.006, 3.5], [90, 0, 0]),
   });
   add({
     id: `${P}helipad_h`,
@@ -1316,7 +1329,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     build_layer: 4,
     geometry: M(B(0.1, 0.006, 0.66, [0, 0, 0], 0.0015), B(0.1, 0.006, 0.66, [-0.38, 0, 0], 0.0015), B(0.48, 0.006, 0.1, [-0.19, 0, 0], 0.0015)),
     material: "cv_deck_line",
-    mate: A([-3.2, markY + 0.007, 1.0]),
+    mate: A([0.8, markY + 0.007, 3.5]),
   });
   // 舷号 18 刷在艏端：真实福建舰的 18 在两根弹射轨前方、靠近艏尖，不能被轨道压住。
   drawDigit("1", "hull_number_1", -0.95, 19.6, 1.5, "舰艏舷号");
@@ -1366,7 +1379,13 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   ctx.layout("carrier.deck.tiedown", ({ index }) => {
     const col = index % 10;
     const row = Math.floor(index / 10);
-    return new THREE.Matrix4().makeTranslation(-3.9 + col * 0.86, deckTop + 0.01, -17 + row * 4.2);
+    const z = -17 + row * 4.2;
+    // 每一排按该 z 的真实甲板宽度重新分布，80 个系留环全部留在甲板内，
+    // 不再用固定 x 网格让艏部/艉部的环悬到甲板外。
+    const star = deckEdgeAt(z, 1).x - 0.18;
+    const port = deckEdgeAt(z, -1).x + 0.18;
+    const x = port + ((star - port) * col) / 9;
+    return new THREE.Matrix4().makeTranslation(x, deckTop + 0.01, z);
   });
   const lightSpots: Array<[number, number]> = [];
   for (let row = 0; row < 9; row++) {

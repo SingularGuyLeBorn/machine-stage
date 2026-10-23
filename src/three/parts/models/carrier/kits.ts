@@ -380,6 +380,56 @@ export const carrierBowRake: GeometryBuilder = () => {
   return geometry;
 };
 
+/** 艏部外飘下方的封闭楔形：上缘贴甲板艏端，向下收成艏柱，把甲板外飘与船壳之间的
+ *  V 形空腔封死；与旧“艏柱整流块”不同，上缘沿用甲板艏端折线、下缘贴真实艏柱，
+ *  侧面连续过渡，不会在壳板旁边留下一条暗缝。 */
+export const carrierBowClosure: GeometryBuilder = () => {
+  const top: Array<[number, number]> = [
+    [-1.52, 20.66],
+    [1.82, 20.66],
+    [2.28, 19.0],
+    [-2.28, 19.0],
+  ];
+  const bottom: Array<[number, number]> = [
+    [-0.28, 18.55],
+    [0.28, 18.55],
+    [0.28, 18.15],
+    [-0.28, 18.15],
+  ];
+  const blend = (t: number): Array<[number, number]> =>
+    top.map(([x, z], i) => [x + (bottom[i]![0] - x) * t, z + (bottom[i]![1] - z) * t] as [number, number]);
+  const rings = [
+    { y: 4.1, pts: top },
+    { y: 3.3, pts: blend(0.35) },
+    { y: 2.5, pts: blend(0.7) },
+    { y: 1.74, pts: bottom },
+  ];
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (const ring of rings) for (const [x, z] of ring.pts) positions.push(x, ring.y, z);
+  const n = 4;
+  for (let r = 0; r < rings.length - 1; r++) {
+    for (let i = 0; i < n; i++) {
+      const a = r * n + i;
+      const b = r * n + ((i + 1) % n);
+      const c = (r + 1) * n + ((i + 1) % n);
+      const d = (r + 1) * n + i;
+      indices.push(a, b, c, a, c, d);
+    }
+  }
+  const cap = (base: number, reverse: boolean) => {
+    if (reverse) indices.push(base, base + 2, base + 1, base, base + 3, base + 2);
+    else indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  };
+  cap(0, true);
+  cap((rings.length - 1) * n, false);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
 /** 双层底：沿 0.62m 高度的真实外板轮廓整片封到舷侧，不再是一条窄板悬在中间。 */
 export const carrierBottom: GeometryBuilder = () =>
   extrudedPlan(hullPlanAtHeight(0.62, 56), 0.1, CV.HULL_BOTTOM + 0.3);
@@ -901,8 +951,9 @@ export const carrierHullStrake: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Record<string, number> }).params ?? {};
   const level = Number(p.level ?? 1.6);
   const side = Number(p.side ?? 1) >= 0 ? 1 : -1;
-  const outer = (z: number) => side * (hullSurfaceHalfAt(z, level) + 0.022);
-  return curvedHullRibbon(-16.8, 16.8, 84, side, outer, (z) => outer(z) - side * 0.16, level + 0.025, level - 0.025);
+  // 艏部曲率大，采样加密并把外缘抬到 0.03，避免列板前段切进壳板里面。
+  const outer = (z: number) => side * (hullSurfaceHalfAt(z, level) + 0.03);
+  return curvedHullRibbon(-16.6, 16.0, 140, side, outer, (z) => outer(z) - side * 0.16, level + 0.025, level - 0.025);
 };
 
 /** 舭龙骨：沿舭部曲面的外伸连续板，内外缘都按该高度真实外板取点。 */

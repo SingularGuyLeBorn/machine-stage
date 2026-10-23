@@ -48,8 +48,8 @@ export const CV = {
   ELEVATOR_W: 2.0,
   ELEVATOR_L: 3.4,
 
-  // 演示机停在艏部左舷停机区（拦阻网前方），滑行到 2 号弹射位时不穿网。
-  AIRCRAFT_PARK: [-3.5, 8.5] as const,
+  // 演示机停在艏部右舷停机位（弹射跑道外侧、拦阻网前方），滑行到 2 号弹射位时不穿网。
+  AIRCRAFT_PARK: [2.95, 8.8] as const,
   AIRCRAFT_LEN: 2.5,
   AIRCRAFT_SPAN: 2.0,
   AIRCRAFT_FOLD_SPAN: 1.05,

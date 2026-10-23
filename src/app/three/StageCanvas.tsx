@@ -531,6 +531,23 @@ function StageRuntime() {
   }, []);
 
   // ---- 每帧纪律 ----
+  // 舰载机换成 fight-stage 的 j20.ts 原模型：仅浏览器运行时挂载（j20 需要 canvas 贴图），
+  // 旧 J-15 零件保留为碰撞代理/零件树但不再渲染。动态 import 让非航母模型不加载这份代码。
+  useEffect(() => {
+    if (!assembled || modelId !== "carrier") return;
+    let disposeMount: (() => void) | undefined;
+    let cancelled = false;
+    import("@/three/parts/models/carrier/j20Mount")
+      .then(({ mountCarrierJ20 }) => {
+        if (!cancelled) disposeMount = mountCarrierJ20(assembled);
+      })
+      .catch((error) => console.warn("J20 挂载失败，保留原舰载机", error));
+    return () => {
+      cancelled = true;
+      disposeMount?.();
+    };
+  }, [assembled, modelId]);
+
   // AK-47 / M249 射击模式跟随状态机（单发/连发/停机）
   const machineState = useStageStore((state) => state.machineState);
   const currentModelId = useStageStore((state) => state.modelId);

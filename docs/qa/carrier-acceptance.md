@@ -1,6 +1,38 @@
 # 福建舰 · 验收记录（carrier worktree）
 
-## 本轮交付（2026-10-24 · 外形返修 4：宽艏段 / 短陡肩 / 宽平艉 / 艏部型线）
+## 本轮交付（2026-10-24 · 甲板细节修正 + 换装 j20.ts）
+
+> 本节为**最新状态**。上一轮的甲板轮廓/艏部形状（b577b0d）保留，本节修细节并换舰载机。
+
+### 甲板标记 / 附件
+- [x] **直升机点移出着舰跑道**：原来在 (-3.2,1.0)，正好压在 9.3° 斜角跑道中线上；移到右舷甲板 (0.8,3.5)，圆圈/H 与着舰跑道、3 号弹射器、前升降机都留出净距。
+- [x] **现役演示机进停机位**：从拦阻网边的无标记位置移到右舷艏部 **5 号停机位 (2.95,8.8)**，补 2.2×3.0 黄色框线 + 编号；滑行到 2 号弹射位仍不穿拦阻网。
+- [x] **停机框线按实际机位重排**：改为艉部 4 个停放位 + 5 号现役位，尺寸按 J20（20.4m）放大；删除原来 1 号位（在着舰跑道上）和与实际机位不对应的旧框。
+- [x] **80 个甲板系留点收进甲板**：取消固定 10×8 网格，每排按 `deckEdgeAt(z)` 的真实甲板宽度重新分布，艏/艉窄段的系留环不再悬到甲板外。
+- [x] **油污改为不规则形状**：8 处油渍从正圆改成 6 个不同半径/偏移扁圆叠成的油渍 + 一小滴流痕；位置从旧停机位移到当前停机位/作业区。
+- [x] **舰艏空腔封死**：删除与曲面壳板不贴合的独立“楔形整流块”，改为 `carrier.hull.bow_closure`（上缘沿甲板艏端折线、下缘贴艏柱）+ `carrier.hull.stem_post` 水下艏柱。正前方 V 形黑洞、舷侧与艏柱之间的暗缝都已封住。
+- [x] **舷侧列板 2.98 不再切进壳板**：艏部采样 84→140 段，外缘偏移 0.022→0.03，艏端范围收到 z=16.0。
+
+### 舰载机换装（j20.ts）
+- [x] **原模型直接使用**：把 `fight-stage/src/three/code/j20.ts` + `detailKit.ts` + `types.ts` 复制到 `carrier/j20/`，浏览器运行时 `buildJ20()` 挂到 `CV_Aircraft` 和 4 个甲板停放位。J20 按米建模（机长 20.4m、翼展 13m），挂载时 1/8 缩放并补偿母节点的 `AIRCRAFT_SCALE_Z`，轮胎落在甲板上。
+- [x] **性能**：现役机保留完整 344 件细节；4 架甲板停放机把每块网格做成 4 实例的 `InstancedMesh`，避免 5 份全量克隆。实测外部视角约 **507 draw calls / 730k triangles / 60fps**（headless Chrome）。
+- [x] **不想要的动画件隐藏**：加力焰、导弹焰、烟团、爆点、hotspot 全部关掉；导弹、座舱、起落架、DSI 等静态细节保留。
+- [x] **旧机保留为碰撞代理**：甲板旧 J-15 零件在 3D 里隐藏，但仍留在注册表里参与穿模门禁与零件树；机库仍用折叠翼 J-15（J20 展开翼展 13m，机库净宽和第一人称机位会被机翼顶到，硬塞会穿模）。**说明：J20 是运行时挂载组，不在零件树/门禁零件列表里；它的尺寸与旧机代理相近，门禁仍覆盖甲板/滑梭/网。**
+
+### 规模与门禁
+- 零件定义 **5473** / 展开 **5473** / 实例 **6773**；三角面 **2,824,794**（不含运行时 J20）。
+- 注册表校验 0 错；悬空 0；悬空孤岛 0；合并件内部悬空 0（最大连通分量 6769/6769）。
+- 静态穿模：**12237 报告 / 未豁免 0**。
+- 动画扫掠：**flight_ops 759/0、engine 550/0、hangar 35/0、ciws 158/0**。
+- `diag-carrier-exterior --active`：**0 条未豁免**。
+- `npx tsc -b` 通过；`npm test -- --run` 通过（313 passed / 1 skipped）；`npm run build` 通过。
+
+### 本轮证据
+`carrier-qa-deck-plan.jpeg`、`carrier-qa-deck-details.jpeg`、`carrier-qa-j20-demo.jpeg`、`carrier-qa-j20-parked.jpeg`、`carrier-qa-bow-closure-front.jpeg`、`carrier-qa-bow-side-close.jpeg`、`carrier-qa-bow-plan.jpeg`、`carrier-qa-bow-closure.jpeg`、`carrier-qa-hull-side.jpeg`、`carrier-qa-catapults.jpeg`、`carrier-qa-launch.jpeg`、`carrier-qa-approach.jpeg`、`carrier-qa-landing-runway.jpeg`、`carrier-qa-final-home.jpeg`。
+
+---
+
+## 上一轮交付（2026-10-24 · 外形返修 4：宽艏段 / 短陡肩 / 宽平艉 / 艏部型线）
 
 > 本节为**最新状态**。上一轮的“细长艏”方案（长三角形收窄）与真实福建舰俯视图不符，已推翻；下方“外形返修 3/2”及更早段落只作回溯。
 
@@ -276,7 +308,7 @@
 npx tsc --noEmit
 npx tsx scripts/diag-carrier.ts
 npx tsx scripts/diag-carrier-exterior.ts --active   # 严格口径：绕开整船豁免的未豁免清单（应为 0）
-node scripts/capture-carrier-fixes.mjs              # 生成本轮 24 张证据
+node scripts/capture-carrier-fixes.mjs              # 生成本轮 32 张证据
 npx tsx scripts/diag-carrier-sweep.ts --state flight_ops --duration 30 --fps 2
 npx tsx scripts/diag-carrier-sweep.ts --state engine --duration 12 --fps 2
 npx tsx scripts/diag-carrier-sweep.ts --state hangar --duration 12 --fps 2

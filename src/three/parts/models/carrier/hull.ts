@@ -116,20 +116,19 @@ export function addHull(ctx: CarrierCtx): void {
     mate: A([0, 3.1, -18.58]),
   });
 
-  // 艏部楔形整流：船壳放样的艏端封口是斜切面，从正前方仰视会看到两舷之间的暗缝；
-  // 用实心楔形艏柱把两舷/艏柱/球鼻艏之间填实，形成可看见的艏部外形。
+  // 艏部外飘下方的封闭楔形：上缘贴甲板艏端折线、下缘贴艏柱，封死甲板外飘与
+  // 船壳之间的 V 形空腔；不再用与壳板曲面不匹配的独立“整流块”。
   add({
-    id: "carrier.hull.bow_rake_fairing",
-    name_cn: "舰艏楔形整流/艏柱",
-    name_en: "bow rake fairing",
+    id: "carrier.hull.bow_closure",
+    name_cn: "舰艏外飘底部封闭楔",
+    name_en: "bow overhang closure",
     assembly: HULL_ASSEMBLY,
     build_layer: 1,
-    geometry: { type: "kit", kit: "carrierBowRake" },
+    geometry: { type: "kit", kit: "carrierBowClosure" },
     material: "cv_hull",
-    mate: A([0, 0, -0.18]),
-    source: "填实两舷艏端之间的楔形空间，避免正前方仰视出现中空暗缝。",
+    mate: A([0, 0, 0]),
+    source: "上缘沿甲板艏端、下缘收至艏柱水线，填死正前方可见的 V 形空腔。",
   });
-  // 艏柱包板焊缝已由楔形艏柱整流承担，不再额外贴一条白色长条。
 
   // 球鼻艏（回转体放样，压在艏柱/龙骨前端）+ 声呐导流罩。
   add({
@@ -165,6 +164,19 @@ export function addHull(ctx: CarrierCtx): void {
     geometry: M(S(0.16, [0, 0, 0], 20)),
     material: "cv_rubber",
     mate: A([0, 0.38, 18.55]),
+  });
+  // 水下艏柱：水上外飘封闭楔到球鼻艏之间还剩一条窄缝，用一小段防污漆艏柱填实，
+  // 避免正前方看进去是黑的。
+  add({
+    id: "carrier.hull.stem_post",
+    name_cn: "水下艏柱",
+    name_en: "underwater stem post",
+    assembly: HULL_ASSEMBLY,
+    build_layer: 1,
+    geometry: M(B(0.34, 1.1, 0.56, [0, 0, 0], 0.03)),
+    material: "cv_antifouling",
+    mate: A([0, 1.3, 18.45]),
+    source: "连接水上封闭楔底缘与球鼻艏，封住水下艏柱窄缝。",
   });
 
   // 肋骨框架：32 站 × 肋板/左右舷侧/甲板梁。
