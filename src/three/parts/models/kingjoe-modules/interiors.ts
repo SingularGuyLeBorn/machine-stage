@@ -6,12 +6,20 @@ import data from "./pedan.generated.json";
 import { addPedanDetailAssemblies, addPedanMachinery, powerMaterial } from "./machinery";
 import { addCavityDevices, planCavityDevices } from "./cavity-devices";
 import { addHandCouplings } from "./hand-couplings";
+import { addEnergyExchange } from "./energy-exchange";
 import { addJointDrives } from "./joint-drives";
 import { CUFF } from "./joint-covers";
 
 // 用户已批准的原创佩丹技术：磁约束能源、计算晶核、场调制器与悬浮线圈。
 // [OM-FREEPLAY] 尺寸由实际壳内设备舱派生；配色、线圈匝数及支架布局为原创机械解释。
 export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
+  // [OM-FREEPLAY] 四组错相的低亮能量端环，避免全机齐闪；每一对仍严格同步。
+  ...Object.fromEntries(
+    ["#6ba59b", "#8d82ae", "#b19d6a", "#6698ad"].map((color, i) => [
+      `pedan_exchange_${i}`,
+      { base: color, metalness: 0.28, roughness: 0.42, emissive: color, emissiveIntensity: 0.2 },
+    ]),
+  ),
   pedan_hand_gel: {
     base: "#659d95",
     metalness: 0.1,
@@ -491,6 +499,7 @@ export function makeInteriors(): Pick<ModelRegistry, "parts" | "nodes" | "consta
   addCavityDevices(wallTrees, parts, nodes);
   addHandCouplings(planCavityDevices(wallTrees), parts, nodes);
   addJointDrives(parts, nodes);
+  addEnergyExchange(planCavityDevices(wallTrees), parts, nodes);
   for (const joint of data.joints) {
     const shoulder = joint.key.startsWith("upper");
     for (let i = 0; i < CUFF.layers; i++) {

@@ -6,6 +6,7 @@ import { makeKingJoeModuleRegistry, kingjoeModuleBuilders } from "./registry";
 import { planCavityDevices } from "./cavity-devices";
 import { animateKingJoeModules } from "./motion";
 import { planHandCouplings, updateHandCouplings } from "./hand-couplings";
+import { planEnergyExchange } from "./energy-exchange";
 
 describe("空腔设备、肩肘驱动与流体连接", () => {
   let model: ReturnType<typeof buildModel>;
@@ -15,12 +16,44 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
     library = createMaterialLibrary({
       pedan_gel: registry.materials.pedan_gel,
       pedan_hand_field: registry.materials.pedan_hand_field,
+      ...Object.fromEntries(
+        [0, 1, 2, 3].map((i) => [`pedan_exchange_${i}`, registry.materials[`pedan_exchange_${i}`]]),
+      ),
     });
     model = buildModel(registry, { builders: kingjoeModuleBuilders, materials: library.materials });
   }, 20000);
   afterAll(() => {
     model.dispose();
     library.dispose();
+  });
+  it("其余内构混合四种低亮交换，八条肩肘通路在抬臂中紧随双端", () => {
+    const routes = planEnergyExchange(planCavityDevices(new Map()));
+    expect(new Set(routes.map((r) => r.mode)).size).toBe(4);
+    expect(routes.filter((r) => r.mode === "membrane").length / routes.length).toBeLessThan(0.25);
+    expect(routes.filter((r) => r.anchors).length).toBe(8);
+    for (const owner of ["legs", "pelvis", "chest", "head_arms", "upper_l", "upper_r"])
+      expect(routes.some((r) => r.owner === owner)).toBe(true);
+    for (const time of [0, 1.7, 3.4]) {
+      animateKingJoeModules(model, time, "beam");
+      for (const [i, route] of routes.entries()) {
+        const parent = model.getNode(route.parent)!;
+        const a = route.anchors
+          ? model.getNode(route.anchors[0])!.localToWorld(new THREE.Vector3(...route.a))
+          : parent.localToWorld(new THREE.Vector3(...route.a));
+        const b = route.anchors
+          ? model.getNode(route.anchors[1])!.localToWorld(new THREE.Vector3(...route.b))
+          : parent.localToWorld(new THREE.Vector3(...route.b));
+        const endA = model.getNode(`Exchange_${i}_end_0`)!,
+          endB = model.getNode(`Exchange_${i}_end_1`)!;
+        expect(endA.getWorldPosition(new THREE.Vector3()).distanceTo(a)).toBeLessThan(1e-6);
+        expect(endB.getWorldPosition(new THREE.Vector3()).distanceTo(b)).toBeLessThan(1e-6);
+        expect(endA.scale.equals(endB.scale)).toBe(true);
+      }
+    }
+    for (const part of model.parts.filter((p) => p.def.material.startsWith("pedan_exchange_")))
+      expect((part.object.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeLessThanOrEqual(
+        0.28,
+      );
   });
   it("手部设备全连通，胶膜端点跟随指节，能量环定向流动且两端同步呼吸", () => {
     const plan = planCavityDevices(new Map()),

@@ -3,7 +3,8 @@ import { Box3, Vector3 } from "three";
 import { getModuleEffects, hideModuleEffects } from "./effects";
 import { updateModuleIllumination } from "./illumination";
 import { updatePedanRays } from "./rays";
-import { updateCavityDevices } from "./cavity-devices";
+import { updateCavityDevices, planCavityDevices } from "./cavity-devices";
+import { updateEnergyExchange } from "./energy-exchange";
 import { updateHandCouplings } from "./hand-couplings";
 import { updateJointDrives } from "./joint-drives";
 import { updatePedanMachinery, type PedanActivity } from "./machinery";
@@ -310,6 +311,7 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
   updatePedanMachinery(model, seconds, activity);
   updateCavityDevices(model, seconds, activity);
   updateHandCouplings(model, seconds, activity.charge);
+  updateEnergyExchange(model, planCavityDevices(new Map()), seconds, activity.charge);
   updateModuleIllumination(model, seconds, activity);
   model.root.updateMatrixWorld(true);
   updatePedanRays(model, seconds, activity.redModule, activity.yellow);

@@ -254,60 +254,9 @@ export function addCavityDevices(
       [90, 0, 0],
     );
   }
-  // 每个设备最多接向两个近邻；连接从器件表面到表面，不在中心叠满透明膜。
-  for (const [i, a] of plan.entries()) {
-    if (a.owner.startsWith("fore")) continue;
-    const peers = plan
-      .map((b, j) => ({ b, j, d: new THREE.Vector3(...a.center).distanceTo(new THREE.Vector3(...b.center)) }))
-      .filter((p) => p.j > i && p.b.owner === a.owner && p.d < a.radius + p.b.radius + 0.42)
-      .sort((x, y) => x.d - y.d)
-      .slice(0, 2);
-    for (const { b, j, d } of peers) {
-      const joint = data.joints.find((k) => k.key === a.owner),
-        module = joint?.module ?? a.owner;
-      const direction = new THREE.Vector3(...b.center).sub(new THREE.Vector3(...a.center)).normalize();
-      const start = new THREE.Vector3(...a.center).addScaledVector(direction, a.radius * 0.72),
-        end = new THREE.Vector3(...b.center).addScaledVector(direction, -b.radius * 0.72);
-      const span = end.distanceTo(start),
-        mid = start.clone().add(end).multiplyScalar(0.5);
-      const tree = trees.get(a.owner)!;
-      const wall = tree.raycastFirst(new THREE.Ray(start, direction), THREE.DoubleSide);
-      if (wall && wall.distance < span) continue;
-      let radius = Math.min(a.radius, b.radius) * 0.65;
-      for (let sample = 0; sample <= 12; sample++)
-        radius = Math.min(
-          radius,
-          tree.closestPointToPoint(start.clone().lerp(end, sample / 12))!.distance * 0.65,
-        );
-      if (radius < 0.012) continue;
-      const euler = new THREE.Euler().setFromQuaternion(
-        new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction),
-      );
-      const node = `Gel_bridge_${i}_${j}`;
-      nodes.push({
-        name: node,
-        parent: joint ? `Joint_${a.owner}` : `Module_${module}`,
-        pivot: mid.toArray().map((v, k) => v - (joint?.pivot[k] ?? 0)) as V3,
-        rest_rotation: [euler.x, euler.y, euler.z].map(THREE.MathUtils.radToDeg) as V3,
-      });
-      parts.push({
-        id: `kingjoemodules.${module}.gel_${i}_${j}`,
-        name_cn: "虹彩流体场耦合桥",
-        name_en: "fluid field bridge",
-        assembly: module,
-        node,
-        build_layer: 2,
-        build_order: 44000 + i,
-        geometry: { type: "kit", kit: "pedanGel", params: {} },
-        material: "pedan_gel",
-        mate: { type: "absolute", position: [0, 0, 0] },
-        scale: [radius, span, radius],
-        tags: ["internal", "gel-link"],
-        source: `原创非接触流体场耦合；邻接器件中心距 ${d.toFixed(3)}m`,
-      });
-    }
-  }
+  // 器件间交换由 energy-exchange / hand-couplings 统一规划，避免旧胶桥叠在新光环上。
 }
+
 const cache = new WeakMap<
   AssembledModel,
   {

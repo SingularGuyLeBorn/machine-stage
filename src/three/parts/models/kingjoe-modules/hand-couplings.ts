@@ -11,10 +11,10 @@ export interface HandCoupling {
   from: CavityDevice;
   to: CavityDevice;
 }
-/** 从靠近腕部的设备向外生长最短树，每个末端都有供能来源，不增加环状乱连线。 */
-export function planHandCouplings(devices: CavityDevice[]): HandCoupling[] {
+/** 每组从最高设备向外生长最短树；手部的根靠近腕部，每个末端都有供能来源。 */
+export function planDeviceTree(devices: CavityDevice[], owners: string[]): HandCoupling[] {
   const links: HandCoupling[] = [];
-  for (const owner of ["fore_l", "fore_r"]) {
+  for (const owner of owners) {
     const points = devices.filter((p) => p.owner === owner).sort((a, b) => b.center[1] - a.center[1]);
     if (!points.length) continue;
     const reached = [points[0]],
@@ -32,6 +32,9 @@ export function planHandCouplings(devices: CavityDevice[]): HandCoupling[] {
     }
   }
   return links;
+}
+export function planHandCouplings(devices: CavityDevice[]): HandCoupling[] {
+  return planDeviceTree(devices, ["fore_l", "fore_r"]);
 }
 
 export function addHandCouplings(
