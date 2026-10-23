@@ -1211,7 +1211,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     "4": ["f", "g", "b", "c"], "5": ["a", "f", "g", "c", "d"], "6": ["a", "f", "g", "e", "c", "d"],
     "7": ["a", "b", "c"], "8": ["a", "b", "c", "d", "e", "f", "g"], "9": ["a", "b", "c", "d", "f", "g"],
   };
-  const drawDigit = (digit: string, idPrefix: string, cx: number, cz: number, size = 0.5) => {
+  const drawDigit = (digit: string, idPrefix: string, cx: number, cz: number, size = 0.5, label = "停机位编号") => {
     const w = size * 0.5;
     const h = size;
     const t = Math.max(0.035, size * 0.09);
@@ -1224,7 +1224,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       const [dx, dz, sw, sd] = segs[s]!;
       add({
         id: `${P}${idPrefix}_${s}`,
-        name_cn: `停机位编号 ${digit}`,
+        name_cn: `${label} ${digit}`,
         name_en: `parking number ${digit}`,
         assembly: ASSEMBLY,
         build_layer: 4,
@@ -1318,9 +1318,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     material: "cv_deck_line",
     mate: A([-3.2, markY + 0.007, 1.0]),
   });
-  // 舷号 18（舰艏甲板）。
-  drawDigit("1", "hull_number_1", -0.95, 17.0, 1.5);
-  drawDigit("8", "hull_number_8", 0.75, 17.0, 1.5);
+  // 舷号 18 刷在艏端：真实福建舰的 18 在两根弹射轨前方、靠近艏尖，不能被轨道压住。
+  drawDigit("1", "hull_number_1", -0.95, 19.6, 1.5, "舰艏舷号");
+  drawDigit("8", "hull_number_8", 0.75, 19.6, 1.5, "舰艏舷号");
   // 挡焰板危险区：随各自轨道/JBD 旋转，只放在 JBD 与弹射起点之间，
   // 不铺到斜角着舰跑道上；弹射位数字已在上方按轨道生成，这里不再重复。
   CAT_TRACKS.forEach((track) => {

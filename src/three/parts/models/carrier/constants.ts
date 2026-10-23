@@ -100,8 +100,9 @@ export function hullHalfBeamAt(z: number): number {
   const half = CV.HULL_BEAM / 2;
   const t = (z - CV.HULL_Z_STERN) / (CV.HULL_Z_BOW - CV.HULL_Z_STERN);
   if (t < 0.12) return half * (0.62 + 0.38 * (t / 0.12));
-  if (t < 0.72) return half;
-  const bow = (t - 0.72) / 0.28;
-  // 艏部型线按真实舰体收窄：先慢后快，最后一段收成尖艏；宽艏会顶出窄甲板轮廓。
-  return half * Math.max(0.03, 1 - Math.pow(bow, 1.5) * 0.9 - Math.pow(bow, 10) * 0.07);
+  if (t < 0.62) return half;
+  const bow = (t - 0.62) / 0.38;
+  // 艏部型线从舯前就开始收窄：真实福建舰的艏段甲板只有约 37m 宽，水下舰体
+  // 必须同步收窄，不能比甲板还宽；最后一段快速收成尖艏。
+  return half * Math.max(0.03, 1 - Math.pow(bow, 1.2) * 0.92 - Math.pow(bow, 10) * 0.06);
 }

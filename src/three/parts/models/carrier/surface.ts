@@ -67,7 +67,8 @@ export function addSurface(ctx: CarrierCtx): void {
       build_layer: 5,
       geometry: M(B(0.12, 0.55, 0.08, [0, 0, 0], 0.01), B(0.46, 0.1, 0.08, [0, -0.3, 0], 0.01), B(0.28, 0.1, 0.08, [0, 0.28, 0], 0.01)),
       material: "cv_steel_dark",
-      mate: A([side * (hullSurfaceHalfAt(17.9, 1.25) + 0.07), 1.25, 17.9], [0, 0, side * 10]),
+      // 艏部型线收窄后锚必须按外板半宽 + 锚爪半宽外移，不能只留 0.07 的缝。
+      mate: A([side * (hullSurfaceHalfAt(17.9, 1.25) + 0.3), 1.25, 17.9], [0, 0, side * 10]),
     });
     add({
       id: `${P}anchor_chain_${tag}`,
