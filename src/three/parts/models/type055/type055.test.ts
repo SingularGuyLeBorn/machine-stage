@@ -1,0 +1,39 @@
+import { afterAll, describe, expect, it } from "vitest";
+import { buildModel } from "@/three/parts/assembler/assembler";
+import { detectStatic } from "@/three/parts/solver/detect";
+import { detectFloatingIslands, detectUnsupportedParts } from "@/three/parts/solver/support";
+import { partitionExpectedContacts } from "@/three/parts/solver/whitelist";
+import { makeType055Layouts, makeType055Registry, TYPE055_BUILDERS } from "./registry";
+
+const registry = makeType055Registry();
+const built = buildModel(registry, {
+  builders: TYPE055_BUILDERS,
+  instanceLayouts: makeType055Layouts(),
+  warnMissingLayout: false,
+});
+
+afterAll(() => built.dispose());
+
+describe("055 型驱逐舰", () => {
+  it("舰体/112 VLS/主炮/相控阵/动力/机库都装出来了", () => {
+    expect(built.parts.length).toBeGreaterThanOrEqual(250);
+    const hatch = built.parts.find((part) => part.partId === "type055.vls.hatch");
+    expect(hatch).toBeDefined();
+    expect(hatch!.instances.length).toBe(112);
+    expect(built.getNode("CV_055_Gun")).toBeDefined();
+    expect(built.getNode("CV_055_Radar")).toBeDefined();
+    expect(built.getNode("CV_055_PropL")).toBeDefined();
+    expect(built.getPart("type055.radar.aesa_front")).toBeDefined();
+    expect(built.getPart("type055.hangar.deck")).toBeDefined();
+  });
+
+  it("零悬空 / 零悬空孤岛 / 静态未豁免 0", () => {
+    const unsupported = detectUnsupportedParts(built, { maxGapM: 0.02 });
+    expect(unsupported.map((row) => `${row.ref} ${row.gap_mm.toFixed(1)}mm`)).toEqual([]);
+    const islands = detectFloatingIslands(built, { maxGapM: 0.02 });
+    expect(islands.islands).toHaveLength(0);
+    expect(islands.islandInstances).toBe(0);
+    const split = partitionExpectedContacts(detectStatic(built, {}), registry.expectedContacts ?? []);
+    expect(split.active.slice(0, 10).map(({ report }) => `${report.a} ↔ ${report.b}`)).toEqual([]);
+  }, 120000);
+});

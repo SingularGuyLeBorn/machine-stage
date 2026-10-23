@@ -60,6 +60,8 @@ import { M2HB_MOTION_PARTS, animateM2hb, getM2hbMode } from "@/three/parts/model
 import { M134_BUILDERS, makeM134Layouts, makeM134Registry } from "@/three/parts/models/m134/registry";
 import { M134_MOTION_PARTS, animateM134, getM134Mode } from "@/three/parts/models/m134/motion";
 import { makeCarrierRegistry, CARRIER_LAYOUTS, carrierBuilders } from "@/three/parts/models/carrier/registry";
+import { makeType055Registry, makeType055Layouts, TYPE055_BUILDERS } from "@/three/parts/models/type055/registry";
+import { animateType055, TYPE055_ANIMATED_STATES, TYPE055_STATE_LABELS } from "@/three/parts/models/type055/motion";
 import {
   animateCarrier,
   CARRIER_ANIMATED_STATES,
@@ -972,6 +974,50 @@ export const CATALOG: StageModel[] = [
       "甲板：3 条电磁弹射器（定子/线圈/水冷/飞轮储能）、4 道拦阻索（左右半索+滑轮+液压拦阻机）、2 部舷侧升降机、系留点/边灯/标线。",
       "电磁弹射可视化：甲板三车道带白边线/铜中心轨/起止线/待发滑梭/挡焰板；甲板下有直线电机隧道、反应轨、水冷主管、变流柜、飞轮储能、脉冲电容和母线铜排。点「电磁弹射器」聚焦，再开「透视」即可看甲板下机构。",
       "斜角着舰区与弹射器共享同一片飞行甲板：着舰跑道斜穿甲板中后部，腰部 3 号弹射器与着舰区在平面上交叉，这是真实航母的布置；起降按作业阶段错开，并非模型错误。舰艏直通起飞区已前移到着舰区前方，俯视不再出现两条浅灰跑道叠在一起。",
+    ],
+  },
+  {
+    id: "type055",
+    title: "055 型驱逐舰 · 南昌舰",
+    category: "ship",
+    subtitle: "180m · 112 单元 VLS · 346B 四面阵 · 130mm 主炮 · COGAG 四燃双轴",
+    milestone: "DDG-1",
+    status: "ready",
+    registry: makeType055Registry(),
+    layouts: makeType055Layouts(),
+    builders: TYPE055_BUILDERS,
+    animate: animateType055,
+    presentationScale: [1, 1, 1],
+    animatedStates: [...TYPE055_ANIMATED_STATES],
+    states: [
+      ...TYPE055_STATE_LABELS.map((state) => ({ ...state })),
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "ddg-engine", group: "动力", label: "COGAG 运转", kind: "machine-state", state: "engine" },
+      { id: "ddg-weapons", group: "武器", label: "主炮/近防跟踪", kind: "machine-state", state: "weapons" },
+      { id: "ddg-idle", group: "机构", label: "系泊检查", kind: "machine-state", state: "idle" },
+      { id: "ddg-vls", group: "武器", label: "112 单元 VLS", kind: "focus-node", node: "CV_055_VlsHatch", offset: [0, 8, 6], radius: 38 },
+      { id: "ddg-radar", group: "雷达", label: "346B 相控阵", kind: "focus-node", node: "CV_055_Radar", offset: [0, 8, 18], radius: 32 },
+      { id: "ddg-gun", group: "武器", label: "130mm 主炮", kind: "focus-node", node: "CV_055_Gun", offset: [0, 6, 14], radius: 16 },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    readouts: () => [
+      { label: "舰长", value: "约 180m" },
+      { label: "舷宽", value: "约 20m（水线）" },
+      { label: "吃水", value: "约 6.6m" },
+      { label: "VLS", value: "112 单元（前 64 + 后 48）" },
+      { label: "动力", value: "COGAG 4×QC-280 / 双轴双桨" },
+    ],
+    notes: [
+      "055 的灵魂是 112 个通用垂直发射单元：前甲板 8×8=64、后部 8×6=48，冷热共架兼容海红旗/鹰击-21。",
+      "346B 四面阵集成在一体化隐身桅杆/上建里；舰体水线以上舷侧内倾 18%，降低雷达反射。",
+      "本版先立舰体/动力/112 VLS/346B/130mm/1130/双机库；直-20 与冷热发射流程在下一轮补齐。",
     ],
   },
   {
