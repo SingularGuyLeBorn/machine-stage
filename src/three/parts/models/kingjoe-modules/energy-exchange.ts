@@ -19,6 +19,7 @@ import {
 } from "./energy-transit.mjs";
 import { moduleBoost, type PedanActivity } from "./machinery";
 import { displayMaterialSource } from "../../kernel/displayMaterial";
+import { updateSoftEnergy } from "./soft-energy";
 import data from "./pedan.generated.json";
 
 export const EXCHANGE_MODES = ["rings", "breath", "current", "rings", "breath", "membrane"] as const;
@@ -130,7 +131,8 @@ export function planEnergyExchange(devices: CavityDevice[]): ExchangeRoute[] {
           mode: sign < 0 ? "rings" : "current",
           a: [sign * r * (JOINT_DRIVE.bearingCenter - JOINT_DRIVE.bearingWire), 0, 0],
           b: [sign * r * (JOINT_DRIVE.hubCenter + JOINT_DRIVE.hubThickness / 2), 0, 0],
-          radius: r * JOINT_DRIVE.bearingRadius,
+          // [OM-FREEPLAY] 能量晕稍露出轮毂外缘，避免在仅内部模式被实体轮毂完全遮住；端面位置不变。
+          radius: r * 1.12,
           anchors: [base, `${base}_rotor`],
         });
       }
@@ -275,6 +277,7 @@ export function addEnergyExchange(
       "pedanRing",
       {
         r: route.radius,
+        soft: 1,
         wire: route.redFeed ? 0.0045 : route.faceLabel ? Math.min(0.002, route.radius * 0.15) : 0.003,
       },
       route.redFeed ? `pedan_redfeed_${module}` : `pedan_transit_${exchangeStage(route)}_${i % 4}`,
@@ -302,7 +305,14 @@ export function addEnergyExchange(
         "pedanRing",
         {
           r: route.radius * 1.02,
-          wire: route.redFeed ? 0.004 : route.faceLabel ? Math.min(0.0015, route.radius * 0.1) : 0.0027,
+          soft: 1,
+          wire: route.redFeed
+            ? 0.004
+            : route.faceLabel && route.owner.startsWith("joint_")
+              ? 0.0035
+              : route.faceLabel
+                ? Math.min(0.0015, route.radius * 0.1)
+                : 0.0027,
         },
         route.redFeed ? `pedan_redfeed_${module}` : `pedan_transit_flow_${exchangeStage(route)}`,
       );
@@ -315,7 +325,7 @@ export function addEnergyExchange(
         "短时微电流交换",
         name,
         "pedanMicroArc",
-        { length: 1, width: route.radius },
+        { length: 1, width: route.radius, soft: 1 },
         route.redFeed ? `pedan_redfeed_${module}` : `pedan_transit_flow_${exchangeStage(route)}`,
       );
     } else if (route.mode === "membrane") {
@@ -362,6 +372,7 @@ export function updateEnergyExchange(
     const redMaterials: { material: THREE.MeshStandardMaterial; owner: string }[] = [];
     for (const part of model.parts) {
       if (part.def.material.startsWith("pedan_redfeed_")) {
+        part.object.castShadow = false;
         const material = displayMaterialSource(
           part.object.material as THREE.Material,
         ) as THREE.MeshStandardMaterial;
@@ -375,6 +386,8 @@ export function updateEnergyExchange(
         part.def.material,
       );
       if (!match) continue;
+      // 柔晕几何只是光学采样范围，不能在实体上投下扩大后的不透明圆管影子。
+      part.object.castShadow = false;
       const material = displayMaterialSource(
         part.object.material as THREE.Material,
       ) as THREE.MeshStandardMaterial;
@@ -479,8 +492,10 @@ export function updateEnergyExchange(
               THREE.MathUtils.lerp(TRANSIT_DELAY[route.feed.from], TRANSIT_DELAY[route.feed.to], p),
             )
           : 1;
+      // [OM-FREEPLAY] 轴承流光保持端环半径；沿用普通光包的 0.85 缩放会再次缩进实体轮毂。
+      const packetRadius = route.faceLabel && route.owner.startsWith("joint_") ? 1 : 0.85;
       node.scale.setScalar(
-        Math.max(0.00001, flowPacketScale(p) * (0.85 + power * 0.2) * traveling * (1 + boost * 0.5)),
+        Math.max(0.00001, flowPacketScale(p) * (packetRadius + power * 0.2) * traveling * (1 + boost * 0.5)),
       );
     }
     if (link.arc) {
@@ -495,6 +510,7 @@ export function updateEnergyExchange(
     }
   }
   for (const { material, owner } of state.redMaterials) {
+    updateSoftEnergy(material, activity.flowTimes[owner] ?? time);
     const charge = activity.redModule === owner ? sampleRedTransit(activity.redTime, RED_FEED_DELAY.tip) : 0;
     material.emissiveIntensity = 0.16 + charge * 0.26 + moduleBoost(activity, owner) * 0.23;
     material.opacity = Math.min(0.88, 0.7 + charge * 0.08 + moduleBoost(activity, owner) * 0.1);
@@ -502,6 +518,7 @@ export function updateEnergyExchange(
   for (const { material, phase, stage, flow } of state.materials) {
     const owner =
       stage === "core" ? "pelvis" : stage === "legs" ? "legs" : stage === "chest" ? "chest" : "head_arms";
+    updateSoftEnergy(material, activity.flowTimes[owner] ?? time);
     const power = Math.max(
       sampleTransit(activity.beamTime, TRANSIT_DELAY[stage]),
       activity.redModule === owner ? 0.7 * sampleRedTransit(activity.redTime) : 0,

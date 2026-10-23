@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { addEnergyProgress } from "./soft-energy";
 import { MeshBVH } from "three-mesh-bvh";
 import type { GeometryBuilder } from "../../assembler/geometry";
 import type { ModelRegistry, PartDefinition, GeometrySpec } from "../../registry/types";
@@ -158,9 +159,14 @@ export const interiorBuilders: Record<string, GeometryBuilder> = {
     return geometry;
   },
   pedanMicroArc: (spec) => {
-    const { length, width } = (spec as { params: Record<string, number> }).params;
+    const { length, width, soft } = (spec as { params: Record<string, number> }).params;
     // 用封端细管弯成短折电流，仍满足项目的实际渲染几何闭合检查。
-    const geometry = new THREE.CylinderGeometry(0.0014, 0.0014, length, 6, 18).translate(0, length / 2, 0);
+    const wire = 0.0014 * (soft ? 3.2 : 1);
+    const geometry = new THREE.CylinderGeometry(wire, wire, length, soft ? 12 : 6, 18).translate(
+      0,
+      length / 2,
+      0,
+    );
     const p = geometry.getAttribute("position");
     for (let i = 0; i < p.count; i++) {
       const t = p.getY(i) / length,
@@ -169,7 +175,7 @@ export const interiorBuilders: Record<string, GeometryBuilder> = {
       p.setZ(i, p.getZ(i) + Math.sin(t * 49) * width * 0.12 * seal);
     }
     geometry.computeVertexNormals();
-    return geometry;
+    return soft ? addEnergyProgress(geometry, "y") : geometry;
   },
   pedanCuff: (spec) => {
     const p = (spec as { params: Record<string, number> }).params;
@@ -256,7 +262,9 @@ export const interiorBuilders: Record<string, GeometryBuilder> = {
   },
   pedanRing: (spec) => {
     const p = (spec as { params: Record<string, number> }).params;
-    return new THREE.TorusGeometry(p.r, p.wire, 10, 48);
+    // [OM-FREEPLAY] 软晕占原线宽的 3.2 倍，亮芯仍窄；不改变圆环中心线或传播法线。
+    const geometry = new THREE.TorusGeometry(p.r, p.wire * (p.soft ? 3.2 : 1), p.soft ? 12 : 10, 48);
+    return p.soft ? addEnergyProgress(geometry, "x") : geometry;
   },
   pedanCrystal: (spec) => {
     const p = (spec as { params: Record<string, number> }).params;

@@ -5,6 +5,8 @@ import type { ModelRegistry, PartDefinition } from "../../registry/types";
 import type { AssembledModel } from "../../assembler/assembler";
 import type { CavityDevice } from "./cavity-devices";
 import data from "./pedan.generated.json";
+import { displayMaterialSource } from "../../kernel/displayMaterial";
+import { updateSoftEnergy } from "./soft-energy";
 
 // [OM-FREEPLAY] 加密采用五圈；途中保持完整尺寸，仅在两端短距离收放，读得出连续传递。
 export const FLOW_PACKET_COUNT = 5;
@@ -123,7 +125,7 @@ export function addHandCouplings(
       "同步呼吸的截面能量环",
       base,
       "pedanRing",
-      { r: width * 0.85, wire: 0.0028 },
+      { r: width * 0.85, wire: 0.0028, soft: 1 },
       "pedan_hand_field",
     );
     Object.assign(terminals, { instances: 2, indexed: true, instance_nodes: ends });
@@ -143,13 +145,20 @@ export function addHandCouplings(
       "沿指节传递的能量环",
       base,
       "pedanRing",
-      { r: width * 0.82, wire: 0.0024 },
+      { r: width * 0.82, wire: 0.0024, soft: 1 },
       "pedan_hand_flow",
     );
     Object.assign(pulse, { instances: FLOW_PACKET_COUNT, indexed: true, instance_nodes: packets });
     const arc = `${base}_arc`;
     nodes.push({ name: arc, parent: base, pivot: [0, start, 0], motion: "scalar" });
-    add("arc", "间歇微电流", arc, "pedanMicroArc", { length: end - start, width }, "pedan_hand_flow");
+    add(
+      "arc",
+      "间歇微电流",
+      arc,
+      "pedanMicroArc",
+      { length: end - start, width, soft: 1 },
+      "pedan_hand_flow",
+    );
   }
 }
 
@@ -165,9 +174,12 @@ const cache = new WeakMap<
   }[]
 >();
 const fieldMaterials = new WeakMap<AssembledModel, Set<THREE.MeshStandardMaterial>>();
+const flowMaterials = new WeakMap<AssembledModel, Set<THREE.MeshStandardMaterial>>();
 export function updateHandCouplings(model: AssembledModel, seconds: number, charge: number, boost = 0): void {
   let links = cache.get(model);
   if (!links) {
+    for (const part of model.parts)
+      if (["pedan_hand_field", "pedan_hand_flow"].includes(part.def.material)) part.object.castShadow = false;
     links = [...model.nodes.values()]
       .filter((n) => /^HandField_\d+$/.test(n.name))
       .map((base) => {
@@ -189,7 +201,19 @@ export function updateHandCouplings(model: AssembledModel, seconds: number, char
       new Set(
         model.parts
           .filter((p) => p.def.material === "pedan_hand_field")
-          .map((p) => p.object.material as THREE.MeshStandardMaterial),
+          .map(
+            (p) => displayMaterialSource(p.object.material as THREE.Material) as THREE.MeshStandardMaterial,
+          ),
+      ),
+    );
+    flowMaterials.set(
+      model,
+      new Set(
+        model.parts
+          .filter((p) => p.def.material === "pedan_hand_flow")
+          .map(
+            (p) => displayMaterialSource(p.object.material as THREE.Material) as THREE.MeshStandardMaterial,
+          ),
       ),
     );
   }
@@ -208,6 +232,9 @@ export function updateHandCouplings(model: AssembledModel, seconds: number, char
     link.arc.rotation.y = Math.sin(seconds * 18 + i) * 0.45;
   }
   // 端环共用低亮材质，所有一对端环明暗同步；避免仅靠缩放冒充呼吸发光。
-  for (const material of fieldMaterials.get(model)!)
+  for (const material of flowMaterials.get(model)!) updateSoftEnergy(material, seconds);
+  for (const material of fieldMaterials.get(model)!) {
+    updateSoftEnergy(material, seconds);
     material.emissiveIntensity = 0.12 + 0.18 * (0.5 + 0.5 * Math.sin(seconds * 1.6)) + boost * 0.2;
+  }
 }
