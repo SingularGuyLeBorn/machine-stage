@@ -40,6 +40,7 @@ import {
   type055VlsFlame,
   type055VlsGasCloud,
   type055VlsHatch,
+  type055VlsLiner,
   type055VlsTube,
   type055Yj18Fins,
   type055Yj18Missile,
@@ -822,6 +823,34 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       mate: A([side * 2.03, 35.4, 20], [0, side * 90, 0]),
     });
   }
+  // 桅身四面平板阵（综合射频桅杆的相控阵/电子战面板）
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}radar.mast_panel_${side === -1 ? "l" : "r"}`,
+      name_cn: `桅身侧面阵 ${side === -1 ? "左" : "右"}`,
+      name_en: `mast side array ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(0.12, 2.6, 3.0, [0, 0, 0], 0.01)),
+      material: "cv_aesa",
+      mate: A([side * 2.3, 31.5, 20], [0, side * 90, 0]),
+    });
+  }
+  for (const [tag, z, yaw] of [
+    ["front", 23.4, 0],
+    ["aft", 16.6, 180],
+  ] as const) {
+    add({
+      id: `${P}radar.mast_panel_${tag}`,
+      name_cn: `桅身前后阵 ${tag}`,
+      name_en: `mast front/aft array ${tag}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(2.6, 2.4, 0.12, [0, 0, 0], 0.01)),
+      material: "cv_aesa",
+      mate: A([0, 31.5, z], [0, yaw, 0]),
+    });
+  }
   // 桅顶平台栏杆
   for (let i = 0; i < 4; i++) {
     add({
@@ -993,7 +1022,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 5,
       geometry: M(C(0.16, 0.6, [0, 0, 0], 10), S(0.34, [0, 0.36, 0], 12)),
       material: "cv_steel",
-      mate: A([i < 3 ? -7.2 : 7.2, t55DeckTop(-46 + (i % 3) * 19) + 0.3, -46 + (i % 3) * 19]),
+      mate: A([i < 3 ? -7.2 : 7.2, t55DeckTop([-30, -20, 8][i % 3]!) + 0.3, [-30, -20, 8][i % 3]!]),
     });
   }
 
@@ -1041,7 +1070,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
         B(0.18, 0.16, len, [-vlsHalfWidth, 0, 0], 0.006),
         B(0.18, 0.16, len, [vlsHalfWidth, 0, 0], 0.006),
       ),
-      material: "cv_steel_dark",
+      material: "cv_055_hull",
       mate: A([0, t55DeckTop(zc) + 0.08, zc]),
     });
   }
@@ -1159,6 +1188,23 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     instances: 112,
     indexed: true,
     instance_layout: "type055.vlsCanister",
+    mate: A([0, 0, 0]),
+  });
+  ctx.layout("type055.vlsLiner", ({ index }) => {
+    const cell = allCells[index]!;
+    return new THREE.Matrix4().makeTranslation(cell.x, 13.55, cell.z);
+  });
+  add({
+    id: `${P}vls.liner`,
+    name_cn: "垂发绿色防盐雾内衬 ×112",
+    name_en: "VLS green interior liner ×112",
+    assembly: "vls",
+    build_layer: 3,
+    geometry: { type: "kit", kit: "type055VlsLiner" },
+    material: "cv_vls_interior",
+    instances: 112,
+    indexed: true,
+    instance_layout: "type055.vlsLiner",
     mate: A([0, 0, 0]),
   });
   ctx.layout("type055.vlsShockRing", ({ index }) => {
@@ -1894,6 +1940,62 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     mate: A([-7.4, 6.05, -21.8]),
   });
 
+  // 机舱至烟囱的排气/进气长通道（沿舷侧，位于机舱顶部）
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}power.er_exhaust_run_${side === -1 ? "l" : "r"}_fwd`,
+      name_cn: `机舱至前烟囱排气通道 ${side === -1 ? "左" : "右"}`,
+      name_en: `engine exhaust run to forward uptake ${side === -1 ? "l" : "r"}`,
+      assembly: "propulsion",
+      build_layer: 1,
+      geometry: M(B(0.9, 0.9, 12.0, [0, 0, 0], 0.03), B(1.5, 0.9, 1.2, [0, 0, 6.3], 0.03)),
+      material: "cv_steel_dark",
+      mate: A([side * 7.0, 13.2, -14]),
+    });
+    add({
+      id: `${P}power.er_exhaust_run_${side === -1 ? "l" : "r"}_aft`,
+      name_cn: `机舱至后烟囱排气通道 ${side === -1 ? "左" : "右"}`,
+      name_en: `engine exhaust run to aft uptake ${side === -1 ? "l" : "r"}`,
+      assembly: "propulsion",
+      build_layer: 1,
+      geometry: M(B(0.9, 0.9, 25.0, [0, 0, 0], 0.03), B(1.5, 0.9, 1.2, [0, 0, -12.8], 0.03)),
+      material: "cv_steel_dark",
+      mate: A([side * 7.0, 13.2, -32.5]),
+    });
+  }
+  add({
+    id: `${P}power.steering_gear`,
+    name_cn: "舵机液压动力单元",
+    name_en: "steering gear hydraulic unit",
+    assembly: "propulsion",
+    build_layer: 2,
+    geometry: M(B(1.8, 1.0, 1.2, [0, 0, 0], 0.03), C(0.3, 1.4, [0, 0.6, 0], 14), C(0.3, 1.4, [0.7, 0.6, 0], 14)),
+    material: "cv_steel_dark",
+    mate: A([0, 5.2, -84]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}power.steering_ram_${side === -1 ? "l" : "r"}`,
+      name_cn: `舵机液压缸 ${side === -1 ? "左" : "右"}`,
+      name_en: `steering ram ${side === -1 ? "l" : "r"}`,
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M({ type: "weld", from: [0, 0, 0], to: [side * 2.2, -1.5, -8.8], radius: 0.14 }, C(0.22, 0.8, [0, 0, 0], 12)),
+      material: "cv_steel",
+      mate: A([0, 5.2, -84]),
+    });
+  }
+  add({
+    id: `${P}power.cpp_hydraulic_unit`,
+    name_cn: "可调距桨液压站",
+    name_en: "CPP hydraulic power unit",
+    assembly: "propulsion",
+    build_layer: 2,
+    geometry: M(B(1.6, 1.4, 1.0, [0, 0, 0], 0.03), B(0.8, 0.5, 0.1, [0, 0.4, 0.52], 0.01), C(0.15, 0.8, [0.6, 0.3, 0.2], 10)),
+    material: "cv_hull_dark",
+    mate: A([-5.5, 5.0, -48.5]),
+  });
+
   // 机舱辅机/管路/配电/吊车/进排气围井
   add({
     id: `${P}power.er_switchboard`,
@@ -2255,6 +2357,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     staticOnly("t55-super-self", "type055.super.*", "type055.super.*", "上层建筑/烟囱/舰桥安装"),
     staticOnly("t55-radar-super", "type055.radar.*", "type055.super.*", "相控阵/桅杆与上建安装", 150),
     staticOnly("t55-radar-self", "type055.radar.*", "type055.radar.*", "阵面/天线/安装框装配"),
+    staticOnly("t55-radar-mast-panel", "type055.radar.mast_panel_*", "type055.super.mast", "桅身相控阵/电子战面板嵌入综合桅杆表面", 2200),
     staticOnly("t55-vls-deck", "type055.vls.*", "type055.deck.*", "VLS 井口/框架与甲板安装", 150),
     staticOnly("t55-vls-self", "type055.vls.*", "type055.vls.*", "井筒/井盖/框架/燃气排导安装"),
     staticOnly("t55-weapons-deck", "type055.weapons.*", "type055.deck.*", "主炮/近防/导弹/鱼雷与甲板安装", 150),
@@ -2384,6 +2487,7 @@ export const TYPE055_BUILDERS = {
   type055Yj21Fins,
   type055VlsFlame,
   type055VlsGasCloud,
+  type055VlsLiner,
   type055VlsTube,
   type055VlsCanister,
 };

@@ -9,6 +9,9 @@ import { T55, t55DeckHalf, t55DeckY, t55HalfAt, t55StemRake } from "./constants"
 
 const STATIONS = 72;
 
+const box = (w: number, h: number, d: number, at: [number, number, number] = [0, 0, 0]): THREE.BufferGeometry =>
+  new THREE.BoxGeometry(w, h, d).translate(at[0], at[1], at[2]);
+
 function stationZ(index: number): number {
   return T55.STERN_Z + ((T55.BOW_Z - T55.STERN_Z) * index) / (STATIONS - 1);
 }
@@ -270,21 +273,65 @@ export const type055VlsGasCloud: GeometryBuilder = () =>
     new THREE.SphereGeometry(0.16, 10, 8).translate(-0.08, 0.42, -0.24),
   ]);
 
-/** 垂发井筒：开口圆筒 + 上下加强环（导弹能从中间穿出，不能有实体端盖）。 */
-export const type055VlsTube: GeometryBuilder = () =>
-  merge([
-    new THREE.CylinderGeometry(0.425, 0.425, 8.8, 22, 1, true),
-    new THREE.TorusGeometry(0.45, 0.024, 6, 22).translate(0, 4.35, 0),
-    new THREE.TorusGeometry(0.45, 0.024, 6, 22).translate(0, -4.35, 0),
-  ]);
+/**
+ * 垂发井筒：850mm 方形开口筒（公开资料：HT-1 为 850×850mm 方形筒弹），
+ * 四面壁 + 上下法兰；导弹从中间穿出，不能有实体端盖。
+ */
+export const type055VlsTube: GeometryBuilder = () => {
+  const h = 8.8;
+  const s = 0.425;
+  const t = 0.008;
+  const parts = [
+    box(t, h, s * 2, [-s, 0, 0]),
+    box(t, h, s * 2, [s, 0, 0]),
+    box(s * 2 - t, h, t, [0, 0, -s]),
+    box(s * 2 - t, h, t, [0, 0, s]),
+  ];
+  for (const y of [-h / 2 + 0.04, h / 2 - 0.04]) {
+    parts.push(
+      box(0.92, 0.07, 0.07, [0, y, -0.46]),
+      box(0.92, 0.07, 0.07, [0, y, 0.46]),
+      box(0.07, 0.07, 0.85, [-0.46, y, 0]),
+      box(0.07, 0.07, 0.85, [0.46, y, 0]),
+    );
+  }
+  return merge(parts);
+};
 
-/** 垂发发射筒：开口圆筒 + 上下法兰环。 */
-export const type055VlsCanister: GeometryBuilder = () =>
-  merge([
-    new THREE.CylinderGeometry(0.415, 0.415, 8.4, 22, 1, true),
-    new THREE.TorusGeometry(0.44, 0.022, 6, 22).translate(0, 4.18, 0),
-    new THREE.TorusGeometry(0.44, 0.022, 6, 22).translate(0, -4.18, 0),
+/** 垂发贮运发射筒：820mm 方形开口筒 + 上下法兰。 */
+export const type055VlsCanister: GeometryBuilder = () => {
+  const h = 8.4;
+  const s = 0.415;
+  const t = 0.004;
+  const parts = [
+    box(t, h, s * 2, [-s, 0, 0]),
+    box(t, h, s * 2, [s, 0, 0]),
+    box(s * 2 - t, h, t, [0, 0, -s]),
+    box(s * 2 - t, h, t, [0, 0, s]),
+  ];
+  for (const y of [-h / 2 + 0.04, h / 2 - 0.04]) {
+    parts.push(
+      box(0.86, 0.06, 0.06, [0, y, -0.43]),
+      box(0.86, 0.06, 0.06, [0, y, 0.43]),
+      box(0.06, 0.06, 0.8, [-0.43, y, 0]),
+      box(0.06, 0.06, 0.8, [0.43, y, 0]),
+    );
+  }
+  return merge(parts);
+};
+
+/** 垂发内衬：打开井盖后可见的绿色防盐雾内壁（开口方筒）。 */
+export const type055VlsLiner: GeometryBuilder = () => {
+  const h = 0.7;
+  const s = 0.417;
+  const t = 0.002;
+  return merge([
+    box(t, h, s * 2, [-s, 0, 0]),
+    box(t, h, s * 2, [s, 0, 0]),
+    box(s * 2 - t, h, t, [0, 0, -s]),
+    box(s * 2 - t, h, t, [0, 0, s]),
   ]);
+};
 
 /** 冷发射导弹：弹体 + 头锥 + 尾翼 + 底部燃气发生器。原点在弹体中心。 */
 export const type055VlsMissile: GeometryBuilder = () => {
@@ -733,6 +780,17 @@ export const type055GasTurbineStatic: GeometryBuilder = () => {
     tube.translate(Math.cos(a) * 0.86, 1.8 + Math.sin(a) * 0.86, -0.35);
     parts.push(tube);
   }
+  // 过渡段/涡轮支撑环/下传动箱/前后机脚/定位架
+  parts.push(
+    new THREE.CylinderGeometry(0.82, 0.62, 0.5, 22).rotateX(Math.PI / 2).translate(0, 1.8, 1.7),
+    new THREE.TorusGeometry(0.88, 0.06, 6, 24).translate(0, 1.8, -2.0),
+    new THREE.TorusGeometry(0.82, 0.055, 6, 24).translate(0, 1.8, -4.0),
+    new THREE.BoxGeometry(0.8, 0.62, 1.2).translate(0, 0.72, 1.4),
+    new THREE.BoxGeometry(0.5, 0.4, 0.3).translate(0, 0.5, 3.6),
+    new THREE.BoxGeometry(0.5, 0.4, 0.3).translate(0, 0.5, -3.6),
+    new THREE.BoxGeometry(0.16, 0.16, 7.8).translate(-1.05, 0.45, 0),
+    new THREE.BoxGeometry(0.16, 0.16, 7.8).translate(1.05, 0.45, 0),
+  );
   // 附件管路/机脚
   const pipe = new THREE.CylinderGeometry(0.05, 0.05, 2.25, 8);
   pipe.translate(-1.15, 1.68, 3.4);
