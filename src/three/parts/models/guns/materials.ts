@@ -13,111 +13,124 @@ import type { MaterialSpec } from "../../kernel/textures";
 
 /** 烤蓝钢（AK 系机匣 / 枪管 / 自动机）：发黑处理，深蓝近黑。 */
 const STEEL_BLUED: MaterialSpec = {
-  base: "#a8b2be",
+  base: "#59636f",
   metalness: 1,
-  roughness: 0.26,
+  // 烤蓝钢不是镜面：0.42 让顶光在弧形防尘盖上摊成柔和高光，避免整片过曝。
+  roughness: 0.42,
   preset: "steel",
   pbr: "brushed",
   anisotropy: 0.85,
   repeat: [3, 3],
-  envMapIntensity: 1.75,
+  envMapIntensity: 1.1,
+};
+
+/** 哑光烤蓝钢（AK/RPK 全包机匣盖）：大面积顶盖用更高粗糙度，避免顶光反射过曝。 */
+const STEEL_BLUED_MATTE: MaterialSpec = {
+  base: "#59636f",
+  metalness: 1,
+  roughness: 0.55,
+  preset: "steel_rough",
+  pbr: "brushed",
+  anisotropy: 0.7,
+  repeat: [3, 3],
+  envMapIntensity: 1.0,
 };
 
 /** 磷化钢（M249 / M2HB / M134 系）：哑光灰绿磷化膜。 */
 const STEEL_PHOSPHATE: MaterialSpec = {
-  base: "#ccd2c6",
+  base: "#6b7164",
   metalness: 1,
-  roughness: 0.5,
+  roughness: 0.55,
   preset: "steel_rough",
   pbr: "scratched",
   anisotropy: 0.25,
   repeat: [3, 3],
-  envMapIntensity: 1.15,
+  envMapIntensity: 1.0,
 };
 
 /** 机加钢件（枪机 / 击针 / 阻铁 / 销）：亮钢色。 */
 const STEEL_MACHINED: MaterialSpec = {
-  base: "#ccd2d8",
+  base: "#9aa1a8",
   metalness: 1,
-  roughness: 0.22,
+  roughness: 0.24,
   preset: "steel",
   pbr: "brushed",
   anisotropy: 1,
   repeat: [2, 2],
-  envMapIntensity: 1.4,
+  envMapIntensity: 1.25,
 };
 
 /** 使用磨损钢（高频摩擦面：抽壳钩 / 闭锁凸笋 / 供弹齿）。 */
 const STEEL_WORN: MaterialSpec = {
-  base: "#b4afa6",
+  base: "#7c7971",
   metalness: 1,
-  roughness: 0.4,
+  roughness: 0.44,
   preset: "steel_rough",
   pbr: "scratched",
   anisotropy: 0.35,
   repeat: [2, 2],
-  envMapIntensity: 1.2,
+  envMapIntensity: 1.05,
 };
 
 /** 簧件（复进簧 / 击锤簧 / 托弹簧）：磷化 + 高糙。 */
 const STEEL_SPRING: MaterialSpec = {
-  base: "#b6bcc2",
+  base: "#767d85",
   metalness: 1,
-  roughness: 0.48,
+  roughness: 0.5,
   preset: "steel_rough",
   pbr: "scratched",
   anisotropy: 0.2,
   repeat: [2, 2],
-  envMapIntensity: 1.1,
+  envMapIntensity: 0.95,
 };
 
 /** 黄铜（弹壳 / 闭锁环）：本色黄铜。 */
 const BRASS: MaterialSpec = {
-  base: "#e8b45c",
+  base: "#d2a24a",
   metalness: 1,
-  roughness: 0.24,
+  roughness: 0.26,
   pbrColor: false,
   preset: "steel",
   pbr: "brushed",
   anisotropy: 0.45,
   repeat: [2, 2],
-  envMapIntensity: 1.35,
+  envMapIntensity: 1.2,
 };
 
 /** 馏青铜被甲（弹头被甲）。 */
 const COPPER: MaterialSpec = {
-  base: "#c9813f",
+  base: "#b56f36",
   metalness: 1,
-  roughness: 0.3,
+  roughness: 0.32,
   pbrColor: false,
   preset: "steel",
   pbr: "brushed",
   anisotropy: 0.45,
   repeat: [1, 1],
-  envMapIntensity: 1.3,
+  envMapIntensity: 1.15,
 };
 
 /** 铅芯（弹头铅套）：暗灰蓝。 */
 const LEAD: MaterialSpec = {
-  base: "#bcc3cb",
+  base: "#8d949c",
   metalness: 1,
-  roughness: 0.48,
+  roughness: 0.5,
   preset: "steel_rough",
   pbr: "scratched",
   repeat: [1, 1],
-  envMapIntensity: 1.15,
+  envMapIntensity: 1.0,
 };
 
 /** 钢芯（穿甲弹心）。 */
 const STEEL_CORE: MaterialSpec = {
-  base: "#d6dce2",
+  base: "#b9c0c7",
   metalness: 1,
-  roughness: 0.24,
+  roughness: 0.26,
   preset: "steel",
   pbr: "brushed",
   anisotropy: 0.8,
   repeat: [1, 1],
-  envMapIntensity: 1.3,
+  envMapIntensity: 1.15,
 };
 
 /** 发射药（颗粒火药柱，断面可见）。 */
@@ -130,39 +143,39 @@ const PROPELLANT: MaterialSpec = {
 
 /** 底火（击发药）：黄铜底 + 火台。 */
 const PRIMER: MaterialSpec = {
-  base: "#e8c274",
+  base: "#d5ad60",
   metalness: 1,
-  roughness: 0.3,
+  roughness: 0.32,
   pbrColor: false,
   preset: "steel",
   pbr: "brushed",
   anisotropy: 0.4,
   repeat: [1, 1],
-  envMapIntensity: 1.25,
+  envMapIntensity: 1.15,
 };
 
 /** 木质件（AK 护木 / 握把 / 枪托）：层压桦木。 */
 const WOOD_FURNITURE: MaterialSpec = {
-  base: "#e6d8c6",
+  base: "#c9b28e",
   metalness: 0,
   roughness: 0.58,
   preset: "wood",
   pbr: "wood",
   normalScale: 0.7,
   repeat: [1.5, 1.5],
-  envMapIntensity: 0.55,
+  envMapIntensity: 0.5,
 };
 
 /** 握把磨亮（手汗 + 使用磨损：粗糙度低于新木）。 */
 const WOOD_WORN: MaterialSpec = {
-  base: "#e0d2c0",
+  base: "#b58a60",
   metalness: 0,
-  roughness: 0.42,
+  roughness: 0.44,
   preset: "wood",
   pbr: "wood",
   normalScale: 0.65,
   repeat: [1.5, 1.5],
-  envMapIntensity: 0.6,
+  envMapIntensity: 0.55,
 };
 
 /** 橡胶握把（M249 握把 / 枪托缓冲）。 */
@@ -208,6 +221,7 @@ const TRACER: MaterialSpec = {
 /** 枪械系列共享材质库（各模型把本表并入自己的 materials）。 */
 export const GUN_MATERIALS: Record<string, MaterialSpec> = {
   steel_blued: STEEL_BLUED,
+  steel_blued_matte: STEEL_BLUED_MATTE,
   steel_phosphate: STEEL_PHOSPHATE,
   steel_machined: STEEL_MACHINED,
   steel_worn: STEEL_WORN,

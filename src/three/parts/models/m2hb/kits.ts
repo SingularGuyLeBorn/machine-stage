@@ -7,6 +7,7 @@ import {
   mergeGeometries,
   tubeGeometry,
 } from "../../kernel/geometry";
+import { gun7Kits } from "../guns7/kits";
 
 type Params = Record<string, unknown>;
 
@@ -18,9 +19,10 @@ function num(params: Params | undefined, key: string, fallback?: number): number
 }
 
 // ---------------------------------------------------------------------------
-// m2ReceiverShroud —— M2HB 外接收器壳：左右侧板 + 底板 + 前后顶板 + 尾板 +
-// 枪管前支撑环 + 铆钉列 + 弹箱挂座。把原来外露的枪机/加速子/供弹机构
-// 全部包在铆接矩管内；供弹口由大供弹盖单独封住。
+// m2ReceiverShroud —— M2HB 外接收器壳：圆角 U 形冲压管 + 弧形前后顶板 +
+// 枪管前支撑环 + 铆钉列 + 弹箱挂座。把外露的枪机/加速子/供弹机构全部
+// 包在铆接壳体里；中段供弹口由大供弹盖单独封住。侧壁、底板、上沿是连续
+// 冲压折弯，不是左右平板 + 平板顶盖拼出来的盒子。
 // 局部系：origin = 枪膛中心，+Z 枪口方向。
 // ---------------------------------------------------------------------------
 const m2ReceiverShroud: GeometryBuilder = (spec) => {
@@ -32,21 +34,48 @@ const m2ReceiverShroud: GeometryBuilder = (spec) => {
   const t = num(p, "t", 0.003);
   const len = z1 - z0;
   const zc = (z0 + z1) / 2;
+  const top = h / 2;
+  const feedZ0 = -0.31;
+  const feedZ1 = -0.01;
   const parts: THREE.BufferGeometry[] = [];
 
-  // 左右侧板 + 纵向压筋 + 上下两排铆钉
+  // U 形圆角冲压壳体：外轮廓圆角、等壁厚、顶部留出 60mm 供弹开口。
+  const body = gun7Kits.roundedUShell({
+    ...(spec as object),
+    params: {
+      w,
+      top,
+      bottom: -h / 2,
+      z0,
+      z1,
+      wall: t,
+      topGap: 0.030,
+      cornerR: 0.012,
+    },
+  } as never, {} as never);
+  parts.push(body);
+
+  // 侧壁纵向压筋 + 上下两排铆钉 + 圆形检查盖
   for (const side of [-1, 1]) {
-    const wall = bevelBoxGeometry(t, h, len, 0.0025, 1);
-    wall.translate(side * (w / 2 - t / 2), 0, zc);
-    parts.push(wall);
     const rib = bevelBoxGeometry(0.0018, 0.008, len * 0.7, 0.0003, 1);
     rib.translate(side * (w / 2 + 0.0007), -0.008, zc + 0.015);
     parts.push(rib);
+    const rib2 = bevelBoxGeometry(0.0016, 0.005, len * 0.52, 0.0003, 1);
+    rib2.translate(side * (w / 2 + 0.0005), 0.018, zc + 0.028);
+    parts.push(rib2);
+    const plug = new THREE.CylinderGeometry(0.010, 0.010, 0.002, 16);
+    plug.rotateZ(Math.PI / 2);
+    plug.translate(side * (w / 2 + 0.0005), -0.010, -0.215);
+    parts.push(plug);
+    const plugRing = new THREE.TorusGeometry(0.011, 0.0012, 6, 20);
+    plugRing.rotateY(Math.PI / 2);
+    plugRing.translate(side * (w / 2 + 0.0007), -0.010, -0.215);
+    parts.push(plugRing);
     for (const y of [-0.032, 0.032]) {
       for (let i = 0; i < 7; i++) {
         const z = z0 + 0.035 + i * 0.058;
         if (z > z1 - 0.012) continue;
-        const rivet = new THREE.CylinderGeometry(0.0032, 0.0032, 0.0015, 8);
+        const rivet = new THREE.CylinderGeometry(0.0026, 0.0026, 0.0015, 8);
         rivet.rotateZ(Math.PI / 2);
         rivet.translate(side * (w / 2 + 0.0008), y, z);
         parts.push(rivet);
@@ -54,25 +83,30 @@ const m2ReceiverShroud: GeometryBuilder = (spec) => {
     }
   }
 
-  // 底板 / 尾板
-  const bottom = bevelBoxGeometry(w, t, len, 0.0025, 1);
-  bottom.translate(0, -h / 2 + t / 2, zc);
-  parts.push(bottom);
-  const rear = bevelBoxGeometry(w, h, t, 0.0025, 1);
+  // 尾板：封闭后端并把缓冲器座铆在上面
+  const rear = bevelBoxGeometry(w - 0.001, h - 0.001, t, 0.004, 2);
   rear.translate(0, 0, z0 + t / 2);
   parts.push(rear);
 
-  // 顶板：中段留供弹口（-0.31..-0.01），由大供弹盖封闭
-  const feedZ0 = -0.31;
-  const feedZ1 = -0.01;
-  const topRearLen = feedZ0 - z0;
-  const topRear = bevelBoxGeometry(w, t, topRearLen, 0.0025, 1);
-  topRear.translate(0, h / 2 - t / 2, z0 + topRearLen / 2);
-  parts.push(topRear);
-  const topFrontLen = z1 - feedZ1;
-  const topFront = bevelBoxGeometry(w, t, topFrontLen, 0.0025, 1);
-  topFront.translate(0, h / 2 - t / 2, feedZ1 + topFrontLen / 2);
-  parts.push(topFront);
+  // 前后固定顶板：弧形冲压件，中段留供弹口给大盖。
+  for (const [a, b] of [[z0, feedZ0], [feedZ1, z1]] as const) {
+    const plate = gun7Kits.archedCover({
+      ...(spec as object),
+      params: {
+        w: w - 0.0004,
+        len: b - a,
+        zc: (a + b) / 2,
+        yBase: top - 0.001,
+        yTop: top + 0.005,
+        wall: t,
+        sag: 0.005,
+        humpW: 0,
+        rib: 1,
+        rivetCount: 3,
+      },
+    } as never, {} as never);
+    parts.push(plate);
+  }
 
   // 前端枪管支撑环 / 节套法兰（凸出前脸，避免正面变成一块大平板）
   const collar = tubeGeometry(0.034, 0.016, 0.038, 28);
@@ -84,12 +118,7 @@ const m2ReceiverShroud: GeometryBuilder = (spec) => {
   trunnion.translate(0, 0, z1 + 0.020);
   parts.push(trunnion);
 
-  // 侧板检查窗压边（左右各一块，轻微凸起；不切穿板面）
-  for (const side of [-1, 1]) {
-    const panel = bevelBoxGeometry(0.0016, 0.050, 0.150, 0.0005, 1);
-    panel.translate(side * (w / 2 + 0.0006), -0.002, -0.170);
-    parts.push(panel);
-  }
+  // 侧板检查窗压边已改为冲压压筋 + 圆形检查盖（见上方循环），不再贴大平板。
 
   // 尾端缓冲器座（后板外侧的圆法兰）
   const buffer = new THREE.CylinderGeometry(0.020, 0.020, 0.014, 20);
@@ -102,10 +131,10 @@ const m2ReceiverShroud: GeometryBuilder = (spec) => {
   bracket.translate(-(w / 2 + 0.009), -0.018, -0.25);
   parts.push(bracket);
 
-  // 供弹盖铰链耳座
+  // 供弹盖铰链耳座：坐在机匣后上沿，与机盖铰链销同轴
   for (const side of [-1, 1]) {
-    const ear = bevelBoxGeometry(0.009, 0.012, 0.016, 0.0008, 1);
-    ear.translate(side * (w / 2 - 0.009), h / 2 + 0.006, feedZ0 + 0.006);
+    const ear = bevelBoxGeometry(0.009, 0.010, 0.016, 0.0008, 1);
+    ear.translate(side * (w / 2 - 0.009), 0.044, feedZ0 + 0.002);
     parts.push(ear);
   }
 
@@ -115,38 +144,52 @@ const m2ReceiverShroud: GeometryBuilder = (spec) => {
 };
 
 // ---------------------------------------------------------------------------
-// m2FeedCoverShell —— M2HB 大供弹盖：覆盖整个供弹口，带下裙边、铰链和
-// 前端卡榫；正常状态把弹链/供弹滑块完全盖住。
+// m2FeedCoverShell —— M2HB 大供弹盖：横向弧形冲压盖 + 中央受弹器凸包 +
+// 两侧下裙边 + 铰链/前端卡榫；正常状态把弹链/供弹滑块完全盖住。
+// 旧版是 14mm 厚的平板盒；现在拱面、裙边和凸包都有连续曲面。
 // 局部系：origin = 枪膛中心，几何按模型坐标布置。
 // ---------------------------------------------------------------------------
 const m2FeedCoverShell: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
-  const w = num(p, "w", 0.074);
+  const w = num(p, "w", 0.078);
   const len = num(p, "len", 0.300);
   const zc = num(p, "zc", -0.162);
-  const y = num(p, "y", 0.048);
+  const yBase = num(p, "yBase", 0.040);
+  const yTop = num(p, "yTop", 0.064);
   const parts: THREE.BufferGeometry[] = [];
-  const top = bevelBoxGeometry(w, 0.014, len, 0.0012, 1);
-  top.translate(0, y, zc);
-  parts.push(top);
-  const rib = bevelBoxGeometry(w * 0.86, 0.005, len * 0.86, 0.0008, 1);
-  rib.translate(0, y + 0.0095, zc);
-  parts.push(rib);
-  for (const side of [-1, 1]) {
-    const skirt = bevelBoxGeometry(0.004, 0.020, len - 0.010, 0.0008, 1);
-    skirt.translate(side * (w / 2 - 0.002), y - 0.013, zc);
-    parts.push(skirt);
-  }
-  const hinge = new THREE.CylinderGeometry(0.0045, 0.0045, 0.078, 12);
+
+  const cover = gun7Kits.archedCover({
+    ...(spec as object),
+    params: {
+      w,
+      len,
+      zc,
+      yBase,
+      yTop,
+      wall: 0.0024,
+      sag: 0.012,
+      humpW: 0.042,
+      humpH: 0.013,
+      humpD: len * 0.60,
+      rib: 1,
+      rivetCount: 6,
+    },
+  } as never, {} as never);
+  parts.push(cover);
+
+  // 后铰链轴：横穿盖尾和机匣耳座
+  const hinge = new THREE.CylinderGeometry(0.0045, 0.0045, w + 0.006, 12);
   hinge.rotateZ(Math.PI / 2);
-  hinge.translate(0, y - 0.002, zc - len / 2 + 0.004);
+  hinge.translate(0, 0.044, zc - len / 2 + 0.004);
   parts.push(hinge);
+  // 前卡榫：盖前端锁在机匣上
   const latch = bevelBoxGeometry(0.020, 0.013, 0.014, 0.0008, 1);
-  latch.translate(0, y - 0.006, zc + len / 2 - 0.004);
+  latch.translate(0, 0.042, zc + len / 2 - 0.004);
   parts.push(latch);
   const frontLip = bevelBoxGeometry(w, 0.004, 0.010, 0.002, 1);
-  frontLip.translate(0, y - 0.004, zc + len / 2 - 0.008);
+  frontLip.translate(0, yBase + 0.001, zc + len / 2 - 0.008);
   parts.push(frontLip);
+
   const merged = mergeGeometries(parts);
   for (const piece of parts) piece.dispose();
   return merged;
@@ -325,32 +368,21 @@ const m2Accelerator: GeometryBuilder = (spec) => {
 };
 
 // ---------------------------------------------------------------------------
-// m2TripodLeg —— M3 三脚架单腿（腿管 + 驻锄 + 调节螺）。
-// 局部系：origin = 腿根（与架座连接处）。
+// m2TripodLeg —— M3 三脚架单腿：冲压 U 形槽钢腿 + 夹箍/调节螺栓 + 驻锄。
+// 旧版是圆管；M3 的腿是开口 U 形冲压件，外壁带折边和纵向压筋。
+// 局部系：origin = 腿根（与架座连接处），+Z 沿腿长。
 // ---------------------------------------------------------------------------
 const m2TripodLeg: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
   const legLen = num(p, "legLen", 0.5);
   const tubeR = num(p, "tubeR", 0.013);
-  const parts: THREE.BufferGeometry[] = [];
-  // 腿管
-  const tube = new THREE.CylinderGeometry(tubeR, tubeR * 0.9, legLen, 12);
-  tube.rotateX(Math.PI / 2);
-  tube.translate(0, 0, legLen / 2);
-  parts.push(tube);
-  // 驻锄（腿末端横向板）
-  const spade = bevelBoxGeometry(0.03, 0.004, 0.09, 0.001, 1);
-  spade.rotateX(Math.PI / 2);
-  spade.translate(0, -0.002, legLen - 0.01);
-  parts.push(spade);
-  // 调节螺（腿上部的螺纹段表达）
-  const screw = new THREE.CylinderGeometry(tubeR * 0.75, tubeR * 0.75, 0.06, 10);
-  screw.rotateX(Math.PI / 2);
-  screw.translate(0, 0, legLen * 0.45);
-  parts.push(screw);
-  const merged = mergeGeometries(parts);
-  for (const piece of parts) piece.dispose();
-  return merged;
+  const width = num(p, "width", tubeR * 2.31);
+  const depth = num(p, "depth", tubeR * 2.0);
+  const wall = num(p, "wall", 0.0024);
+  return gun7Kits.uChannelLeg({
+    ...(spec as object),
+    params: { legLen, width, depth, wall },
+  } as never, {} as never);
 };
 
 // ---------------------------------------------------------------------------

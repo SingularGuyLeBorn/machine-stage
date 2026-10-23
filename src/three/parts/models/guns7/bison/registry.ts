@@ -144,10 +144,6 @@ const clonePart = (p: PartDefinition): PartDefinition => {
   let mate = p.mate && "to" in p.mate
     ? { ...p.mate, to: String(p.mate.to).replace(/^ak47\./, "bison.") }
     : p.mate;
-  if (p.id === "ak47.furniture.grip" && mate && "position" in mate) {
-    const pos = mate.position as [number, number, number];
-    mate = { ...mate, position: [-0.022, pos[1], pos[2]] };
-  }
   const instanceNodes = p.instance_nodes?.map((n) => n);
   return {
     ...p,
@@ -370,20 +366,27 @@ parts.push(
     geometry: { type: "kit", kit: "bisonFoldingStock", params: { len: 0.170 } },
     material: "parkerized",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [-0.022, -0.006, -0.280] },
-    source: "左侧折叠骨架托：两根钢管 + 橡胶托底板 + 贴腮片；折叠后托底贴住机匣左侧。",
+    mate: { type: "absolute", position: [0, -0.006, -0.310] },
+    source: "侧折叠骨架托：两根钢管 + 橡胶托底板 + 贴腮片；铰链后移到机匣尾端之外，展开时托底与枪身中线对齐，折叠时向左侧收拢贴住机匣。",
   }),
   p({
     id: "bison.stock.mount",
     name_cn: "托铰链座",
-    name_en: "Stock hinge block",
+    name_en: "Stock hinge yoke",
     assembly: "furniture",
     build_layer: 2,
-    geometry: { type: "box", w: 0.012, h: 0.030, d: 0.056, bevel: 0.001 },
+    geometry: {
+      type: "merge",
+      parts: [
+        { type: "box", w: 0.006, h: 0.030, d: 0.070, bevel: 0.001, at: [-0.019, 0, 0] },
+        { type: "box", w: 0.006, h: 0.030, d: 0.070, bevel: 0.001, at: [0.019, 0, 0] },
+        { type: "box", w: 0.044, h: 0.030, d: 0.008, bevel: 0.001, at: [0, 0, -0.028] },
+      ],
+    },
     material: "machined",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [-0.022, -0.006, -0.257] },
-    source: "左侧托铰链座：铆在机匣左侧尾端，把折叠托的铰链耳引到机匣外，避开枪机框后坐路径。",
+    mate: { type: "absolute", position: [0, -0.006, -0.285] },
+    source: "托铰链座：中置 U 形轭架，两侧板夹住机匣尾部，中央让开枪机框后坐路径；铰链轴后移到机匣尾端之外，枪托中线与枪身重合，仍可向左折叠。",
   }),
   p({
     id: "bison.stock.hinge",
@@ -394,8 +397,8 @@ parts.push(
     geometry: { type: "cylinder", r: 0.0042, h: 0.032, segments: 14, bevel: 0 },
     material: "machined",
     node: "AkRecoil",
-    mate: { type: "absolute", position: [-0.022, -0.006, -0.280] },
-    source: "托铰链轴：竖直销轴，骨架托可绕它向左侧折叠 180°。",
+    mate: { type: "absolute", position: [0, -0.006, -0.310] },
+    source: "托铰链轴：竖直销轴，轴线与枪身中线重合；骨架托可绕它向左侧折叠 180°。",
   }),
   p({
     id: "bison.action.charging_handle",

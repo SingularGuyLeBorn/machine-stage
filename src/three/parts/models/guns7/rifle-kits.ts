@@ -101,15 +101,15 @@ const foreEndLoft: GeometryBuilder = (spec) => {
   const w = num(p, "w", 0.044);
   const bottom = num(p, "bottom", -0.04);
   const sections = [
-    { z: 0.0, width: w, top: 0.0, bottom, squareness: 0.56, grooveWidth: 0.012, grooveDepth: 0.011 },
-    { z: 0.045, width: w * 0.985, top: -0.001, bottom: bottom * 0.985, squareness: 0.54, grooveWidth: 0.012, grooveDepth: 0.011 },
-    { z: 0.12, width: w * 0.95, top: -0.003, bottom: bottom * 0.94, squareness: 0.52, grooveWidth: 0.0115, grooveDepth: 0.01 },
-    { z: 0.22, width: w * 0.86, top: -0.006, bottom: bottom * 0.86, squareness: 0.48, grooveWidth: 0.011, grooveDepth: 0.008 },
-    { z: 0.3, width: w * 0.75, top: -0.01, bottom: bottom * 0.75, squareness: 0.46, grooveWidth: 0.01, grooveDepth: 0.006 },
-    { z: len - 0.008, width: w * 0.68, top: -0.013, bottom: bottom * 0.68, squareness: 0.44, grooveWidth: 0.0095, grooveDepth: 0.005 },
-    { z: len, width: w * 0.64, top: -0.015, bottom: bottom * 0.64, squareness: 0.42, grooveWidth: 0.009, grooveDepth: 0.004 },
+    { z: 0.0, width: w, top: 0.0, bottom, squareness: 0.64, grooveWidth: 0.018, grooveDepth: 0.012 },
+    { z: 0.045, width: w * 0.985, top: -0.001, bottom: bottom * 0.985, squareness: 0.62, grooveWidth: 0.018, grooveDepth: 0.012 },
+    { z: 0.12, width: w * 0.95, top: -0.003, bottom: bottom * 0.94, squareness: 0.6, grooveWidth: 0.017, grooveDepth: 0.011 },
+    { z: 0.22, width: w * 0.86, top: -0.005, bottom: bottom * 0.86, squareness: 0.56, grooveWidth: 0.016, grooveDepth: 0.009 },
+    { z: 0.3, width: w * 0.75, top: -0.008, bottom: bottom * 0.78, squareness: 0.52, grooveWidth: 0.015, grooveDepth: 0.007 },
+    { z: len - 0.008, width: w * 0.68, top: -0.01, bottom: bottom * 0.72, squareness: 0.5, grooveWidth: 0.014, grooveDepth: 0.006 },
+    { z: len, width: w * 0.64, top: -0.012, bottom: bottom * 0.7, squareness: 0.48, grooveWidth: 0.013, grooveDepth: 0.005 },
   ];
-  return loftGeometry(sections, 32, true, true);
+  return loftGeometry(sections, 40, true, true);
 };
 
 // ---------------------------------------------------------------------------
@@ -135,10 +135,10 @@ const woodSidePanel: GeometryBuilder = (spec) => {
   const panel = new THREE.ExtrudeGeometry(shape, {
     depth: thickness,
     bevelEnabled: true,
-    bevelThickness: 0.0009,
-    bevelSize: 0.0009,
-    bevelSegments: 2,
-    curveSegments: 6,
+    bevelThickness: 0.0014,
+    bevelSize: 0.0014,
+    bevelSegments: 3,
+    curveSegments: 8,
     steps: 1,
   });
   // shape 的 x 是枪身方向（z），挤出方向是板厚（x）。
@@ -223,6 +223,7 @@ const noseCap: GeometryBuilder = (spec) => {
   const w = num(p, "w", 0.046);
   const h = num(p, "h", 0.044);
   const t = num(p, "t", 0.003);
+  const holeY = num(p, "holeY", -h * 0.56);
   const parts: THREE.BufferGeometry[] = [];
   for (const side of [-1, 1]) {
     const wall = box(t, h, len, 0.0006);
@@ -237,7 +238,7 @@ const noseCap: GeometryBuilder = (spec) => {
   parts.push(top);
   const hole = tubeZ(0.0036, 0.0024, len + 0.002, 12);
   hole.rotateY(Math.PI / 2);
-  hole.translate(0, -h * 0.56, len / 2);
+  hole.translate(0, holeY, len / 2);
   parts.push(hole);
   return merge(parts);
 };

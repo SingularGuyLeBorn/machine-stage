@@ -28,11 +28,14 @@ const m134Rotor: GeometryBuilder = (spec) => {
   const ringR = num(p, "ringR", 0.032);
   const count = Math.round(num(p, "count", 6));
   const parts: THREE.BufferGeometry[] = [];
-  // 旋转机匣主体（中空筒：6 根枪管从中间穿过）
-  const body = tubeGeometry(r, ringR + 0.009, len, 24);
-  body.rotateX(Math.PI / 2);
-  body.translate(0, 0, len / 2);
-  parts.push(body);
+  // 后段筒身只包住凸轮环/枪机尾座（z 0..0.05）；枪机工作段（0.05..0.14）
+  // 做成开放式骨架：前后环 + 6 条纵向轨。真实 M134 的转子本来就是让枪机
+  // 在导轨之间前后滑动的框架，不是把枪机封在实心筒里——这样从右侧窗口能
+  // 直接看到 6 套枪机随转子公转并往复。
+  const rearTube = tubeGeometry(r, ringR + 0.009, 0.05, 24);
+  rearTube.rotateX(Math.PI / 2);
+  rearTube.translate(0, 0, 0.025);
+  parts.push(rearTube);
   // 6 个枪管孔座（前端凸台，枪管从这里伸出）
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
@@ -46,6 +49,16 @@ const m134Rotor: GeometryBuilder = (spec) => {
   camRing.rotateX(Math.PI / 2);
   camRing.translate(0, 0, 0.008);
   parts.push(camRing);
+  // 开放式枪机笼：6 条**细导杆**（不是宽板），位于相邻枪机之间（偏转 30°），
+  // 径向 45..50mm。原来 7mm 宽的板条从侧面看会把枪机整排挡住；改成 2.6mm
+  // 圆角方杆后，窗口里能直接看到枪机本体的往复，杆只作为转子框架的读点。
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 + Math.PI / count;
+    const rail = bevelBoxGeometry(0.0026, 0.0045, 0.09, 0.0004, 1);
+    rail.rotateZ(angle);
+    rail.translate(Math.cos(angle) * 0.0475, Math.sin(angle) * 0.0475, 0.095);
+    parts.push(rail);
+  }
   // 转子前端面环
   const front = latheGeometry(
     [
@@ -102,9 +115,6 @@ const m134Housing: GeometryBuilder = (spec) => {
     const rearPlateLower = new THREE.BoxGeometry(0.006, 0.05, 0.14);
     rearPlateLower.translate(w / 2 - 0.003, -h / 2 + 0.025, z0 + 0.07);
     parts.push(rearPlateLower);
-    const chute = new THREE.BoxGeometry(0.004, 0.05, 0.06);
-    chute.translate(w / 2 - 0.003, -0.02, -0.02);
-    parts.push(chute);
     // 观察窗边框（机加工倒角）
     const frameTop = new THREE.BoxGeometry(0.006, 0.004, 0.12);
     frameTop.translate(w / 2 - 0.003, 0.022, z0 + 0.07);
@@ -141,13 +151,47 @@ const m134FrontHousing: GeometryBuilder = (spec) => {
   const len = z1 - z0;
   const zc = (z0 + z1) / 2;
 
-  for (const side of [-1, 1]) {
-    const wall = bevelBoxGeometry(0.006, h, len, 0.0008, 1);
-    wall.translate(side * (w / 2 - 0.003), 0, zc);
-    parts.push(wall);
-    const rib = bevelBoxGeometry(0.0018, 0.010, len * 0.74, 0.0004, 1);
-    rib.translate(side * (w / 2 + 0.0008), -0.022, zc + 0.01);
-    parts.push(rib);
+  // 左侧：整块侧板 + 加强筋。右侧：只留上下/前后边框，中间开一个
+  // 覆盖枪机实际行程（世界 z -0.16..-0.01、y ±0.045）的大观察窗。
+  // 原来的整块右墙在 z -0.20..0.06 把 6 套枪机完全挡住；电机/供弹机都
+  // 在窗口之外，所以这个开口是纯展示性 cutaway，不切断承力件。
+  {
+    const leftWall = bevelBoxGeometry(0.006, h, len, 0.0008, 1);
+    leftWall.translate(-(w / 2 - 0.003), 0, zc);
+    parts.push(leftWall);
+    const leftRib = bevelBoxGeometry(0.0018, 0.010, len * 0.74, 0.0004, 1);
+    leftRib.translate(-(w / 2 + 0.0008), -0.022, zc + 0.01);
+    parts.push(leftRib);
+
+    const x = w / 2 - 0.003;
+    const topStrip = bevelBoxGeometry(0.006, 0.030, len, 0.0008, 1);
+    topStrip.translate(x, h / 2 - 0.015, zc);
+    parts.push(topStrip);
+    const bottomStrip = bevelBoxGeometry(0.006, 0.030, len, 0.0008, 1);
+    bottomStrip.translate(x, -h / 2 + 0.015, zc);
+    parts.push(bottomStrip);
+    const rearStrip = bevelBoxGeometry(0.006, 0.090, 0.040, 0.0008, 1);
+    rearStrip.translate(x, 0, z0 + 0.020);
+    parts.push(rearStrip);
+    const frontStrip = bevelBoxGeometry(0.006, 0.090, 0.070, 0.0008, 1);
+    frontStrip.translate(x, 0, z1 - 0.035);
+    parts.push(frontStrip);
+    // 窗口倒角框：略高于侧板，读作机加工 cutaway 边缘，而不是破洞。
+    const rimY = 0.047;
+    for (const y of [-1, 1]) {
+      const rim = bevelBoxGeometry(0.008, 0.005, 0.158, 0.001, 1);
+      rim.translate(x + 0.001, y * rimY, zc);
+      parts.push(rim);
+    }
+    for (const z of [z0 + 0.042, z1 - 0.072]) {
+      const rim = bevelBoxGeometry(0.008, 0.094, 0.005, 0.001, 1);
+      rim.translate(x + 0.001, 0, z);
+      parts.push(rim);
+    }
+    // 下边框上的一道压筋，保留固定机匣的冲压感。
+    const rightRib = bevelBoxGeometry(0.0018, 0.010, len * 0.74, 0.0004, 1);
+    rightRib.translate(x + 0.0008, -h / 2 + 0.022, zc + 0.01);
+    parts.push(rightRib);
   }
 
   // 前端框：上下横梁 + 左右立柱，中间留 90×90mm 枪管束出口

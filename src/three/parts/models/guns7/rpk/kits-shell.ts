@@ -149,16 +149,27 @@ const receiverBody: GeometryBuilder = (spec) => {
     shape.moveTo(-points[0][0], points[0][1]);
     for (let i = 1; i < points.length; i++) shape.lineTo(-points[i][0], points[i][1]);
     shape.closePath();
-    // 抛壳窗：z ∈ [portZ0, portZ1]（shape x = -z），高 portH，中心高 portY
+    // 抛壳窗/检查窗：z ∈ [portZ0, portZ1]（shape x = -z），圆角矩形。
+    // 窗口开得足够长，闭锁时能看到枪机框前段和拉机柄，后坐 85mm 仍能看到
+    // 枪机框在窗内滑动，而不是只露出枪机头。
     const port = new THREE.Path();
-    const pz0 = num(p, "portZ0", -0.075);
-    const pz1 = num(p, "portZ1", 0.02);
-    const portH = num(p, "portH", 0.055);
-    const portY = num(p, "portY", -0.028);
-    port.moveTo(-pz0, portY - portH / 2);
-    port.lineTo(-pz0, portY + portH / 2);
-    port.lineTo(-pz1, portY + portH / 2);
-    port.lineTo(-pz1, portY - portH / 2);
+    const pz0 = num(p, "portZ0", -0.185);
+    const pz1 = num(p, "portZ1", 0.025);
+    const portH = num(p, "portH", 0.033);
+    const portY = num(p, "portY", -0.0055);
+    const portR = Math.min(0.003, portH * 0.18);
+    const px0 = -pz0;
+    const px1 = -pz1;
+    const py0 = portY - portH / 2;
+    const py1 = portY + portH / 2;
+    port.moveTo(px0 - portR, py0);
+    port.lineTo(px0, py0 + portR);
+    port.lineTo(px0, py1 - portR);
+    port.quadraticCurveTo(px0, py1, px0 - portR, py1);
+    port.lineTo(px1 + portR, py1);
+    port.quadraticCurveTo(px1, py1, px1, py1 - portR);
+    port.lineTo(px1, py0 + portR);
+    port.quadraticCurveTo(px1, py0, px1 + portR, py0);
     port.closePath();
     shape.holes.push(port);
     const inner = Math.max(0.0016 - 2 * 0.0004, 0.0008);
@@ -169,11 +180,27 @@ const receiverBody: GeometryBuilder = (spec) => {
       bevelSize: 0.0004,
       bevelSegments: 1,
       steps: 1,
-      curveSegments: 4,
+      curveSegments: 6,
     });
     geometry.rotateY(Math.PI / 2);
     geometry.translate(halfW - 0.0008, 0, 0);
     parts.push(geometry);
+    // 窗框翻边：冲压切口外缘加一圈 1.2mm 高的压边，遮住 1.6mm 板厚，
+    // 同时让窗口看起来是冲压出来的，而不是在薄板上直接挖一个方洞。
+    const frameX = halfW + 0.0014;
+    const railT = 0.0012;
+    const railW = 0.003;
+    const railLen = pz1 - pz0 + 0.006;
+    for (const y of [py0, py1]) {
+      const rail = bevelBoxGeometry(railT, railW, railLen, 0.0004, 1);
+      rail.translate(frameX, y, (pz0 + pz1) / 2);
+      parts.push(rail);
+    }
+    for (const z of [pz0, pz1]) {
+      const post = bevelBoxGeometry(railT, portH + 0.006, railW, 0.0004, 1);
+      post.translate(frameX, portY, z);
+      parts.push(post);
+    }
   }
 
   // 4) 顶部导轨（枪机框滑行导轨，两条，焊/铆在侧壁上缘内侧）
@@ -495,9 +522,14 @@ const boltCarrierKit: GeometryBuilder = (spec) => {
     cam.translate(side * (r - 0.001), 0.0045, len - 0.02);
     parts.push(cam);
   }
-  // 拉机柄（机框右侧的柄）
-  const handle = bevelBoxGeometry(0.006, 0.01, 0.02, 0.0012, 1);
-  handle.translate(r + 0.002, 0.002, len * 0.15);
+  // 拉机柄（机框右侧的柄）：柄根从机框圆柱伸出，柄头穿出抛壳窗。
+  // 真实 AK/RPK 的拉机柄在闭锁时靠近抛壳窗前段，后坐 85mm 时滑到窗口后段；
+  // 旧版放在机框尾端 15% 处，从抛壳窗里几乎看不到，也跟不上后坐行程。
+  const stem = bevelBoxGeometry(0.013, 0.007, 0.014, 0.0008, 1);
+  stem.translate(r + 0.0015, 0.002, len * 0.72);
+  parts.push(stem);
+  const handle = bevelBoxGeometry(0.009, 0.012, 0.026, 0.0012, 1);
+  handle.translate(r + 0.0085, 0.002, len * 0.72);
   parts.push(handle);
   // 复进簧座（尾部容纳导杆的沉台）
   const seat = tubeGeometry(0.0098, 0.0058, 0.014, 12);

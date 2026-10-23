@@ -38,7 +38,7 @@ export const AK47_NODES: ModelRegistry["nodes"] = [
     axis: "z",
     note: "枪机框（携枪机/活塞后坐复进，行程 85mm）",
   },
-  { name: "AkBolt", parent: "AkCarrier", motion: "rotate", axis: "z", note: "枪机回转闭锁（±19°）" },
+  { name: "AkBolt", parent: "AkCarrier", motion: "rotate", axis: "z", note: "枪机回转闭锁（回转 48°）" },
   { name: "AkFiringPin", parent: "AkBolt", motion: "translate", axis: "z", note: "击针前冲 3mm" },
   { name: "AkExtractor", parent: "AkBolt", note: "抽壳钩（随枪机）" },
   { name: "AkPiston", parent: "AkCarrier", note: "导气活塞（与枪机框一体后坐）" },
@@ -99,9 +99,9 @@ export const AK47_EXTRA_CONSTANTS = {
 /** AK 材质：共享枪械库 + 本型号特需。 */
 export const AK47_MATERIALS: ModelRegistry["materials"] = {
   ...GUN_MATERIALS,
-  gunsteel: { base: "#9aa5b1", metalness: 1, roughness: 0.36, preset: "steel", pbr: "brushed", anisotropy: 0.7, repeat: [3, 3], envMapIntensity: 1.3 },
-  worn_blued: { base: "#8d97a3", metalness: 1, roughness: 0.42, preset: "steel_rough", pbr: "scratched", anisotropy: 0.4, repeat: [3, 3], envMapIntensity: 1.2 },
-  ejector_steel: { base: "#d2d8de", metalness: 1, roughness: 0.24, preset: "steel", pbr: "brushed", anisotropy: 1, repeat: [2, 2], envMapIntensity: 1.45 },
+  gunsteel: { base: "#6b7480", metalness: 1, roughness: 0.38, preset: "steel", pbr: "brushed", anisotropy: 0.7, repeat: [3, 3], envMapIntensity: 1.1 },
+  worn_blued: { base: "#79828e", metalness: 1, roughness: 0.44, preset: "steel_rough", pbr: "scratched", anisotropy: 0.4, repeat: [3, 3], envMapIntensity: 1.0 },
+  ejector_steel: { base: "#aab2ba", metalness: 1, roughness: 0.28, preset: "steel", pbr: "brushed", anisotropy: 1, repeat: [2, 2], envMapIntensity: 1.25 },
 };
 
 export const AK47_BUILDERS: Record<string, GeometryBuilder> = {
@@ -228,13 +228,13 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     geometry: {
       type: "kit",
       kit: "receiverBody",
-      params: { w: 0.042, h: 0.05, z0: -0.235, z1: 0.055, magZ1: -0.095, portZ0: -0.095, portZ1: 0.02, portH: 0.055, portY: -0.028 },
+      params: { w: 0.042, h: 0.05, z0: -0.235, z1: 0.055, magZ1: -0.095, portZ0: -0.185, portZ1: 0.025, portH: 0.033, portY: -0.0055 },
     },
     material: "steel_blued",
     node: "AkRecoil",
     mate: { type: "absolute" },
     source:
-      "冲压铆接机匣：42 宽 × 50 高 × 290 长，含弹匣安装口（前挂后卡）、右侧抛壳窗（95 × 55）、顶部枪机框导轨、后端复进簧座与铆钉、表尺座。",
+      "冲压铆接机匣：42 宽 × 50 高 × 290 长，含弹匣安装口（前挂后卡）、右侧抛壳窗/检查窗（210 × 33，圆角翻边，能看全枪机框后坐）、顶部枪机框导轨、后端复进簧座与铆钉、表尺座。",
   },
   {
     id: "ak47.receiver.rear_sight",
@@ -274,7 +274,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     build_layer: 5,
     build_order: 560,
     geometry: { type: "kit", kit: "receiverShell", params: { w: 0.046, h: 0.034, z0: -0.223, z1: 0.052, t: 0.0024 } },
-    material: "steel_blued",
+    material: "steel_blued_matte",
     node: "AkRecoil",
     mate: { type: "absolute" },
     source: "全宽机匣顶盖：46 × 34mm 冲压盖，左右裙边盖住机匣上缘的两条枪机导轨，后端让开表尺座、前端止于节套；顶面两道压筋和后卡榫。下机匣两侧板把击锤簧、扳机簧和击发机构包住，底边停在弹匣井/扳机护圈上方。原 30mm 薄防尘盖保留在内部作分解细节。",
@@ -383,7 +383,7 @@ const AK47_PARTS: ModelRegistry["parts"] = [
     material: "steel_machined",
     node: "AkBolt",
     mate: { type: "absolute" },
-    source: "枪机头：⌀15 机身（在枪机框内孔滑行）+ 前端双闭锁凸笋 ⌀25.6 × 4.5（咬入节套闭锁窗）+ 弹底窝 + 抽壳钩座。开锁/闭锁时绕自身轴回转 38°。",
+    source: "枪机头：⌀15 机身（在枪机框内孔滑行）+ 前端双闭锁凸笋 ⌀25.6 × 4.5（咬入节套闭锁窗）+ 弹底窝 + 抽壳钩座。开锁/闭锁时绕自身轴回转 48°。",
   },
   {
     id: "ak47.action.lug_l",
@@ -1246,6 +1246,7 @@ export function makeAk47Registry(): ModelRegistry {
       { family: "ak-internal", a: "ak47.receiver.body", b: "ak47.action.carrier", reason: "枪机框在机匣内腔往复（机匣为封闭代理体）", maxDepthMm: 8, allowDisplaced: true },
       { family: "ak-internal", a: "ak47.fire.selector", b: "ak47.ammo.*", reason: "快慢机轴在机匣侧壁，供弹口第一发弹从其内侧通过", maxDepthMm: 4, allowDisplaced: true },
       { family: "ak-internal", a: "ak47.action.bolt", b: "ak47.ammo.*", reason: "枪机头推弹/支撑弹壳底", maxDepthMm: 4, allowDisplaced: true },
+      { family: "ak-internal", a: "ak47.action.extractor_spring", b: "ak47.ammo.*", reason: "抽壳钩簧在枪机头内，弹药在弹膛内；闭锁时簧与弹壳/发射药为包容件，检测器误报", maxDepthMm: 2, allowDisplaced: true },
       { family: "ak-internal", a: "ak47.acc.cleaning_rod", b: "ak47.ammo.*", reason: "通条在枪管下方，与抛出的空壳相邻（AABB 包络）", maxDepthMm: 3, allowDisplaced: true },
       { family: "ak-fire", a: "ak47.receiver.body", b: "ak47.fire.hammer", reason: "击锤在机匣内腔摆动", maxDepthMm: 3, allowDisplaced: true },
       // 装配/运动内部通道：枪机框、导气活塞、弹匣、扳机组在封闭代理体内运动。
@@ -1312,7 +1313,7 @@ export function makeAk47Registry(): ModelRegistry {
       { family: "ejector-mount", a: "ak47.receiver.body", b: "ak47.receiver.ejector", reason: "抛壳挺铆接在机匣左侧壁", maxDepthMm: 2 },
       { family: "pin-press", a: "ak47.receiver.body", b: "ak47.fire.trigger_pin", reason: "扳机轴销压配在机匣两侧壁", maxDepthMm: 2 },
       { family: "pin-press", a: "ak47.receiver.body", b: "ak47.fire.hammer_pin", reason: "击锤轴销压配在机匣两侧壁", maxDepthMm: 2 },
-      { family: "selector-shaft", a: "ak47.receiver.body", b: "ak47.fire.selector", reason: "快慢机轴横穿机匣两侧（露头成拨片座）", maxDepthMm: 3 },
+      { family: "selector-shaft", a: "ak47.receiver.body", b: "ak47.fire.selector", reason: "快慢机轴横穿机匣两侧（露头成拨片座），轴孔配合允许 1.2mm 位移", maxDepthMm: 3, allowDisplaced: true },
       { family: "mag-latch", a: "ak47.mag.body", b: "ak47.mag.latch_spring", reason: "弹匣卡榫扭簧装在卡榫座内", maxDepthMm: 3 },
       { family: "pin-in-hole", a: "ak47.fire.trigger", b: "ak47.fire.trigger_pin", reason: "扳机轴销穿过扳机铰孔（轴孔配合）", maxDepthMm: 5 },
       { family: "pin-in-hole", a: "ak47.fire.hammer", b: "ak47.fire.hammer_pin", reason: "击锤轴销穿过击锤铰孔（轴孔配合）", maxDepthMm: 5 },

@@ -90,6 +90,35 @@ export function animateM134(
   if (rotor) rotor.rotation.z = angle;
   if (gear) gear.rotation.z = angle * 0.28; // 36:10 减速比的反向表达
 
+  // 6 根枪管/枪管子件是 instanced（instance_layout 没有 instance_nodes），
+  // 不会自动继承 M134Rotor 的旋转。这里把它们作为一个刚性管束绕枪轴
+  // 一起转：枪管、枪口螺帽、准星、膛线全部同步，否则会出现“管束不转、
+  // 只有转子骨架在转”的假动作。绕 (0, SY) 旋转，而不是绕世界原点。
+  const clusterPivot = new THREE.Matrix4().makeTranslation(0, SY, 0);
+  const clusterPivotInv = new THREE.Matrix4().makeTranslation(0, -SY, 0);
+  const clusterSpin = new THREE.Matrix4()
+    .copy(clusterPivot)
+    .multiply(new THREE.Matrix4().makeRotationZ(angle))
+    .multiply(clusterPivotInv);
+  const clusterMatrix = new THREE.Matrix4();
+  for (const id of [
+    "m134.barrel.barrel",
+    "m134.barrel.nut",
+    "m134.barrel.sleeve",
+    "m134.barrel.front_sight",
+    "m134.barrel.muzzle_nut",
+    "m134.barrel.muzzle_crown",
+    "m134.barrel.rifling",
+  ]) {
+    const handle = assembled.getPart(id);
+    if (!handle) continue;
+    for (let i = 0; i < handle.instances.length; i++) {
+      clusterMatrix.copy(handle.instances[i].restMatrix);
+      clusterMatrix.premultiply(clusterSpin);
+      handle.setInstanceMatrix(i, clusterMatrix);
+    }
+  }
+
   // ---- 6 套独立枪机：随转子公转 + 凸轮槽驱动的往复 ----
   const bolt = assembled.getPart("m134.bolt.bolt");
   const matrix = new THREE.Matrix4();

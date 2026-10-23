@@ -7,6 +7,7 @@ import {
   mergeGeometries,
   tubeGeometry,
 } from "../../../kernel/geometry";
+import { gun7Kits } from "../kits";
 
 type Params = Record<string, unknown>;
 
@@ -86,9 +87,10 @@ const m60GasPiston: GeometryBuilder = (spec) => {
 };
 
 // ---------------------------------------------------------------------------
-// m60ReceiverShell —— M60 全包机匣外壳：两侧板 + 底板 + 前后顶板 + 尾板 +
-// 枪管节套环 + 下发射机座 + 左侧弹链导槽。正常状态完全遮住自动机；爆炸/
-// 透视时脱开，内部枪机框、枪机、击锤、供弹滑板仍完整保留。
+// m60ReceiverShell —— M60 全包机匣外壳：圆角 U 形冲压壳（等厚侧壁 + 底板）+
+// 弧形前后固定顶板 + 尾板 + 枪管节套环 + 下发射机座 + 左侧弹链导槽。
+// 正常状态完全遮住自动机；爆炸/透视时脱开，内部枪机框、枪机、击锤、
+// 供弹滑板仍完整保留。
 // 局部系：origin = 枪膛中心，+Z 枪口方向。
 // ---------------------------------------------------------------------------
 const m60ReceiverShell: GeometryBuilder = (spec) => {
@@ -102,35 +104,79 @@ const m60ReceiverShell: GeometryBuilder = (spec) => {
   const zc = (z0 + z1) / 2;
   const parts: THREE.BufferGeometry[] = [];
 
-  // 左右侧板（M60 冲压机匣，外表面带一道纵向压筋）
+  // U 形冲压机匣主体：圆角外轮廓 + 等厚侧壁/底板 + 顶部开口。
+  // 顶盖是独立的弧形冲压件，机匣本体不再由左右平板拼出来。
+  const top = h / 2;
+  const feedZ0 = -0.132;
+  const feedZ1 = 0.022;
+  const body = gun7Kits.roundedUShell({
+    ...(spec as object),
+    params: {
+      w,
+      top,
+      bottom: -h / 2,
+      z0,
+      z1,
+      wall: t,
+      topGap: 0.024,
+      cornerR: 0.010,
+    },
+  } as never, {} as never);
+  parts.push(body);
+
+  // 侧壁纵向压筋 + 两排铆钉：冲压机匣的加强筋是连续压出来的。
   for (const side of [-1, 1]) {
-    const wall = bevelBoxGeometry(t, h, len, 0.0025, 1);
-    wall.translate(side * (w / 2 - t / 2), 0, zc);
-    parts.push(wall);
     const rib = bevelBoxGeometry(0.0018, 0.007, len * 0.62, 0.0003, 1);
     rib.translate(side * (w / 2 + 0.0006), -0.006, zc + 0.012);
     parts.push(rib);
+    const rib2 = bevelBoxGeometry(0.0016, 0.005, len * 0.52, 0.0003, 1);
+    rib2.translate(side * (w / 2 + 0.0005), 0.018, zc + 0.020);
+    parts.push(rib2);
+    // 圆形检查盖：冲压机匣侧壁上的小检修口，带压边
+    const plug = new THREE.CylinderGeometry(0.009, 0.009, 0.002, 16);
+    plug.rotateZ(Math.PI / 2);
+    plug.translate(side * (w / 2 + 0.0005), -0.010, -0.190);
+    parts.push(plug);
+    const plugRing = new THREE.TorusGeometry(0.010, 0.0012, 6, 20);
+    plugRing.rotateY(Math.PI / 2);
+    plugRing.translate(side * (w / 2 + 0.0007), -0.010, -0.190);
+    parts.push(plugRing);
+    for (let i = 0; i < 7; i++) {
+      const z = z0 + 0.032 + i * 0.045;
+      if (z > z1 - 0.014) continue;
+      for (const ry of [-0.031, 0.031]) {
+        const rivet = new THREE.CylinderGeometry(0.0019, 0.0019, 0.0016, 8);
+        rivet.rotateZ(Math.PI / 2);
+        rivet.translate(side * (w / 2 + 0.0005), ry, z);
+        parts.push(rivet);
+      }
+    }
   }
 
-  // 底板 / 后板
-  const bottom = bevelBoxGeometry(w, t, len, 0.0025, 1);
-  bottom.translate(0, -h / 2 + t / 2, zc);
-  parts.push(bottom);
-  const rear = bevelBoxGeometry(w, h, t, 0.0025, 1);
+  // 后板：封闭机匣尾端，和枪托连接座铆在一起
+  const rear = bevelBoxGeometry(w - 0.001, h - 0.001, t, 0.004, 2);
   rear.translate(0, 0, z0 + t / 2);
   parts.push(rear);
 
-  // 顶板：留出中段受弹口，由 M60 大机盖封盖
-  const feedZ0 = -0.132;
-  const feedZ1 = 0.022;
-  const topRearLen = feedZ0 - z0;
-  const topRear = bevelBoxGeometry(w, t, topRearLen, 0.0025, 1);
-  topRear.translate(0, h / 2 - t / 2, z0 + topRearLen / 2);
-  parts.push(topRear);
-  const topFrontLen = z1 - feedZ1;
-  const topFront = bevelBoxGeometry(w, t, topFrontLen, 0.0025, 1);
-  topFront.translate(0, h / 2 - t / 2, feedZ1 + topFrontLen / 2);
-  parts.push(topFront);
+  // 前后固定顶板：同样是弧形冲压件，中间留出 154mm 受弹口给大机盖。
+  for (const [a, b] of [[z0, feedZ0], [feedZ1, z1]] as const) {
+    const plate = gun7Kits.archedCover({
+      ...(spec as object),
+      params: {
+        w: w - 0.0004,
+        len: b - a,
+        zc: (a + b) / 2,
+        yBase: top - 0.001,
+        yTop: top + 0.005,
+        wall: t,
+        sag: 0.005,
+        humpW: 0,
+        rib: 1,
+        rivetCount: 3,
+      },
+    } as never, {} as never);
+    parts.push(plate);
+  }
 
   // 前节套环：枪管从中心孔穿出，环体把机匣前脸封住
   const collar = tubeGeometry(0.023, 0.011, 0.022, 24);
@@ -169,16 +215,41 @@ const m60ReceiverShell: GeometryBuilder = (spec) => {
     parts.push(edge);
   }
 
-  // 顶盖铰链耳座
+  // 顶盖铰链耳座：坐在机匣后上沿，铰链销从耳座中穿过
   for (const side of [-1, 1]) {
-    const ear = bevelBoxGeometry(0.008, 0.010, 0.014, 0.0007, 1);
-    ear.translate(side * (w / 2 - 0.007), h / 2 + 0.005, feedZ0 + 0.008);
+    const ear = bevelBoxGeometry(0.008, 0.008, 0.014, 0.0007, 1);
+    ear.translate(side * (w / 2 - 0.007), top + 0.001, feedZ0 + 0.006);
     parts.push(ear);
   }
 
   const merged = mergeGeometries(parts);
   for (const piece of parts) piece.dispose();
   return merged;
+};
+
+// ---------------------------------------------------------------------------
+// m60FeedCover —— M60 大供弹盖：弧形冲压盖 + 中央受弹器凸包 + 两侧裙边。
+// 局部系：origin = 枪膛中心，几何按模型坐标布置。
+// ---------------------------------------------------------------------------
+const m60FeedCover: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  return gun7Kits.archedCover({
+    ...(spec as object),
+    params: {
+      w: num(p, "w", 0.060),
+      len: num(p, "len", 0.154),
+      zc: num(p, "zc", -0.055),
+      yBase: num(p, "yBase", 0.040),
+      yTop: num(p, "yTop", 0.062),
+      wall: num(p, "wall", 0.0022),
+      sag: num(p, "sag", 0.012),
+      humpW: num(p, "humpW", 0.036),
+      humpH: num(p, "humpH", 0.012),
+      humpD: num(p, "humpD", 0.100),
+      rib: 1,
+      rivetCount: 5,
+    },
+  } as never, {} as never);
 };
 
 // ---------------------------------------------------------------------------
@@ -379,6 +450,7 @@ const sawGasRegulator: GeometryBuilder = (spec) => {
 export const m249KitBuilders: Record<string, GeometryBuilder> = {
   m60GasPiston,
   m60ReceiverShell,
+  m60FeedCover,
   sawReceiver,
   sawStock,
   sawCarryHandle,

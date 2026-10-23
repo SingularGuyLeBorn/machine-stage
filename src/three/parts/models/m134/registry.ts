@@ -153,7 +153,7 @@ export const M134_PARTS: ModelRegistry["parts"] = [
     indexed: true,
     instance_layout: "m134BoltRing",
     geometry: { type: "kit", kit: "m134Bolt", params: { r: 0.0092, len: 0.085 } },
-    material: "steel_machined",
+    material: "bolt_steel",
     node: "M134Rotor",
     mate: { type: "absolute" },
     source: "独立枪机 ×6：每根枪管一套（导销插在转子凸轮槽里）——旋转中依次装填→闭锁→击发→抽壳→抛壳。",
@@ -456,7 +456,10 @@ export function makeM134Layouts(): Record<string, InstanceLayout> {
 
 export const M134_MATERIALS: ModelRegistry["materials"] = {
   ...GUN_MATERIALS,
-  olive_drab: { base: "#a9b189", metalness: 1, roughness: 0.52, preset: "steel_rough", pbr: "plates", anisotropy: 0.15, repeat: [2, 2], envMapIntensity: 1.1 },
+  // 枪机是观察窗里的主角：比机匣磷化层亮一档、粗糙度更低，靠环境反射
+  // 和窗口补光把圆柱面/闭锁凸笋的轮廓读出来，避免整排黑成一块。
+  bolt_steel: { base: "#b9c1c9", metalness: 1, roughness: 0.22, preset: "steel", pbr: "brushed", anisotropy: 1, repeat: [2, 2], envMapIntensity: 1.5 },
+  olive_drab: { base: "#616a47", metalness: 1, roughness: 0.58, preset: "steel_rough", pbr: "plates", anisotropy: 0.15, repeat: [2, 2], envMapIntensity: 0.95 },
 };
 
 export function makeM134Registry(): ModelRegistry {

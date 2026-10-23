@@ -24,7 +24,7 @@ const boltDetail = (
   build_order: number,
   geometry: ModelRegistry["parts"][number]["geometry"],
   source: string,
-  material = "steel_machined",
+  material = "bolt_steel",
   offset?: [number, number, number],
 ): ModelRegistry["parts"][number] => ({
   id,

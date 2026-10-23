@@ -722,6 +722,269 @@ const woodHandguard: GeometryBuilder = (spec) => {
   return loftGeometry(sections, 48, true, true);
 };
 
+// ---------------------------------------------------------------------------
+// roundedUShell —— 真正的圆角 U 形冲压机匣（M60 / M2HB 共用）。
+//
+// 旧版 M60/M2HB 机匣是「左右各一块平板 + 一块底板 + 几块平板顶盖」，
+// 侧看是堆起来的盒子。这里按冲压管做：外轮廓是圆角矩形，顶部留出
+// 供弹/机盖开口，内外轮廓等壁厚，沿 Z 挤出成一整块 U 形壳体。
+// 底板、侧壁和上沿都是连续折弯，侧面有真实的圆角过渡。
+//
+// 局部系：origin = 截面中心；top/bottom 是绝对 Y；z0..z1 是长度范围。
+// 顶部开口宽度 = 2 * topGap；上沿法兰从 ±topGap 延伸到 ±(w/2)。
+// ---------------------------------------------------------------------------
+const roundedUShell: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.060);
+  const top = num(p, "top", 0.047);
+  const bottom = num(p, "bottom", -0.047);
+  const z0 = num(p, "z0", -0.25);
+  const z1 = num(p, "z1", 0.06);
+  const wall = num(p, "wall", 0.0024);
+  const topGap = num(p, "topGap", 0.024);
+  const cornerR = num(p, "cornerR", 0.010);
+
+  const hw = w / 2;
+  const hh = (top - bottom) / 2;
+  const r = Math.min(cornerR, hw - 0.001, hh - 0.001);
+  const ri = Math.max(r - wall, 0.001);
+  const g = Math.min(topGap, hw - wall - 0.001);
+  const innerTop = top - wall;
+  const innerBottom = bottom + wall;
+
+  const shape = new THREE.Shape();
+  shape.moveTo(-g, top);
+  shape.lineTo(-hw + r, top);
+  shape.absarc(-hw + r, top - r, r, Math.PI / 2, Math.PI, false);
+  shape.lineTo(-hw, bottom + r);
+  shape.absarc(-hw + r, bottom + r, r, Math.PI, Math.PI * 1.5, false);
+  shape.lineTo(hw - r, bottom);
+  shape.absarc(hw - r, bottom + r, r, Math.PI * 1.5, Math.PI * 2, false);
+  shape.lineTo(hw, top - r);
+  shape.absarc(hw - r, top - r, r, 0, Math.PI / 2, false);
+  shape.lineTo(g, top);
+  // 右侧上沿法兰的端面，再沿法兰下表面进入内腔
+  shape.lineTo(g, innerTop);
+  shape.lineTo(hw - wall, innerTop);
+  shape.lineTo(hw - wall, innerBottom + ri);
+  shape.absarc(hw - wall - ri, innerBottom + ri, ri, 0, -Math.PI / 2, true);
+  shape.lineTo(-hw + wall + ri, innerBottom);
+  shape.absarc(-hw + wall + ri, innerBottom + ri, ri, -Math.PI / 2, -Math.PI, true);
+  shape.lineTo(-hw + wall, innerTop);
+  shape.lineTo(-g, innerTop);
+  shape.lineTo(-g, top);
+  shape.closePath();
+
+  const shell = new THREE.ExtrudeGeometry(shape, {
+    depth: Math.max(0.001, z1 - z0 - 0.007),
+    bevelEnabled: true,
+    bevelThickness: 0.0035,
+    bevelSize: 0.0035,
+    bevelSegments: 3,
+    curveSegments: 12,
+    steps: 1,
+  });
+  shell.translate(0, 0, z0 + 0.0035);
+  return shell;
+};
+
+// ---------------------------------------------------------------------------
+// archedCover —— 弧形冲压机盖（M60 供弹盖 / M2HB 大供弹盖 / 固定顶板共用）。
+//
+// 旧版是一个长方盒 + 一块薄顶板，侧看就是叠起来的平板。这里用二次曲线
+// 做出横向浅拱，两侧裙边向下扣住机匣上沿；壁厚沿拱面等厚，底部开口。
+// 可选中间凸包（受弹器盖/供弹盖中央的加强包）、纵向压筋和铆钉列。
+//
+// 局部系：origin = 枪膛中心；yBase 是裙边底，yTop 是拱顶；zc/len 是长度。
+// ---------------------------------------------------------------------------
+const archedCover: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.060);
+  const len = num(p, "len", 0.154);
+  const zc = num(p, "zc", -0.055);
+  const yBase = num(p, "yBase", 0.040);
+  const yTop = num(p, "yTop", 0.058);
+  const wall = num(p, "wall", 0.0022);
+  const sag = Math.max(0.0008, num(p, "sag", 0.006));
+  const humpW = num(p, "humpW", 0);
+  const humpH = num(p, "humpH", 0.010);
+  const humpD = num(p, "humpD", len * 0.75);
+  const rib = num(p, "rib", 1);
+  const rivetCount = Math.round(num(p, "rivetCount", 5));
+
+  const hw = w / 2;
+  const innerHw = Math.max(hw - wall, 0.002);
+  const yArc = yTop - sag;
+  const yArcInner = Math.max(yBase + 0.001, yArc - wall);
+  // 三次贝塞尔：两端切线竖直，拱面从裙边连续弯到顶，侧面没有折角。
+  // 控制点抬高 sag/3，曲线中点才正好落在 yTop。
+  const yControl = yArc + sag / 0.75;
+  const yControlInner = yControl - wall;
+
+  const shape = new THREE.Shape();
+  shape.moveTo(-hw, yBase);
+  shape.lineTo(-hw, yArc);
+  shape.bezierCurveTo(-hw, yControl, hw, yControl, hw, yArc);
+  shape.lineTo(hw, yBase);
+  shape.lineTo(innerHw, yBase);
+  shape.lineTo(innerHw, yArcInner);
+  shape.bezierCurveTo(innerHw, yControlInner, -innerHw, yControlInner, -innerHw, yArcInner);
+  shape.lineTo(-innerHw, yBase);
+  shape.closePath();
+
+  const parts: THREE.BufferGeometry[] = [];
+  const cover = new THREE.ExtrudeGeometry(shape, {
+    depth: Math.max(0.001, len - 0.0024),
+    bevelEnabled: true,
+    bevelThickness: 0.0012,
+    bevelSize: 0.0012,
+    bevelSegments: 2,
+    curveSegments: 12,
+    steps: 1,
+  });
+  cover.translate(0, 0, zc - len / 2 + 0.0012);
+  parts.push(cover);
+
+  // 中央凸包：受弹器盖/供弹盖的加强包。用压扁的上半球做连续拱顶，
+  // 不再是平顶盒子。球心下沉到机盖拱面以下，赤道被拱面遮住，只露出
+  // 一段没有接缝的圆拱。
+  if (humpW > 0.001) {
+    const sink = Math.min(0.006, humpH * 0.45);
+    const dome = new THREE.SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+    dome.scale(humpW / 2, Math.max(0.003, humpH), humpD / 2);
+    dome.translate(0, yTop - sink, zc);
+    parts.push(dome);
+  }
+
+  // 两侧裙边压筋 + 铆钉列
+  if (rib > 0) {
+    for (const side of [-1, 1]) {
+      const rail = bevelBoxGeometry(0.0016, 0.004, len * 0.86, 0.0004, 1);
+      rail.translate(side * (hw + 0.0005), yBase + 0.0065, zc);
+      parts.push(rail);
+      // 裙边下沿卷边：让盖的侧边不是一刀切的薄板
+      const hem = bevelBoxGeometry(0.0034, 0.0026, len * 0.94, 0.0006, 1);
+      hem.translate(side * (hw - 0.0017), yBase + 0.0013, zc);
+      parts.push(hem);
+    }
+  }
+  if (rivetCount > 0) {
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < rivetCount; i++) {
+        const z = zc - len * 0.4 + (len * 0.8 * i) / Math.max(1, rivetCount - 1);
+        const rivet = cylinderGeometry(0.0018, 0.0016, 0.0016, 10);
+        rivet.rotateZ(Math.PI / 2);
+        rivet.translate(side * (hw + 0.0004), yBase + 0.012, z);
+        parts.push(rivet);
+      }
+    }
+  }
+
+  // 前端唇边：盖住机匣上沿，同时避免开口边缘是一圈薄纸。
+  const lip = bevelBoxGeometry(w, 0.004, 0.010, 0.002, 1);
+  lip.translate(0, yBase + 0.002, zc + len / 2 - 0.004);
+  parts.push(lip);
+
+  return merge(parts);
+};
+
+// ---------------------------------------------------------------------------
+// uChannelLeg —— 冲压 U 形钢腿（M3 三脚架 / 通用支腿）。
+//
+// 旧版是一根圆管，和 M3 三脚架的冲压 U 形腿完全不像。这里做开口朝 +Y
+// 的 U 形槽：外壁圆角、等壁厚、上沿双折边，带纵向压筋；腿上还有夹箍、
+// 调节螺栓、驻锄板和尖端。局部 +Z 沿腿长，原点在腿根。
+// ---------------------------------------------------------------------------
+const uChannelLeg: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const legLen = num(p, "legLen", 0.5);
+  const width = num(p, "width", 0.030);
+  const depth = num(p, "depth", 0.026);
+  const wall = num(p, "wall", 0.0024);
+  const hw = width / 2;
+  const r = Math.min(0.003, hw - 0.001, depth - 0.001);
+  const ri = Math.max(r - wall, 0.0008);
+
+  // 截面：开口在 y=0，槽底在 y=-depth；沿外轮廓绕到底，再沿内轮廓回到开口。
+  const shape = new THREE.Shape();
+  shape.moveTo(-hw, 0);
+  shape.lineTo(-hw, -depth + r);
+  shape.absarc(-hw + r, -depth + r, r, Math.PI, Math.PI * 1.5, false);
+  shape.lineTo(hw - r, -depth);
+  shape.absarc(hw - r, -depth + r, r, Math.PI * 1.5, Math.PI * 2, false);
+  shape.lineTo(hw, 0);
+  shape.lineTo(hw - wall, 0);
+  shape.lineTo(hw - wall, -depth + wall + ri);
+  shape.absarc(hw - wall - ri, -depth + wall + ri, ri, 0, -Math.PI / 2, true);
+  shape.lineTo(-hw + wall + ri, -depth + wall);
+  shape.absarc(-hw + wall + ri, -depth + wall + ri, ri, -Math.PI / 2, -Math.PI, true);
+  shape.lineTo(-hw + wall, 0);
+  shape.closePath();
+
+  const parts: THREE.BufferGeometry[] = [];
+  const channel = new THREE.ExtrudeGeometry(shape, {
+    depth: Math.max(0.001, legLen - 0.0008),
+    bevelEnabled: true,
+    bevelThickness: 0.0004,
+    bevelSize: 0.0004,
+    bevelSegments: 1,
+    curveSegments: 8,
+    steps: 1,
+  });
+  channel.translate(0, 0, 0.0004);
+  parts.push(channel);
+
+  // 上沿双折边：M3 腿的标志性卷边，不是圆管口。
+  for (const side of [-1, 1]) {
+    const lip = bevelBoxGeometry(0.0034, 0.0016, legLen * 0.97, 0.0004, 1);
+    lip.translate(side * (hw - 0.0017), 0.0007, legLen / 2);
+    parts.push(lip);
+    // 侧壁纵向压筋
+    const rib = bevelBoxGeometry(0.0012, 0.005, legLen * 0.8, 0.0003, 1);
+    rib.translate(side * (hw + 0.0004), -depth * 0.45, legLen * 0.45);
+    parts.push(rib);
+  }
+
+  // 腿根枢轴耳 + 枢轴销
+  const pivot = new THREE.CylinderGeometry(0.006, 0.006, 0.044, 12);
+  pivot.rotateZ(Math.PI / 2);
+  pivot.translate(0, -depth * 0.55, 0);
+  parts.push(pivot);
+  const clevis = bevelBoxGeometry(0.022, 0.016, 0.022, 0.0015, 1);
+  clevis.translate(0, -depth * 0.55, 0.012);
+  parts.push(clevis);
+
+  // 夹箍 + 调节螺栓（腿长可调）
+  const clampZ = legLen * 0.54;
+  const clamp = bevelBoxGeometry(width + 0.010, depth + 0.010, 0.030, 0.002, 1);
+  clamp.translate(0, -depth / 2, clampZ);
+  parts.push(clamp);
+  const bolt = new THREE.CylinderGeometry(0.004, 0.004, width + 0.030, 10);
+  bolt.rotateZ(Math.PI / 2);
+  bolt.translate(0, -depth * 0.35, clampZ);
+  parts.push(bolt);
+  const handle = new THREE.CylinderGeometry(0.003, 0.003, 0.020, 8);
+  handle.rotateZ(Math.PI / 2);
+  handle.translate(width / 2 + 0.017, -depth * 0.35, clampZ);
+  parts.push(handle);
+
+  // 驻锄板：斜插进地面的钢板 + 三角尖端 + 加强肋
+  const spade = bevelBoxGeometry(width + 0.018, 0.006, 0.082, 0.0015, 1);
+  spade.rotateX(-0.28);
+  spade.translate(0, -depth * 0.52, legLen - 0.022);
+  parts.push(spade);
+  const gusset = bevelBoxGeometry(0.008, 0.020, 0.042, 0.001, 1);
+  gusset.translate(0, -depth * 0.52, legLen - 0.018);
+  parts.push(gusset);
+  const point = new THREE.CylinderGeometry(0.001, 0.020, 0.052, 4);
+  point.rotateX(Math.PI / 2);
+  point.rotateZ(Math.PI / 4);
+  point.translate(0, -depth * 0.52, legLen + 0.024);
+  parts.push(point);
+
+  return merge(parts);
+};
+
 export const gun7Kits: Record<string, GeometryBuilder> = {
   // 复用旧共享库中仍然正确的通用件（弹簧/弹药/焰/弹链/脚架/护木）
   ammoBullet: gunKitBuilders.ammoBullet,
@@ -753,6 +1016,9 @@ export const gun7Kits: Record<string, GeometryBuilder> = {
   triggerGuard,
   boxMagShell,
   stampedShell,
+  roundedUShell,
+  archedCover,
+  uChannelLeg,
   woodHandguard,
 };
 

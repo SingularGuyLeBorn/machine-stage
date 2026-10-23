@@ -14,7 +14,7 @@ import type { AssembledModel } from "@/three/parts";
 //   0.00–0.05 扣扳机（10°）→ 阻铁解脱击锤
 //   0.05–0.10 击锤回转 70° → 击针前冲 3mm
 //   0.10      ★击发：弹头出膛（弹头与弹壳分离）+ 枪口焰 + 全枪后坐
-//   0.14–0.52 导气自动机后坐 85mm：行程 6→30mm 间枪机回转 38° 开锁，
+//   0.14–0.52 导气自动机后坐 85mm：行程 6→30mm 间枪机回转 48° 开锁，
 //             抽壳钩随枪机把弹壳抽出弹膛
 //   ~0.39     弹壳底缘撞抛壳挺 → 抛出（抛物线 + 落地弹跳 + 侧躺堆积）
 //   0.42–0.58 枪机框压过击锤 → 重新待击；0.52–0.60 后坐到底缓冲回弹
@@ -32,7 +32,7 @@ const T_RETURN1 = 1.02;
 const CARRIER_STROKE = 0.085;
 const LOCK_TRAVEL0 = 0.006;
 const LOCK_TRAVEL1 = 0.03;
-const BOLT_LOCK_ANGLE = (38 * Math.PI) / 180;
+const BOLT_LOCK_ANGLE = (48 * Math.PI) / 180;
 const STRIP_TRAVEL = 0.0615; // 枪机面追上弹底的行程
 const CASES = 12; // 弹壳池槽位
 const ROUNDS = 30;
@@ -61,7 +61,7 @@ function carrierTravel(t: number): number {
   return 0;
 }
 
-/** 枪机回转角（开锁为负；行程 6→30mm 之间完成 38°）。 */
+/** 枪机回转角（开锁为负；行程 6→30mm 之间完成 48°）。 */
 function boltAngle(travel: number): number {
   if (travel <= LOCK_TRAVEL0) return 0;
   if (travel >= LOCK_TRAVEL1) return -BOLT_LOCK_ANGLE;

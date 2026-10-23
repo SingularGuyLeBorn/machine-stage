@@ -311,18 +311,66 @@ const rearSightBase: GeometryBuilder = (_spec) => {
 // barrelBand —??枪管箍（下挂背带环）??// ---------------------------------------------------------------------------
 const barrelBand: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
-  const rOuter = num(p, "rOuter", 0.0235);
-  const rInner = num(p, "rInner", 0.018);
+  const w = num(p, "w", 0.05);
+  const top = num(p, "top", 0.017);
+  const bottom = num(p, "bottom", -0.035);
+  const wall = num(p, "wall", 0.003);
   const h = num(p, "h", 0.013);
+  const swivel = p?.swivel !== false;
   const parts: THREE.BufferGeometry[] = [];
-  const band = tubeZ(rOuter, rInner, h, 24);
+
+  // 真实三八式枪箍是**冲压钢板带**，不是圆管：外轮廓随下护木/上护木
+  // 的截面做成圆角矩形，壁厚 3mm，前后各一道，把两段木头夹在一起。
+  const cy = (top + bottom) / 2;
+  const hh = (top - bottom) / 2;
+  const roundedRect = (path: THREE.Shape | THREE.Path, hw: number, hhh: number, r: number) => {
+    const x = hw;
+    const y0 = cy - hhh;
+    const y1 = cy + hhh;
+    path.moveTo(-x + r, y0);
+    path.lineTo(x - r, y0);
+    path.quadraticCurveTo(x, y0, x, y0 + r);
+    path.lineTo(x, y1 - r);
+    path.quadraticCurveTo(x, y1, x - r, y1);
+    path.lineTo(-x + r, y1);
+    path.quadraticCurveTo(-x, y1, -x, y1 - r);
+    path.lineTo(-x, y0 + r);
+    path.quadraticCurveTo(-x, y0, -x + r, y0);
+    path.closePath();
+  };
+  const shape = new THREE.Shape();
+  roundedRect(shape, w / 2, hh, Math.min(0.01, hh * 0.4));
+  const hole = new THREE.Path();
+  roundedRect(hole, w / 2 - wall, hh - wall, Math.max(0.002, Math.min(0.01, hh * 0.4) - wall));
+  shape.holes.push(hole);
+  const band = new THREE.ExtrudeGeometry(shape, {
+    depth: h,
+    bevelEnabled: true,
+    bevelThickness: 0.0006,
+    bevelSize: 0.0006,
+    bevelSegments: 1,
+    steps: 1,
+  });
+  band.translate(0, 0, -h / 2);
   parts.push(band);
-  const lug = box(0.008, 0.012, 0.012, 0.0005);
-  lug.translate(0, -rOuter - 0.004, 0);
-  parts.push(lug);
-  const swivel = new THREE.TorusGeometry(0.0065, 0.0014, 5, 12, Math.PI * 1.7);
-  swivel.translate(0, -rOuter - 0.014, 0);
-  parts.push(swivel);
+
+  // 右侧锁紧簧片/卡榫：冲压带不是焊死的，靠这个簧片压紧木托。
+  const spring = box(0.006, 0.012, h * 0.9, 0.0004);
+  spring.translate(w / 2 + 0.002, cy - hh * 0.15, 0);
+  parts.push(spring);
+  const springRivet = cylinderX(0.0012, 0.004, 10);
+  springRivet.translate(w / 2 + 0.0045, cy + hh * 0.25, 0);
+  parts.push(springRivet);
+
+  if (swivel) {
+    const lug = box(0.008, 0.012, 0.012, 0.0005);
+    lug.translate(0, bottom - 0.004, 0);
+    parts.push(lug);
+    const ring = new THREE.TorusGeometry(0.0065, 0.0014, 6, 14, Math.PI * 1.8);
+    ring.rotateX(Math.PI / 2);
+    ring.translate(0, bottom - 0.013, 0);
+    parts.push(ring);
+  }
   return merge(parts);
 };
 
