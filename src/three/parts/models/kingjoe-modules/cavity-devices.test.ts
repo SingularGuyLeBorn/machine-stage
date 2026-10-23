@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import * as THREE from "three";
 import { MeshBVH } from "three-mesh-bvh";
+import { QUIET_ACTIVITY } from "./machinery";
 import { opticalContactFaces } from "./optical-interiors";
 import { createMaterialLibrary } from "../../kernel/textures";
 import { buildModel } from "../../assembler/assembler";
@@ -10,7 +11,7 @@ import { makeKingJoeModuleRegistry, kingjoeModuleBuilders } from "./registry";
 import { planCavityDevices } from "./cavity-devices";
 import { animateKingJoeModules } from "./motion";
 import { planHandCouplings, updateHandCouplings, FLOW_PACKET_COUNT, flowPacketScale } from "./hand-couplings";
-import { planEnergyExchange } from "./energy-exchange";
+import { planEnergyExchange, exchangeMaterials, updateEnergyExchange } from "./energy-exchange";
 import { flexibleFrame, flexProfile } from "./flex-frame";
 import flexData from "./flex-frame.generated.json";
 
@@ -20,11 +21,9 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
   beforeAll(() => {
     const registry = makeKingJoeModuleRegistry();
     library = createMaterialLibrary({
+      ...exchangeMaterials,
       pedan_gel: registry.materials.pedan_gel,
       pedan_hand_field: registry.materials.pedan_hand_field,
-      ...Object.fromEntries(
-        [0, 1, 2, 3].map((i) => [`pedan_exchange_${i}`, registry.materials[`pedan_exchange_${i}`]]),
-      ),
     });
     model = buildModel(registry, { builders: kingjoeModuleBuilders, materials: library.materials });
   }, 20000);
@@ -96,6 +95,44 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
       ).toBeGreaterThan(0.01);
     }
   });
+  it("技能从核心分阶段带亮接口，停止后恢复，分体时主干光包不残留", () => {
+    const devices = planCavityDevices(new Map());
+    const material = (stage: string) =>
+      model.parts.find((p) => p.def.material === `pedan_transit_${stage}_0`)!.object
+        .material as THREE.MeshStandardMaterial;
+    const baseline = new Map<string, number>();
+    updateEnergyExchange(model, devices, 10, QUIET_ACTIVITY);
+    for (const stage of ["core", "chest", "head", "screen"])
+      baseline.set(stage, material(stage).emissiveIntensity);
+    updateEnergyExchange(model, devices, 10, { ...QUIET_ACTIVITY, beamTime: 0.25, charge: 0.2 });
+    expect(material("core").emissiveIntensity).toBeGreaterThan(baseline.get("core")!);
+    expect(material("chest").emissiveIntensity).toBe(baseline.get("chest"));
+    expect(material("screen").emissiveIntensity).toBe(baseline.get("screen"));
+    updateEnergyExchange(model, devices, 10, { ...QUIET_ACTIVITY, beamTime: 0.7, charge: 0.5 });
+    expect(material("chest").emissiveIntensity).toBeGreaterThan(baseline.get("chest")!);
+    expect(material("head").emissiveIntensity).toBe(baseline.get("head"));
+    updateEnergyExchange(model, devices, 10, { ...QUIET_ACTIVITY, beamTime: 1.45, charge: 1 });
+    expect(material("screen").emissiveIntensity).toBeGreaterThan(baseline.get("screen")!);
+    for (const part of model.parts.filter((p) => p.def.material.startsWith("pedan_transit_"))) {
+      const m = part.object.material as THREE.MeshStandardMaterial;
+      expect(m.emissiveIntensity).toBeLessThanOrEqual(0.5);
+      if (part.def.material.includes("flow")) expect(m.opacity).toBeLessThanOrEqual(0.74);
+    }
+    updateEnergyExchange(model, devices, 10, QUIET_ACTIVITY);
+    for (const stage of baseline.keys()) expect(material(stage).emissiveIntensity).toBe(baseline.get(stage));
+    const legBase = material("legs").emissiveIntensity;
+    updateEnergyExchange(model, devices, 10, { ...QUIET_ACTIVITY, redModule: "legs" });
+    expect(material("legs").emissiveIntensity).toBeGreaterThan(legBase);
+    expect(material("core").emissiveIntensity).toBe(baseline.get("core"));
+    expect(material("chest").emissiveIntensity).toBe(baseline.get("chest"));
+    const routes = planEnergyExchange(devices);
+    expect(routes.filter((r) => r.feed)).toHaveLength(4);
+    routes.forEach((route, i) => {
+      if (!route.feed) return;
+      expect(model.getNode(`Exchange_${i}_end_0`)!.scale.x).toBeLessThan(0.0001);
+      expect(model.getNode(`Exchange_${i}_packet_0`)!.scale.x).toBeLessThan(0.0001);
+    });
+  });
   it("手部和全身光环的实际实例法线始终沿截面传递方向", () => {
     const rings = model.parts.filter(
       (p) =>
@@ -130,7 +167,7 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
     const routes = planEnergyExchange(planCavityDevices(new Map()));
     expect(new Set(routes.map((r) => r.mode)).size).toBe(4);
     expect(routes.filter((r) => r.mode === "membrane").length / routes.length).toBeLessThan(0.25);
-    expect(routes.filter((r) => r.anchors && !r.faceLabel).length).toBe(8);
+    expect(routes.filter((r) => r.anchors && !r.faceLabel && !r.feed).length).toBe(8);
     expect(routes.filter((r) => r.anchors && r.faceLabel).length).toBe(8);
     expect(routes.filter((r) => r.faceLabel).length).toBe(32);
     for (const owner of ["legs", "pelvis", "chest", "head_arms", "upper_l", "upper_r"])
@@ -149,12 +186,14 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
           endB = model.getNode(`Exchange_${i}_end_1`)!;
         expect(endA.getWorldPosition(new THREE.Vector3()).distanceTo(a)).toBeLessThan(1e-6);
         expect(endB.getWorldPosition(new THREE.Vector3()).distanceTo(b)).toBeLessThan(1e-6);
-        expect(endA.scale.equals(endB.scale)).toBe(true);
+        if (!route.feed) expect(endA.scale.equals(endB.scale)).toBe(true);
       }
     }
-    for (const part of model.parts.filter((p) => p.def.material.startsWith("pedan_exchange_")))
+    for (const part of model.parts.filter(
+      (p) => p.def.material.startsWith("pedan_transit_") && !p.def.material.includes("_flow_"),
+    ))
       expect((part.object.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeLessThanOrEqual(
-        0.28,
+        0.44,
       );
   });
   it("手部设备全连通，胶膜端点跟随指节，能量环定向流动且两端同步呼吸", () => {
