@@ -2,7 +2,14 @@ import * as THREE from "three";
 import type { AssembledModel } from "../../assembler/assembler";
 
 // 原创佩丹折线光束：每个发射口一条连续 Z 字实体，不用多股错位叠线。
-const STEPS = 32;
+const BENDS = 32;
+export const RAY_SUBDIVISIONS = 6;
+const STEPS = BENDS * RAY_SUBDIVISIONS;
+// [OM-FREEPLAY] 连续的多频扰动：索引决定空间纹理，时间只让纹理流动，避免逐帧随机闪烁。
+const grain = (index: number, seconds: number) =>
+  0.58 * Math.sin(index * 2.399 + seconds * 13) +
+  0.28 * Math.sin(index * 5.71 - seconds * 23) +
+  0.14 * Math.sin(index * 11.13 + seconds * 31);
 /** [OM-FREEPLAY] 近距胸口目标：红束末端保留 46% 间距，前伸 3.2、下落 0.7，不交叉。 */
 export function redRayEnd(
   start: THREE.Vector3,
@@ -30,6 +37,7 @@ const SECTION = 4;
 function ribbon(): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(new Float32Array((STEPS + 1) * SECTION * 3), 3));
+  g.setAttribute("color", new THREE.BufferAttribute(new Float32Array((STEPS + 1) * SECTION * 3), 3));
   const index: number[] = [];
   for (let i = 0; i < STEPS; i++)
     for (let face = 0; face < SECTION; face++) {
@@ -55,9 +63,20 @@ class PedanRays {
         depthWrite: false,
         blending: THREE.NormalBlending,
         toneMapped: false,
+        vertexColors: true,
       }),
     );
     mesh.frustumCulled = false;
+    // [OM-FREEPLAY] 少量短弧贴在主干边缘，只延伸局部，不复制一整束 Z。
+    const sparks = new THREE.LineSegments(
+      new THREE.BufferGeometry().setAttribute(
+        "position",
+        new THREE.BufferAttribute(new Float32Array(12 * 3 * 2 * 3), 3),
+      ),
+      new THREE.LineBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false }),
+    );
+    sparks.frustumCulled = false;
+    mesh.add(sparks);
     this.group.add(mesh);
     return mesh;
   });
@@ -70,6 +89,9 @@ class PedanRays {
       for (const mesh of this.strands) {
         mesh.geometry.dispose();
         mesh.material.dispose();
+        const sparks = mesh.children[0] as THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+        sparks.geometry.dispose();
+        sparks.material.dispose();
       }
       this.group.removeFromParent();
       dispose();
@@ -112,29 +134,62 @@ class PedanRays {
         ? redRayEnd(start, origins[1 - j]!, heading, up)
         : yellowRayEnd(start, heading, up, yellow);
       const attr = mesh.geometry.getAttribute("position");
+      const colors = mesh.geometry.getAttribute("color");
       for (let i = 0; i <= STEPS; i++) {
         const t = i / STEPS,
-          envelope = Math.pow(Math.sin(Math.PI * t), 0.35);
+          envelope = i === 0 || i === STEPS ? 0 : Math.pow(Math.sin(Math.PI * t), 0.35);
         // [OM-FREEPLAY] 黄色实体截面比红色宽；加力波逐段把截面放大到 2.1 倍，折线条数不变。
-        const zig = (i % 2 === 0 ? 1 : -1) * (module ? 0.115 : 0.16) * envelope;
+        const segment = Math.floor(i / RAY_SUBDIVISIONS);
+        const fraction = (i % RAY_SUBDIVISIONS) / RAY_SUBDIVISIONS;
+        const zig = (segment % 2 === 0 ? 1 : -1) * (1 - 2 * fraction) * (module ? 0.115 : 0.16) * envelope;
+        const radius = (module ? 0.018 : 0.045) * widthScale * (1 + 1.1 * boostAt(t));
         const p = start
           .clone()
           .lerp(end, t)
           .addScaledVector(across, zig)
-          .addScaledVector(up, Math.sin(seconds * 17 + i * 0.6) * 0.008 * envelope);
-        const radius = (module ? 0.018 : 0.045) * widthScale * (1 + 1.1 * boostAt(t));
+          .addScaledVector(across, grain(i + j * 71, seconds) * radius * 0.45 * envelope)
+          .addScaledVector(up, grain(i + 103 + j * 71, seconds) * radius * 0.55 * envelope);
         for (let k = 0; k < SECTION; k++) {
           const angle = Math.PI / 4 + (k * Math.PI) / 2;
+          const noise = grain(i + k * 47 + j * 71, seconds);
+          const raggedRadius =
+            radius * (1 + envelope * (0.55 * noise + 1.2 * Math.pow(Math.max(0, noise), 7)));
           const vertex = p
             .clone()
-            .addScaledVector(up, Math.cos(angle) * radius)
-            .addScaledVector(across, Math.sin(angle) * radius);
+            .addScaledVector(up, Math.cos(angle) * raggedRadius)
+            .addScaledVector(across, Math.sin(angle) * raggedRadius);
           attr.setXYZ(i * SECTION + k, vertex.x, vertex.y, vertex.z);
+          const light = 0.68 + 0.32 * (0.5 + 0.5 * noise);
+          colors.setXYZ(i * SECTION + k, light, light, light);
         }
       }
       attr.needsUpdate = true;
+      colors.needsUpdate = true;
       mesh.material.color.set(module ? 0xff3c28 : 0xffd22b);
       mesh.material.opacity = (module ? redPower : yellow) * (0.88 + 0.1 * boostAt(0));
+      const sparks = mesh.children[0] as THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+      const sparkPositions = sparks.geometry.getAttribute("position");
+      for (let s = 0; s < 12; s++) {
+        const section = 8 + s * 15;
+        const base = new THREE.Vector3().fromBufferAttribute(attr, section * SECTION + (s % SECTION));
+        const pulse = Math.pow(Math.max(0, Math.sin(seconds * 9 + s * 2.399)), 6);
+        const length = (module ? 0.07 : 0.11) * widthScale * pulse * (1 + 0.4 * boostAt(section / STEPS));
+        let previous = base;
+        for (let n = 0; n < 3; n++) {
+          const next = base
+            .clone()
+            .addScaledVector(up, ((length * (n + 1)) / 3) * (s % 2 ? 1 : -1))
+            .addScaledVector(across, length * (n % 2 ? -0.28 : 0.38))
+            .addScaledVector(heading, length * (n + 1) * 0.3);
+          const index = (s * 3 + n) * 2;
+          sparkPositions.setXYZ(index, previous.x, previous.y, previous.z);
+          sparkPositions.setXYZ(index + 1, next.x, next.y, next.z);
+          previous = next;
+        }
+      }
+      sparkPositions.needsUpdate = true;
+      sparks.material.color.copy(mesh.material.color);
+      sparks.material.opacity = mesh.material.opacity * 0.48;
     }
   }
 }
