@@ -165,7 +165,7 @@ const cache = new WeakMap<
   }[]
 >();
 const fieldMaterials = new WeakMap<AssembledModel, Set<THREE.MeshStandardMaterial>>();
-export function updateHandCouplings(model: AssembledModel, seconds: number, charge: number): void {
+export function updateHandCouplings(model: AssembledModel, seconds: number, charge: number, boost = 0): void {
   let links = cache.get(model);
   if (!links) {
     links = [...model.nodes.values()]
@@ -200,7 +200,7 @@ export function updateHandCouplings(model: AssembledModel, seconds: number, char
     for (const [k, node] of link.packets.entries()) {
       const phase = (seconds * 0.42 + i * 0.17 + k / FLOW_PACKET_COUNT) % 1;
       node.position.y = THREE.MathUtils.lerp(link.start, link.end, phase);
-      node.scale.setScalar(flowPacketScale(phase) * (0.8 + charge * 0.15));
+      node.scale.setScalar(flowPacketScale(phase) * (0.8 + charge * 0.15) * (1 + boost * 0.5));
     }
     const phase = (seconds * 0.22 + i * 0.23) % 1;
     const envelope = phase < 0.07 ? Math.sin((phase / 0.07) * Math.PI) ** 2 : 0;
@@ -209,5 +209,5 @@ export function updateHandCouplings(model: AssembledModel, seconds: number, char
   }
   // 端环共用低亮材质，所有一对端环明暗同步；避免仅靠缩放冒充呼吸发光。
   for (const material of fieldMaterials.get(model)!)
-    material.emissiveIntensity = 0.12 + 0.18 * (0.5 + 0.5 * Math.sin(seconds * 1.6));
+    material.emissiveIntensity = 0.12 + 0.18 * (0.5 + 0.5 * Math.sin(seconds * 1.6)) + boost * 0.2;
 }

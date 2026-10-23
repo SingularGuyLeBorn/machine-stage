@@ -417,6 +417,8 @@ function StageRuntime() {
       assembled,
       model.animationClock === "continuous" ? realTimeRef.current : running ? clockRef.current : 0,
       state,
+      store.energyBoost,
+      store.energyWidth,
     );
     // 舱盖/加油口盖是交互件：用真实帧时间平滑开合，不跟机器状态时钟走
     setArmourWet(store.views.rain);

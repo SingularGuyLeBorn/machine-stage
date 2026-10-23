@@ -1,36 +1,55 @@
 import * as THREE from "three";
 import type { AssembledModel } from "../../assembler/assembler";
 
-// [OM-FREEPLAY] 密集折线电束分成亮芯与细分支，使用折面条带而非圆柱光炮。
+// 原创佩丹折线光束：每个发射口一条连续 Z 字实体，不用多股错位叠线。
 const STEPS = 32;
-/** 双束向内收 28% 半间距，末端保留 72% 间距；共同下倾约 4°，不会交叉。 */
+/** [OM-FREEPLAY] 近距胸口目标：红束末端保留 46% 间距，前伸 3.2、下落 0.7，不交叉。 */
 export function redRayEnd(
   start: THREE.Vector3,
   other: THREE.Vector3,
   forward: THREE.Vector3,
   up: THREE.Vector3,
 ): THREE.Vector3 {
-  const inward = other.clone().sub(start).multiplyScalar(0.14);
-  return start.clone().addScaledVector(forward, 4.5).add(inward).addScaledVector(up, -0.32);
+  const inward = other.clone().sub(start).multiplyScalar(0.27);
+  return start.clone().addScaledVector(forward, 3.2).add(inward).addScaledVector(up, -0.7);
 }
+/** [OM-FREEPLAY] 头屏光束从屏幕向近处胸高目标下倾，包络控制伸出长度。 */
+export function yellowRayEnd(
+  start: THREE.Vector3,
+  forward: THREE.Vector3,
+  up: THREE.Vector3,
+  power: number,
+): THREE.Vector3 {
+  return start
+    .clone()
+    .addScaledVector(forward, 3.8 * power)
+    .addScaledVector(up, -1.3 * power);
+}
+// 每束只有一条中心折线，四边实体截面沿中心线构建；加粗截面，不叠加错位 Z。
+const SECTION = 4;
 function ribbon(): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array((STEPS + 1) * 6), 3));
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array((STEPS + 1) * SECTION * 3), 3));
   const index: number[] = [];
-  for (let i = 0; i < STEPS; i++) {
-    const k = i * 2;
-    index.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
-  }
+  for (let i = 0; i < STEPS; i++)
+    for (let face = 0; face < SECTION; face++) {
+      const a = i * SECTION + face,
+        b = i * SECTION + ((face + 1) % SECTION);
+      index.push(a, b, a + SECTION, b, b + SECTION, a + SECTION);
+    }
+  index.push(0, 2, 1, 0, 3, 2);
+  const end = STEPS * SECTION;
+  index.push(end, end + 1, end + 2, end, end + 2, end + 3);
   g.setIndex(index);
   return g;
 }
 class PedanRays {
   group = new THREE.Group();
-  strands = Array.from({ length: 24 }, (_, i) => {
+  strands = Array.from({ length: 3 }, () => {
     const mesh = new THREE.Mesh(
       ribbon(),
       new THREE.MeshBasicMaterial({
-        color: i % 3 === 0 ? 0xfff0cf : 0xff3329,
+        color: 0xff4930,
         side: THREE.DoubleSide,
         transparent: true,
         depthWrite: false,
@@ -56,60 +75,66 @@ class PedanRays {
       dispose();
     };
   }
-  update(seconds: number, module: string | null, yellow: number, redPower: number): void {
+  update(
+    seconds: number,
+    module: string | null,
+    yellow: number,
+    redPower: number,
+    boostAt: (position: number) => number,
+    widthScale: number,
+  ): void {
     this.group.visible = (!!module && redPower > 0.01) || yellow > 0.01;
     if (!this.group.visible) return;
     const origins: THREE.Vector3[] = [];
-    if (module) {
+    if (module)
       for (const suffix of ["l", "r"]) {
         const node = this.model.getNode(`Antenna_${module}_${suffix}`)!;
         origins.push(this.model.root.worldToLocal(node.localToWorld(new THREE.Vector3(0, 0.93, 0))));
       }
-    } else {
+    else
       origins.push(
         this.model.root.worldToLocal(
           this.model.getNode("Module_head_arms")!.localToWorld(new THREE.Vector3(0, 6.195, 0.66)),
         ),
       );
-    }
-    // 光束顶点写在模型根节点局部空间；方向也必须去掉根节点的世界变换。
     const moduleMatrix = new THREE.Matrix4()
       .copy(this.model.root.matrixWorld)
       .invert()
       .multiply(this.model.getNode(`Module_${module ?? "head_arms"}`)!.matrixWorld);
+    const heading = new THREE.Vector3(0, 0, 1).transformDirection(moduleMatrix);
+    const across = new THREE.Vector3(1, 0, 0).transformDirection(moduleMatrix);
+    const up = new THREE.Vector3(0, 1, 0).transformDirection(moduleMatrix);
     for (const [j, mesh] of this.strands.entries()) {
-      const start = origins[j % origins.length]!;
-      const heading = new THREE.Vector3(0, 0, 1).transformDirection(moduleMatrix);
-      const across = new THREE.Vector3(1, 0, 0).transformDirection(moduleMatrix),
-        up = new THREE.Vector3(0, 1, 0).transformDirection(moduleMatrix);
-      const length = module ? 4.5 : 5.8 * yellow;
+      mesh.visible = module ? j < 2 : j === 2;
+      if (!mesh.visible) continue;
+      const start = origins[module ? j : 0]!;
       const end = module
-        ? redRayEnd(start, origins[(j + 1) % 2]!, heading, up)
-        : start.clone().addScaledVector(heading, length);
+        ? redRayEnd(start, origins[1 - j]!, heading, up)
+        : yellowRayEnd(start, heading, up, yellow);
       const attr = mesh.geometry.getAttribute("position");
       for (let i = 0; i <= STEPS; i++) {
         const t = i / STEPS,
           envelope = Math.pow(Math.sin(Math.PI * t), 0.35);
-        const zig = (i % 2 === 0 ? 1 : -1) * (0.06 + (j % 6) * 0.012) * envelope;
+        // [OM-FREEPLAY] 黄色实体截面比红色宽；加力波逐段把截面放大到 2.1 倍，折线条数不变。
+        const zig = (i % 2 === 0 ? 1 : -1) * (module ? 0.115 : 0.16) * envelope;
         const p = start
           .clone()
           .lerp(end, t)
-          .addScaledVector(across, zig + Math.sin(seconds * 19 + j * 2.3 + i * 0.8) * 0.025 * envelope)
-          .addScaledVector(
-            up,
-            ((j % 5) - 2) * 0.035 * envelope + Math.cos(seconds * 17 + i + j) * 0.015 * envelope,
-          );
-        const width = j % 3 === 0 ? 0.006 : 0.003;
-        const a = p.clone().addScaledVector(up, width),
-          b = p.clone().addScaledVector(up, -width);
-        attr.setXYZ(i * 2, a.x, a.y, a.z);
-        attr.setXYZ(i * 2 + 1, b.x, b.y, b.z);
+          .addScaledVector(across, zig)
+          .addScaledVector(up, Math.sin(seconds * 17 + i * 0.6) * 0.008 * envelope);
+        const radius = (module ? 0.018 : 0.045) * widthScale * (1 + 1.1 * boostAt(t));
+        for (let k = 0; k < SECTION; k++) {
+          const angle = Math.PI / 4 + (k * Math.PI) / 2;
+          const vertex = p
+            .clone()
+            .addScaledVector(up, Math.cos(angle) * radius)
+            .addScaledVector(across, Math.sin(angle) * radius);
+          attr.setXYZ(i * SECTION + k, vertex.x, vertex.y, vertex.z);
+        }
       }
       attr.needsUpdate = true;
-      mesh.material.color.set(
-        module ? (j % 3 === 0 ? 0xff5030 : 0xe51912) : j % 3 === 0 ? 0xffef65 : 0xffbd0c,
-      );
-      mesh.material.opacity = (module ? redPower : yellow) * (0.65 + 0.3 * Math.sin(seconds * 24 + j) ** 2);
+      mesh.material.color.set(module ? 0xff3c28 : 0xffd22b);
+      mesh.material.opacity = (module ? redPower : yellow) * (0.88 + 0.1 * boostAt(0));
     }
   }
 }
@@ -120,11 +145,13 @@ export function updatePedanRays(
   module: string | null,
   yellow: number,
   redPower: number,
+  boostAt: (position: number) => number = () => 0,
+  widthScale = 1,
 ): void {
   let rays = cache.get(model);
   if (!rays) {
     rays = new PedanRays(model);
     cache.set(model, rays);
   }
-  rays.update(seconds, module, yellow, redPower);
+  rays.update(seconds, module, yellow, redPower, boostAt, widthScale);
 }

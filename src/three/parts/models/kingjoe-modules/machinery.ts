@@ -10,6 +10,8 @@ import data from "./pedan.generated.json";
 type Room = (typeof data.rooms)[number];
 type V3 = [number, number, number];
 export interface PedanActivity {
+  boost: number;
+  flowTimes: Record<string, number>;
   beamTime: number | null;
   drive: number;
   charge: number;
@@ -18,6 +20,8 @@ export interface PedanActivity {
   redTime: number | null;
 }
 export const QUIET_ACTIVITY: PedanActivity = {
+  boost: 0,
+  flowTimes: {},
   beamTime: null,
   drive: 0,
   charge: 0,
@@ -29,7 +33,14 @@ const smooth = (x: number) => {
   const t = THREE.MathUtils.clamp(x, 0, 1);
   return t * t * (3 - 2 * t);
 };
+export function moduleBoost(activity: PedanActivity, owner: string): number {
+  return activity.beamTime !== null || activity.redModule === owner ? activity.boost : 0;
+}
 export function pedanPower(seconds: number, channel: string, activity = QUIET_ACTIVITY): number {
+  const owner = channel.startsWith("modulator") ? "chest" : channel === "brain" ? "head_arms" : channel;
+  return basePedanPower(seconds, channel, activity) * (1 + 0.35 * moduleBoost(activity, owner));
+}
+function basePedanPower(seconds: number, channel: string, activity: PedanActivity): number {
   const arrival = transitArrival(
     activity.beamTime,
     channel.startsWith("modulator")
@@ -448,9 +459,14 @@ export function updatePedanMachinery(model: AssembledModel, seconds: number, act
         activity.redModule === module ? sampleRedTransit(activity.redTime) : 0,
       );
       // 固定载波相位，活动只改变光包尺度；状态切换不再让光包瞬移。
-      const t = (((seconds * 0.25 + index / (node.name.includes("_output_") ? 7 : 3)) % 1) + 1) % 1;
+      const t =
+        ((((activity.flowTimes[module] ?? seconds) * 0.25 +
+          index / (node.name.includes("_output_") ? 7 : 3)) %
+          1) +
+          1) %
+        1;
       node.position.y = (t - 0.5) * extent * 0.88;
-      node.scale.setScalar(0.65 + energized * 0.65);
+      node.scale.setScalar((0.65 + energized * 0.65) * (1 + 0.45 * moduleBoost(activity, module)));
     }
   }
   for (const { material, channel } of cache.lights)

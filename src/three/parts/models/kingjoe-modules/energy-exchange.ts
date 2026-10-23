@@ -12,9 +12,12 @@ import {
   sampleTransit,
   sampleRedTransit,
   RED_FEED_DELAY,
+  RED_PACKET_COUNT,
+  redGather,
+  redPacketPosition,
   type TransitStage,
 } from "./energy-transit.mjs";
-import type { PedanActivity } from "./machinery";
+import { moduleBoost, type PedanActivity } from "./machinery";
 import { displayMaterialSource } from "../../kernel/displayMaterial";
 import data from "./pedan.generated.json";
 
@@ -177,7 +180,7 @@ export function planEnergyExchange(devices: CavityDevice[]): ExchangeRoute[] {
         mode: "rings",
         a: [0, 0, room.size[2] * 0.35],
         b: [0, -0.04, 0],
-        radius: 0.048,
+        radius: 0.072,
         anchors: [`Room_${key}`, `Mount_${owner}_${side}`],
         redFeed: { from: RED_FEED_DELAY.core, to: RED_FEED_DELAY.mount, side, section: "核心至天线根部" },
       });
@@ -187,7 +190,7 @@ export function planEnergyExchange(devices: CavityDevice[]): ExchangeRoute[] {
         mode: "rings",
         a: [0, 0.03, 0],
         b: [0, 0.93, 0],
-        radius: 0.037,
+        radius: 0.06,
         anchors: [antenna, antenna],
         redFeed: { from: RED_FEED_DELAY.mount, to: RED_FEED_DELAY.tip, side, section: "天线内置蓄能级" },
       });
@@ -270,22 +273,37 @@ export function addEnergyExchange(
       "成对呼吸的能量截面",
       base,
       "pedanRing",
-      { r: route.radius, wire: route.faceLabel ? Math.min(0.002, route.radius * 0.15) : 0.003 },
+      {
+        r: route.radius,
+        wire: route.redFeed ? 0.0045 : route.faceLabel ? Math.min(0.002, route.radius * 0.15) : 0.003,
+      },
       route.redFeed ? `pedan_redfeed_${module}` : `pedan_transit_${exchangeStage(route)}_${i % 4}`,
     );
     Object.assign(terminals, { instances: 2, indexed: true, instance_nodes: ends });
     if (route.mode === "rings") {
-      const packets = Array.from({ length: route.faceLabel ? 3 : FLOW_PACKET_COUNT }, (_, k) => {
-        const name = `${base}_packet_${k}`;
-        nodes.push({ name, parent: base, pivot: [0, 0, 0], rest_rotation: [-90, 0, 0], motion: "translate" });
-        return name;
-      });
+      const packets = Array.from(
+        { length: route.redFeed ? RED_PACKET_COUNT : route.faceLabel ? 3 : FLOW_PACKET_COUNT },
+        (_, k) => {
+          const name = `${base}_packet_${k}`;
+          nodes.push({
+            name,
+            parent: base,
+            pivot: [0, 0, 0],
+            rest_rotation: [-90, 0, 0],
+            motion: "translate",
+          });
+          return name;
+        },
+      );
       const p = add(
         "packets",
         "非接触传递光环",
         base,
         "pedanRing",
-        { r: route.radius * 1.02, wire: route.faceLabel ? Math.min(0.0015, route.radius * 0.1) : 0.0027 },
+        {
+          r: route.radius * 1.02,
+          wire: route.redFeed ? 0.004 : route.faceLabel ? Math.min(0.0015, route.radius * 0.1) : 0.0027,
+        },
         route.redFeed ? `pedan_redfeed_${module}` : `pedan_transit_flow_${exchangeStage(route)}`,
       );
       Object.assign(p, { instances: packets.length, indexed: true, instance_nodes: packets });
@@ -377,7 +395,7 @@ export function updateEnergyExchange(
         base: model.getNode(`Exchange_${i}`)!,
         parent: model.getNode(route.parent)!,
         ends: [0, 1].map((k) => model.getNode(`Exchange_${i}_end_${k}`)!),
-        packets: Array.from({ length: FLOW_PACKET_COUNT }, (_, k) => k)
+        packets: Array.from({ length: route.redFeed ? RED_PACKET_COUNT : FLOW_PACKET_COUNT }, (_, k) => k)
           .map((k) => model.getNode(`Exchange_${i}_packet_${k}`))
           .filter((n): n is THREE.Group => !!n),
         arc: model.getNode(`Exchange_${i}_arc`),
@@ -401,6 +419,10 @@ export function updateEnergyExchange(
       dir = b.clone().sub(a).normalize();
     link.base.position.copy(a);
     link.base.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    const owner =
+      route.owner.startsWith("joint_") || /^(upper|fore)_/.test(route.owner) ? "head_arms" : route.owner;
+    const boost = moduleBoost(activity, owner);
+    const flowTime = activity.flowTimes[owner] ?? time;
     const stage = exchangeStage(route);
     const power = Math.max(
       sampleTransit(activity.beamTime, TRANSIT_DELAY[stage]),
@@ -422,7 +444,13 @@ export function updateEnergyExchange(
           : 1;
       end.scale.setScalar(
         route.feed || route.redFeed
-          ? Math.max(0.00001, endpointPower)
+          ? Math.max(
+              0.00001,
+              endpointPower *
+                (route.redFeed && route.redFeed.to === RED_FEED_DELAY.tip && endIndex === 1
+                  ? 1 + 0.35 * redGather(activity.redTime)
+                  : 1),
+            )
           : route.faceLabel
             ? 1
             : 0.95 + 0.08 * breath,
@@ -430,14 +458,20 @@ export function updateEnergyExchange(
     }
     for (const [k, node] of link.packets.entries()) {
       const p =
-        (time * (route.faceLabel ? 0.6 : 0.36) +
+        (flowTime * (route.faceLabel ? 0.6 : 0.36) +
           (route.redFeed ? route.redFeed.from : i * 0.19) +
           k / link.packets.length) %
         1;
-      node.position.y = length * p;
+      // 环列向尖端收拢时仍按原载波相位淡出，避免循环复位在尖端留下瞬跳。
+      const position =
+        route.redFeed && route.redFeed.to === RED_FEED_DELAY.tip ? redPacketPosition(p, activity.redTime) : p;
+      node.position.y = length * position;
       const traveling = route.redFeed
         ? activity.redModule === route.owner
-          ? sampleRedTransit(activity.redTime, THREE.MathUtils.lerp(route.redFeed.from, route.redFeed.to, p))
+          ? sampleRedTransit(
+              activity.redTime,
+              THREE.MathUtils.lerp(route.redFeed.from, route.redFeed.to, position),
+            )
           : 0
         : route.feed
           ? sampleTransit(
@@ -445,7 +479,9 @@ export function updateEnergyExchange(
               THREE.MathUtils.lerp(TRANSIT_DELAY[route.feed.from], TRANSIT_DELAY[route.feed.to], p),
             )
           : 1;
-      node.scale.setScalar(Math.max(0.00001, flowPacketScale(p) * (0.85 + power * 0.2) * traveling));
+      node.scale.setScalar(
+        Math.max(0.00001, flowPacketScale(p) * (0.85 + power * 0.2) * traveling * (1 + boost * 0.5)),
+      );
     }
     if (link.arc) {
       const p = (time * 0.18 + i * 0.217) % 1,
@@ -460,8 +496,8 @@ export function updateEnergyExchange(
   }
   for (const { material, owner } of state.redMaterials) {
     const charge = activity.redModule === owner ? sampleRedTransit(activity.redTime, RED_FEED_DELAY.tip) : 0;
-    material.emissiveIntensity = 0.16 + charge * 0.26;
-    material.opacity = 0.7 + charge * 0.08;
+    material.emissiveIntensity = 0.16 + charge * 0.26 + moduleBoost(activity, owner) * 0.23;
+    material.opacity = Math.min(0.88, 0.7 + charge * 0.08 + moduleBoost(activity, owner) * 0.1);
   }
   for (const { material, phase, stage, flow } of state.materials) {
     const owner =
@@ -473,6 +509,7 @@ export function updateEnergyExchange(
     material.emissiveIntensity = flow
       ? 0.35 + power * 0.15
       : 0.1 + 0.18 * (0.5 + 0.5 * Math.sin(time * 1.35 + phase)) + power * 0.16;
-    if (flow) material.opacity = 0.62 + power * 0.12;
+    material.emissiveIntensity += moduleBoost(activity, owner) * 0.24;
+    if (flow) material.opacity = Math.min(0.86, 0.62 + power * 0.12 + moduleBoost(activity, owner) * 0.12);
   }
 }

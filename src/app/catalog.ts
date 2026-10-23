@@ -72,6 +72,7 @@ export type ViewKey =
   "explode" | "xray" | "localXray" | "internalsOnly" | "labels" | "grid" | "shadow" | "rain" | "thermal";
 
 export type StageAction =
+  | { id: string; group: string; label: string; kind: "energy-boost" }
   | { id: string; group: string; label: string; kind: "machine-state"; state: string }
   | { id: string; group: string; label: string; kind: "damage"; level: DamageState }
   | { id: string; group: string; label: string; kind: "view-toggle"; view: ViewKey }
@@ -123,7 +124,13 @@ export interface StageModel {
   /** 模型自定义几何 kit 构造器（如发动机 borePlate/siameseBlock 等）。 */
   builders?: Record<string, GeometryBuilder>;
   /** 动画：只驱动节点，每帧调用前框架已 resetNodes。t 为秒；state 为当前机器状态。 */
-  animate?: (assembled: AssembledModel, seconds: number, state?: string) => void;
+  animate?: (
+    assembled: AssembledModel,
+    seconds: number,
+    state?: string,
+    energyBoost?: boolean,
+    energyWidth?: number,
+  ) => void;
   /** 纯展示比例（只缩放置换根节点，不改节点/动画/对接）；在包围盒与相机基准之前应用。 */
   presentationScale?: [number, number, number];
   /** 可动总成的完整行程范围，用于初始取景。 */
@@ -284,6 +291,7 @@ export const CATALOG: StageModel[] = [
         state: "separation",
       },
       { id: "modules-reset", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "modules-boost", group: "佩丹光线", label: "光线加力", kind: "energy-boost" },
       { id: "modules-beam", group: "佩丹光线", label: "整机黄色光线", kind: "machine-state", state: "beam" },
       ...(["legs", "pelvis", "chest", "head_arms"] as const).map((key, i) => ({
         id: `modules-ray-${key}`,

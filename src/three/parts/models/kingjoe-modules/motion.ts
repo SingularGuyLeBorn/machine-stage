@@ -5,7 +5,13 @@ import { getModuleEffects, hideModuleEffects } from "./effects";
 import { updateModuleIllumination } from "./illumination";
 import { updatePedanRays } from "./rays";
 import { updateCavityDevices, planCavityDevices } from "./cavity-devices";
-import { redRayPower } from "./energy-transit.mjs";
+import {
+  redRayPower,
+  createBoostClock,
+  advanceBoostClock,
+  boostAt,
+  type BoostClock,
+} from "./energy-transit.mjs";
 import { updateEnergyExchange } from "./energy-exchange";
 import { updateFlexibleFrame } from "./flex-frame";
 import { updateOrbitalCores } from "./orbital-cores";
@@ -169,7 +175,14 @@ interface Playback {
 const playback = new WeakMap<AssembledModel, Playback>();
 const all = (u: number) => Object.fromEntries(MODULE_KEYS.map((k) => [k, u])) as Openings;
 
-export function animateKingJoeModules(model: AssembledModel, seconds: number, state = "idle"): void {
+const boostClocks = new WeakMap<AssembledModel, Record<ModuleKey, BoostClock>>();
+export function animateKingJoeModules(
+  model: AssembledModel,
+  seconds: number,
+  state = "idle",
+  energyBoost = false,
+  energyWidth = 1,
+): void {
   let entry = playback.get(model);
   if (!entry || entry.state !== state) {
     const from = entry?.open ?? all(state === "separation" || state === "closed" ? 0 : 1);
@@ -303,7 +316,28 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
   }
   updateJointCovers(model);
   updateJointDrives(model);
+  let clocks = boostClocks.get(model);
+  if (!clocks) {
+    clocks = Object.fromEntries(MODULE_KEYS.map((key) => [key, createBoostClock(seconds)])) as Record<
+      ModuleKey,
+      BoostClock
+    >;
+    boostClocks.set(model, clocks);
+  }
+  const active = state === "beam" ? beamTime >= 0 && beamTime < 4.1 : redModule !== null && time >= 2;
+  let boost = 0;
+  for (const key of MODULE_KEYS) {
+    const level = advanceBoostClock(
+      clocks[key],
+      seconds,
+      energyBoost && active && (state === "beam" || redModule === key),
+    );
+    if (state === "beam" || redModule === key) boost = Math.max(boost, level);
+  }
+  const rayClock = clocks[(redModule ?? "head_arms") as ModuleKey];
   const activity: PedanActivity = {
+    boost,
+    flowTimes: Object.fromEntries(MODULE_KEYS.map((key) => [key, clocks[key].flowTime])),
     beamTime: state === "beam" ? beamTime : null,
     drive:
       Math.abs(entry.arms[0]) +
@@ -317,13 +351,26 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
   updatePedanMachinery(model, seconds, activity);
   updateCavityDevices(model, seconds, activity);
   updateOrbitalCores(model, seconds, activity);
-  updateHandCouplings(model, seconds, activity.charge);
+  updateHandCouplings(
+    model,
+    activity.flowTimes.head_arms,
+    activity.charge,
+    state === "beam" || redModule === "head_arms" ? boost : 0,
+  );
   updateEnergyExchange(model, planCavityDevices(new Map()), seconds, activity);
   updateFlexibleFrame(model, seconds);
   updateModuleIllumination(model, seconds, activity);
   updateOpticalInteriors(model, seconds, activity);
   model.root.updateMatrixWorld(true);
-  updatePedanRays(model, seconds, activity.redModule, activity.yellow, redRayPower(activity.redTime));
+  updatePedanRays(
+    model,
+    seconds,
+    activity.redModule,
+    activity.yellow,
+    redRayPower(activity.redTime),
+    (position) => boostAt(rayClock, seconds, 0.3 + position * 1.15),
+    energyWidth,
+  );
   if (state === "combining" || state === "separation" || (state === "beam" && time < beamDockTime)) {
     model.root.updateMatrixWorld(true);
     getModuleEffects(model).update(seconds, entry.open);
