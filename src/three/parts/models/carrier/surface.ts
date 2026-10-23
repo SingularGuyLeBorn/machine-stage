@@ -164,7 +164,7 @@ export function addSurface(ctx: CarrierCtx): void {
   });
   ctx.layout("carrier.surface.railPost", ({ index }) => {
     const [side, z] = railPostSpots[index]!;
-    return new THREE.Matrix4().makeTranslation(side === -1 ? -5.0 : 4.35, deckTop + 0.1, z);
+    return new THREE.Matrix4().makeTranslation(side === -1 ? -4.5 : 4.35, deckTop + 0.1, z);
   });
   add({
     id: `${P}deck_rail_l_1`,
@@ -174,7 +174,7 @@ export function addSurface(ctx: CarrierCtx): void {
     build_layer: 4,
     geometry: M(C(0.018, 12.0, [0, 0, 0], 8)),
     material: "cv_steel",
-    mate: A([-5.0, deckTop + 0.2, 2.0], [90, 0, 0]),
+    mate: A([-4.5, deckTop + 0.2, 2.0], [90, 0, 0]),
   });
   add({
     id: `${P}deck_rail_l_mid_1`,
@@ -184,7 +184,7 @@ export function addSurface(ctx: CarrierCtx): void {
     build_layer: 4,
     geometry: M(C(0.014, 12.0, [0, 0, 0], 8)),
     material: "cv_steel",
-    mate: A([-5.0, deckTop + 0.1, 2.0], [90, 0, 0]),
+    mate: A([-4.5, deckTop + 0.1, 2.0], [90, 0, 0]),
   });
   // 右舷栏杆只保留后升降机与前升降机之间的一段，不横跨升降机平台。
   add({
@@ -233,7 +233,7 @@ export function addSurface(ctx: CarrierCtx): void {
     build_layer: 4,
     geometry: M(C(0.3, 0.55, [0, 0, 0], 16), T(0.32, 0.26, 0.05, [0, 0.28, 0], 16)),
     material: "cv_canvas",
-    mate: A([-4.3, deckTop + 0.3, -6.0]),
+    mate: A([-4.15, deckTop + 0.3, -6.0]),
     instances: 6,
     indexed: true,
     instance_layout: "carrier.surface.raft",
