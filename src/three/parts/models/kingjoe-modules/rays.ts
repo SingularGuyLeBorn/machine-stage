@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import type { AssembledModel } from "../../assembler/assembler";
+import { createRayMaterial } from "./ray-material";
 
-// 原创佩丹折线光束：每个发射口一条连续 Z 字实体，不用多股错位叠线。
+// 原创佩丹折线光束：每个发射口一条连续 Z 字光带，柔边和流动交给材质。
 const BENDS = 32;
 export const RAY_SUBDIVISIONS = 6;
 const STEPS = BENDS * RAY_SUBDIVISIONS;
@@ -32,40 +33,34 @@ export function yellowRayEnd(
     .addScaledVector(forward, 3.8 * power)
     .addScaledVector(up, -1.3 * power);
 }
-// 每束只有一条中心折线，四边实体截面沿中心线构建；加粗截面，不叠加错位 Z。
+// 四个截面采样点保留毛边/锚点测量；只渲染一面对着相机的光带，消除封闭实体的厚重感。
 const SECTION = 4;
 function ribbon(): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(new Float32Array((STEPS + 1) * SECTION * 3), 3));
-  g.setAttribute("color", new THREE.BufferAttribute(new Float32Array((STEPS + 1) * SECTION * 3), 3));
-  const index: number[] = [];
-  for (let i = 0; i < STEPS; i++)
-    for (let face = 0; face < SECTION; face++) {
-      const a = i * SECTION + face,
-        b = i * SECTION + ((face + 1) % SECTION);
-      index.push(a, b, a + SECTION, b, b + SECTION, a + SECTION);
+  for (const name of ["beamCenter", "beamTangent"])
+    g.setAttribute(name, new THREE.BufferAttribute(new Float32Array((STEPS + 1) * SECTION * 3), 3));
+  g.setAttribute("beamRadius", new THREE.BufferAttribute(new Float32Array((STEPS + 1) * SECTION), 1));
+  const uv = new Float32Array((STEPS + 1) * SECTION * 2);
+  for (let i = 0; i <= STEPS; i++)
+    for (let k = 0; k < SECTION; k++) {
+      uv[(i * SECTION + k) * 2] = i / STEPS;
+      uv[(i * SECTION + k) * 2 + 1] = k === 0 || k === 3 ? -1 : 1;
     }
-  index.push(0, 2, 1, 0, 3, 2);
-  const end = STEPS * SECTION;
-  index.push(end, end + 1, end + 2, end, end + 2, end + 3);
+  g.setAttribute("beamUv", new THREE.BufferAttribute(uv, 2));
+  const index: number[] = [];
+  for (let i = 0; i < STEPS; i++) {
+    const a = i * SECTION,
+      b = a + 1;
+    index.push(a, b, a + SECTION, b, b + SECTION, a + SECTION);
+  }
   g.setIndex(index);
   return g;
 }
 class PedanRays {
   group = new THREE.Group();
   strands = Array.from({ length: 3 }, () => {
-    const mesh = new THREE.Mesh(
-      ribbon(),
-      new THREE.MeshBasicMaterial({
-        color: 0xff4930,
-        side: THREE.DoubleSide,
-        transparent: true,
-        depthWrite: false,
-        blending: THREE.NormalBlending,
-        toneMapped: false,
-        vertexColors: true,
-      }),
-    );
+    const mesh = new THREE.Mesh(ribbon(), createRayMaterial());
     mesh.frustumCulled = false;
     // [OM-FREEPLAY] 少量短弧贴在主干边缘，只延伸局部，不复制一整束 Z。
     const sparks = new THREE.LineSegments(
@@ -134,11 +129,13 @@ class PedanRays {
         ? redRayEnd(start, origins[1 - j]!, heading, up)
         : yellowRayEnd(start, heading, up, yellow);
       const attr = mesh.geometry.getAttribute("position");
-      const colors = mesh.geometry.getAttribute("color");
+      const centers = mesh.geometry.getAttribute("beamCenter");
+      const radii = mesh.geometry.getAttribute("beamRadius");
+      const tangents = mesh.geometry.getAttribute("beamTangent");
       for (let i = 0; i <= STEPS; i++) {
         const t = i / STEPS,
           envelope = i === 0 || i === STEPS ? 0 : Math.pow(Math.sin(Math.PI * t), 0.35);
-        // [OM-FREEPLAY] 黄色实体截面比红色宽；加力波逐段把截面放大到 2.1 倍，折线条数不变。
+        // [OM-FREEPLAY] 黄色光带比红色宽；加力波逐段把宽度放大到 2.1 倍，折线条数不变。
         const segment = Math.floor(i / RAY_SUBDIVISIONS);
         const fraction = (i % RAY_SUBDIVISIONS) / RAY_SUBDIVISIONS;
         const zig = (segment % 2 === 0 ? 1 : -1) * (1 - 2 * fraction) * (module ? 0.115 : 0.16) * envelope;
@@ -159,14 +156,26 @@ class PedanRays {
             .addScaledVector(up, Math.cos(angle) * raggedRadius)
             .addScaledVector(across, Math.sin(angle) * raggedRadius);
           attr.setXYZ(i * SECTION + k, vertex.x, vertex.y, vertex.z);
-          const light = 0.68 + 0.32 * (0.5 + 0.5 * noise);
-          colors.setXYZ(i * SECTION + k, light, light, light);
+          centers.setXYZ(i * SECTION + k, p.x, p.y, p.z);
+          radii.setX(i * SECTION + k, raggedRadius);
         }
       }
       attr.needsUpdate = true;
-      colors.needsUpdate = true;
-      mesh.material.color.set(module ? 0xff3c28 : 0xffd22b);
-      mesh.material.opacity = (module ? redPower : yellow) * (0.88 + 0.1 * boostAt(0));
+      for (let i = 0; i <= STEPS; i++) {
+        const before = Math.max(0, i - 1) * SECTION,
+          after = Math.min(STEPS, i + 1) * SECTION;
+        for (let k = 0; k < SECTION; k++)
+          tangents.setXYZ(
+            i * SECTION + k,
+            centers.getX(after) - centers.getX(before),
+            centers.getY(after) - centers.getY(before),
+            centers.getZ(after) - centers.getZ(before),
+          );
+      }
+      centers.needsUpdate = radii.needsUpdate = tangents.needsUpdate = true;
+      mesh.material.uniforms.tint!.value.set(module ? 0xff3c28 : 0xffd22b);
+      mesh.material.uniforms.power!.value = (module ? redPower : yellow) * (0.88 + 0.1 * boostAt(0));
+      mesh.material.uniforms.flowTime!.value = seconds;
       const sparks = mesh.children[0] as THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
       const sparkPositions = sparks.geometry.getAttribute("position");
       for (let s = 0; s < 12; s++) {
@@ -188,8 +197,8 @@ class PedanRays {
         }
       }
       sparkPositions.needsUpdate = true;
-      sparks.material.color.copy(mesh.material.color);
-      sparks.material.opacity = mesh.material.opacity * 0.48;
+      sparks.material.color.copy(mesh.material.uniforms.tint!.value);
+      sparks.material.opacity = mesh.material.uniforms.power!.value * 0.22;
     }
   }
 }
