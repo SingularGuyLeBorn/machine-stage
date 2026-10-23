@@ -129,10 +129,18 @@ export function planEnergyExchange(devices: CavityDevice[]): ExchangeRoute[] {
           parent: "Module_head_arms",
           faceLabel: `${side === "l" ? "左" : "右"}${kind === "upper" ? "肩" : "肘"}轴承端面耦合`,
           mode: sign < 0 ? "rings" : "current",
-          a: [sign * r * (JOINT_DRIVE.bearingCenter - JOINT_DRIVE.bearingWire), 0, 0],
-          b: [sign * r * (JOINT_DRIVE.hubCenter + JOINT_DRIVE.hubThickness / 2), 0, 0],
-          // [OM-FREEPLAY] 能量晕稍露出轮毂外缘，避免在仅内部模式被实体轮毂完全遮住；端面位置不变。
-          radius: r * 1.12,
+          // [OM-FREEPLAY] 环列跨两侧轴承外端面，在齿圈外围传递；原短缝容不下三枚分离的柔光环。
+          // 正侧仍保留短程微电流；只调整能量路径，不移动轴承、轮毂或关节枢轴。
+          a: [sign * r * (JOINT_DRIVE.bearingCenter + (sign < 0 ? 1 : -1) * JOINT_DRIVE.bearingWire), 0, 0],
+          b: [
+            r *
+              (sign < 0
+                ? JOINT_DRIVE.bearingCenter + JOINT_DRIVE.bearingWire
+                : JOINT_DRIVE.hubCenter + JOINT_DRIVE.hubThickness / 2),
+            0,
+            0,
+          ],
+          radius: r * (sign < 0 ? 1.5 : 1.12),
           anchors: [base, `${base}_rotor`],
         });
       }
@@ -309,7 +317,7 @@ export function addEnergyExchange(
           wire: route.redFeed
             ? 0.004
             : route.faceLabel && route.owner.startsWith("joint_")
-              ? 0.0035
+              ? 0.006
               : route.faceLabel
                 ? Math.min(0.0015, route.radius * 0.1)
                 : 0.0027,
@@ -527,6 +535,11 @@ export function updateEnergyExchange(
       ? 0.35 + power * 0.15
       : 0.1 + 0.18 * (0.5 + 0.5 * Math.sin(time * 1.35 + phase)) + power * 0.16;
     material.emissiveIntensity += moduleBoost(activity, owner) * 0.24;
-    if (flow) material.opacity = Math.min(0.86, 0.62 + power * 0.12 + moduleBoost(activity, owner) * 0.12);
+    // [OM-FREEPLAY] 肩肘载波提高覆盖度，保持原自发光功率和软边；白底上不再只剩极淡色线。
+    if (flow)
+      material.opacity = Math.min(
+        0.86,
+        (stage === "arms" ? 0.82 : 0.62) + power * 0.12 + moduleBoost(activity, owner) * 0.12,
+      );
   }
 }
