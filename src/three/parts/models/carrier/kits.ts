@@ -111,6 +111,25 @@ function hullStationAt(z: number): HullStation {
   return { z, base, bottom, bow };
 }
 
+/** 飞行甲板右舷外轮廓（不含升降机开口），用于舰体上部宽度封顶。 */
+const DECK_STAR_SILHOUETTE: Array<[number, number]> = [
+  [2.9, -19.4], [3.5, -17.5], [4.68, -15.8], [4.68, 6.0], [4.18, 9.53], [2.4, 11.4], [1.85, 20.7],
+];
+
+function deckStarHalfAt(z: number): number {
+  for (let i = 0; i < DECK_STAR_SILHOUETTE.length - 1; i++) {
+    const [x0, z0] = DECK_STAR_SILHOUETTE[i]!;
+    const [x1, z1] = DECK_STAR_SILHOUETTE[i + 1]!;
+    const lo = Math.min(z0, z1);
+    const hi = Math.max(z0, z1);
+    if (z >= lo && z <= hi) {
+      const t = Math.abs(z1 - z0) < 1e-6 ? 0 : (z - z0) / (z1 - z0);
+      return x0 + (x1 - x0) * t;
+    }
+  }
+  return DECK_STAR_SILHOUETTE[DECK_STAR_SILHOUETTE.length - 1]![0];
+}
+
 /** 给定高度处的半宽（水线以下为椭圆舭部，以上为外飘直线）。 */
 function hullHalfAt(st: HullStation, y: number): number {
   if (y <= HULL_WL) {
@@ -119,7 +138,10 @@ function hullHalfAt(st: HullStation, y: number): number {
   }
   const t = Math.min(1, (y - HULL_WL) / (HULL_DECK_BOTTOM - HULL_WL));
   const flare = 0.1 + 0.07 * t;
-  return st.base * (0.88 + (1.0 - 0.88) * Math.min(1, t / 0.42)) * (1 + flare * Math.max(0, t - 0.42)) + (t > 0.55 ? (0.22 + 0.42 * st.bow * st.bow) * ((t - 0.55) / 0.45) : 0);
+  const upper = st.base * (0.88 + (1.0 - 0.88) * Math.min(1, t / 0.42)) * (1 + flare * Math.max(0, t - 0.42)) + (t > 0.55 ? (0.22 + 0.42 * st.bow * st.bow) * ((t - 0.55) / 0.45) : 0);
+  // 上部船壳必须收在飞行甲板边缘以内（甲板始终外飘），否则底封板/外飘板会插进船壳。
+  const deckCap = Math.max(0.25, deckStarHalfAt(st.z + hullRakeShift(st, y)) - 0.12);
+  return Math.min(upper, deckCap);
 }
 
 /** 艏部前倾：越靠近甲板，环线越向艏前伸。 */

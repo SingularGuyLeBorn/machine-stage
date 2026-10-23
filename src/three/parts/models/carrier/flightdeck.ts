@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { CV, hullHalfBeamAt } from "./constants";
+import { hullSurfaceHalfAt } from "./kits";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
 
 // ============================================================================
@@ -942,9 +943,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     }
   }
   const oilSpots: Array<[number, number, number]> = [
-    [3.95, 10.0, 0.26], [3.95, 14.2, 0.3], [-2.4, -14.4, 0.24],
-    [-2.4, -18.0, 0.28], [3.95, 5.6, 0.22], [3.95, 8.0, 0.24],
-    [2.75, 2.0, 0.2], [0.4, 6.2, 0.18],
+    [2.2, -15.8, 0.26], [-2.4, -11.5, 0.24], [-2.4, -14.4, 0.24], [-2.0, -16.8, 0.24],
+    [1.2, 4.0, 0.18], [0.4, 8.0, 0.18], [-3.0, 2.0, 0.18], [0.8, -2.0, 0.16],
   ];
   oilSpots.forEach(([x, z, r], index) => {
     add({
@@ -955,7 +955,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       build_layer: 4,
       geometry: M(C(r, 0.002, [0, 0, 0], 20), C(r * 0.45, 0.002, [r * 0.5, 0, r * 0.35], 14)),
       material: "cv_deck_wear",
-      mate: A([x, markY + 0.001, z]),
+      mate: A([x, deckTop + 0.009, z]),
     });
   });
   CAT_TRACKS.forEach((track, index) => {
@@ -1207,7 +1207,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     for (let i = 0; i < 13; i++) {
       const z = -18.5 + i * 3.166;
       const info = edgeInfoAt(outline, z);
-      const hullX = hullHalfBeamAt(z);
+      const hullX = hullSurfaceHalfAt(z, CV.HULL_TOP + 0.03);
       add({
         id: `${P}sponson_shell_${tag}_${pad(i + 1)}`,
         name_cn: `舷侧外飘封边板 ${tag.toUpperCase()}-${i + 1}`,
@@ -1229,7 +1229,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         mate: A([0, 0, 0]),
       });
       // 外飘底封板：把甲板缘封边板与舰体侧壁之间封死（不敞口进浪）。
-      const bottomWidth = Math.max(0.4, Math.abs(info.x - side * hullX) + 0.12);
+      const bottomWidth = Math.max(0.25, Math.abs(info.x - side * hullX) + 0.08);
       add({
         id: `${P}sponson_bottom_${tag}_${pad(i + 1)}`,
         name_cn: `外飘底封板 ${tag.toUpperCase()}-${i + 1}`,

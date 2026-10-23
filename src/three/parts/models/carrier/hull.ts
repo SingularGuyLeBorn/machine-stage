@@ -1,4 +1,5 @@
 import { CV, hullHalfBeamAt } from "./constants";
+import { hullSurfaceHalfAt } from "./kits";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
 
 // ============================================================================
@@ -323,20 +324,26 @@ export function addHull(ctx: CarrierCtx): void {
     });
   }
 
-  // 舰体分段接缝：8 段 × 舷侧板带，帮助剖视时辨认分段建造。
+  // 舰体分段接缝：不再叠浮板，直接在船壳表面上焊出分段缝（沿曲面逐段取点）。
   for (let s = 0; s < 8; s++) {
     const z = -16.1 + s * 4.6;
-    const half = hullHalfBeamAt(z);
+    const ys = [1.3, 1.9, 2.5, 3.1, 3.5];
     for (const side of [-1, 1] as const) {
+      const seams = [];
+      for (let i = 0; i < ys.length - 1; i++) {
+        const y0 = ys[i]!;
+        const y1 = ys[i + 1]!;
+        seams.push({ type: "weld" as const, from: [side * (hullSurfaceHalfAt(z, y0) + 0.008), y0, z] as [number, number, number], to: [side * (hullSurfaceHalfAt(z, y1) + 0.008), y1, z] as [number, number, number], radius: 0.012, seed: 900 + s + side });
+      }
       add({
         id: `carrier.hull.segment_${pad(s + 1)}_${side === -1 ? "l" : "r"}`,
-        name_cn: `分段外板 ${s + 1}-${side === -1 ? "左" : "右"}`,
-        name_en: `shell segment ${s + 1}-${side === -1 ? "l" : "r"}`,
+        name_cn: `分段外板焊缝 ${s + 1}-${side === -1 ? "左" : "右"}`,
+        name_en: `shell segment seam ${s + 1}-${side === -1 ? "l" : "r"}`,
         assembly: HULL_ASSEMBLY,
         build_layer: 1,
-        geometry: M(B(0.05, 2.2, s === 7 ? 3.3 : 4.5, [0, 0, 0], 0.008)),
-        material: "cv_hull_dark",
-        mate: A([side * (half - 0.06), 1.95, z + (s === 7 ? 1.65 : 2.2)]),
+        geometry: M(...seams),
+        material: "cv_steel_dark",
+        mate: A([0, 0, 0]),
       });
     }
   }
