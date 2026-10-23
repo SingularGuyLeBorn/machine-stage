@@ -89,7 +89,7 @@ export function addOrbitalCore(rig: CoreRig, parts: PartDefinition[], nodes: Mod
 // [OM-FREEPLAY] 四组低亮色相、透明度与粒面参数为原创视觉选择；黄色金属外壳不受影响。
 export const orbitalMaterials: ModelRegistry["materials"] = {
   ...Object.fromEntries(
-    ["#7acbb8", "#d9b975", "#aa8cda", "#77bcd8"].map((color, i) => [
+    ["#81afb6", "#c3a46f", "#8cabbc", "#76a0b5"].map((color, i) => [
       `pedan_orbit_core_${i}`,
       {
         base: color,
@@ -103,8 +103,8 @@ export const orbitalMaterials: ModelRegistry["materials"] = {
     ]),
   ),
   pedan_orbit_haze: {
-    base: "#72afa7",
-    emissive: "#669c94",
+    base: "#779ca7",
+    emissive: "#688d97",
     emissiveIntensity: 0.15,
     opacity: 0.12,
     depthWrite: false,
@@ -112,8 +112,8 @@ export const orbitalMaterials: ModelRegistry["materials"] = {
     roughness: 0.6,
   },
   pedan_orbit_satellite: {
-    base: "#78b3b3",
-    emissive: "#528f8e",
+    base: "#b29b70",
+    emissive: "#927a4e",
     emissiveIntensity: 0.24,
     metalness: 0.58,
     roughness: 0.3,

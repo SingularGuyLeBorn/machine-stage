@@ -17,23 +17,23 @@ import { CORE_MODES } from "./core-dynamics.mjs";
 // [OM-FREEPLAY] 尺寸由实际壳内设备舱派生；配色、线圈匝数及支架布局为原创机械解释。
 export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
   ...orbitalMaterials,
-  // [OM-FREEPLAY] 柔性段使用低亮青铜金属，与金色硬肋区分，依靠褶皱而非高亮表达连接。
+  // [OM-FREEPLAY] 内部试用钛灰／暗铜／青蓝与琥珀配色；外壳黄色金属独立保留。
   pedan_flex: {
-    base: "#5c8177",
+    base: "#415963",
     metalness: 0.68,
     roughness: 0.38,
-    emissive: "#52796e",
-    emissiveIntensity: 0.06,
+    emissive: "#48606b",
+    emissiveIntensity: 0.03,
   },
   // [OM-FREEPLAY] 四组错相的低亮能量端环，避免全机齐闪；每一对仍严格同步。
   ...Object.fromEntries(
-    ["#6ba59b", "#8d82ae", "#b19d6a", "#6698ad"].map((color, i) => [
+    ["#6e9da7", "#839fa9", "#b39b70", "#628999"].map((color, i) => [
       `pedan_exchange_${i}`,
       { base: color, metalness: 0.28, roughness: 0.42, emissive: color, emissiveIntensity: 0.2 },
     ]),
   ),
   pedan_hand_gel: {
-    base: "#659d95",
+    base: "#577f8a",
     metalness: 0.1,
     roughness: 0.38,
     opacity: 0.5,
@@ -42,54 +42,54 @@ export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
     clearcoatRoughness: 0.35,
   },
   pedan_hand_field: {
-    base: "#508f85",
+    base: "#547985",
     metalness: 0.35,
     roughness: 0.4,
-    emissive: "#73a992",
+    emissive: "#79a0aa",
     emissiveIntensity: 0.2,
   },
   pedan_hand_flow: {
-    base: "#79b7ae",
+    base: "#7ca7b2",
     metalness: 0.15,
     roughness: 0.45,
-    emissive: "#76b5a2",
+    emissive: "#709ba7",
     emissiveIntensity: 0.25,
     opacity: 0.46,
     depthWrite: false,
   },
-  pedan_chrome: { base: "#b9cedb", metalness: 0.88, roughness: 0.24 },
+  pedan_chrome: { base: "#a6afb3", metalness: 0.82, roughness: 0.32 },
   pedan_gel: {
-    base: "#8ccac5",
+    base: "#648d97",
     metalness: 0.18,
-    roughness: 0.2,
-    opacity: 0.58,
+    roughness: 0.34,
+    opacity: 0.38,
     depthWrite: false,
-    clearcoat: 0.85,
-    clearcoatRoughness: 0.16,
+    clearcoat: 0.4,
+    clearcoatRoughness: 0.3,
   },
-  pedan_frame: { base: "#94773e", metalness: 0.78, roughness: 0.32 },
-  pedan_coil: { base: "#c68b47", metalness: 0.85, roughness: 0.27 },
-  pedan_ceramic: { base: "#29383e", metalness: 0.3, roughness: 0.46 },
-  pedan_violet: { base: "#9948c7", metalness: 0.5, roughness: 0.28 },
-  pedan_red: { base: "#a63827", metalness: 0.7, roughness: 0.3 },
-  pedan_titanium: { base: "#4d9dae", metalness: 0.7, roughness: 0.25 },
+  pedan_frame: { base: "#53616a", metalness: 0.78, roughness: 0.38 },
+  pedan_coil: { base: "#9c7552", metalness: 0.8, roughness: 0.36 },
+  pedan_ceramic: { base: "#26343b", metalness: 0.2, roughness: 0.52 },
+  pedan_violet: { base: "#344d5c", metalness: 0.6, roughness: 0.34 },
+  pedan_red: { base: "#795340", metalness: 0.65, roughness: 0.4 },
+  pedan_titanium: { base: "#6d8590", metalness: 0.75, roughness: 0.34 },
   pedan_core: {
-    base: "#63cbbf",
+    base: "#78a7ad",
     metalness: 0.4,
     roughness: 0.2,
-    emissive: "#27cfae",
-    emissiveIntensity: 0.8,
+    emissive: "#6095a2",
+    emissiveIntensity: 0.5,
   },
   pedan_crystal: {
-    base: "#bce4fc",
+    base: "#9dbac5",
     metalness: 0.35,
     roughness: 0.18,
-    emissive: "#429bd9",
-    emissiveIntensity: 0.65,
+    emissive: "#618eaa",
+    emissiveIntensity: 0.4,
   },
 };
 for (const channel of ["brain", "modulator_l", "modulator_r", "legs", "pelvis", "chest", "head_arms"]) {
-  const color = channel === "brain" ? "#ffd24d" : channel.startsWith("modulator") ? "#56e3bc" : "#ff5034";
+  const color = channel === "brain" ? "#c8a167" : channel.startsWith("modulator") ? "#83b6bc" : "#bd8c54";
   INTERIOR_MATERIALS[`pedan_power_${channel}`] = {
     base: color,
     emissive: color,

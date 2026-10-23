@@ -129,6 +129,7 @@ export function addCavityDevices(
   nodes: ModelRegistry["nodes"],
 ): void {
   const plan = planCavityDevices(trees);
+  const capsuleCounts = new Map<string, number>();
   for (const [i, device] of plan.entries()) {
     const joint = data.joints.find((j) => j.key === device.owner),
       module = joint?.module ?? device.owner;
@@ -171,11 +172,14 @@ export function addCavityDevices(
     const family = i % 3;
     // [OM-FREEPLAY] 小于 9cm 的安装球保留紧凑晶核，避免伴核缩成不可辨的像素。
     const hasOrbit = family === 0 && r >= 0.09;
-    // 手部交由连续指节网络连接，不再用一个个独立胶囊；其余新设备保留柔性场包覆。
-    if (device.infill && !device.owner.startsWith("fore")) {
+    // [OM-FREEPLAY] 每个区域约四台补隙设备保留一只场囊；公转设备露出轨道，手部仍用连续胶膜。
+    const capsuleCandidate = Boolean(device.infill) && !device.owner.startsWith("fore");
+    const capsuleIndex = capsuleCounts.get(device.owner) ?? 0;
+    if (capsuleCandidate) capsuleCounts.set(device.owner, capsuleIndex + 1);
+    if (capsuleCandidate && capsuleIndex % 4 === 0 && !hasOrbit) {
       add(
         "gel_capsule",
-        device.owner.startsWith("fore") ? "手掌虹彩凝胶肌束" : "设备柔性场囊",
+        "设备柔性场囊",
         "pedanGel",
         {},
         "pedan_gel",
@@ -320,14 +324,16 @@ export function updateCavityDevices(model: AssembledModel, seconds: number, acti
           "#include <emissivemap_fragment>",
           `#include <emissivemap_fragment>
           float flow=gelPoint.y*9.0-gelTime*(0.55+gelCharge*1.8)+sin(gelPoint.x*3.0+gelPoint.z*4.0);
-          vec3 film=0.55+0.45*cos(flow+vec3(0.0,2.1,4.2));
-          diffuseColor.rgb=mix(vec3(0.24,0.48,0.52),film,0.8);
+          // 低饱和青灰薄膜，少量暖色流纹；不再整片循环红绿紫的彩虹色。
+          float ripple=0.5+0.5*sin(flow);
+          vec3 film=mix(vec3(0.13,0.27,0.31),vec3(0.38,0.33,0.22),ripple*0.28);
+          diffuseColor.rgb=mix(diffuseColor.rgb,film,0.6);
           diffuseColor.a*=0.58+0.34*pow(0.5+0.5*sin(flow*1.7),2.0);
           totalEmissiveRadiance+=film*(0.07+gelCharge*0.18);
         `,
         );
       };
-      material.customProgramCacheKey = () => "pedan-fluid-field-v2";
+      material.customProgramCacheKey = () => "pedan-fluid-field-v3";
       material.needsUpdate = true;
       gels.push({ material, time, charge });
     }
