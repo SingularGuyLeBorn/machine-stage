@@ -11,6 +11,7 @@ import { chestWindowBuilders, chestWindowParts } from "./chest-windows";
 import { makeVisorBuilders, visorParts } from "./visor";
 import pedan from "./pedan.generated.json";
 import { interiorBuilders, INTERIOR_MATERIALS, makeInteriors } from "./interiors";
+import { flexFrameBuilders } from "./flex-frame";
 
 // 四分体沿用原阶梯接口，外壳加工设备舱；肩肘分件保留原外表面，贴壳内骨架由实际内壁生成。
 function decode(value: string): ArrayBuffer {
@@ -70,6 +71,7 @@ for (const detail of makeKingJoeSkinDetails().filter((p) => p.assembly === "ship
 }
 Object.assign(kingjoeModuleBuilders, chestWindowBuilders);
 Object.assign(kingjoeModuleBuilders, interiorBuilders);
+Object.assign(kingjoeModuleBuilders, flexFrameBuilders);
 Object.assign(kingjoeModuleBuilders, makeVisorBuilders(kingjoeModuleBuilders.kjModule_head_arms!));
 
 const NAMES: Record<string, string> = {

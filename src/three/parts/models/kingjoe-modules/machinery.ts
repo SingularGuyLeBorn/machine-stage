@@ -235,7 +235,8 @@ export function addPedanMachinery(
  * [OM-FREEPLAY] 四类附件的比例是原创机械解释，全部留在原设备的内壁安全球内。
  */
 export function addPedanDetailAssemblies(parts: PartDefinition[], nodes: ModelRegistry["nodes"]): void {
-  const original = parts.filter((p) => p.tags?.includes("internal"));
+  // 柔性接头属于骨架分段替换，不再次计入原设备附件翻倍预算。
+  const original = parts.filter((p) => p.tags?.includes("internal") && !p.tags.includes("flex-frame"));
   for (const module of new Set(original.map((p) => p.assembly))) {
     const budget = original
       .filter((p) => p.assembly === module)

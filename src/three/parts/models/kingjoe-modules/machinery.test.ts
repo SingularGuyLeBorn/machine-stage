@@ -13,7 +13,7 @@ describe("佩丹内部联动与输能", () => {
     const internal = registry.parts.filter(
       (p) =>
         p.tags?.includes("internal") &&
-        !p.tags.some((tag) => ["cavity-device", "joint-drive", "gel-link"].includes(tag)),
+        !p.tags.some((tag) => ["cavity-device", "joint-drive", "gel-link", "flex-frame"].includes(tag)),
     );
     for (const [module, before] of Object.entries({ legs: 990, pelvis: 245, chest: 513, head_arms: 1016 })) {
       expect(

@@ -1,12 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import * as THREE from "three";
 import { createMaterialLibrary } from "../../kernel/textures";
 import { buildModel } from "../../assembler/assembler";
 import { makeKingJoeModuleRegistry, kingjoeModuleBuilders } from "./registry";
 import { planCavityDevices } from "./cavity-devices";
 import { animateKingJoeModules } from "./motion";
-import { planHandCouplings, updateHandCouplings } from "./hand-couplings";
+import { planHandCouplings, updateHandCouplings, FLOW_PACKET_COUNT, flowPacketScale } from "./hand-couplings";
 import { planEnergyExchange } from "./energy-exchange";
+import { flexibleFrame, flexProfile } from "./flex-frame";
+import flexData from "./flex-frame.generated.json";
 
 describe("空腔设备、肩肘驱动与流体连接", () => {
   let model: ReturnType<typeof buildModel>;
@@ -25,6 +29,36 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
   afterAll(() => {
     model.dispose();
     library.dispose();
+  });
+  it("五圈低亮光包在路途中保持清楚轮廓，柔性骨架端部锁定", () => {
+    expect(flexData.sourceSha256).toBe(
+      createHash("sha256")
+        .update(readFileSync(new URL("./pedan.generated.json", import.meta.url)))
+        .digest("hex"),
+    );
+    const packets = model.parts.filter((p) => /_(packets)$/.test(p.partId));
+    expect(FLOW_PACKET_COUNT).toBe(5);
+    expect(packets.length).toBeGreaterThan(100);
+    for (const part of packets) expect(part.instances.length).toBe(5);
+    for (const phase of [0.12, 0.3, 0.5, 0.7, 0.88]) expect(flowPacketScale(phase)).toBeCloseTo(1);
+    expect(flowPacketScale(0)).toBeLessThan(0.001);
+    expect(flowPacketScale(1)).toBeLessThan(0.001);
+    expect(new Set([...flexibleFrame.values()].map((p) => p.owner)).size).toBe(8);
+    for (const piece of flexibleFrame.values()) {
+      expect(piece.softVolume).toBeGreaterThan(0);
+      expect(piece.rigidVolume).toBeLessThan(piece.originalVolume);
+      for (const zone of piece.zones) {
+        expect(flexProfile(zone.center - zone.width / 2, [zone])[0]).toBeCloseTo(0);
+        expect(flexProfile(zone.center + zone.width / 2, [zone])[0]).toBeCloseTo(0);
+        expect(flexProfile(zone.center, [zone])[0]).toBeCloseTo(1);
+      }
+      const part = model.parts.find((p) => p.partId.endsWith(`.flex_${piece.key}`))!;
+      expect(part).toBeDefined();
+      expect(part.def.tags).toContain("internal");
+      expect(part.geometry.getAttribute("flexProfile").count).toBe(
+        part.geometry.getAttribute("position").count,
+      );
+    }
   });
   it("手部和全身光环的实际实例法线始终沿截面传递方向", () => {
     const rings = model.parts.filter(

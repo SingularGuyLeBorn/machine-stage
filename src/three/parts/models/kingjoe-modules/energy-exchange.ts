@@ -3,7 +3,7 @@
 import * as THREE from "three";
 import type { AssembledModel } from "../../assembler/assembler";
 import type { ModelRegistry, PartDefinition } from "../../registry/types";
-import { planDeviceTree } from "./hand-couplings";
+import { planDeviceTree, FLOW_PACKET_COUNT, flowPacketScale } from "./hand-couplings";
 import type { CavityDevice } from "./cavity-devices";
 import data from "./pedan.generated.json";
 
@@ -129,7 +129,7 @@ export function addEnergyExchange(
     );
     Object.assign(terminals, { instances: 2, indexed: true, instance_nodes: ends });
     if (route.mode === "rings") {
-      const packets = [0, 1, 2].map((k) => {
+      const packets = Array.from({ length: FLOW_PACKET_COUNT }, (_, k) => {
         const name = `${base}_packet_${k}`;
         nodes.push({ name, parent: base, pivot: [0, 0, 0], rest_rotation: [-90, 0, 0], motion: "translate" });
         return name;
@@ -139,10 +139,10 @@ export function addEnergyExchange(
         "非接触传递光环",
         base,
         "pedanRing",
-        { r: route.radius * 0.78, wire: 0.002 },
+        { r: route.radius * 1.02, wire: 0.0027 },
         "pedan_hand_flow",
       );
-      Object.assign(p, { instances: 3, indexed: true, instance_nodes: packets });
+      Object.assign(p, { instances: FLOW_PACKET_COUNT, indexed: true, instance_nodes: packets });
     } else if (route.mode === "current") {
       const name = `${base}_arc`;
       nodes.push({ name, parent: base, motion: "scalar" });
@@ -205,7 +205,7 @@ export function updateEnergyExchange(
         base: model.getNode(`Exchange_${i}`)!,
         parent: model.getNode(route.parent)!,
         ends: [0, 1].map((k) => model.getNode(`Exchange_${i}_end_${k}`)!),
-        packets: [0, 1, 2]
+        packets: Array.from({ length: FLOW_PACKET_COUNT }, (_, k) => k)
           .map((k) => model.getNode(`Exchange_${i}_packet_${k}`))
           .filter((n): n is THREE.Group => !!n),
         arc: model.getNode(`Exchange_${i}_arc`),
@@ -233,9 +233,9 @@ export function updateEnergyExchange(
     link.ends[1].position.y = length;
     for (const end of link.ends) end.scale.setScalar(0.95 + 0.08 * breath);
     for (const [k, node] of link.packets.entries()) {
-      const p = (time * 0.36 + i * 0.19 + k / 3) % 1;
+      const p = (time * 0.36 + i * 0.19 + k / FLOW_PACKET_COUNT) % 1;
       node.position.y = length * p;
-      node.scale.setScalar(Math.max(0.00001, Math.sin(Math.PI * p) ** 0.7) * (0.85 + charge * 0.1));
+      node.scale.setScalar(flowPacketScale(p) * (0.85 + charge * 0.1));
     }
     if (link.arc) {
       const p = (time * 0.18 + i * 0.217) % 1,

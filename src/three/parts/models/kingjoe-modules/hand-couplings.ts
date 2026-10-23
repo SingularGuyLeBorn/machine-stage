@@ -6,6 +6,14 @@ import type { AssembledModel } from "../../assembler/assembler";
 import type { CavityDevice } from "./cavity-devices";
 import data from "./pedan.generated.json";
 
+// [OM-FREEPLAY] 加密采用五圈；途中保持完整尺寸，仅在两端短距离收放，读得出连续传递。
+export const FLOW_PACKET_COUNT = 5;
+export function flowPacketScale(phase: number): number {
+  return Math.max(
+    0.00001,
+    THREE.MathUtils.smoothstep(phase, 0, 0.12) * THREE.MathUtils.smoothstep(1 - phase, 0, 0.12),
+  );
+}
 export interface HandCoupling {
   owner: string;
   from: CavityDevice;
@@ -119,7 +127,7 @@ export function addHandCouplings(
       "pedan_hand_field",
     );
     Object.assign(terminals, { instances: 2, indexed: true, instance_nodes: ends });
-    const packets = Array.from({ length: 3 }, (_, k) => {
+    const packets = Array.from({ length: FLOW_PACKET_COUNT }, (_, k) => {
       const name = `${base}_packet_${k}`;
       nodes.push({
         name,
@@ -135,10 +143,10 @@ export function addHandCouplings(
       "沿指节传递的能量环",
       base,
       "pedanRing",
-      { r: width * 0.6, wire: 0.0018 },
+      { r: width * 0.82, wire: 0.0024 },
       "pedan_hand_flow",
     );
-    Object.assign(pulse, { instances: 3, indexed: true, instance_nodes: packets });
+    Object.assign(pulse, { instances: FLOW_PACKET_COUNT, indexed: true, instance_nodes: packets });
     const arc = `${base}_arc`;
     nodes.push({ name: arc, parent: base, pivot: [0, start, 0], motion: "scalar" });
     add("arc", "间歇微电流", arc, "pedanMicroArc", { length: end - start, width }, "pedan_hand_flow");
@@ -167,7 +175,9 @@ export function updateHandCouplings(model: AssembledModel, seconds: number, char
         return {
           base,
           ends,
-          packets: [0, 1, 2].map((k) => model.getNode(`${base.name}_packet_${k}`)!),
+          packets: Array.from({ length: FLOW_PACKET_COUNT }, (_, k) =>
+            model.getNode(`${base.name}_packet_${k}`)!,
+          ),
           arc: model.getNode(`${base.name}_arc`)!,
           start: ends[0].position.y,
           end: ends[1].position.y,
@@ -188,9 +198,9 @@ export function updateHandCouplings(model: AssembledModel, seconds: number, char
     const breath = 0.5 + 0.5 * Math.sin(seconds * 1.6 + i * 0.37);
     for (const node of link.ends) node.scale.setScalar(0.92 + breath * 0.12);
     for (const [k, node] of link.packets.entries()) {
-      const phase = (seconds * 0.42 + i * 0.17 + k / 3) % 1;
+      const phase = (seconds * 0.42 + i * 0.17 + k / FLOW_PACKET_COUNT) % 1;
       node.position.y = THREE.MathUtils.lerp(link.start, link.end, phase);
-      node.scale.setScalar(Math.pow(Math.sin(Math.PI * phase), 0.6) * (0.8 + charge * 0.15));
+      node.scale.setScalar(flowPacketScale(phase) * (0.8 + charge * 0.15));
     }
     const phase = (seconds * 0.22 + i * 0.23) % 1;
     const envelope = phase < 0.07 ? Math.sin((phase / 0.07) * Math.PI) ** 2 : 0;

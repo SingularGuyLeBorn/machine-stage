@@ -9,10 +9,19 @@ import { addHandCouplings } from "./hand-couplings";
 import { addEnergyExchange } from "./energy-exchange";
 import { addJointDrives } from "./joint-drives";
 import { CUFF } from "./joint-covers";
+import { flexibleFrame } from "./flex-frame";
 
 // 用户已批准的原创佩丹技术：磁约束能源、计算晶核、场调制器与悬浮线圈。
 // [OM-FREEPLAY] 尺寸由实际壳内设备舱派生；配色、线圈匝数及支架布局为原创机械解释。
 export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
+  // [OM-FREEPLAY] 柔性段使用低亮青铜金属，与金色硬肋区分，依靠褶皱而非高亮表达连接。
+  pedan_flex: {
+    base: "#5c8177",
+    metalness: 0.68,
+    roughness: 0.38,
+    emissive: "#52796e",
+    emissiveIntensity: 0.06,
+  },
   // [OM-FREEPLAY] 四组错相的低亮能量端环，避免全机齐闪；每一对仍严格同步。
   ...Object.fromEntries(
     ["#6ba59b", "#8d82ae", "#b19d6a", "#6698ad"].map((color, i) => [
@@ -494,6 +503,25 @@ export function makeInteriors(): Pick<ModelRegistry, "parts" | "nodes" | "consta
       tags: ["internal"],
       source: "原外壳向内保留 25mm 壁厚；28mm 随形加强肋和 26mm 纵梁，原创内部结构",
     });
+    if (flexibleFrame.has(piece.key)) {
+      parts.push({
+        id: `kingjoemodules.${module}.flex_${piece.key}`,
+        name_cn: "骨架分段柔性褶皱接头",
+        name_en: `flex_${piece.key}`,
+        assembly: module,
+        node: joint ? `Joint_${piece.owner}` : `Module_${piece.owner}`,
+        build_layer: 2,
+        build_order: 10 + parts.length,
+        geometry: { type: "kit", kit: `kjFlex_${piece.key}` },
+        material: "pedan_flex",
+        mate: {
+          type: "absolute",
+          position: (joint?.pivot ?? [0, 0, 0]).map((v) => -v) as [number, number, number],
+        },
+        tags: ["internal", "flex-frame"],
+        source: "原随形骨架短段实体切分，五道褶皱与收腰芯连接硬段；端部锁定的展示用微形变",
+      });
+    }
   }
   addPedanDetailAssemblies(parts, nodes);
   addCavityDevices(wallTrees, parts, nodes);
