@@ -29,6 +29,10 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_055_aesa_tile: { base: "#6e7a80", metalness: 0.06, roughness: 0.92, preset: "none", envMapIntensity: 0.18 },
   cv_055_shell: { base: "#a98a52", metalness: 0.55, roughness: 0.62, preset: "primer", envMapIntensity: 0.45 },
   cv_055_engine: { base: "#c5ccd0", metalness: 0.06, roughness: 0.7, preset: "primer", emissive: "#344046", emissiveIntensity: 0.7, envMapIntensity: 0.6 },
+  // 定制翼型桨叶 + 各向异性 physical 材质会让 N8AO 后处理整屏发黑；桨叶用标准青铜。
+  cv_055_prop: { base: "#b08c4a", metalness: 0.72, roughness: 0.38, preset: "primer", envMapIntensity: 0.9 },
+  cv_steam: { base: "#e3ebec", metalness: 0.0, roughness: 0.96, preset: "none", opacity: 0.32, depthWrite: false, doubleSided: true, envMapIntensity: 0.1 },
+  cv_smoke: { base: "#383c3d", metalness: 0.0, roughness: 0.98, preset: "none", opacity: 0.38, depthWrite: false, doubleSided: true, envMapIntensity: 0.05 },
   cv_glass: { base: "#1b2b34", metalness: 0.5, roughness: 0.06, preset: "none", envMapIntensity: 1.9 },
   cv_bridge_glass: { base: "#b8d2dc", metalness: 0.1, roughness: 0.04, preset: "none", envMapIntensity: 1.2, opacity: 0.09, depthWrite: false, doubleSided: true },
   cv_canopy: { base: "#9fc3cf", metalness: 0.12, roughness: 0.05, preset: "none", envMapIntensity: 1.2, opacity: 0.22, depthWrite: false, doubleSided: true },

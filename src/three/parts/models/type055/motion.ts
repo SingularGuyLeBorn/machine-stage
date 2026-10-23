@@ -19,8 +19,8 @@ const PAD_MAIN_ROTOR = "CV_055_Z20_pad_MainRotor";
 const PAD_TAIL_ROTOR = "CV_055_Z20_pad_TailRotor";
 const GT_ROTORS = ["CV_055_GT1_Rotor", "CV_055_GT2_Rotor", "CV_055_GT3_Rotor", "CV_055_GT4_Rotor"] as const;
 
-const LAUNCH_CYCLE = 10.5;
-const LAUNCH_STAGGER = 0.6;
+const LAUNCH_CYCLE = 11.0;
+const LAUNCH_STAGGER = 0.5;
 const LAUNCH_RISE = 34;
 
 const smooth = (v: number) => {
@@ -42,16 +42,17 @@ function animateLaunch(assembled: AssembledModel, t: number, active: boolean): v
     const local = active
       ? (((t - index * LAUNCH_STAGGER) % LAUNCH_CYCLE) + LAUNCH_CYCLE) % LAUNCH_CYCLE
       : 0;
+    // 055 开盖约 95°、约 2.3s；燃气团先在甲板扩散，再让导弹出筒。
     const open =
-      active ? smooth(clamp01((local - 0.15) / 0.9)) * (1 - smooth(clamp01((local - 6.6) / 0.7))) : 0;
-    lid.rotation.x = -1.32 * open;
+      active ? smooth(clamp01((local - 0.15) / 2.3)) * (1 - smooth(clamp01((local - 7.6) / 0.8))) : 0;
+    lid.rotation.x = -1.66 * open;
 
     // 冷发射先由燃气发生器弹射出筒，出筒后点火；热发射在筒内直接点火、加速更快。
-    const start = spec.launch === "cold" ? 1.0 : 0.75;
-    const riseTime = spec.launch === "hot" ? 3.0 : 3.9;
-    const visible = active && local > start + 0.1 && local < 5.6;
+    const start = spec.launch === "cold" ? 2.5 : 2.3;
+    const riseTime = 3.2;
+    const visible = active && local > start + 0.1 && local < 6.8;
     const rise = active ? LAUNCH_RISE * Math.pow(clamp01((local - start) / riseTime), 2) : 0;
-    const shrink = active ? 1 - smooth(clamp01((local - 4.9) / 0.6)) : 0;
+    const shrink = active ? 1 - smooth(clamp01((local - 6.0) / 0.6)) : 0;
     missile.position.y = missileRestY(hero.type) + rise;
     missile.scale.setScalar(visible ? Math.max(0, shrink) : 0);
     if (fins) {
@@ -59,8 +60,17 @@ function animateLaunch(assembled: AssembledModel, t: number, active: boolean): v
       fins.object.scale.setScalar(deployed ? 1 : 0.001);
     }
     if (flame) {
-      const ignite = spec.launch === "hot" ? start + 0.15 : start + 2.1;
+      const ignite = spec.launch === "hot" ? start + 0.1 : start + 2.0;
       flame.object.visible = visible && local > ignite;
+    }
+    const gas = assembled.getNode(`CV_055_VlsGas_${tag}`);
+    if (gas) {
+      const gasStart = spec.launch === "hot" ? start - 0.25 : 0.4;
+      const gasLife = spec.launch === "hot" ? 2.0 : 2.2;
+      const u = active ? clamp01((local - gasStart) / gasLife) : 0;
+      const grow = active && local > gasStart ? Math.sin(Math.PI * u) * (spec.launch === "hot" ? 2.1 : 1.7) : 0;
+      gas.scale.setScalar(Math.max(0.001, grow));
+      gas.position.y = (spec.launch === "hot" ? 0.4 : 0.32) + (1 - Math.min(1, u)) * 0.35;
     }
   }
 }

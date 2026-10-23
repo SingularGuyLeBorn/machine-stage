@@ -195,7 +195,7 @@ const TYPE055_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec
   },
   engine_room: {
     eyePart: "type055.power.engine_console",
-    eye: [0, 1.8, -2.5],
+    eye: [0, 0.9, -0.5],
     targetPart: "type055.power.gt1_casing",
     fov: 72,
   },

@@ -241,10 +241,33 @@ export const type055HullNumber: GeometryBuilder = () => {
 /** 通用垂发井盖：盖板 + 加强筋 + 锁钩。 */
 export const type055VlsHatch: GeometryBuilder = () =>
   merge([
-    new THREE.BoxGeometry(0.86, 0.075, 0.86).translate(0, 0, 0),
-    new THREE.BoxGeometry(0.7, 0.03, 0.7).translate(0, 0.052, 0),
-    new THREE.BoxGeometry(0.1, 0.12, 0.07).translate(-0.33, 0.025, 0.33),
-    new THREE.BoxGeometry(0.1, 0.12, 0.07).translate(0.33, 0.025, 0.33),
+    new THREE.BoxGeometry(0.86, 0.07, 0.86),
+    new THREE.BoxGeometry(0.72, 0.03, 0.72).translate(0, 0.05, 0),
+    // 井盖背面加强筋（开盖后可见）
+    new THREE.BoxGeometry(0.06, 0.045, 0.74).translate(-0.24, -0.05, 0),
+    new THREE.BoxGeometry(0.06, 0.045, 0.74).translate(0.24, -0.05, 0),
+    new THREE.BoxGeometry(0.74, 0.045, 0.06).translate(0, -0.05, -0.24),
+    new THREE.BoxGeometry(0.74, 0.045, 0.06).translate(0, -0.05, 0.24),
+    // 艉侧铰链耳/销
+    new THREE.CylinderGeometry(0.038, 0.038, 0.14, 10).rotateX(Math.PI / 2).translate(-0.26, -0.02, -0.39),
+    new THREE.CylinderGeometry(0.038, 0.038, 0.14, 10).rotateX(Math.PI / 2).translate(0.26, -0.02, -0.39),
+    // 前缘锁紧把手/吊环/四角螺栓
+    new THREE.BoxGeometry(0.2, 0.05, 0.1).translate(0, 0.075, 0.26),
+    new THREE.TorusGeometry(0.055, 0.018, 5, 12).translate(0, 0.09, 0),
+    new THREE.CylinderGeometry(0.025, 0.025, 0.05, 6).translate(-0.34, 0.04, 0.34),
+    new THREE.CylinderGeometry(0.025, 0.025, 0.05, 6).translate(0.34, 0.04, 0.34),
+    new THREE.CylinderGeometry(0.025, 0.025, 0.05, 6).translate(-0.34, 0.04, -0.34),
+    new THREE.CylinderGeometry(0.025, 0.025, 0.05, 6).translate(0.34, 0.04, -0.34),
+  ]);
+
+/** 冷/热发射甲板燃气团（低多边形球团，按节点缩放淡入）。 */
+export const type055VlsGasCloud: GeometryBuilder = () =>
+  merge([
+    new THREE.SphereGeometry(0.32, 10, 8).translate(0, 0.15, 0),
+    new THREE.SphereGeometry(0.25, 10, 8).translate(0.28, 0.32, 0.08),
+    new THREE.SphereGeometry(0.22, 10, 8).translate(-0.27, 0.28, -0.06),
+    new THREE.SphereGeometry(0.18, 10, 8).translate(0.05, 0.5, 0.22),
+    new THREE.SphereGeometry(0.16, 10, 8).translate(-0.08, 0.42, -0.24),
   ]);
 
 /** 垂发井筒：开口圆筒 + 上下加强环（导弹能从中间穿出，不能有实体端盖）。 */
@@ -346,8 +369,9 @@ export const type055Yj18Fins: GeometryBuilder = () =>
 export const type055Yj21Missile: GeometryBuilder = () =>
   merge([
     new THREE.CylinderGeometry(0.41, 0.41, 3.2, 24).translate(0, -2.8, 0),
-    new THREE.CylinderGeometry(0.34, 0.34, 3.6, 24).translate(0, 0.6, 0),
-    new THREE.CylinderGeometry(0.02, 0.34, 2.0, 24).translate(0, 3.4, 0),
+    new THREE.CylinderGeometry(0.3, 0.3, 3.6, 24).translate(0, 0.6, 0),
+    new THREE.CylinderGeometry(0.18, 0.3, 1.0, 24).translate(0, 3.4, 0),
+    new THREE.CylinderGeometry(0.02, 0.18, 1.0, 24).translate(0, 4.4, 0),
     new THREE.CylinderGeometry(0.3, 0.41, 0.26, 24).translate(0, -4.35, 0),
     ...foldedFins(4, 0.405, 1.2, 0.2, -3.45),
   ]);
@@ -661,7 +685,36 @@ export const type055GasTurbineStatic: GeometryBuilder = () => {
   const parts: THREE.BufferGeometry[] = [];
   // 公共底座
   parts.push(new THREE.BoxGeometry(8.4, 0.4, 2.7).translate(0, 0.2, 0));
-  // 检修状态：机匣上半与侧板已拆下（面板靠舷侧放置），只留转子托架。
+  // 检修状态：外侧板拆下，保留内舷板/顶部两条盖板/端部门框，转子从外侧敞开可见。
+  parts.push(new THREE.BoxGeometry(0.08, 2.9, 7.8).translate(1.24, 1.55, 0));
+  for (const z of [-4.05, 4.05]) {
+    parts.push(new THREE.BoxGeometry(2.5, 0.1, 0.1).translate(0, 0.55, z));
+    parts.push(new THREE.BoxGeometry(2.5, 0.1, 0.1).translate(0, 3.35, z));
+    parts.push(new THREE.BoxGeometry(0.1, 2.9, 0.1).translate(-1.2, 1.7, z));
+    parts.push(new THREE.BoxGeometry(0.1, 2.9, 0.1).translate(1.2, 1.7, z));
+  }
+  for (const x of [-0.9, 0.9]) {
+    parts.push(new THREE.BoxGeometry(0.8, 0.08, 7.8).translate(x, 3.42, 0));
+  }
+  parts.push(new THREE.BoxGeometry(2.5, 0.08, 0.5).translate(0, 3.42, 0));
+  // 外侧检修开口的上下导轨
+  for (const y of [0.55, 3.35]) {
+    parts.push(new THREE.BoxGeometry(0.08, 0.1, 7.8).translate(-1.24, y, 0));
+  }
+  // 内舷检查门/门把手/顶部吊耳
+  parts.push(new THREE.BoxGeometry(0.06, 1.5, 0.8).translate(1.28, 1.55, 1.6));
+  parts.push(new THREE.BoxGeometry(0.08, 0.08, 0.2).translate(1.32, 1.55, 2.05));
+  for (const z of [-2.8, 2.8]) {
+    parts.push(new THREE.TorusGeometry(0.08, 0.02, 5, 10).translate(-0.9, 3.48, z));
+  }
+  // 外置传动箱/起动机/滑油分离器/燃油总管/管路
+  parts.push(new THREE.BoxGeometry(0.8, 0.9, 1.4).translate(-1.55, 1.0, 1.9));
+  parts.push(new THREE.CylinderGeometry(0.2, 0.2, 0.8, 14).rotateX(Math.PI / 2).translate(-1.55, 0.55, 2.9));
+  parts.push(new THREE.CylinderGeometry(0.28, 0.28, 1.1, 16).translate(1.0, 2.2, 3.6));
+  parts.push(new THREE.TorusGeometry(1.16, 0.06, 6, 28).translate(0, 1.8, -0.35));
+  for (const x of [-1.05, 1.05]) {
+    parts.push(new THREE.CylinderGeometry(0.045, 0.045, 6.8, 8).rotateX(Math.PI / 2).translate(x, 0.7, 0.3));
+  }
   for (const z of [-2.4, 2.4]) {
     parts.push(new THREE.BoxGeometry(0.12, 1.7, 0.12).translate(-0.8, 0.85, z));
     parts.push(new THREE.BoxGeometry(0.12, 1.7, 0.12).translate(0.8, 0.85, z));
@@ -723,43 +776,199 @@ export const type055GasTurbineRotor: GeometryBuilder = () => {
   return merge(parts);
 };
 
-/**
- * 五叶可调距螺旋桨（CPP）：半径 2.5m，桨毂/桨叶座/可调距机构 + 5 片分段扭转桨叶。
- * 桨叶用 4 段不同弦长/厚度/螺距角的箱体拼接，比圆柱叶片更接近真实侧斜桨。
- */
+function airfoilLoop(chord: number, thicknessRatio: number): Array<[number, number]> {
+  // NACA 4 位对称翼型，返回闭合剖面（LE→上表面→TE→下表面）
+  const upper: Array<[number, number]> = [];
+  const lower: Array<[number, number]> = [];
+  const n = 8;
+  for (let i = 0; i <= n; i++) {
+    const u = i / n;
+    const yth =
+      5 *
+      thicknessRatio *
+      (0.2969 * Math.sqrt(u) - 0.126 * u - 0.3516 * u * u + 0.2843 * u ** 3 - 0.1015 * u ** 4);
+    const c = (u - 0.5) * chord;
+    upper.push([c, yth * chord]);
+    if (i > 0 && i < n) lower.push([c, -yth * chord]);
+  }
+  return [...upper, ...lower.reverse()];
+}
+
+/** 五叶大侧斜可调距螺旋桨（CPP），直径 5m。桨叶用 NACA 翼型放样，带螺距/侧斜/后倾。 */
 export const type055Propeller: GeometryBuilder = () => {
   const parts: THREE.BufferGeometry[] = [];
-  // 桨毂（轴线 Z）与整流帽
-  const hub = new THREE.CylinderGeometry(0.52, 0.6, 0.9, 20);
+  const sections = 9;
+  const r0 = 0.55;
+  const r1 = 2.5;
+  const rings: Array<Array<[number, number, number]>> = [];
+  for (let i = 0; i < sections; i++) {
+    const m = i / (sections - 1);
+    const r = r0 + (r1 - r0) * m;
+    const chord = 0.98 - 0.46 * m;
+    const thickness = 0.17 - 0.13 * m;
+    const pitch = 0.95 - 0.42 * m;
+    const skew = 0.28 * m * m;
+    const rake = 0.11 * m * m;
+    const loop = airfoilLoop(chord, thickness);
+    rings.push(
+      loop.map(([c, z]) => {
+        const y = c * Math.cos(pitch) - z * Math.sin(pitch) + skew;
+        const zz = c * Math.sin(pitch) + z * Math.cos(pitch) + rake;
+        return [r, y, zz] as [number, number, number];
+      }),
+    );
+  }
+  const n = rings[0]!.length;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (const ring of rings) for (const [x, y, z] of ring) positions.push(x, y, z);
+  for (let i = 0; i < sections - 1; i++) {
+    for (let j = 0; j < n - 1; j++) {
+      const a = i * n + j;
+      const b = i * n + j + 1;
+      const c = (i + 1) * n + j + 1;
+      const d = (i + 1) * n + j;
+      indices.push(a, b, c, a, c, d);
+    }
+  }
+  // 叶根/叶尖封口
+  for (const [ringIndex, flip] of [[0, false], [sections - 1, true]] as const) {
+    const base = ringIndex * n;
+    const center = new THREE.Vector3();
+    for (let j = 0; j < n; j++) center.add(new THREE.Vector3(...rings[ringIndex]![j]!));
+    center.multiplyScalar(1 / n);
+    const ci = positions.length / 3;
+    positions.push(center.x, center.y, center.z);
+    for (let j = 0; j < n; j++) {
+      const k = (j + 1) % n;
+      if (flip) indices.push(ci, base + j, base + k);
+      else indices.push(ci, base + k, base + j);
+    }
+  }
+  const blade = new THREE.BufferGeometry();
+  blade.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  blade.setIndex(indices);
+  blade.computeVertexNormals();
+  for (let i = 0; i < 5; i++) {
+    const copy = blade.clone();
+    copy.rotateZ((i / 5) * Math.PI * 2);
+    parts.push(copy);
+  }
+  // 桨毂/整流帽/调距环/桨叶座
+  const hub = new THREE.CylinderGeometry(0.55, 0.62, 1.0, 24);
   hub.rotateX(Math.PI / 2);
   parts.push(hub);
-  const cap = new THREE.CylinderGeometry(0.02, 0.55, 0.85, 20);
+  const cap = new THREE.CylinderGeometry(0.02, 0.56, 0.9, 24);
   cap.rotateX(Math.PI / 2);
-  cap.translate(0, 0, -0.8);
+  cap.translate(0, 0, -0.9);
   parts.push(cap);
-  const pitchRing = new THREE.TorusGeometry(0.67, 0.08, 6, 24);
-  pitchRing.translate(0, 0, 0.45);
-  parts.push(pitchRing);
+  parts.push(new THREE.TorusGeometry(0.68, 0.07, 8, 28).translate(0, 0, 0.48));
   for (let i = 0; i < 5; i++) {
-    const angle = (i / 5) * Math.PI * 2;
-    for (let seg = 0; seg < 4; seg++) {
-      const r0 = 0.55 + seg * 0.5;
-      const chord = 0.92 - seg * 0.12;
-      const thick = 0.13 - seg * 0.025;
-      const blade = new THREE.BoxGeometry(0.5, chord, thick);
-      blade.translate(r0 + 0.25, 0, 0);
-      blade.rotateX(0.58);
-      blade.rotateZ(angle);
-      parts.push(blade);
-    }
-    // 桨叶座
-    const socket = new THREE.CylinderGeometry(0.2, 0.26, 0.35, 12);
+    const a = (i / 5) * Math.PI * 2;
+    const socket = new THREE.CylinderGeometry(0.2, 0.28, 0.38, 14);
     socket.rotateX(Math.PI / 2);
-    socket.translate(0.55, 0, 0);
-    socket.rotateZ(angle);
+    socket.translate(r0, 0, 0);
+    socket.rotateZ(a);
     parts.push(socket);
   }
   return merge(parts);
+};
+
+/** 减摇鳍：NACA 对称翼型沿展向放样，根部带整流罩。 */
+export const type055Stabilizer: GeometryBuilder = () => {
+  const sections = 6;
+  const rings: Array<Array<[number, number, number]>> = [];
+  for (let i = 0; i < sections; i++) {
+    const m = i / (sections - 1);
+    const span = 1.8 * m;
+    const chord = 2.2 - 0.8 * m;
+    const thickness = 0.22 - 0.1 * m;
+    rings.push(
+      airfoilLoop(chord, thickness).map(([c, yth]) => [span, yth, c] as [number, number, number]),
+    );
+  }
+  const n = rings[0]!.length;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (const ring of rings) for (const [x, y, z] of ring) positions.push(x, y, z);
+  for (let i = 0; i < sections - 1; i++) {
+    for (let j = 0; j < n - 1; j++) {
+      const a = i * n + j;
+      const b = a + 1;
+      const c = (i + 1) * n + j + 1;
+      const d = (i + 1) * n + j;
+      indices.push(a, b, c, a, c, d);
+    }
+  }
+  for (const [ringIndex, flip] of [[0, false], [sections - 1, true]] as const) {
+    const base = ringIndex * n;
+    const center = new THREE.Vector3();
+    for (let j = 0; j < n; j++) center.add(new THREE.Vector3(...rings[ringIndex]![j]!));
+    center.multiplyScalar(1 / n);
+    const ci = positions.length / 3;
+    positions.push(center.x, center.y, center.z);
+    for (let j = 0; j < n; j++) {
+      const k = (j + 1) % n;
+      if (flip) indices.push(ci, base + j, base + k);
+      else indices.push(ci, base + k, base + j);
+    }
+  }
+  const foil = new THREE.BufferGeometry();
+  foil.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  foil.setIndex(indices);
+  foil.computeVertexNormals();
+  const root = new THREE.BoxGeometry(0.3, 0.55, 2.5);
+  return merge([foil, root]);
+};
+
+/** 流线型舵：NACA 对称翼型沿高度放样，带舵杆/舵踵（不是一块平板）。 */
+export const type055Rudder: GeometryBuilder = () => {
+  const sections = 6;
+  const rings: Array<Array<[number, number, number]>> = [];
+  for (let i = 0; i < sections; i++) {
+    const m = i / (sections - 1);
+    const y = 3.2 * m;
+    const chord = 1.85 - 0.55 * m;
+    const thickness = 0.18 - 0.04 * m;
+    rings.push(
+      airfoilLoop(chord, thickness).map(([c, x]) => [x, y, -c] as [number, number, number]),
+    );
+  }
+  const n = rings[0]!.length;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (const ring of rings) for (const [x, y, z] of ring) positions.push(x, y, z);
+  for (let i = 0; i < sections - 1; i++) {
+    for (let j = 0; j < n - 1; j++) {
+      const a = i * n + j;
+      const b = a + 1;
+      const c = (i + 1) * n + j + 1;
+      const d = (i + 1) * n + j;
+      indices.push(a, b, c, a, c, d);
+    }
+  }
+  for (const [ringIndex, flip] of [[0, false], [sections - 1, true]] as const) {
+    const base = ringIndex * n;
+    const center = new THREE.Vector3();
+    for (let j = 0; j < n; j++) center.add(new THREE.Vector3(...rings[ringIndex]![j]!));
+    center.multiplyScalar(1 / n);
+    const ci = positions.length / 3;
+    positions.push(center.x, center.y, center.z);
+    for (let j = 0; j < n; j++) {
+      const k = (j + 1) % n;
+      if (flip) indices.push(ci, base + j, base + k);
+      else indices.push(ci, base + k, base + j);
+    }
+  }
+  const foil = new THREE.BufferGeometry();
+  foil.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  foil.setIndex(indices);
+  foil.computeVertexNormals();
+  const stock = new THREE.CylinderGeometry(0.16, 0.2, 3.5, 14);
+  stock.translate(0, 1.75, 0);
+  const skeg = new THREE.CylinderGeometry(0.2, 0.28, 0.55, 12);
+  skeg.translate(0, -0.2, 0);
+  return merge([foil, stock, skeg]);
 };
 
 /** 直升机甲板：防滑涂层圆 + 中心 H + 系留格栅，作为甲板贴面。 */

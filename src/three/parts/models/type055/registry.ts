@@ -32,10 +32,13 @@ import {
   type055HullUnderwater,
   type055Propeller,
   type055Rhib,
+  type055Rudder,
+  type055Stabilizer,
   type055Hhq9bFins,
   type055Hhq9bMissile,
   type055VlsCanister,
   type055VlsFlame,
+  type055VlsGasCloud,
   type055VlsHatch,
   type055VlsTube,
   type055Yj18Fins,
@@ -184,6 +187,66 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       mate: A([side * 8.55, 4.6, 2]),
     });
   }
+
+  // 减摇鳍/海水门/牺牲阳极
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}hull.stabilizer_${side === -1 ? "l" : "r"}`,
+      name_cn: `减摇鳍 ${side === -1 ? "左" : "右"}`,
+      name_en: `stabilizer fin ${side === -1 ? "l" : "r"}`,
+      assembly: "hull",
+      build_layer: 1,
+      geometry: { type: "kit", kit: "type055Stabilizer" },
+      material: "cv_055_fitting",
+      mate: A([side * t55HalfAt(-12, 4.5), 4.5, -12], [0, side === -1 ? 180 : 0, 0]),
+    });
+    for (const [i, z] of [-28, -44].entries()) {
+      add({
+        id: `${P}hull.sea_chest_${side === -1 ? "l" : "r"}_${i + 1}`,
+        name_cn: `海水门 ${side === -1 ? "左" : "右"} ${i + 1}`,
+        name_en: `sea chest ${side === -1 ? "l" : "r"} ${i + 1}`,
+        assembly: "hull",
+        build_layer: 1,
+        geometry: M(
+          B(0.9, 0.08, 1.6, [0, 0, 0], 0.01),
+          B(0.7, 0.04, 0.12, [0, 0.05, -0.5], 0.004),
+          B(0.7, 0.04, 0.12, [0, 0.05, -0.25], 0.004),
+          B(0.7, 0.04, 0.12, [0, 0.05, 0], 0.004),
+          B(0.7, 0.04, 0.12, [0, 0.05, 0.25], 0.004),
+          B(0.7, 0.04, 0.12, [0, 0.05, 0.5], 0.004),
+        ),
+        material: "cv_grate",
+        mate: A([side * (t55HalfAt(z, 4.2) + 0.02), 4.2, z], [0, side * 90, 0]),
+      });
+    }
+  }
+  const anodeSpots: Array<[number, number, number]> = [];
+  for (const side of [-1, 1] as const) {
+    for (let i = 0; i < 7; i++) {
+      const z = -78 + i * 19;
+      anodeSpots.push([side * (t55HalfAt(z, 5.7) + 0.03), 5.7, z, ]);
+    }
+  }
+  ctx.layout("type055.anodes", ({ index }) => {
+    const [x, y, z] = anodeSpots[index]!;
+    const side = x < 0 ? -1 : 1;
+    return new THREE.Matrix4()
+      .makeTranslation(x, y, z)
+      .multiply(new THREE.Matrix4().makeRotationY((side * 90 * Math.PI) / 180));
+  });
+  add({
+    id: `${P}hull.anodes`,
+    name_cn: "牺牲阳极 ×14",
+    name_en: "sacrificial anodes ×14",
+    assembly: "hull",
+    build_layer: 5,
+    geometry: M(B(0.12, 0.34, 0.28, [0, 0, 0], 0.01), C(0.06, 0.06, [0, 0.12, 0], 8)),
+    material: "cv_055_fitting",
+    instances: 14,
+    indexed: true,
+    instance_layout: "type055.anodes",
+    mate: A([0, 0, 0]),
+  });
 
   // ---------------- 甲板 ----------------
   add({
@@ -747,6 +810,18 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       mate: A([0, 35.4, z], [0, yaw, 0]),
     });
   }
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}radar.xband_side_${side === -1 ? "l" : "r"}`,
+      name_cn: `X 波段侧面阵 ${side === -1 ? "左" : "右"}`,
+      name_en: `X-band side array ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(1.2, 1.0, 0.14, [0, 0, 0], 0.01)),
+      material: "cv_aesa",
+      mate: A([side * 2.03, 35.4, 20], [0, side * 90, 0]),
+    });
+  }
   // 桅顶平台栏杆
   for (let i = 0; i < 4; i++) {
     add({
@@ -1217,6 +1292,27 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       mate: A([0, -half, 0]),
       tags: ["fx"],
     });
+    const gasNode = `CV_055_VlsGas_${tag}`;
+    ctx.node({
+      name: gasNode,
+      parent: "root",
+      pivot: [cell.x, deckY + 0.28, cell.z],
+      motion: "scalar",
+      note: `${spec.launch === "hot" ? "热发射燃气" : "冷弹射燃气"} ${tag}`,
+    });
+    add({
+      id: `${P}vls.gas_${tag}`,
+      name_cn: `${spec.label} 发射燃气团 ${tag}`,
+      name_en: `${spec.label} launch gas ${tag}`,
+      assembly: "vls",
+      build_layer: 5,
+      geometry: { type: "kit", kit: "type055VlsGasCloud" },
+      material: spec.launch === "hot" ? "cv_smoke" : "cv_steam",
+      node: gasNode,
+      mate: A([0, 0, 0]),
+      tags: ["fx"],
+      scale: [0.001, 0.001, 0.001],
+    });
   }
   // 阵列框/燃气排导
   for (const [tag, z0, rows] of [
@@ -1265,6 +1361,49 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       mate: A([-2.85 + (i % 4) * 1.9, 10.2, i < 6 ? 53.8 : -53.6]),
     });
   }
+  // 8 单元模块分隔框：每 2 列/2 行一道，对应 HT-1 的 8 隔舱模块
+  for (const [tag, z0, rows] of [
+    ["fwd", VLS.FWD_Z, VLS.FWD_ROWS],
+    ["aft", VLS.AFT_Z, VLS.AFT_ROWS],
+  ] as const) {
+    const width = (VLS.COLS - 1) * VLS.PITCH;
+    const len = (rows - 1) * VLS.PITCH;
+    const zc = z0 + len / 2;
+    const pieces: Array<Parameters<typeof M>[0]> = [];
+    for (const x of [-2.85, -0.95, 0.95, 2.85]) {
+      pieces.push(B(0.055, 0.035, len + 0.1, [x, 0, 0], 0.004));
+    }
+    for (let r = 2; r < rows; r += 2) {
+      pieces.push(B(width + 0.1, 0.035, 0.055, [0, 0, z0 + (r - 0.5) * VLS.PITCH - zc], 0.004));
+    }
+    add({
+      id: `${P}vls.module_dividers_${tag}`,
+      name_cn: `垂发 8 单元模块分隔框 ${tag}`,
+      name_en: `VLS 8-cell module dividers ${tag}`,
+      assembly: "vls",
+      build_layer: 4,
+      geometry: M(...pieces),
+      material: "cv_steel_dark",
+      mate: A([0, t55DeckTop(zc) + 0.022, zc]),
+    });
+  }
+  // 前甲板垂发海上再装填吊车（折叠收藏位）
+  add({
+    id: `${P}vls.reload_crane`,
+    name_cn: "垂发海上再装填吊车（收藏）",
+    name_en: "VLS reloading crane (stowed)",
+    assembly: "vls",
+    build_layer: 4,
+    geometry: M(
+      C(0.46, 0.5, [0, 0, 0], 14),
+      C(0.18, 2.4, [0, 1.3, 0], 12),
+      { type: "weld", from: [0, 2.5, 0], to: [0, 2.9, 3.9], radius: 0.09 },
+      { type: "weld", from: [0, 2.9, 3.9], to: [0, 1.7, 3.9], radius: 0.025 },
+      T(0.14, 0.08, 0.2, [0, 1.6, 3.9], 12),
+    ),
+    material: "cv_055_fitting",
+    mate: A([-5.0, t55DeckTop(55) + 0.25, 55]),
+  });
 
   // ---------------- 主炮 ----------------
   ctx.node({ name: "CV_055_Gun", parent: "root", pivot: [0, t55DeckTop(T55.GUN_Z), T55.GUN_Z], motion: "rotate", axis: "y", note: "130mm 炮塔旋回" });
@@ -1755,6 +1894,102 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     mate: A([-7.4, 6.05, -21.8]),
   });
 
+  // 机舱辅机/管路/配电/吊车/进排气围井
+  add({
+    id: `${P}power.er_switchboard`,
+    name_cn: "机舱配电/集控屏",
+    name_en: "engine room switchboard",
+    assembly: "propulsion",
+    build_layer: 2,
+    geometry: M(B(0.8, 1.6, 0.5, [0, 0, 0], 0.03), B(0.6, 0.5, 0.03, [0, 0.35, -0.27], 0.004), B(0.5, 0.08, 0.2, [0, -0.55, -0.27], 0.004)),
+    material: "cv_hull_dark",
+    mate: A([-7.2, 6.0, -22.5], [0, 90, 0]),
+  });
+  add({
+    id: `${P}power.er_switchboard_screen`,
+    name_cn: "机舱配电屏",
+    name_en: "engine room switchboard screen",
+    assembly: "propulsion",
+    build_layer: 2,
+    geometry: M(B(0.55, 0.45, 0.03, [0, 0, 0], 0.002)),
+    material: "cv_screen",
+    mate: A([-7.45, 6.35, -22.5], [0, 90, 0]),
+  });
+  for (const [tag, z] of [["a", -28], ["b", -34]] as const) {
+    add({
+      id: `${P}power.er_pump_${tag}`,
+      name_cn: `机舱海水/滑油泵 ${tag.toUpperCase()}`,
+      name_en: `engine room pump ${tag}`,
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(C(0.34, 0.8, [0, 0, 0], 16), C(0.42, 0.14, [0, 0.48, 0], 16), C(0.12, 0.8, [0.55, 0.2, 0], 10)),
+      material: "cv_steel_dark",
+      mate: A([-6.9, 5.0, z]),
+    });
+  }
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}power.er_pipe_${side === -1 ? "l" : "r"}_a`,
+      name_cn: `机舱燃油/滑油管路 ${side === -1 ? "左" : "右"} A`,
+      name_en: `engine room pipe ${side === -1 ? "l" : "r"} a`,
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M({ type: "weld", from: [0, 0, -9], to: [0, 0, 9], radius: 0.07 }, { type: "weld", from: [0, 0.8, -9], to: [0, 0.8, 9], radius: 0.05 }),
+      material: "cv_steel",
+      mate: A([side * 6.4, 4.6, -33]),
+    });
+    add({
+      id: `${P}power.er_pipe_${side === -1 ? "l" : "r"}_b`,
+      name_cn: `机舱海水冷却管路 ${side === -1 ? "左" : "右"}`,
+      name_en: `engine room seawater pipe ${side === -1 ? "l" : "r"}`,
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M({ type: "weld", from: [0, 0, -8], to: [0, 0, 8], radius: 0.1 }, T(0.14, 0.1, 0.16, [0, 0, 0], 12)),
+      material: "cv_steel_dark",
+      mate: A([side * 5.4, 4.5, -33]),
+    });
+    add({
+      id: `${P}power.er_intake_trunk_${side === -1 ? "l" : "r"}`,
+      name_cn: `机舱进气围井 ${side === -1 ? "左" : "右"}`,
+      name_en: `engine room intake trunk ${side === -1 ? "l" : "r"}`,
+      assembly: "propulsion",
+      build_layer: 1,
+      geometry: M(B(1.2, 5.0, 1.2, [0, 0, 0], 0.03), B(1.2, 1.2, 2.0, [0, 2.5, 1.4], 0.03)),
+      material: "cv_steel_dark",
+      mate: A([side * 7.5, 10.4, -22.0]),
+    });
+    add({
+      id: `${P}power.er_exhaust_trunk_${side === -1 ? "l" : "r"}`,
+      name_cn: `机舱排气围井 ${side === -1 ? "左" : "右"}`,
+      name_en: `engine room exhaust trunk ${side === -1 ? "l" : "r"}`,
+      assembly: "propulsion",
+      build_layer: 1,
+      geometry: M(B(1.2, 5.0, 1.2, [0, 0, 0], 0.03), B(1.2, 1.2, 2.0, [0, 2.5, -1.4], 0.03)),
+      material: "cv_steel_dark",
+      mate: A([side * 7.5, 10.4, -45.0]),
+    });
+    add({
+      id: `${P}power.er_fire_bottles_${side === -1 ? "l" : "r"}`,
+      name_cn: `机舱消防瓶组 ${side === -1 ? "左" : "右"}`,
+      name_en: `engine room fire bottles ${side === -1 ? "l" : "r"}`,
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(C(0.16, 1.0, [0, 0, 0], 12), C(0.16, 1.0, [0.45, 0, 0], 12), C(0.16, 1.0, [0.9, 0, 0], 12), B(1.1, 0.1, 0.4, [0.45, -0.55, 0], 0.01)),
+      material: "cv_deck_red",
+      mate: A([side * 7.0, 5.0, -36.0]),
+    });
+  }
+  add({
+    id: `${P}power.er_crane_rail`,
+    name_cn: "机舱行车轨道",
+    name_en: "engine room crane rail",
+    assembly: "propulsion",
+    build_layer: 2,
+    geometry: M(B(0.16, 0.16, 18, [0, 0, 0], 0.01), B(1.0, 0.35, 0.8, [0, -0.3, 0], 0.02), C(0.06, 0.6, [0, -0.75, 0], 8)),
+    material: "cv_steel_dark",
+    mate: A([0, 12.9, -34]),
+  });
+
   // 并车齿轮箱 + 输入联轴器
   for (const side of [-1, 1] as const) {
     add({
@@ -1839,7 +2074,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       assembly: "propulsion",
       build_layer: 1,
       geometry: { type: "kit", kit: "type055Propeller" },
-      material: "cv_brass",
+      material: "cv_055_prop",
       node: side === -1 ? "CV_055_PropL" : "CV_055_PropR",
       mate: A([0, 0, 0]),
     });
@@ -1857,9 +2092,9 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       name_en: `rudder ${side === -1 ? "l" : "r"}`,
       assembly: "propulsion",
       build_layer: 1,
-      geometry: M(B(0.18, 3.2, 1.8, [0, 0, 0], 0.03), C(0.18, 1.2, [0, 1.8, 0], 12), C(0.2, 0.5, [0, -1.7, 0], 12)),
+      geometry: { type: "kit", kit: "type055Rudder" },
       material: "cv_steel_dark",
-      mate: A([side * 2.2, 2.9, -93.3]),
+      mate: A([side * 2.2, 1.3, -93.6]),
     });
   }
 
@@ -2128,6 +2363,8 @@ export const TYPE055_BUILDERS = {
   type055AesaPanel,
   type055Propeller,
   type055Rhib,
+  type055Rudder,
+  type055Stabilizer,
   type055Helipad,
   type055GunTurret,
   type055BridgeShell,
@@ -2146,6 +2383,7 @@ export const TYPE055_BUILDERS = {
   type055Yj21Missile,
   type055Yj21Fins,
   type055VlsFlame,
+  type055VlsGasCloud,
   type055VlsTube,
   type055VlsCanister,
 };
