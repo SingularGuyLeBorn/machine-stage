@@ -7,7 +7,13 @@ import { planDeviceTree, FLOW_PACKET_COUNT, flowPacketScale } from "./hand-coupl
 import type { CavityDevice } from "./cavity-devices";
 import { opticalContactFaces } from "./optical-interiors";
 import { JOINT_DRIVE } from "./joint-drives";
-import { TRANSIT_DELAY, sampleTransit, type TransitStage } from "./energy-transit.mjs";
+import {
+  TRANSIT_DELAY,
+  sampleTransit,
+  sampleRedTransit,
+  RED_FEED_DELAY,
+  type TransitStage,
+} from "./energy-transit.mjs";
 import type { PedanActivity } from "./machinery";
 import { displayMaterialSource } from "../../kernel/displayMaterial";
 import data from "./pedan.generated.json";
@@ -24,6 +30,7 @@ export interface ExchangeRoute {
   anchors?: [string, string];
   faceLabel?: string;
   feed?: { from: TransitStage; to: TransitStage };
+  redFeed?: { from: number; to: number; side: string; section: string };
 }
 export function exchangeStage(route: ExchangeRoute): TransitStage {
   if (route.feed) return route.feed.to;
@@ -55,6 +62,16 @@ for (const stage of Object.keys(TRANSIT_DELAY)) {
     depthWrite: false,
   };
 }
+for (const module of ["legs", "pelvis", "chest", "head_arms"])
+  exchangeMaterials[`pedan_redfeed_${module}`] = {
+    base: "#d0a1b3",
+    emissive: "#b97887",
+    emissiveIntensity: 0.16,
+    metalness: 0.15,
+    roughness: 0.4,
+    opacity: 0.7,
+    depthWrite: false,
+  };
 /** 同壳体设备按最短树组织；跨关节只使用真实安装端，不用距离猜跨分体连接。 */
 export function planEnergyExchange(devices: CavityDevice[]): ExchangeRoute[] {
   const owners = [...new Set(devices.map((p) => p.owner))].filter((o) => !o.startsWith("fore"));
@@ -142,6 +159,39 @@ export function planEnergyExchange(devices: CavityDevice[]): ExchangeRoute[] {
       });
     }
   }
+  for (const owner of ["legs", "pelvis", "chest", "head_arms"])
+    for (const side of ["l", "r"]) {
+      const key =
+        owner === "legs"
+          ? `drive_${side}`
+          : owner === "chest"
+            ? `modulator_${side}`
+            : owner === "pelvis"
+              ? "energy"
+              : "brain";
+      const room = data.rooms.find((r) => r.key === key)!;
+      const antenna = `Antenna_${owner}_${side}`;
+      routes.push({
+        owner,
+        parent: `Module_${owner}`,
+        mode: "rings",
+        a: [0, 0, room.size[2] * 0.35],
+        b: [0, -0.04, 0],
+        radius: 0.048,
+        anchors: [`Room_${key}`, `Mount_${owner}_${side}`],
+        redFeed: { from: RED_FEED_DELAY.core, to: RED_FEED_DELAY.mount, side, section: "核心至天线根部" },
+      });
+      routes.push({
+        owner,
+        parent: `Module_${owner}`,
+        mode: "rings",
+        a: [0, 0.03, 0],
+        b: [0, 0.93, 0],
+        radius: 0.037,
+        anchors: [antenna, antenna],
+        redFeed: { from: RED_FEED_DELAY.mount, to: RED_FEED_DELAY.tip, side, section: "天线内置蓄能级" },
+      });
+    }
   return routes;
 }
 
@@ -181,11 +231,13 @@ export function addEnergyExchange(
     ) => {
       const p: PartDefinition = {
         id: `kingjoemodules.${module}.exchange_${i}_${key}`,
-        name_cn: route.feed
-          ? `${route.feed.from === "core" ? "核心至胸甲" : "胸甲至头部"}传能 · ${label}`
-          : route.faceLabel
-            ? `${route.faceLabel} · ${label}`
-            : label,
+        name_cn: route.redFeed
+          ? `${route.redFeed.side === "l" ? "左" : "右"}${route.redFeed.section} · ${label}`
+          : route.feed
+            ? `${route.feed.from === "core" ? "核心至胸甲" : "胸甲至头部"}传能 · ${label}`
+            : route.faceLabel
+              ? `${route.faceLabel} · ${label}`
+              : label,
         name_en: key,
         assembly: module,
         node,
@@ -219,7 +271,7 @@ export function addEnergyExchange(
       base,
       "pedanRing",
       { r: route.radius, wire: route.faceLabel ? Math.min(0.002, route.radius * 0.15) : 0.003 },
-      `pedan_transit_${exchangeStage(route)}_${i % 4}`,
+      route.redFeed ? `pedan_redfeed_${module}` : `pedan_transit_${exchangeStage(route)}_${i % 4}`,
     );
     Object.assign(terminals, { instances: 2, indexed: true, instance_nodes: ends });
     if (route.mode === "rings") {
@@ -234,7 +286,7 @@ export function addEnergyExchange(
         base,
         "pedanRing",
         { r: route.radius * 1.02, wire: route.faceLabel ? Math.min(0.0015, route.radius * 0.1) : 0.0027 },
-        `pedan_transit_flow_${exchangeStage(route)}`,
+        route.redFeed ? `pedan_redfeed_${module}` : `pedan_transit_flow_${exchangeStage(route)}`,
       );
       Object.assign(p, { instances: packets.length, indexed: true, instance_nodes: packets });
     } else if (route.mode === "current") {
@@ -246,7 +298,7 @@ export function addEnergyExchange(
         name,
         "pedanMicroArc",
         { length: 1, width: route.radius },
-        `pedan_transit_flow_${exchangeStage(route)}`,
+        route.redFeed ? `pedan_redfeed_${module}` : `pedan_transit_flow_${exchangeStage(route)}`,
       );
     } else if (route.mode === "membrane") {
       const name = `${base}_membrane`;
@@ -269,6 +321,7 @@ const cache = new WeakMap<
       membrane?: THREE.Object3D;
       anchors?: THREE.Object3D[];
     }[];
+    redMaterials: { material: THREE.MeshStandardMaterial; owner: string }[];
     materials: { material: THREE.MeshStandardMaterial; phase: number; stage: TransitStage; flow: boolean }[];
   }
 >();
@@ -288,7 +341,18 @@ export function updateEnergyExchange(
       stage: TransitStage;
       flow: boolean;
     }[] = [];
+    const redMaterials: { material: THREE.MeshStandardMaterial; owner: string }[] = [];
     for (const part of model.parts) {
+      if (part.def.material.startsWith("pedan_redfeed_")) {
+        const material = displayMaterialSource(
+          part.object.material as THREE.Material,
+        ) as THREE.MeshStandardMaterial;
+        if (!seen.has(material)) {
+          seen.add(material);
+          redMaterials.push({ material, owner: part.def.assembly });
+        }
+        continue;
+      }
       const match = /^pedan_transit_(?:(flow)_)?(core|legs|chest|arms|head|screen)(?:_(\d))?$/.exec(
         part.def.material,
       );
@@ -308,6 +372,7 @@ export function updateEnergyExchange(
     state = {
       routes,
       materials,
+      redMaterials,
       links: routes.map((route, i) => ({
         base: model.getNode(`Exchange_${i}`)!,
         parent: model.getNode(route.parent)!,
@@ -341,29 +406,45 @@ export function updateEnergyExchange(
       sampleTransit(activity.beamTime, TRANSIT_DELAY[stage]),
       activity.redModule ===
         (route.owner.startsWith("joint_") || /^(upper|fore)_/.test(route.owner) ? "head_arms" : route.owner)
-        ? 0.7
+        ? 0.7 * sampleRedTransit(activity.redTime)
         : 0,
     );
     const breath = 0.5 + 0.5 * Math.sin(time * 1.35 + (i % 4) * 1.7);
     link.ends[1].position.y = length;
     // 安装面固定在实体上，只让光包收放；不能把端环呼吸成漂浮的装饰。
     for (const [endIndex, end] of link.ends.entries()) {
-      const endpointPower = route.feed
-        ? sampleTransit(activity.beamTime, TRANSIT_DELAY[endIndex === 0 ? route.feed.from : route.feed.to])
-        : 1;
+      const endpointPower = route.redFeed
+        ? activity.redModule === route.owner
+          ? sampleRedTransit(activity.redTime, endIndex === 0 ? route.redFeed.from : route.redFeed.to)
+          : 0
+        : route.feed
+          ? sampleTransit(activity.beamTime, TRANSIT_DELAY[endIndex === 0 ? route.feed.from : route.feed.to])
+          : 1;
       end.scale.setScalar(
-        route.feed ? Math.max(0.00001, endpointPower) : route.faceLabel ? 1 : 0.95 + 0.08 * breath,
+        route.feed || route.redFeed
+          ? Math.max(0.00001, endpointPower)
+          : route.faceLabel
+            ? 1
+            : 0.95 + 0.08 * breath,
       );
     }
     for (const [k, node] of link.packets.entries()) {
-      const p = (time * (route.faceLabel ? 0.6 : 0.36) + i * 0.19 + k / link.packets.length) % 1;
+      const p =
+        (time * (route.faceLabel ? 0.6 : 0.36) +
+          (route.redFeed ? route.redFeed.from : i * 0.19) +
+          k / link.packets.length) %
+        1;
       node.position.y = length * p;
-      const traveling = route.feed
-        ? sampleTransit(
-            activity.beamTime,
-            THREE.MathUtils.lerp(TRANSIT_DELAY[route.feed.from], TRANSIT_DELAY[route.feed.to], p),
-          )
-        : 1;
+      const traveling = route.redFeed
+        ? activity.redModule === route.owner
+          ? sampleRedTransit(activity.redTime, THREE.MathUtils.lerp(route.redFeed.from, route.redFeed.to, p))
+          : 0
+        : route.feed
+          ? sampleTransit(
+              activity.beamTime,
+              THREE.MathUtils.lerp(TRANSIT_DELAY[route.feed.from], TRANSIT_DELAY[route.feed.to], p),
+            )
+          : 1;
       node.scale.setScalar(Math.max(0.00001, flowPacketScale(p) * (0.85 + power * 0.2) * traveling));
     }
     if (link.arc) {
@@ -377,12 +458,17 @@ export function updateEnergyExchange(
       link.membrane.scale.set(route.radius, length, route.radius * 0.55);
     }
   }
+  for (const { material, owner } of state.redMaterials) {
+    const charge = activity.redModule === owner ? sampleRedTransit(activity.redTime, RED_FEED_DELAY.tip) : 0;
+    material.emissiveIntensity = 0.16 + charge * 0.26;
+    material.opacity = 0.7 + charge * 0.08;
+  }
   for (const { material, phase, stage, flow } of state.materials) {
     const owner =
       stage === "core" ? "pelvis" : stage === "legs" ? "legs" : stage === "chest" ? "chest" : "head_arms";
     const power = Math.max(
       sampleTransit(activity.beamTime, TRANSIT_DELAY[stage]),
-      activity.redModule === owner ? 0.7 : 0,
+      activity.redModule === owner ? 0.7 * sampleRedTransit(activity.redTime) : 0,
     );
     material.emissiveIntensity = flow
       ? 0.35 + power * 0.15

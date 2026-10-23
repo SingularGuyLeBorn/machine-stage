@@ -100,8 +100,8 @@ describe("佩丹内部联动与输能", () => {
     expect(Math.max(...samples)).toBeGreaterThan(0.9);
     expect(pedanPower(5, "modulator_l", { ...QUIET_ACTIVITY, charge: 1 })).toBeGreaterThan(0.8);
     expect(pedanPower(5, "brain", { ...QUIET_ACTIVITY, yellow: 1 })).toBeGreaterThan(1.2);
-    expect(pedanPower(5, "legs", { ...QUIET_ACTIVITY, redModule: "legs" })).toBeGreaterThan(1);
-    expect(pedanPower(5, "chest", { ...QUIET_ACTIVITY, redModule: "legs" })).toBeLessThan(0.3);
+    expect(pedanPower(5, "legs", { ...QUIET_ACTIVITY, redModule: "legs", redTime: 1.5 })).toBeGreaterThan(1);
+    expect(pedanPower(5, "chest", { ...QUIET_ACTIVITY, redModule: "legs", redTime: 1.5 })).toBeLessThan(0.3);
   });
   it("双红束在模块局部空间轻微内收、下倾，末端仍分开，倾斜模块也保持方向", () => {
     for (const angle of [0, 0.4, -0.6, 1.2]) {

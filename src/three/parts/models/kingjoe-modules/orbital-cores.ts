@@ -241,7 +241,7 @@ export function updateOrbitalCores(model: AssembledModel, time: number, activity
     );
   }
   // 四组共享材质和中心缩放采用同一呼吸相位；发射只增强功率，不改 time 乘数造成轨道跳变。
-  const energized = Math.max(activity.charge, activity.yellow, activity.redModule ? 0.5 : 0);
+  const energized = Math.max(activity.charge, activity.yellow);
   for (const { material, phase } of entry.materials)
     material.emissiveIntensity = 0.08 + 0.75 * coreBreath(time, phase) + energized * 0.25;
   // 主灯窗仍由原有 power 通道控制；这里只读取同一活动输入，不覆盖胸窗呼吸曲线。

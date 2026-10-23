@@ -18,9 +18,9 @@ import { CORE_MODES } from "./core-dynamics.mjs";
 export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
   ...orbitalMaterials,
   ...exchangeMaterials,
-  // [OM-FREEPLAY] 内部试用钛灰／暗铜／青蓝与琥珀配色；外壳黄色金属独立保留。
+  // [OM-FREEPLAY] 内部采用浅青钛／香槟金／淡紫陶瓷，折中金属承力感与科幻设备感；外壳黄色金属独立保留。
   pedan_flex: {
-    base: "#415963",
+    base: "#72949e",
     metalness: 0.68,
     roughness: 0.38,
     emissive: "#48606b",
@@ -61,12 +61,12 @@ export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
     clearcoat: 0.4,
     clearcoatRoughness: 0.3,
   },
-  pedan_frame: { base: "#53616a", metalness: 0.78, roughness: 0.38 },
-  pedan_coil: { base: "#9c7552", metalness: 0.8, roughness: 0.36 },
-  pedan_ceramic: { base: "#26343b", metalness: 0.2, roughness: 0.52 },
-  pedan_violet: { base: "#344d5c", metalness: 0.6, roughness: 0.34 },
-  pedan_red: { base: "#795340", metalness: 0.65, roughness: 0.4 },
-  pedan_titanium: { base: "#6d8590", metalness: 0.75, roughness: 0.34 },
+  pedan_frame: { base: "#8ea7b0", metalness: 0.58, roughness: 0.38 },
+  pedan_coil: { base: "#c4aa7c", metalness: 0.62, roughness: 0.36 },
+  pedan_ceramic: { base: "#667d8c", metalness: 0.2, roughness: 0.52 },
+  pedan_violet: { base: "#8d90b7", metalness: 0.6, roughness: 0.34 },
+  pedan_red: { base: "#b68c91", metalness: 0.65, roughness: 0.4 },
+  pedan_titanium: { base: "#a1bbc7", metalness: 0.55, roughness: 0.34 },
   pedan_core: {
     base: "#47b9b5",
     metalness: 0.4,

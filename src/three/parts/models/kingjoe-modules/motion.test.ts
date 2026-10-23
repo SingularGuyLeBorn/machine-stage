@@ -47,7 +47,9 @@ describe("分体、吸合和接触面电弧", () => {
     for (const [i, key] of MODULE_KEYS.entries()) {
       const start = i * 5;
       animateKingJoeModules(model, start, `ray_${key}`);
-      animateKingJoeModules(model, start + 3, `ray_${key}`);
+      animateKingJoeModules(model, start + 2.9, `ray_${key}`);
+      expect(model.root.getObjectByName("kingjoe-pedan-z-rays")!.visible).toBe(false);
+      animateKingJoeModules(model, start + 3.5, `ray_${key}`);
       const rays = model.root.getObjectByName("kingjoe-pedan-z-rays")!;
       expect(rays.visible).toBe(true);
       expect(rays.children).toHaveLength(24);

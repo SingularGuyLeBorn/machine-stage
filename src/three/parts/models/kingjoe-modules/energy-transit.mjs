@@ -15,3 +15,16 @@ export function sampleTransit(time, delay) {
   // 同一波形沿阶段延迟，增强时也不把变化的速度乘绝对时间。
   return envelope * (0.82 + 0.18 * Math.cos((local * Math.PI * 2) / 0.72) ** 2);
 }
+
+// [OM-FREEPLAY] 传播延迟与蓄能时长为展示取值；红束局部时钟从分体展开两秒后起算。
+// 双天线使用同一延迟，不混入零件索引相位，尖端充满后才允许发射。
+export const RED_FEED_DELAY = { core: 0, mount: 0.25, tip: 0.55, fire: 1.2 };
+export function sampleRedTransit(time, delay = 0) {
+  if (time === null || time < 0) return 0;
+  const charge = smooth((time - delay) / 0.55);
+  const fire = smooth((time - RED_FEED_DELAY.fire) / 0.18);
+  return charge * (1 - fire * 0.12 + fire * 0.12 * Math.cos((time - RED_FEED_DELAY.fire) * 5) ** 2);
+}
+export function redRayPower(time) {
+  return time === null ? 0 : smooth((time - RED_FEED_DELAY.fire) / 0.18);
+}

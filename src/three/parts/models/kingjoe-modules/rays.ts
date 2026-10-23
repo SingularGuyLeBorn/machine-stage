@@ -56,8 +56,8 @@ class PedanRays {
       dispose();
     };
   }
-  update(seconds: number, module: string | null, yellow: number): void {
-    this.group.visible = !!module || yellow > 0.01;
+  update(seconds: number, module: string | null, yellow: number, redPower: number): void {
+    this.group.visible = (!!module && redPower > 0.01) || yellow > 0.01;
     if (!this.group.visible) return;
     const origins: THREE.Vector3[] = [];
     if (module) {
@@ -109,7 +109,7 @@ class PedanRays {
       mesh.material.color.set(
         module ? (j % 3 === 0 ? 0xff5030 : 0xe51912) : j % 3 === 0 ? 0xffef65 : 0xffbd0c,
       );
-      mesh.material.opacity = (module ? 1 : yellow) * (0.65 + 0.3 * Math.sin(seconds * 24 + j) ** 2);
+      mesh.material.opacity = (module ? redPower : yellow) * (0.65 + 0.3 * Math.sin(seconds * 24 + j) ** 2);
     }
   }
 }
@@ -119,11 +119,12 @@ export function updatePedanRays(
   seconds: number,
   module: string | null,
   yellow: number,
+  redPower: number,
 ): void {
   let rays = cache.get(model);
   if (!rays) {
     rays = new PedanRays(model);
     cache.set(model, rays);
   }
-  rays.update(seconds, module, yellow);
+  rays.update(seconds, module, yellow, redPower);
 }

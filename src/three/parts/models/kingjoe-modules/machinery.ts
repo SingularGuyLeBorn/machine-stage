@@ -4,7 +4,7 @@ import * as THREE from "three";
 import type { MeshBVH } from "three-mesh-bvh";
 import type { GeometrySpec, ModelRegistry, PartDefinition } from "../../registry/types";
 import type { AssembledModel } from "../../assembler/assembler";
-import { TRANSIT_DELAY, transitArrival, sampleTransit } from "./energy-transit.mjs";
+import { TRANSIT_DELAY, transitArrival, sampleTransit, sampleRedTransit } from "./energy-transit.mjs";
 import data from "./pedan.generated.json";
 
 type Room = (typeof data.rooms)[number];
@@ -15,6 +15,7 @@ export interface PedanActivity {
   charge: number;
   yellow: number;
   redModule: string | null;
+  redTime: number | null;
 }
 export const QUIET_ACTIVITY: PedanActivity = {
   beamTime: null,
@@ -22,6 +23,7 @@ export const QUIET_ACTIVITY: PedanActivity = {
   charge: 0,
   yellow: 0,
   redModule: null,
+  redTime: null,
 };
 const smooth = (x: number) => {
   const t = THREE.MathUtils.clamp(x, 0, 1);
@@ -36,6 +38,8 @@ export function pedanPower(seconds: number, channel: string, activity = QUIET_AC
         ? TRANSIT_DELAY.head
         : TRANSIT_DELAY.core,
   );
+  const redOwner = channel.startsWith("modulator") ? "chest" : channel === "brain" ? "head_arms" : channel;
+  const redPower = activity.redModule === redOwner ? sampleRedTransit(activity.redTime) : 0;
   if (channel.startsWith("modulator")) {
     const side = channel.endsWith("l") ? -1 : 1;
     const wave = 0.5 + 0.5 * Math.sin(seconds * 2.1 + side * 1.3 + 4.77 * 3);
@@ -44,15 +48,17 @@ export function pedanPower(seconds: number, channel: string, activity = QUIET_AC
       0.006 + lit * (0.15 + 0.85 * wave * wave),
       activity.charge * 0.85 * arrival,
       activity.yellow * arrival,
+      redPower * 0.9,
     );
   }
   if (channel === "brain")
-    return 0.3 + 0.12 * Math.sin(seconds * 1.35) ** 2 + (activity.charge * 0.8 + activity.yellow) * arrival;
-  return (
-    0.13 +
-    0.08 * Math.sin(seconds * 1.7) ** 2 +
-    (channel === activity.redModule ? 1.3 : activity.charge * 0.45)
-  );
+    return (
+      0.3 +
+      0.12 * Math.sin(seconds * 1.35) ** 2 +
+      (activity.charge * 0.8 + activity.yellow) * arrival +
+      redPower * 0.9
+    );
+  return 0.13 + 0.08 * Math.sin(seconds * 1.7) ** 2 + Math.max(redPower * 1.3, activity.charge * 0.45);
 }
 export const powerMaterial = (room: string, module: string) =>
   `pedan_power_${room === "brain" || room.startsWith("modulator") ? room : module}`;
@@ -439,7 +445,7 @@ export function updatePedanMachinery(model: AssembledModel, seconds: number, act
             : TRANSIT_DELAY.core;
       const energized = Math.max(
         sampleTransit(activity.beamTime, delay),
-        activity.redModule === module ? 1 : 0,
+        activity.redModule === module ? sampleRedTransit(activity.redTime) : 0,
       );
       // 固定载波相位，活动只改变光包尺度；状态切换不再让光包瞬移。
       const t = (((seconds * 0.25 + index / (node.name.includes("_output_") ? 7 : 3)) % 1) + 1) % 1;

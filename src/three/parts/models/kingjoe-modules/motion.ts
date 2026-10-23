@@ -5,6 +5,7 @@ import { getModuleEffects, hideModuleEffects } from "./effects";
 import { updateModuleIllumination } from "./illumination";
 import { updatePedanRays } from "./rays";
 import { updateCavityDevices, planCavityDevices } from "./cavity-devices";
+import { redRayPower } from "./energy-transit.mjs";
 import { updateEnergyExchange } from "./energy-exchange";
 import { updateFlexibleFrame } from "./flex-frame";
 import { updateOrbitalCores } from "./orbital-cores";
@@ -310,7 +311,8 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
       Object.values(entry.open).reduce((a, b) => a + b, 0),
     charge: state === "beam" ? smooth(beamTime / 1.5) * (1 - smooth((beamTime - 3.8) / 1.2)) : 0,
     yellow: state === "beam" ? smooth((beamTime - 1.5) / 0.3) * (1 - smooth((beamTime - 3.8) / 0.3)) : 0,
-    redModule: redModule && time > 2 ? redModule : null,
+    redModule,
+    redTime: redModule ? time - 2 : null,
   };
   updatePedanMachinery(model, seconds, activity);
   updateCavityDevices(model, seconds, activity);
@@ -321,7 +323,7 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
   updateModuleIllumination(model, seconds, activity);
   updateOpticalInteriors(model, seconds, activity);
   model.root.updateMatrixWorld(true);
-  updatePedanRays(model, seconds, activity.redModule, activity.yellow);
+  updatePedanRays(model, seconds, activity.redModule, activity.yellow, redRayPower(activity.redTime));
   if (state === "combining" || state === "separation" || (state === "beam" && time < beamDockTime)) {
     model.root.updateMatrixWorld(true);
     getModuleEffects(model).update(seconds, entry.open);
