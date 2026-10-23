@@ -4,7 +4,7 @@ import { detectUnsupportedParts } from "@/three/parts/solver/support";
 import { detectFloatingIslands } from "@/three/parts/solver/support";
 import { detectKitIslands } from "@/three/parts/solver/kitConnectivity";
 import { findModel } from "@/app/catalog";
-import { animateCarrier, carrierFlightPhase } from "./motion";
+import { animateCarrier, carrierFlightPhase, CAT_NOSE_ENGAGE } from "./motion";
 import { CV } from "./constants";
 import { HANGAR_DOOR_NODES, AMMO_ELEVATOR_NODE } from "./hangar";
 import { WIRE_NODES, SHUTTLE_NODE, JBD_NODES, ELEVATOR_NODES } from "./flightdeck";
@@ -200,9 +200,9 @@ describe("福建舰 · 整机", () => {
     expect(carrierFlightPhase(5)).toBe("airborne");
     expect(carrierFlightPhase(19)).toBe("arrested");
 
-    // 滑跑：飞机与滑梭同步前移
+    // 滑跑：滑梭顶在机头弹射杆上，机体原点落后滑梭一个前起落架纵向距离。
     expect(launch.aircraft.z).toBeGreaterThan(taxi.aircraft.z + 2);
-    expect(launch.shuttleZ).toBeCloseTo(launch.aircraft.z, 5);
+    expect(launch.shuttleZ - launch.aircraft.z).toBeCloseTo(CAT_NOSE_ENGAGE, 1);
     // 起飞后离舰：明显抬高并越过舰艏
     expect(airborne.aircraft.y).toBeGreaterThan(launch.aircraft.y + 1.2);
     expect(airborne.shuttleZ).toBeCloseTo(CV.CAT_Z0, 5);
@@ -214,6 +214,9 @@ describe("福建舰 · 整机", () => {
     expect(caught.hook).toBeLessThan(-0.3);
     expect(Math.abs(caught.wire)).toBeGreaterThan(0.25);
     expect(caught.aircraft.z).toBeGreaterThan(approach.aircraft.z);
+    // 进近/滑跑贴 9.3° 斜角跑道中线：机身 x 随 z 向港侧偏移，不再走 x=0 的直线。
+    expect(approach.aircraft.x).toBeLessThan(1.0);
+    expect(caught.aircraft.x).toBeLessThan(0);
     // 复位后重新折叠系留
     expect(Math.abs(secured.wing)).toBeGreaterThan(1.4);
     expect(secured.aircraft.z).toBeCloseTo(CV.AIRCRAFT_PARK[1], 1);

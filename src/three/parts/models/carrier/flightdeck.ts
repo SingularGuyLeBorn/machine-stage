@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { CV } from "./constants";
+import { CAT_TRACKS, CV, catAcross, catPoint } from "./constants";
 import { deckEdgeAt, deckPlan, hullSurfaceHalfAt } from "./kits";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
 
@@ -17,12 +17,6 @@ export const WIRE_NODES = [
   ["CV_Wire_2_L", "CV_Wire_2_R"],
   ["CV_Wire_3_L", "CV_Wire_3_R"],
   ["CV_Wire_4_L", "CV_Wire_4_R"],
-] as const;
-
-const CAT_TRACKS = [
-  { id: 1, x: -1.7, z0: CV.CAT_Z0, z1: CV.CAT_Z1 },
-  { id: 2, x: 1.7, z0: CV.CAT_Z0, z1: CV.CAT_Z1 },
-  { id: 3, x: -3.15, z0: -1.0, z1: 9.0 },
 ] as const;
 
 export function addFlightDeck(ctx: CarrierCtx): void {
@@ -112,12 +106,15 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     }
   }
 
-  // ---- 电磁弹射器 ×3 ----
+  // ---- 电磁弹射器 ×3：三条轨道等长，舰艏两条内收 1.5°，腰部三号与斜角跑道平行 ----
   for (const track of CAT_TRACKS) {
     const tag = pad(track.id);
-    const segLen = (track.z1 - track.z0) / CV.CAT_SEGMENTS;
+    const yaw = track.yawDeg;
+    const length = track.length;
+    const mid = catPoint(track, length / 2);
+    const segLen = length / CV.CAT_SEGMENTS;
     for (let s = 0; s < CV.CAT_SEGMENTS; s++) {
-      const z = track.z0 + segLen * (s + 0.5);
+      const p = catPoint(track, segLen * (s + 0.5));
       add({
         id: `${P}cat_${tag}_stator_${pad(s + 1)}`,
         name_cn: `弹射器 ${track.id} 定子段 ${s + 1}`,
@@ -130,7 +127,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
           B(0.3, 0.014, segLen + 0.02, [0, 0.004, 0], 0.002),
         ),
         material: "cv_steel",
-        mate: A([track.x, deckTop + 0.026, z]),
+        mate: A([p.x, deckTop + 0.026, p.z], [0, yaw, 0]),
       });
       add({
         id: `${P}cat_${tag}_coil_${pad(s + 1)}`,
@@ -140,7 +137,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         build_layer: 3,
         geometry: M(B(0.04, 0.024, segLen * 0.92, [-0.235, 0, 0], 0.002), B(0.04, 0.024, segLen * 0.92, [0.235, 0, 0], 0.002)),
         material: "cv_copper",
-        mate: A([track.x, deckTop + 0.044, z]),
+        mate: A([p.x, deckTop + 0.044, p.z], [0, yaw, 0]),
       });
       add({
         id: `${P}cat_${tag}_cooling_${pad(s + 1)}`,
@@ -150,30 +147,30 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         build_layer: 3,
         geometry: M(B(0.06, 0.04, segLen * 0.96, [-0.305, 0, 0], 0.003), B(0.06, 0.04, segLen * 0.96, [0.305, 0, 0], 0.003)),
         material: "cv_steel",
-        mate: A([track.x, deckTop + 0.022, z]),
+        mate: A([p.x, deckTop + 0.022, p.z], [0, yaw, 0]),
       });
     }
-    // 弹射槽中心铜轨 + 两侧白色界线：俯视时一眼分辨这是弹射器而不是普通车道。
     add({
       id: `${P}cat_${tag}_center_rail`,
       name_cn: `弹射器 ${track.id} 中心铜轨`,
       name_en: `catapult ${track.id} center conductor`,
       assembly: ASSEMBLY,
       build_layer: 3,
-      geometry: M(B(0.05, 0.024, track.z1 - track.z0 - 0.1, [0, 0, 0], 0.002)),
+      geometry: M(B(0.05, 0.024, length - 0.1, [0, 0, 0], 0.002)),
       material: "cv_copper",
-      mate: A([track.x, deckTop + 0.04, (track.z0 + track.z1) / 2]),
+      mate: A([mid.x, deckTop + 0.04, mid.z], [0, yaw, 0]),
     });
     for (const side of [-1, 1] as const) {
+      const lane = catAcross(track, length / 2, side * 0.43);
       add({
         id: `${P}cat_${tag}_lane_${side === -1 ? "l" : "r"}`,
         name_cn: `弹射器 ${track.id} 车道边线 ${side === -1 ? "左" : "右"}`,
         name_en: `catapult ${track.id} lane edge ${side === -1 ? "l" : "r"}`,
         assembly: ASSEMBLY,
         build_layer: 4,
-        geometry: M(B(0.035, 0.004, track.z1 - track.z0, [0, 0, 0], 0.001)),
+        geometry: M(B(0.035, 0.004, length, [0, 0, 0], 0.001)),
         material: "cv_deck_line",
-        mate: A([track.x + side * 0.43, deckTop + 0.012, (track.z0 + track.z1) / 2]),
+        mate: A([lane.x, deckTop + 0.012, lane.z], [0, yaw, 0]),
       });
     }
     add({
@@ -183,25 +180,26 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       assembly: ASSEMBLY,
       build_layer: 4,
       geometry: M(
-        B(0.9, 0.004, 0.08, [0, 0, -(track.z1 - track.z0) / 2 - 0.18], 0.001),
-        B(0.9, 0.004, 0.08, [0, 0, (track.z1 - track.z0) / 2 + 0.18], 0.001),
+        B(0.9, 0.004, 0.08, [0, 0, -length / 2 - 0.18], 0.001),
+        B(0.9, 0.004, 0.08, [0, 0, length / 2 + 0.18], 0.001),
       ),
       material: "cv_deck_line",
-      mate: A([track.x, deckTop + 0.013, (track.z0 + track.z1) / 2]),
+      mate: A([mid.x, deckTop + 0.013, mid.z], [0, yaw, 0]),
     });
-    // 轨道两侧盖板/端部缓冲。
     for (const side of [-1, 1] as const) {
+      const rail = catAcross(track, length / 2, side * 0.355);
       add({
         id: `${P}cat_${tag}_rail_${side === -1 ? "l" : "r"}`,
         name_cn: `弹射器 ${track.id} 导轨盖板 ${side === -1 ? "左" : "右"}`,
         name_en: `catapult ${track.id} rail cover ${side === -1 ? "l" : "r"}`,
         assembly: ASSEMBLY,
         build_layer: 3,
-        geometry: M(B(0.06, 0.018, track.z1 - track.z0, [0, 0, 0], 0.003)),
+        geometry: M(B(0.06, 0.018, length, [0, 0, 0], 0.003)),
         material: "cv_steel",
-        mate: A([track.x + side * 0.355, deckTop + 0.01, (track.z0 + track.z1) / 2]),
+        mate: A([rail.x, deckTop + 0.01, rail.z], [0, yaw, 0]),
       });
     }
+    const end = catPoint(track, length + 0.12);
     add({
       id: `${P}cat_${tag}_end_stop`,
       name_cn: `弹射器 ${track.id} 末端缓冲`,
@@ -210,21 +208,18 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       build_layer: 3,
       geometry: M(B(0.5, 0.12, 0.22, [0, 0.06, 0], 0.01), C(0.07, 0.1, [0, 0.07, 0], 12)),
       material: "cv_steel_dark",
-      mate: A([track.x, deckTop, track.z1 + 0.12]),
+      mate: A([end.x, deckTop, end.z], [0, yaw, 0]),
     });
   }
-  // 弹射位编号：白色大号数字刷在轨道旁，俯视一眼能区分 1/2/3 号弹射器。
+  // 弹射位编号：放在各自轨道起点外侧，随轨道角度旋转。
   const digitDefs: Record<string, Array<[number, number, number, number]>> = {
     "1": [[0.05, 0.34, 0.0, 0.0], [0.18, 0.05, -0.03, -0.17]],
     "2": [[0.26, 0.05, 0, 0.2], [0.05, 0.16, 0.1, 0.12], [0.26, 0.05, 0, 0], [0.05, 0.16, -0.1, -0.12], [0.26, 0.05, 0, -0.2]],
     "3": [[0.26, 0.05, 0, 0.2], [0.05, 0.16, 0.1, 0.12], [0.26, 0.05, 0, 0], [0.05, 0.16, 0.1, -0.12], [0.26, 0.05, 0, -0.2]],
   };
-  const catNumberSpots: Array<[number, number, string]> = [
-    [-0.95, 5.2, "1"],
-    [2.6, 5.2, "2"],
-    [-4.0, -3.6, "3"],
-  ];
-  catNumberSpots.forEach(([x, z, digit]) => {
+  CAT_TRACKS.forEach((track) => {
+    const digit = String(track.id);
+    const spot = catAcross(track, -1.2, track.id === 1 ? -0.9 : 0.9);
     const bars = digitDefs[digit]!.map(([w, h, dx, dz]) => B(w * 1.5, 0.012, h * 1.5, [dx * 1.5, 0, dz * 1.5], 0.002));
     add({
       id: `${P}cat_number_${digit}`,
@@ -234,15 +229,18 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       build_layer: 4,
       geometry: M(...bars),
       material: "cv_deck_yellow",
-      mate: A([x, deckTop + 0.02, z]),
+      mate: A([spot.x, deckTop + 0.02, spot.z], [0, track.yawDeg, 0]),
     });
   });
 
-  // 挡焰板：铰接节点，待机平放，弹射时竖起。
+  // 挡焰板：铰接节点，待机平放，弹射时竖起。外层对齐节点带轨道偏航，
+  // 让铰链轴始终横跨轨道；挡焰板整体放在轨道起点后方 3.2，避开着舰跑道。
   CAT_TRACKS.forEach((track, index) => {
     const node = JBD_NODES[index]!;
-    const z = track.z0 - 3.2;
-    ctx.node({ name: node, parent: "root", pivot: [track.x, deckTop + 0.05, z], motion: "rotate", axis: "x", rest_rotation: [-90, 0, 0], note: `弹射器 ${track.id} 挡焰板` });
+    const pos = catPoint(track, -3.2);
+    const align = `CV_JBD_Align_${track.id}`;
+    ctx.node({ name: align, parent: "root", pivot: [pos.x, deckTop + 0.05, pos.z], rest_rotation: [0, track.yawDeg, 0] });
+    ctx.node({ name: node, parent: align, pivot: [0, 0, 0], motion: "rotate", axis: "x", rest_rotation: [-90, 0, 0], note: `弹射器 ${track.id} 挡焰板` });
     add({
       id: `${P}cat_${pad(track.id)}_jbd_panel`,
       name_cn: `弹射器 ${track.id} 挡焰板`,
@@ -277,8 +275,17 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       mate: A([0.38, 0.16, -0.06], [0, 0, 25]),
     });
   });
-  // 滑梭（唯一被动画驱动的是 2 号弹射器）。
-  ctx.node({ name: SHUTTLE_NODE, parent: "root", pivot: [CV.CAT_X, deckTop + 0.09, CV.CAT_Z0], motion: "translate", axis: "z", note: "电磁弹射滑梭" });
+  // 滑梭（唯一被动画驱动的是 2 号弹射器）；静止姿态带轨道偏航。
+  const launchTrack = CAT_TRACKS[1]!;
+  ctx.node({
+    name: SHUTTLE_NODE,
+    parent: "root",
+    pivot: [launchTrack.x0, deckTop + 0.09, launchTrack.z0],
+    rest_rotation: [0, launchTrack.yawDeg, 0],
+    motion: "translate",
+    axis: "z",
+    note: "电磁弹射滑梭",
+  });
   add({
     id: `${P}shuttle_body`,
     name_cn: "弹射滑梭",
@@ -317,6 +324,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // 1、3 号弹射器各放一枚待发滑梭（2 号由动画节点驱动）。
   for (const track of [CAT_TRACKS[0]!, CAT_TRACKS[2]!]) {
     const tag = pad(track.id);
+    const parked = catPoint(track, 0.1);
     add({
       id: `${P}cat_${tag}_shuttle_parked`,
       name_cn: `弹射器 ${track.id} 待发滑梭`,
@@ -329,15 +337,16 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         C(0.035, 0.1, [0, -0.01, 0.1], 10),
       ),
       material: "cv_steel",
-      mate: A([track.x, deckTop + 0.09, track.z0 + 0.1]),
+      mate: A([parked.x, deckTop + 0.09, parked.z], [0, track.yawDeg, 0]),
     });
   }
   // ---- 电磁弹射器甲板下机构：直线电机隧道 / 反应轨 / 水冷 / 变流 / 储能 / 母线 ----
   // 全部吊在飞行甲板底面（y∈4.08~4.40），在透视模式下可见，不占机库净高。
   CAT_TRACKS.forEach((track) => {
     const tag = pad(track.id);
-    const len = track.z1 - track.z0;
-    const zc = (track.z0 + track.z1) / 2;
+    const len = track.length;
+    const yaw = track.yawDeg;
+    const mid = catPoint(track, len / 2);
     const E = `${P}emals_${tag}_`;
     add({
       id: `${E}channel`,
@@ -351,7 +360,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         B(0.57, 0.03, len, [0, 0.12, 0], 0.004),
       ),
       material: "cv_steel_dark",
-      mate: A([track.x, 4.28, zc]),
+      mate: A([mid.x, 4.28, mid.z], [0, yaw, 0]),
     });
     add({
       id: `${E}armature`,
@@ -361,7 +370,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       build_layer: 3,
       geometry: M(B(0.05, 0.08, len * 0.98, [-0.1, 0, 0], 0.002), B(0.05, 0.08, len * 0.98, [0.1, 0, 0], 0.002)),
       material: "cv_copper",
-      mate: A([track.x, 4.27, zc]),
+      mate: A([mid.x, 4.27, mid.z], [0, yaw, 0]),
     });
     add({
       id: `${E}reaction_rail`,
@@ -371,7 +380,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       build_layer: 3,
       geometry: M(B(0.08, 0.045, len, [0, 0, 0], 0.003)),
       material: "cv_steel",
-      mate: A([track.x, 4.19, zc]),
+      mate: A([mid.x, 4.19, mid.z], [0, yaw, 0]),
     });
     add({
       id: `${E}coolant`,
@@ -381,7 +390,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       build_layer: 3,
       geometry: M(B(0.06, 0.06, len * 0.98, [-0.3, 0, 0], 0.003), B(0.06, 0.06, len * 0.98, [0.3, 0, 0], 0.003)),
       material: "cv_copper",
-      mate: A([track.x, 4.22, zc]),
+      mate: A([mid.x, 4.22, mid.z], [0, yaw, 0]),
     });
     const hangerGeos: Parameters<typeof M>[0][] = [];
     for (let h = 0; h < 5; h++) {
@@ -395,12 +404,14 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       build_layer: 3,
       geometry: M(...hangerGeos),
       material: "cv_steel",
-      mate: A([track.x, 4.28, zc]),
+      mate: A([mid.x, 4.28, mid.z], [0, yaw, 0]),
     });
-    // 变流/储能机柜靠弹射器后端外侧，顶面吊在甲板底面。
-    // 1 号机的变流柜必须让开 3 号机的水冷管（两套弹射器在此段并排）。
-    const cabinetX = track.id === 1 ? track.x - 0.72 : track.x + 0.92;
-    const cabinetZ = track.z0 - 1.7;
+    // 变流/储能机柜靠弹射器后端外侧，顶面吊在甲板底面；横向偏移沿轨道法向。
+    const across = track.id === 1 ? -0.92 : 0.92;
+    const cabinet = catAcross(track, -1.7, across);
+    const flywheel = catAcross(track, -2.4, across);
+    const capacitor = catAcross(track, -0.8, across);
+    const busway = catAcross(track, -0.8, 0);
     add({
       id: `${E}converter`,
       name_cn: `弹射器 ${track.id} 变流器机柜`,
@@ -413,7 +424,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         B(0.34, 0.16, 0.015, [0, 0.01, 0.235], 0.003),
       ),
       material: "cv_steel_dark",
-      mate: A([cabinetX, 4.235, cabinetZ]),
+      mate: A([cabinet.x, 4.235, cabinet.z], [0, yaw, 0]),
     });
     add({
       id: `${E}flywheel`,
@@ -427,8 +438,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         C(0.07, 0.28, [0, 0.01, 0], 14),
       ),
       material: "cv_steel",
-      // 飞轮放在变流柜正后方，避开前向母线槽（原偏移位置会与 busway 相交）。
-      mate: A([cabinetX, 4.27, cabinetZ - 0.7]),
+      // 飞轮放在变流柜后方，避开前向母线槽。
+      mate: A([flywheel.x, 4.27, flywheel.z], [0, yaw, 0]),
     });
     add({
       id: `${E}capacitors`,
@@ -441,7 +452,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         ...Array.from({ length: 6 }, (_, k) => C(0.055, 0.24, [-0.26 + (k % 3) * 0.26, -0.14, -0.09 + Math.floor(k / 3) * 0.18], 12)),
       ),
       material: "cv_copper",
-      mate: A([cabinetX, 4.38, cabinetZ + 0.9]),
+      mate: A([capacitor.x, 4.38, capacitor.z], [0, yaw, 0]),
     });
     add({
       id: `${E}busway`,
@@ -451,7 +462,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       build_layer: 3,
       geometry: M(B(0.2, 0.12, 1.6, [0, 0, 0], 0.004), B(0.24, 0.02, 1.62, [0, -0.062, 0], 0.002)),
       material: "cv_steel_dark",
-      mate: A([track.x, 4.34, track.z0 - 0.8]),
+      mate: A([busway.x, 4.34, busway.z], [0, yaw, 0]),
     });
     add({
       id: `${E}busbars`,
@@ -465,7 +476,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         B(0.035, 0.018, 1.48, [0.05, 0, 0], 0.001),
       ),
       material: "cv_copper",
-      mate: A([track.x, 4.2725, track.z0 - 0.8]),
+      mate: A([busway.x, 4.2725, busway.z], [0, yaw, 0]),
     });
   });
 
@@ -558,7 +569,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     const netRad = (9.3 * Math.PI) / 180;
     const netSin = Math.sin(netRad);
     const netCos = Math.cos(netRad);
-    const netCenterX = 0.5 - ((netZ + 18.5) / netCos) * netSin;
+    // 网中心必须落在斜角跑道中线上：用跑道艉端 x=1.05 反算，旧版用 0.5 让整张网向
+    // 左舷偏 0.55，左支柱悬出甲板外。
+    const netCenterX = 1.05 - ((netZ + 18.5) / netCos) * netSin;
     const netHalf = 1.5;
     const netYaw = -9.3;
     const postAt = (side: -1 | 1): [number, number] => [
@@ -1151,15 +1164,16 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     });
   });
   CAT_TRACKS.forEach((track, index) => {
+    const scorch = catPoint(track, -3.55);
     add({
       id: `${P}jbd_scorch_${index + 1}`,
       name_cn: `挡焰板烧蚀区 ${index + 1}`,
       name_en: `JBD scorch mark ${index + 1}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(1.35, 0.003, 0.95, [0, 0, 0], 0.002)),
+      geometry: M(B(1.2, 0.003, 0.62, [0, 0, 0], 0.002)),
       material: "cv_deck_wear",
-      mate: A([track.x, markY + 0.001, track.z0 - 4.55]),
+      mate: A([scorch.x, markY + 0.001, scorch.z], [0, track.yawDeg, 0]),
     });
   });
 
@@ -1307,24 +1321,23 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // 舷号 18（舰艏甲板）。
   drawDigit("1", "hull_number_1", -0.95, 17.0, 1.5);
   drawDigit("8", "hull_number_8", 0.75, 17.0, 1.5);
-  // 弹射位数字 + 危险区（挡焰板后红黄条 + 艉部危险区）。
-  drawDigit("1", "cat_number_1", -1.7, 2.6, 0.42);
-  drawDigit("2", "cat_number_2", 1.7, 2.6, 0.42);
-  drawDigit("3", "cat_number_3", -3.15, -1.0, 0.42);
-  for (const [cx, cz] of [[-1.7, 1.1], [1.7, 1.1], [-3.15, -4.0]] as const) {
-    for (let st = 0; st < 5; st++) {
+  // 挡焰板危险区：随各自轨道/JBD 旋转，只放在 JBD 与弹射起点之间，
+  // 不铺到斜角着舰跑道上；弹射位数字已在上方按轨道生成，这里不再重复。
+  CAT_TRACKS.forEach((track) => {
+    for (let st = 0; st < 3; st++) {
+      const p = catPoint(track, -3.3 - st * 0.18);
       add({
-        id: `${P}danger_${String(cx).replace("-", "m").replace(".", "_")}_${st + 1}`,
-        name_cn: `挡焰板危险区 ${st + 1}`,
-        name_en: `JBD danger stripe ${st + 1}`,
+        id: `${P}danger_${track.id}_${st + 1}`,
+        name_cn: `挡焰板危险区 ${track.id}-${st + 1}`,
+        name_en: `JBD danger stripe ${track.id}-${st + 1}`,
         assembly: ASSEMBLY,
         build_layer: 4,
-        geometry: M(B(2.2 - st * 0.28, 0.006, 0.18, [0, 0, 0], 0.0015)),
+        geometry: M(B(2.0 - st * 0.3, 0.006, 0.16, [0, 0, 0], 0.0015)),
         material: st % 2 === 0 ? "cv_deck_red" : "cv_deck_yellow",
-        mate: A([cx, markY + 0.005, cz - st * 0.26]),
+        mate: A([p.x, markY + 0.005, p.z], [0, track.yawDeg, 0]),
       });
     }
-  }
+  });
   for (let st = 0; st < 6; st++) {
     add({
       id: `${P}stern_danger_${st + 1}`,
@@ -1415,7 +1428,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       assembly: ASSEMBLY,
       build_layer: 3,
       geometry: { type: "kit", kit: "carrierSponsonSkirt", params: { points: [a, b] } },
-      material: "cv_hull",
+      // 甲板缘下方是垂直舷墙，用深色钢，避免从俯视角度看像另一块浅色甲板。
+      material: "cv_hull_dark",
       mate: A([0, 0, 0]),
       source: "逐段沿飞行甲板真实折线放样；上缘埋入甲板、下缘与外飘底封板共边。",
     });

@@ -453,38 +453,8 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
     });
   }
 
-  // ---------------- L3 甲板：弹射器绕组/安装座/甲板附件 ----------------
-  for (let track = 0; track < 3; track++) {
-    const data = [
-      { x: -1.7, z0: CV.CAT_Z0, z1: CV.CAT_Z1 },
-      { x: 1.7, z0: CV.CAT_Z0, z1: CV.CAT_Z1 },
-      { x: -3.15, z0: -1.0, z1: 9.0 },
-    ][track]!;
-    const seg = (data.z1 - data.z0) / CV.CAT_SEGMENTS;
-    for (let s = 0; s < CV.CAT_SEGMENTS; s++) {
-      const z = data.z0 + seg * (s + 0.5);
-      add({
-        id: `carrier.deck.detail_cat_${track + 1}_winding_${pad(s + 1)}`,
-        name_cn: `弹射器 ${track + 1} 绕组 ${s + 1}`,
-        name_en: `catapult ${track + 1} winding ${s + 1}`,
-        assembly: DECK,
-        build_layer: 3,
-        geometry: M(C(0.05, seg * 0.72, [0, 0, 0], 10)),
-        material: "cv_steel_dark",
-        mate: A([data.x + 0.42, DECK_TOP + 0.05, z], [90, 0, 0]),
-      });
-      add({
-        id: `carrier.deck.detail_cat_${track + 1}_mount_${pad(s + 1)}`,
-        name_cn: `弹射器 ${track + 1} 定子安装座 ${s + 1}`,
-        name_en: `catapult ${track + 1} mount ${s + 1}`,
-        assembly: DECK,
-        build_layer: 3,
-        geometry: M(B(0.56, 0.07, 0.18, [0, 0, 0], 0.004)),
-        material: "cv_steel",
-        mate: A([data.x, DECK_TOP - 0.03, z]),
-      });
-    }
-  }
+  // ---------------- L3 甲板：拦阻/升降机附件 ----------------
+  // 弹射器绕组/安装座已由 flightdeck 的轨道段直接生成（含偏航），这里不再重复。
   for (let v = 0; v < 20; v++) {
     const side = v % 2 === 0 ? -1 : 1;
     add({

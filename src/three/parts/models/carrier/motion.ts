@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { AssembledModel } from "../../assembler/assembler";
-import { CV } from "./constants";
-import { AIRCRAFT_NODE, HOOK_NODE, WING_FOLD_L, WING_FOLD_R } from "./aircraft";
+import { CAT_TRACKS, CV, catPoint } from "./constants";
+import { AIRCRAFT_NODE, AIRCRAFT_SCALE_Z, HOOK_NODE, WING_FOLD_L, WING_FOLD_R } from "./aircraft";
 import { SHUTTLE_NODE, JBD_NODES, WIRE_NODES } from "./flightdeck";
 import { RADAR_NODE, CIWS_NODES } from "./island";
 import { AMMO_ELEVATOR_NODE, HANGAR_DOOR_NODES } from "./hangar";
@@ -27,18 +27,38 @@ import { CIC_SWEEP_NODE } from "./cic";
 
 const DECK_TOP = CV.DECK_Y + CV.DECK_T;
 const PARK = new THREE.Vector3(CV.AIRCRAFT_PARK[0], DECK_TOP, CV.AIRCRAFT_PARK[1]);
-const CAT_START = new THREE.Vector3(CV.CAT_X, DECK_TOP, CV.CAT_Z0);
-const CATCH_CENTER_Z = -7.5;
+const LAUNCH_TRACK = CAT_TRACKS[1]!;
+const LAUNCH_YAW = (LAUNCH_TRACK.yawDeg * Math.PI) / 180;
+// 前起落架/弹射杆前端到机体原点的纵向距离（机体节点沿 z 缩放过）。
+// 滑梭必须顶在弹射杆上，机体原点要落后滑梭这么多；否则机身/机翼会压在滑梭上。
+export const CAT_NOSE_ENGAGE = AIRCRAFT_SCALE_Z * 1.13;
+const LAUNCH_START_POINT = catPoint(LAUNCH_TRACK, -CAT_NOSE_ENGAGE);
+const LAUNCH_END_POINT = catPoint(LAUNCH_TRACK, LAUNCH_TRACK.length - CAT_NOSE_ENGAGE);
+const CAT_START = new THREE.Vector3(LAUNCH_START_POINT.x, DECK_TOP, LAUNCH_START_POINT.z);
+// 斜角着舰跑道：与甲板标线同一坐标系（艉端 x=1.05/z=-18.5，向左舷偏 9.3°）。
+// 进近/滑跑/拦阻全部贴跑道中线，不能再用 x=0 的直线。
+const RUNWAY_DEG = 9.3;
+const RUNWAY_YAW = (-RUNWAY_DEG * Math.PI) / 180;
+const RUNWAY_AFT_X = 1.05;
+const RUNWAY_AFT_Z = -18.5;
+const RUNWAY_COS = Math.cos((RUNWAY_DEG * Math.PI) / 180);
+const RUNWAY_SIN = Math.sin((RUNWAY_DEG * Math.PI) / 180);
+const runwayX = (z: number): number => RUNWAY_AFT_X - ((z - RUNWAY_AFT_Z) / RUNWAY_COS) * RUNWAY_SIN;
+const TAXI_BACK_MID = new THREE.Vector3(2.5, DECK_TOP, 3.8);
+// 绕网第二拐点：先沿右舷往前开过拦阻网所在 z=6.0，再横越回左舷停机区。
+// 旧路线在 z=6 处横越时飞机左翼尖距网右支柱只有几厘米，动画扫掠会穿模。
+const TAXI_BACK_FWD = new THREE.Vector3(2.7, DECK_TOP, 7.2);
+const CATCH_Z = -7.5;
 const WIRE_PULL_MAX = 1.5;
 
 const FLIGHT_CURVE = new THREE.CatmullRomCurve3(
   [
-    new THREE.Vector3(CV.CAT_X, DECK_TOP + 0.55, CV.CAT_Z1),
+    new THREE.Vector3(LAUNCH_END_POINT.x, DECK_TOP + 0.55, LAUNCH_END_POINT.z),
     new THREE.Vector3(4.6, DECK_TOP + 4.6, 22.5),
     new THREE.Vector3(-3.6, DECK_TOP + 8.4, 17.0),
     new THREE.Vector3(-8.6, DECK_TOP + 7.4, -4.0),
     new THREE.Vector3(-5.4, DECK_TOP + 4.2, -24.0),
-    new THREE.Vector3(0, DECK_TOP + 1.0, -17.5),
+    new THREE.Vector3(runwayX(-17.5), DECK_TOP + 1.0, -17.5),
   ],
   false,
   "catmullrom",
@@ -133,7 +153,9 @@ function setBridgeMotion(assembled: AssembledModel, t: number): void {
 
 function setShuttle(assembled: AssembledModel, z: number): void {
   const shuttle = assembled.getNode(SHUTTLE_NODE);
-  if (shuttle) shuttle.position.z = z;
+  if (!shuttle) return;
+  shuttle.position.x = LAUNCH_TRACK.x0 + Math.tan(LAUNCH_YAW) * (z - LAUNCH_TRACK.z0);
+  shuttle.position.z = z;
 }
 
 function setRotors(assembled: AssembledModel, seconds: number, speed: number): void {
@@ -224,16 +246,19 @@ function flightPose(t: number): {
     position.lerpVectors(PARK, CAT_START, u);
     position.y = DECK_TOP;
     wingFold = 1.72 * (1 - smooth(t / 1.25));
-    yaw = 0.06 * Math.sin(u * Math.PI);
+    yaw = LAUNCH_YAW * smooth(u);
     jbd = smooth((t - 2.0) / 0.5);
   } else if (t < LAUNCH_END) {
     phase = "launch";
     const u = clamp01((t - TAXI_END) / (LAUNCH_END - TAXI_END));
     const run = Math.pow(u, 1.55);
-    position.set(CV.CAT_X, DECK_TOP + 0.045 * smooth((u - 0.55) / 0.45), lerp(CV.CAT_Z0, CV.CAT_Z1, run));
+    const stroke = lerp(0, LAUNCH_TRACK.length, run);
+    const p = catPoint(LAUNCH_TRACK, stroke - CAT_NOSE_ENGAGE);
+    position.set(p.x, DECK_TOP + 0.045 * smooth((u - 0.55) / 0.45), p.z);
     pitch = -0.12 * smooth((u - 0.55) / 0.45);
+    yaw = LAUNCH_YAW;
     jbd = 1;
-    shuttleZ = position.z;
+    shuttleZ = catPoint(LAUNCH_TRACK, stroke).z;
   } else if (t < AIRBORNE_END) {
     phase = "airborne";
     const u = clamp01((t - LAUNCH_END) / (AIRBORNE_END - LAUNCH_END));
@@ -248,27 +273,42 @@ function flightPose(t: number): {
   } else if (t < TOUCHDOWN) {
     phase = "approach";
     const u = smooth((t - AIRBORNE_END) / (TOUCHDOWN - AIRBORNE_END));
-    position.set(lerp(0, 0, u), lerp(DECK_TOP + 1.0, DECK_TOP, u), lerp(-17.5, -14.5, u));
-    yaw = 0;
+    const z = lerp(-17.5, -14.5, u);
+    position.set(runwayX(z), lerp(DECK_TOP + 1.0, DECK_TOP, u), z);
+    yaw = RUNWAY_YAW;
     pitch = 0.03 * (1 - u);
     hook = -0.41 * smooth((t - AIRBORNE_END) / 0.9);
   } else if (t < CATCH) {
     phase = "rollout";
     const u = smooth((t - TOUCHDOWN) / (CATCH - TOUCHDOWN));
-    position.set(0, DECK_TOP, lerp(-14.5, CATCH_CENTER_Z, u));
+    const z = lerp(-14.5, CATCH_Z, u);
+    position.set(runwayX(z), DECK_TOP, z);
+    yaw = RUNWAY_YAW;
     hook = -0.41;
     pitch = 0.02 * (1 - u);
   } else if (t < STOP) {
     phase = "arrested";
     const u = smooth((t - CATCH) / (STOP - CATCH));
-    position.set(0, DECK_TOP - 0.02 * Math.sin(u * Math.PI), lerp(CATCH_CENTER_Z, -6.0, u));
+    const z = lerp(CATCH_Z, -6.0, u);
+    position.set(runwayX(z), DECK_TOP - 0.02 * Math.sin(u * Math.PI), z);
+    yaw = RUNWAY_YAW;
     hook = -0.41;
     wirePull = WIRE_PULL_MAX * u;
     pitch = 0.02 * (1 - u);
   } else if (t < PARKED) {
     phase = "taxi_back";
     const u = smooth((t - STOP) / (PARKED - STOP));
-    position.set(lerp(0, PARK.x, u), DECK_TOP, lerp(-6.0, PARK.z, u));
+    // 返航滑行绕过仍竖起的拦阻网：先滑到网前右侧，沿右舷越过网线，再横越回停机区。
+    if (u < 0.4) {
+      position.lerpVectors(new THREE.Vector3(runwayX(-6.0), DECK_TOP, -6.0), TAXI_BACK_MID, smooth(u / 0.4));
+      yaw = RUNWAY_YAW * (1 - smooth(u / 0.4));
+    } else if (u < 0.62) {
+      position.lerpVectors(TAXI_BACK_MID, TAXI_BACK_FWD, smooth((u - 0.4) / 0.22));
+      yaw = 0;
+    } else {
+      position.lerpVectors(TAXI_BACK_FWD, PARK, smooth((u - 0.62) / 0.38));
+      yaw = -0.16 * (1 - smooth((u - 0.62) / 0.38));
+    }
     hook = -0.41 * (1 - smooth((t - STOP) / 0.7));
     wingFold = 1.72 * smooth((t - (PARKED - 1.4)) / 1.4);
     wirePull = 0;

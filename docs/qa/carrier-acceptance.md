@@ -1,8 +1,41 @@
 # 福建舰 · 验收记录（carrier worktree）
 
-## 本轮交付（2026-10-23 · 外形返修 2：封边 / 穿模 / EMALS / 海面）
+## 本轮交付（2026-10-23 · 外形返修 3：细长艏 / 弹射器-跑道平行 / 弹射杆对接 / 斜角着舰）
 
-> 本节为**最新状态**。下方历史段落里的 S-01..S-13 逐站封边、5810 件、旧相机角度限制等均已被本节取代。
+> 本节为**最新状态**。下方“外形返修 2”及更早段落（5585 件、旧艏部折线、旧弹射器直排等）均已被本节取代。
+
+### 规模与门禁
+- 零件定义 **5461** / 展开 **5461** / 实例 **6761**；分层 L1=1812、L2=317、L3=392、L4=980、L5=1960；三角面 **2,794,737**。
+- 注册表校验 0 错；悬空 0；悬空孤岛 0；合并件内部悬空 0（最大连通分量 6757/6757）。
+- 静态穿模：**12233 报告 / 未豁免 0**（白名单 96 条）。
+- 动画扫掠：**flight_ops 775/0、engine 550/0、hangar 35/0、ciws 158/0**。
+- `diag-carrier-exterior --active`：**0 条未豁免**（仍无整船 `carrier.* ↔ carrier.*` 兜底规则，96 条窄规则）。
+- `npx tsc -b` 通过；`npm test -- --run` 通过（313 passed / 1 skipped）；`npm run build` 通过。
+
+### 艏部轮廓 / 装甲板与外缘线
+- [x] **艏部改成一条长直线收束**：右舷 `右舷甲板外缘线 2` 从 (4.5,9.1) 直接拉到 (2.2,17.3)，左舷 `左舷甲板外缘线 10` 从 (-4.8,9.1) 拉到 (-2.0,17.3)，再接艏端平边。旧版在 z=12.8 就提前折到 2.7，艏部只剩很短一段斜切，俯视是宽钝方艏；新轮廓的接触点落在 **艏右 19-3/18-3** 与 **艏右 19-1/18-1** 两列装甲板的外缘线上，艏段明显变长变窄。证据：`carrier-qa-deck-plan.jpeg`、`carrier-qa-bow-plan.jpeg`。
+- [x] **装甲板随新折线重切**：65 块装甲板仍由 `deckEdgeAt(z)` 逐带取边，板边与外缘线严格共线；外缘线直接压 `deckPlan()` 外缘（无内偏），俯视不会再看到板子跑到线外。板缝 0.022、深 18mm，明暗两档材质。
+- [x] **艏柱包板已删除**：不再有贴在艏柱外的窄条包板；艏部由连续外飘封边 + 楔形艏整流收口。证据：`carrier-qa-bow-seal.jpeg`、`carrier-qa-bow-closure.jpeg`。
+
+### 三条弹射器 / 挡焰板 / 滑梭
+- [x] **三条等长 8.4**：1/2 号在舰艏直通起飞区，各内收 1.5°（合计 3° 夹角，真实福建舰布置）；3 号腰部弹射器改为 **yaw -9.3°**，与斜角着舰跑道**平行**，整体放在跑道右侧（靠舰岛一侧），不再横跨/压住着舰跑道。
+- [x] **挡焰板随轨道走**：每块 JBD 挂在各自轨道的对齐节点上，位置 s=-3.2、朝向 = 轨道偏航；危险区条、烧蚀区、弹射位编号也全部按轨道坐标生成。1/2 号挡焰板在斜角跑道前方（z≈6.8），3 号在 (3.1,-11.8)，均不在着舰跑道范围内。证据：`carrier-qa-catapults.jpeg`、`carrier-qa-launch.jpeg`。
+- [x] **滑梭顶住弹射杆**：滑梭位置按轨道弧长 s 驱动，机体原点落在滑梭后方 `1.13 × AIRCRAFT_SCALE_Z`，使前起落架/弹射杆正好搭在滑梭上；消除了原来滑梭压在机翼/前轮上的 3.4~54mm 重叠。`CAT_NOSE_ENGAGE` 由 motion.ts 导出并在测试中断言。
+- [x] **一架弹射器对应一架飞机**：1/3 号各有一枚待发滑梭，2 号是动画驱动滑梭；30s 闭环只使用 2 号弹射位，起飞后滑梭复位。
+
+### 着舰闭环 / 停机位 / 拦阻网
+- [x] **进近/滑跑贴 9.3° 跑道中线**：`motion.ts` 用与甲板标线同一套跑道参数（艉端 x=1.05/z=-18.5）计算进近、接地点、滑跑和拦阻段的 x；机体 yaw=-9.3°。不再出现“跑道是斜的、飞机却沿 x=0 直线进近”。
+- [x] **4 架停放机移出着舰跑道**：全部放到跑道左侧（港侧）艉部条带，避开救生筏鞍座、救生圈、系留链和拦阻索滑轮座；原 (1.8,-15.8) 的 2 号机正好压在斜角跑道上，已移除。滑行返航路线改为先沿右舷越过拦阻网、再横越回停机区，绕开网右支柱。证据：`carrier-qa-landing-runway.jpeg`、`carrier-qa-deck-plan.jpeg`。
+- [x] **拦阻网对准跑道中线**：网中心 x 由 0.5 修正为 1.05（跑道艉端），整张网向左舷偏 0.55 的问题消失，左支柱不再悬出甲板。证据：`carrier-qa-catapults.jpeg`。
+
+### 本轮证据
+`carrier-qa-deck-plan.jpeg`、`carrier-qa-bow-plan.jpeg`、`carrier-qa-launch.jpeg`、`carrier-qa-approach.jpeg`、`carrier-qa-landing-runway.jpeg`、`carrier-qa-catapults.jpeg`、`carrier-qa-bow-seal.jpeg`、`carrier-qa-bow-closure.jpeg`、`carrier-qa-stern-closure.jpeg`、`carrier-qa-transom.jpeg`、`carrier-qa-deck-plates.jpeg`、`carrier-qa-deck-edge.jpeg`、`carrier-qa-emals-isolated.jpeg`、`carrier-qa-emals-xray.jpeg`、`carrier-qa-sea-on.jpeg`、`carrier-qa-sea-off.jpeg`、`carrier-qa-360-e/s/w/n.jpeg`、`carrier-qa-final-home.jpeg`。
+
+---
+
+## 上一轮交付（2026-10-23 · 外形返修 2：封边 / 穿模 / EMALS / 海面）
+
+> 本节及以下历史数据（5585 件、旧艏部折线、弹射器直排等）已被上节取代，仅作回溯。
 
 ### 规模与门禁
 - 零件定义 **5585** / 展开 **5585** / 实例 **6885**；分层 L1=1813、L2=317、L3=497、L4=998、L5=1960；三角面 **2,836,965**。
@@ -215,7 +248,7 @@
 npx tsc --noEmit
 npx tsx scripts/diag-carrier.ts
 npx tsx scripts/diag-carrier-exterior.ts --active   # 严格口径：绕开整船豁免的未豁免清单（应为 0）
-node scripts/capture-carrier-fixes.mjs              # 生成本轮 14 张证据
+node scripts/capture-carrier-fixes.mjs              # 生成本轮 24 张证据
 npx tsx scripts/diag-carrier-sweep.ts --state flight_ops --duration 30 --fps 2
 npx tsx scripts/diag-carrier-sweep.ts --state engine --duration 12 --fps 2
 npx tsx scripts/diag-carrier-sweep.ts --state hangar --duration 12 --fps 2

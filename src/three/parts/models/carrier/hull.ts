@@ -129,17 +129,7 @@ export function addHull(ctx: CarrierCtx): void {
     mate: A([0, 0, -0.18]),
     source: "填实两舷艏端之间的楔形空间，避免正前方仰视出现中空暗缝。",
   });
-  // 前倾舰艏已并入外板型线放样，这里只保留艏柱包板焊缝。
-  add({
-    id: "carrier.hull.bow_stem_strip",
-    name_cn: "艏柱包板",
-    name_en: "bow stem strip",
-    assembly: HULL_ASSEMBLY,
-    build_layer: 1,
-    geometry: M({ type: "weld", from: [0, 0.45, 18.55], to: [0, 3.98, 20.42], radius: 0.045 }),
-    material: "cv_steel_dark",
-    mate: A([0, 0, 0]),
-  });
+  // 艏柱包板焊缝已由楔形艏柱整流承担，不再额外贴一条白色长条。
 
   // 球鼻艏（回转体放样，压在艏柱/龙骨前端）+ 声呐导流罩。
   add({
