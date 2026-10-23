@@ -107,9 +107,16 @@ export function addEnergyExchange(
       parts.push(p);
       return p;
     };
+    // 实例节点忽略 mate 旋转；将圆环 +Z 法线转到通路 +Y，使环面垂直于传播方向。
     const ends = [0, 1].map((k) => {
       const name = `${base}_end_${k}`;
-      nodes.push({ name, parent: base, pivot: [0, k * length, 0], motion: "scalar" });
+      nodes.push({
+        name,
+        parent: base,
+        pivot: [0, k * length, 0],
+        rest_rotation: [-90, 0, 0],
+        motion: "scalar",
+      });
       return name;
     });
     const terminals = add(
@@ -120,12 +127,11 @@ export function addEnergyExchange(
       { r: route.radius, wire: 0.003 },
       `pedan_exchange_${i % 4}`,
     );
-    terminals.mate = { type: "absolute", position: [0, 0, 0], rotation: [90, 0, 0] };
     Object.assign(terminals, { instances: 2, indexed: true, instance_nodes: ends });
     if (route.mode === "rings") {
       const packets = [0, 1, 2].map((k) => {
         const name = `${base}_packet_${k}`;
-        nodes.push({ name, parent: base, pivot: [0, 0, 0], motion: "translate" });
+        nodes.push({ name, parent: base, pivot: [0, 0, 0], rest_rotation: [-90, 0, 0], motion: "translate" });
         return name;
       });
       const p = add(
@@ -136,7 +142,6 @@ export function addEnergyExchange(
         { r: route.radius * 0.78, wire: 0.002 },
         "pedan_hand_flow",
       );
-      p.mate = { type: "absolute", position: [0, 0, 0], rotation: [90, 0, 0] };
       Object.assign(p, { instances: 3, indexed: true, instance_nodes: packets });
     } else if (route.mode === "current") {
       const name = `${base}_arc`;

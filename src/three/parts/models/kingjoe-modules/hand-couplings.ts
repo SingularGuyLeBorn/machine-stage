@@ -104,9 +104,10 @@ export function addHandCouplings(
       [0, length / 2, 0],
       [width, length, width * 0.55],
     );
+    // 实例节点忽略 mate 旋转；将圆环 +Z 法线转到通路 +Y，使环面垂直于传播方向。
     const ends = [start, end].map((y, k) => {
       const name = `${base}_end_${k}`;
-      nodes.push({ name, parent: base, pivot: [0, y, 0], motion: "scalar" });
+      nodes.push({ name, parent: base, pivot: [0, y, 0], rest_rotation: [-90, 0, 0], motion: "scalar" });
       return name;
     });
     const terminals = add(
@@ -117,11 +118,16 @@ export function addHandCouplings(
       { r: width * 0.85, wire: 0.0028 },
       "pedan_hand_field",
     );
-    terminals.mate = { type: "absolute", position: [0, 0, 0], rotation: [90, 0, 0] };
     Object.assign(terminals, { instances: 2, indexed: true, instance_nodes: ends });
     const packets = Array.from({ length: 3 }, (_, k) => {
       const name = `${base}_packet_${k}`;
-      nodes.push({ name, parent: base, pivot: [0, start, 0], motion: "translate" });
+      nodes.push({
+        name,
+        parent: base,
+        pivot: [0, start, 0],
+        rest_rotation: [-90, 0, 0],
+        motion: "translate",
+      });
       return name;
     });
     const pulse = add(
@@ -132,7 +138,6 @@ export function addHandCouplings(
       { r: width * 0.6, wire: 0.0018 },
       "pedan_hand_flow",
     );
-    pulse.mate = { type: "absolute", position: [0, 0, 0], rotation: [90, 0, 0] };
     Object.assign(pulse, { instances: 3, indexed: true, instance_nodes: packets });
     const arc = `${base}_arc`;
     nodes.push({ name: arc, parent: base, pivot: [0, start, 0], motion: "scalar" });

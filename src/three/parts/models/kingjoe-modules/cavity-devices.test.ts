@@ -26,6 +26,36 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
     model.dispose();
     library.dispose();
   });
+  it("手部和全身光环的实际实例法线始终沿截面传递方向", () => {
+    const rings = model.parts.filter(
+      (p) =>
+        (p.def.tags?.includes("hand-coupling") || p.def.tags?.includes("energy-exchange")) &&
+        /_(terminals|packets)$/.test(p.partId),
+    );
+    expect(rings.length).toBeGreaterThan(300);
+    for (const time of [0.2, 1.7, 3.4]) {
+      model.resetNodes();
+      animateKingJoeModules(model, time, "beam");
+      model.syncInstances();
+      for (const part of rings) {
+        const base = model.getNode(part.def.node!)!;
+        const direction = model
+          .getNode(`${base.name}_end_1`)!
+          .getWorldPosition(new THREE.Vector3())
+          .sub(model.getNode(`${base.name}_end_0`)!.getWorldPosition(new THREE.Vector3()))
+          .normalize();
+        for (const instance of part.instances) {
+          const matrix = new THREE.Matrix4();
+          (part.object as THREE.InstancedMesh).getMatrixAt(instance.index, matrix);
+          matrix.premultiply(part.object.matrixWorld);
+          const normal = new THREE.Vector3(0, 0, 1)
+            .applyMatrix3(new THREE.Matrix3().getNormalMatrix(matrix))
+            .normalize();
+          expect(normal.dot(direction), `${part.partId}[${instance.index}]`).toBeGreaterThan(0.99999);
+        }
+      }
+    }
+  });
   it("其余内构混合四种低亮交换，八条肩肘通路在抬臂中紧随双端", () => {
     const routes = planEnergyExchange(planCavityDevices(new Map()));
     expect(new Set(routes.map((r) => r.mode)).size).toBe(4);
