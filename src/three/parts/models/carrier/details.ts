@@ -209,6 +209,41 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
       });
     }
   }
+  // 舷窗：两列小圆窗贴着外板，打断大面积光板；位置随真实半宽，不悬空。
+  for (const side of [-1, 1] as const) {
+    for (let i = 0; i < 9; i++) {
+      const z = -10.5 + i * 2.5;
+      for (const [tag, y] of [["a", 3.18], ["b", 3.5]] as const) {
+        const x = side * (hullSurfaceHalfAt(z, y) + 0.012);
+        add({
+          id: `carrier.hull.porthole_${side === -1 ? "l" : "r"}_${pad(i + 1)}_${tag}`,
+          name_cn: `舷窗 ${side === -1 ? "左" : "右"} ${i + 1}-${tag}`,
+          name_en: `side porthole ${side === -1 ? "port" : "starboard"} ${i + 1}-${tag}`,
+          assembly: HULL,
+          build_layer: 1,
+          geometry: M(T(0.075, 0.058, 0.035, [0, 0, 0], 16), C(0.058, 0.02, [0, 0, 0], 12)),
+          material: "cv_steel_dark",
+          mate: A([x, y, z], [0, 0, 90]),
+        });
+      }
+    }
+  }
+  // 右舷外板水密门/舷门：门板 + 门框，贴壳面。
+  for (let d = 0; d < 4; d++) {
+    const z = -8.0 + d * 4.5;
+    const x = hullSurfaceHalfAt(z, 3.3) + 0.008;
+    add({
+      id: `carrier.hull.side_door_${pad(d + 1)}`,
+      name_cn: `右舷外板舷门 ${d + 1}`,
+      name_en: `starboard shell door ${d + 1}`,
+      assembly: HULL,
+      build_layer: 1,
+      geometry: M(B(0.03, 0.8, 0.5, [0, 0, 0], 0.004), B(0.02, 0.66, 0.4, [0.015, 0, 0], 0.003)),
+      material: "cv_steel_dark",
+      mate: A([x, 3.3, z]),
+    });
+  }
+
   // 舭龙骨：沿舭部折角外伸的连续板，内缘与底部纵骨/舷侧纵骨搭接。
   for (const side of [-1, 1] as const) {
     add({
