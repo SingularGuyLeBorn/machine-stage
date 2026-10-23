@@ -997,6 +997,7 @@ export const CATALOG: StageModel[] = [
       { id: "ddg-engine", group: "动力", label: "COGAG 运转", kind: "machine-state", state: "engine" },
       { id: "ddg-weapons", group: "武器", label: "主炮/近防跟踪", kind: "machine-state", state: "weapons" },
       { id: "ddg-launch", group: "武器", label: "VLS 冷发射", kind: "machine-state", state: "launch" },
+      { id: "ddg-aviation", group: "航空", label: "机库/旋翼作业", kind: "machine-state", state: "aviation" },
       { id: "ddg-idle", group: "机构", label: "系泊检查", kind: "machine-state", state: "idle" },
       { id: "ddg-vls", group: "武器", label: "112 单元 VLS", kind: "focus-node", node: "CV_055_VlsHatch", offset: [0, 8, 6], radius: 38 },
       { id: "ddg-radar", group: "雷达", label: "346B 相控阵", kind: "focus-node", node: "CV_055_Radar", offset: [0, 8, 18], radius: 32 },
@@ -1015,6 +1016,7 @@ export const CATALOG: StageModel[] = [
       { label: "吃水", value: "约 6.6m" },
       { label: "VLS", value: "112 单元（前 64 + 后 48）" },
       { label: "动力", value: "COGAG 4×QC-280 / 双轴双桨" },
+      { label: "航空", value: "直-20 ×3（甲板 1 + 机库 2）" },
     ],
     notes: [
       "055 的灵魂是 112 个通用垂直发射单元：前甲板 8×8=64、后部 8×6=48，冷热共架兼容海红旗/鹰击-21。",

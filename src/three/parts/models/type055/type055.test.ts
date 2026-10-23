@@ -16,7 +16,7 @@ afterAll(() => built.dispose());
 
 describe("055 型驱逐舰", () => {
   it("舰体/112 VLS/主炮/相控阵/动力/机库都装出来了", () => {
-    expect(built.parts.length).toBeGreaterThanOrEqual(360);
+    expect(built.parts.length).toBeGreaterThanOrEqual(600);
     const hatchInstances = built.parts
       .filter((part) => part.partId === "type055.vls.hatch" || part.partId.startsWith("type055.vls.hatch_hero"))
       .reduce((sum, part) => sum + part.instances.length, 0);
@@ -32,6 +32,13 @@ describe("055 型驱逐舰", () => {
     expect(built.getPart("type055.radar.aesa_front")).toBeDefined();
     expect(built.getPart("type055.hangar.deck")).toBeDefined();
     expect(built.getPart("type055.surface.hull_number_r")).toBeDefined();
+    expect(built.getPart("type055.hangar.z20_pad_main_blade_1")).toBeDefined();
+    expect(built.getPart("type055.hangar.z20_hangar_l_cabin_upper")).toBeDefined();
+    expect(built.getNode("CV_055_Z20_pad_MainRotor")).toBeDefined();
+    expect(built.getNode("CV_055_HangarDoor_L")).toBeDefined();
+    expect(built.getPart("type055.hangar.door_l")).toBeDefined();
+    const physical = built.parts.reduce((sum, part) => sum + part.instances.length, 0);
+    expect(physical).toBeGreaterThanOrEqual(1700);
   });
 
   it("零悬空 / 零悬空孤岛 / 静态未豁免 0", () => {

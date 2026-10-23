@@ -13,6 +13,9 @@ const CIWS_AFT = "CV_055_Ciws_aft";
 const RADAR_NODE = "CV_055_Radar";
 const PROP_L = "CV_055_PropL";
 const PROP_R = "CV_055_PropR";
+const HANGAR_DOORS = ["CV_055_HangarDoor_L", "CV_055_HangarDoor_R"] as const;
+const PAD_MAIN_ROTOR = "CV_055_Z20_pad_MainRotor";
+const PAD_TAIL_ROTOR = "CV_055_Z20_pad_TailRotor";
 
 const HERO_TAGS = ["fwd_2", "fwd_3", "fwd_4", "aft_2", "aft_3", "aft_4"] as const;
 const MISSILE_REST_Y = 10.4;
@@ -54,6 +57,7 @@ export function animateType055(assembled: AssembledModel, seconds: number, state
   const weapons = state === "weapons";
   const engine = state === "engine" || weapons;
   const launch = state === "launch";
+  const aviation = state === "aviation";
 
   const gun = assembled.getNode(GUN_NODE);
   if (gun) gun.rotation.y = weapons ? Math.sin(t * 0.35) * 0.72 : 0;
@@ -73,14 +77,25 @@ export function animateType055(assembled: AssembledModel, seconds: number, state
     if (prop) prop.rotation.z = engine ? t * (node === PROP_L ? 7.0 : -7.0) : 0;
   }
 
+  const doorOpen = aviation ? smooth(Math.min(1, t / 2.2)) : 0;
+  for (const node of HANGAR_DOORS) {
+    const door = assembled.getNode(node);
+    if (door) door.scale.y = 1 - 0.92 * doorOpen;
+  }
+  const padMain = assembled.getNode(PAD_MAIN_ROTOR);
+  if (padMain) padMain.rotation.y = aviation ? t * 9.5 : 0;
+  const padTail = assembled.getNode(PAD_TAIL_ROTOR);
+  if (padTail) padTail.rotation.x = aviation ? t * 30 : 0;
+
   animateLaunch(assembled, t, launch);
 }
 
-export const TYPE055_ANIMATED_STATES = ["engine", "weapons", "launch"] as const;
+export const TYPE055_ANIMATED_STATES = ["engine", "weapons", "launch", "aviation"] as const;
 
 export const TYPE055_STATE_LABELS = [
   { id: "idle", label: "系泊检查", hint: "雷达慢转；主炮/近防归零，双桨静止，VLS 井盖闭锁" },
   { id: "engine", label: "COGAG 动力运转", hint: "四台燃气轮机并车，双轴双桨转动，导航雷达加速" },
   { id: "weapons", label: "主炮/近防跟踪", hint: "130mm 炮塔旋回俯仰，前后 1130 近防随动跟踪" },
   { id: "launch", label: "VLS 冷发射", hint: "首尾 6 格井盖开启，导弹冷弹射出筒、点火后离场" },
+  { id: "aviation", label: "航空作业", hint: "双机库卷帘门升起，甲板直-20 主/尾旋翼运转" },
 ] as const;

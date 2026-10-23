@@ -3,6 +3,7 @@ import type { InstanceLayout } from "../../assembler/assembler";
 import type { ExpectedContactRule, ModelRegistry } from "../../registry/types";
 import { A, B, C, M, S, T, carrierContext, pad } from "../carrier/common";
 import { CV_MATERIALS } from "../carrier/materials";
+import { addZ20 } from "./helicopter";
 import {
   T55,
   T55_CONSTANTS,
@@ -21,6 +22,7 @@ import {
   type055DeckWalkLines,
   type055Frustum,
   type055GunTurret,
+  type055HangarShell,
   type055Helipad,
   type055HullNumber,
   type055HullShell,
@@ -274,9 +276,10 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     name_en: "hangar block",
     assembly: "hangar",
     build_layer: 4,
-    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 12.6, d0: 18, w1: 11.2, d1: 16, h: 6.4 } },
+    geometry: { type: "kit", kit: "type055HangarShell" },
     material: "cv_055_hull",
-    mate: A([0, DECK, -63]),
+    mate: A([0, t55DeckTop(-63), -63]),
+    source: "双机库壳体（左右壁 + 顶盖 + 前壁，艉端敞开装卷帘门）；内部可见。",
   });
   add({
     id: `${P}super.mast`,
@@ -862,7 +865,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
   }
   for (const [tag, z, sign] of [
     ["jack", 88.6, 1],
-    ["flag", -89.4, -1],
+    ["flag", -88.6, -1],
   ] as const) {
     add({
       id: `${P}surface.${tag}staff`,
@@ -872,7 +875,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 5,
       geometry: M(C(0.06, 3.2, [0, 0, 0], 8), C(0.12, 0.16, [0, -1.55, 0], 8)),
       material: "cv_steel",
-      mate: A([0, t55DeckTop(z) + 1.6, z]),
+      mate: A([tag === "flag" ? 2.8 : 0, t55DeckTop(z) + 1.6, z]),
     });
     add({
       id: `${P}surface.${tag}flag`,
@@ -882,7 +885,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 5,
       geometry: M(B(1.5, 0.9, 0.02, [0, 0, 0], 0.002)),
       material: "cv_deck_red",
-      mate: A([sign * 0.8, t55DeckTop(z) + 2.6, z - sign * 0.05]),
+      mate: A([(tag === "flag" ? 2.8 : 0) + sign * 0.8, t55DeckTop(z) + 2.6, z - sign * 0.05]),
     });
   }
   for (let i = 0; i < 6; i++) {
@@ -1344,7 +1347,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 4,
       geometry: M(B(2.2, 1.5, 1.4, [0, 0, 0], 0.04), B(1.9, 1.2, 0.1, [0, 0, 0.72], 0.02)),
       material: "cv_055_hull",
-      mate: A([0, tag === "fwd" ? DECK + 0.75 : DECK + 7.15, z], [0, tag === "fwd" ? 180 : 0, 0]),
+      mate: A([0, tag === "fwd" ? DECK + 0.75 : DECK + 7.1, z], [0, tag === "fwd" ? 180 : 0, 0]),
     });
     for (let i = 0; i < 12; i++) {
       add({
@@ -1355,7 +1358,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
         build_layer: 4,
         geometry: M(C(0.13, 0.24, [0, 0, 0], 10)),
         material: "cv_steel_dark",
-        mate: A([-0.75 + (i % 4) * 0.5, (tag === "fwd" ? DECK + 0.75 : DECK + 7.15) + (Math.floor(i / 4) - 1) * 0.38, z + (tag === "fwd" ? 0.72 : -0.72)]),
+        mate: A([-0.75 + (i % 4) * 0.5, (tag === "fwd" ? DECK + 0.75 : DECK + 7.1) + (Math.floor(i / 4) - 1) * 0.38, z + (tag === "fwd" ? 0.72 : -0.72)]),
       });
     }
   }
@@ -1407,18 +1410,152 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     material: "cv_runway",
     mate: A([0, t55DeckTop(T55.HELIPAD_Z) + 0.02, T55.HELIPAD_Z]),
   });
+  // 双机库卷帘门（节点缩放 y 收进顶梁）、门楣/门柱
+  add({
+    id: `${P}hangar.door_header`,
+    name_cn: "机库门楣",
+    name_en: "hangar door header",
+    assembly: "hangar",
+    build_layer: 4,
+    geometry: M(B(11.4, 0.75, 0.2, [0, 0, 0], 0.02)),
+    material: "cv_055_hull",
+    mate: A([0, t55DeckTop(-72) + 6.0, -72.05]),
+  });
   for (const side of [-1, 1] as const) {
     add({
-      id: `${P}hangar.door_${side === -1 ? "l" : "r"}`,
-      name_cn: `机库门 ${side === -1 ? "左" : "右"}`,
-      name_en: `hangar door ${side === -1 ? "l" : "r"}`,
+      id: `${P}hangar.door_pillar_${side === -1 ? "l" : "r"}`,
+      name_cn: `机库门柱 ${side === -1 ? "左" : "右"}`,
+      name_en: `hangar door pillar ${side === -1 ? "l" : "r"}`,
       assembly: "hangar",
       build_layer: 4,
-      geometry: M(B(5.2, 4.6, 0.18, [0, 0, 0], 0.01)),
-      material: "cv_steel_dark",
-      mate: A([side * 2.9, t55DeckTop(-72.1) + 2.3, -72.1]),
+      geometry: M(B(0.32, 6.4, 0.26, [0, 0, 0], 0.02)),
+      material: "cv_055_hull",
+      mate: A([side * 5.55, t55DeckTop(-72) + 3.2, -72.05]),
+    });
+    const doorNode = `CV_055_HangarDoor_${side === -1 ? "L" : "R"}`;
+    ctx.node({ name: doorNode, parent: "root", pivot: [side * 2.78, t55DeckTop(-72) + 5.78, -72.12], motion: "scalar", note: `双机库门 ${side === -1 ? "左" : "右"}` });
+    add({
+      id: `${P}hangar.door_${side === -1 ? "l" : "r"}`,
+      name_cn: `机库卷帘门 ${side === -1 ? "左" : "右"}`,
+      name_en: `hangar rolling door ${side === -1 ? "l" : "r"}`,
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(
+        B(5.45, 5.55, 0.14, [0, 0, 0], 0.02),
+        B(5.2, 0.1, 0.1, [0, 1.4, 0.08], 0.006),
+        B(5.2, 0.1, 0.1, [0, 0.4, 0.08], 0.006),
+        B(5.2, 0.1, 0.1, [0, -0.6, 0.08], 0.006),
+        B(5.2, 0.1, 0.1, [0, -1.6, 0.08], 0.006),
+      ),
+      material: "cv_055_hull",
+      node: doorNode,
+      mate: A([0, -2.775, 0]),
     });
   }
+  // 机库地板/灯/肋骨/工作间/吊车
+  add({
+    id: `${P}hangar.interior_floor`,
+    name_cn: "机库地板",
+    name_en: "hangar floor",
+    assembly: "hangar",
+    build_layer: 3,
+    geometry: M(B(10.8, 0.1, 17.2, [0, 0, 0], 0.01)),
+    material: "cv_deck_plate",
+    mate: A([0, t55DeckTop(-63) + 0.06, -63]),
+  });
+  for (let i = 0; i < 4; i++) {
+    const z = -68 + i * 3.8;
+    add({
+      id: `${P}hangar.light_${i + 1}`,
+      name_cn: `机库顶灯 ${i + 1}`,
+      name_en: `hangar light ${i + 1}`,
+      assembly: "hangar",
+      build_layer: 5,
+      geometry: M(B(1.5, 0.06, 0.28, [0, 0, 0], 0.004)),
+      material: "cv_glow",
+      mate: A([0, t55DeckTop(-63) + 6.05, z]),
+    });
+    for (const side of [-1, 1] as const) {
+      add({
+        id: `${P}hangar.rib_${i + 1}_${side === -1 ? "l" : "r"}`,
+        name_cn: `机库肋骨 ${i + 1} ${side === -1 ? "左" : "右"}`,
+        name_en: `hangar rib ${i + 1} ${side === -1 ? "l" : "r"}`,
+        assembly: "hangar",
+        build_layer: 4,
+        geometry: M(B(0.14, 5.6, 0.34, [0, 0, 0], 0.01)),
+        material: "cv_steel_dark",
+        mate: A([side * 5.9, t55DeckTop(-63) + 3.0, z]),
+      });
+    }
+  }
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}hangar.workshop_${side === -1 ? "l" : "r"}`,
+      name_cn: `机库工作间 ${side === -1 ? "左" : "右"}`,
+      name_en: `hangar workshop ${side === -1 ? "l" : "r"}`,
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(B(1.6, 1.8, 0.55, [0, 0, 0], 0.03), B(1.4, 0.1, 0.65, [0, 0.45, 0.05], 0.01)),
+      material: "cv_hull_dark",
+      mate: A([side * 4.2, t55DeckTop(-63) + 1.0, -55.2]),
+    });
+    add({
+      id: `${P}hangar.fire_bottle_${side === -1 ? "l" : "r"}`,
+      name_cn: `机库灭火瓶 ${side === -1 ? "左" : "右"}`,
+      name_en: `hangar fire bottle ${side === -1 ? "l" : "r"}`,
+      assembly: "hangar",
+      build_layer: 5,
+      geometry: M(C(0.18, 1.2, [0, 0, 0], 12), C(0.1, 0.2, [0, 0.7, 0], 10)),
+      material: "cv_deck_red",
+      mate: A([side * 5.3, t55DeckTop(-63) + 0.65, -55.5]),
+    });
+  }
+  add({
+    id: `${P}hangar.crane_rail`,
+    name_cn: "机库吊车轨道",
+    name_en: "hangar crane rail",
+    assembly: "hangar",
+    build_layer: 4,
+    geometry: M(B(0.18, 0.18, 15, [0, 0, 0], 0.01)),
+    material: "cv_steel_dark",
+    mate: A([0, t55DeckTop(-63) + 6.0, -63]),
+  });
+  add({
+    id: `${P}hangar.crane_trolley`,
+    name_cn: "机库吊车小车",
+    name_en: "hangar crane trolley",
+    assembly: "hangar",
+    build_layer: 4,
+    geometry: M(B(1.0, 0.4, 0.8, [0, 0, 0], 0.02), C(0.08, 0.6, [0, -0.45, 0], 10)),
+    material: "cv_steel",
+    mate: A([0, t55DeckTop(-63) + 5.7, -62]),
+  });
+  const hangarTieDowns: Array<[number, number]> = [];
+  for (const side of [-1, 1] as const) {
+    for (let i = 0; i < 4; i++) hangarTieDowns.push([side * 3.6, -68 + i * 3.3]);
+  }
+  ctx.layout("type055.hangarTieDown", ({ index }) => {
+    const [x, z] = hangarTieDowns[index]!;
+    return new THREE.Matrix4().makeTranslation(x, t55DeckTop(z) + 0.12, z);
+  });
+  add({
+    id: `${P}hangar.tie_down_inner`,
+    name_cn: "机库系留点 ×8",
+    name_en: "hangar tie-downs ×8",
+    assembly: "hangar",
+    build_layer: 5,
+    geometry: T(0.16, 0.09, 0.05, [0, 0, 0], 10),
+    material: "cv_steel_dark",
+    instances: 8,
+    indexed: true,
+    instance_layout: "type055.hangarTieDown",
+    mate: A([0, 0, 0]),
+  });
+
+  // 两架折叠直-20（双机库）+ 一架旋翼展开的直-20（直升机甲板）
+  addZ20(ctx, { tag: "hangar_l", x: -3.0, y: t55DeckTop(-64) + 0.12, z: -64, yaw: 180, scale: 0.78, folded: true });
+  addZ20(ctx, { tag: "hangar_r", x: 3.0, y: t55DeckTop(-64) + 0.12, z: -64, yaw: 180, scale: 0.78, folded: true });
+  addZ20(ctx, { tag: "pad", x: 0, y: t55DeckTop(-81) + 0.01, z: -81, yaw: 0, scale: 1 });
   add({
     id: `${P}hangar.traverse`,
     name_cn: "直升机牵引轨道",
@@ -1656,10 +1793,43 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     staticOnly("t55-ciws-self", "type055.ciws.*", "type055.ciws.*", "近防炮塔/炮管/基座装配", 300),
     staticOnly("t55-vls-hull", "type055.vls.*", "type055.hull.*", "VLS 井筒/框架与舰体结构安装", 400),
     staticOnly("t55-deck-self", "type055.deck.*", "type055.deck.*", "甲板铺板/栏杆/立柱安装", 80),
-    staticOnly("t55-hangar-self", "type055.hangar.*", "type055.hangar.*", "机库/直升机甲板/牵引轨道安装", 120),
+    staticOnly("t55-hangar-self", "type055.hangar.*", "type055.hangar.*", "机库/直升机甲板/门/内设安装", 1200),
+    staticOnly("t55-z20-self", "type055.hangar.z20_*", "type055.hangar.z20_*", "直-20 机身/旋翼/起落架/任务设备装配", 900),
+    staticOnly("t55-z20-deck", "type055.hangar.z20_*", "type055.deck.*", "直升机起落架与甲板停放", 400),
+    staticOnly("t55-z20-hangar", "type055.hangar.z20_*", "type055.hangar.*", "直升机在机库/甲板停放", 900),
     staticOnly("t55-surface-hull", "type055.surface.*", "type055.hull.*", "锚/栏杆/救生设备与舰体安装", 150),
     staticOnly("t55-surface-deck", "type055.surface.*", "type055.deck.*", "舷号/栏杆/救生设备与甲板安装", 100),
     staticOnly("t55-surface-self", "type055.surface.*", "type055.surface.*", "栏杆/救生筏/锚/锚链孔装配", 90),
+    {
+      family: "t55-gun-trunnion",
+      a: "type055.gun.turret",
+      b: "type055.gun.barrel",
+      reason: "130mm 身管绕耳轴俯仰，根部始终埋在炮塔炮盾内（相对运动窄规则）",
+      maxDepthMm: 900,
+      anyForm: true,
+      allowDisplaced: true,
+      allowSuspect: true,
+    },
+    {
+      family: "t55-vls-launch-bore",
+      a: "type055.vls.missile_*",
+      b: "type055.vls.*",
+      reason: "冷发射导弹从已开启的井盖/井筒中穿出（相对运动窄规则）",
+      maxDepthMm: 1200,
+      anyForm: true,
+      allowDisplaced: true,
+      allowSuspect: true,
+    },
+    {
+      family: "t55-vls-launch-deck",
+      a: "type055.vls.missile_*",
+      b: "type055.deck.*",
+      reason: "导弹从甲板井口穿出，甲板为无孔盖板近似（相对运动窄规则）",
+      maxDepthMm: 600,
+      anyForm: true,
+      allowDisplaced: true,
+      allowSuspect: true,
+    },
   ];
 
   const registry: ModelRegistry = {
@@ -1713,6 +1883,7 @@ export const TYPE055_BUILDERS = {
   type055Rhib,
   type055Helipad,
   type055GunTurret,
+  type055HangarShell,
   type055BootTop,
   type055BulbousBow,
   type055Bulwark,

@@ -270,6 +270,35 @@ export const type055VlsMissile: GeometryBuilder = () => {
 export const type055VlsFlame: GeometryBuilder = () =>
   new THREE.CylinderGeometry(0.32, 0.04, 3.0, 14, 1, true).translate(0, -4.2, 0);
 
+/**
+ * 双机库壳体：左右壁 + 顶盖 + 前壁，艉端敞开装门。
+ * 旧版是实心四棱台，开门后只能看到一堵实心墙；改成双层壳后机库内部可见。
+ * 局部原点在机库底面中心（z 轴 +9 为前壁，-9 为艉端门洞）。
+ */
+export const type055HangarShell: GeometryBuilder = () => {
+  const h = 6.4;
+  const zb = -9;
+  const zf = 9;
+  const wb = 6.3;
+  const wt = 5.6;
+  const positions: number[] = [
+    -wb, 0, zb, -wt, h, zb, -wt, h, zf, -wb, 0, zf, // 左壁
+    wb, 0, zb, wt, h, zb, wt, h, zf, wb, 0, zf, // 右壁
+    -wt, h, zb, wt, h, zb, wt, h, zf, -wt, h, zf, // 顶盖
+    -wb, 0, zf, wb, 0, zf, wt, h, zf, -wt, h, zf, // 前壁
+  ];
+  const indices: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    const a = i * 4;
+    indices.push(a, a + 1, a + 2, a, a + 2, a + 3);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
 /** 艏部舷墙：沿脊弧从 52m 到 88.5m，两侧 0.75m 高、顶部内倾 0.12m。 */
 export const type055Bulwark: GeometryBuilder = () => {
   const stations = 22;
