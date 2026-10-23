@@ -24,6 +24,17 @@ export function addSea(ctx: CarrierCtx): void {
     source: "涌浪网格 44×88；半透明以透出红色水下舰体、球鼻艏、螺旋桨与舵。",
   });
   add({
+    id: `${P}whitecaps`,
+    name_cn: "波峰白浪",
+    name_en: "wave crest foam",
+    assembly: ASSEMBLY,
+    build_layer: 5,
+    tags: ["fx"],
+    geometry: { type: "kit", kit: "carrierSeaFoam" },
+    material: "cv_sea_foam",
+    mate: A([0, 0, 0]),
+  });
+  add({
     id: `${P}bow_wave`,
     name_cn: "艏浪",
     name_en: "bow wave",

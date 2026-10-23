@@ -847,5 +847,136 @@ export function addAircraft(ctx: CarrierCtx): void {
       mate: A([(l % 2 === 0 ? -1 : 1) * 0.45, 0.34, -0.25 - Math.floor(l / 2) * 0.5]),
     });
   }
+  // 歼-20 级细部补充：座舱框/后视镜、进气道内环肋、喷口作动环、前起舱门、刹车盘、静电刷、受油探管。
+  add({
+    id: `${P}canopy_bow_frame`,
+    name_cn: "座舱盖前弧框",
+    name_en: "canopy bow frame",
+    assembly: "aircraft",
+    build_layer: 5,
+    geometry: M(B(0.24, 0.012, 0.016, [0, 0, 0], 0.002)),
+    material: "cv_aircraft_dark",
+    node: AIRCRAFT_NODE,
+    mate: A([0, 0.722, 0.53]),
+  });
+  add({
+    id: `${P}canopy_aft_hinge`,
+    name_cn: "座舱盖后铰链",
+    name_en: "canopy aft hinge",
+    assembly: "aircraft",
+    build_layer: 5,
+    geometry: M(C(0.025, 0.16, [0, 0, 0], 10), B(0.16, 0.025, 0.025, [0, 0, 0], 0.003)),
+    material: "cv_steel_dark",
+    node: AIRCRAFT_NODE,
+    mate: A([0, 0.61, 0.28], [0, 0, 90]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}canopy_mirror_${side === -1 ? "l" : "r"}`,
+      name_cn: `座舱后视镜 ${side === -1 ? "左" : "右"}`,
+      name_en: `canopy mirror ${side === -1 ? "l" : "r"}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(B(0.028, 0.012, 0.02, [0, 0.03, 0], 0.002), C(0.004, 0.05, [0, 0, 0], 6)),
+      material: "cv_gauge_face",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.075, 0.69, 0.46], [0, 0, side * 12]),
+    });
+    add({
+      id: `${P}canopy_actuator_${side === -1 ? "l" : "r"}`,
+      name_cn: `座舱盖作动筒 ${side === -1 ? "左" : "右"}`,
+      name_en: `canopy actuator ${side === -1 ? "l" : "r"}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(C(0.01, 0.14, [0, 0, 0], 8)),
+      material: "cv_steel",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.07, 0.62, 0.31], [0, 0, side * 72]),
+    });
+    for (let rib = 0; rib < 3; rib++) {
+      add({
+        id: `${P}intake_rib_${side === -1 ? "l" : "r"}_${rib + 1}`,
+        name_cn: `${side === -1 ? "左" : "右"}进气道内环肋 ${rib + 1}`,
+        name_en: `intake internal rib ${side === -1 ? "l" : "r"} ${rib + 1}`,
+        assembly: "aircraft",
+        build_layer: 5,
+        geometry: M(T(0.085, 0.074, 0.012, [0, 0, 0], 20)),
+        material: "cv_aircraft_dark",
+        node: AIRCRAFT_NODE,
+        mate: A([side * 0.3, 0.38, 0.14 + rib * 0.14], [90, 0, 0]),
+      });
+    }
+    add({
+      id: `${P}nozzle_actuator_ring_${side === -1 ? "l" : "r"}`,
+      name_cn: `${side === -1 ? "左" : "右"}喷口作动环`,
+      name_en: `nozzle actuator ring ${side === -1 ? "l" : "r"}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(T(0.15, 0.13, 0.035, [0, 0, 0], 20)),
+      material: "cv_steel_dark",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.3, 0.38, -1.01], [90, 0, 0]),
+    });
+    for (let rod = 0; rod < 4; rod++) {
+      const a = (rod / 4) * Math.PI * 2 + 0.4;
+      add({
+        id: `${P}nozzle_rod_${side === -1 ? "l" : "r"}_${rod + 1}`,
+        name_cn: `${side === -1 ? "左" : "右"}喷口作动杆 ${rod + 1}`,
+        name_en: `nozzle actuator rod ${side === -1 ? "l" : "r"} ${rod + 1}`,
+        assembly: "aircraft",
+        build_layer: 5,
+        geometry: M(C(0.008, 0.18, [0, 0, 0], 6)),
+        material: "cv_steel",
+        node: AIRCRAFT_NODE,
+        mate: A([side * 0.3 + Math.cos(a) * 0.14, 0.38 + Math.sin(a) * 0.14, -1.0], [90, 0, 0]),
+      });
+    }
+    add({
+      id: `${P}static_discharger_${side === -1 ? "l" : "r"}_tip`,
+      name_cn: `翼尖静电刷 ${side === -1 ? "左" : "右"}`,
+      name_en: `wingtip static discharger ${side === -1 ? "l" : "r"}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(C(0.004, 0.1, [0, 0, 0], 6)),
+      material: "cv_steel_dark",
+      // 跟着外翼折叠一起动，不能挂机身节点。
+      node: side === -1 ? WING_FOLD_L : WING_FOLD_R,
+      mate: A([side * 0.55, 0.01, -0.16], [-70, 0, 0]),
+    });
+    add({
+      id: `${P}static_discharger_${side === -1 ? "l" : "r"}_fin`,
+      name_cn: `垂尾静电刷 ${side === -1 ? "左" : "右"}`,
+      name_en: `fin static discharger ${side === -1 ? "l" : "r"}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(C(0.003, 0.09, [0, 0, 0], 6)),
+      material: "cv_steel_dark",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.3, 0.89, -1.24], [0, 0, side * 65]),
+    });
+  }
+  add({
+    id: `${P}refuel_probe_door`,
+    name_cn: "受油探管舱门",
+    name_en: "refuel probe door",
+    assembly: "aircraft",
+    build_layer: 5,
+    geometry: M(B(0.08, 0.035, 0.13, [0, 0, 0], 0.003)),
+    material: "cv_aircraft_dark",
+    node: AIRCRAFT_NODE,
+    mate: A([0.14, 0.56, 0.5]),
+  });
+  add({
+    id: `${P}refuel_probe`,
+    name_cn: "受油探管",
+    name_en: "refuel probe",
+    assembly: "aircraft",
+    build_layer: 5,
+    geometry: M(C(0.012, 0.26, [0, 0, 0], 8), C(0.02, 0.04, [0, 0.13, 0], 8)),
+    material: "cv_steel",
+    node: AIRCRAFT_NODE,
+    mate: A([0.15, 0.57, 0.64], [12, 0, -18]),
+  });
+
   // 折叠状态下的系留环/轮挡（甲板固定件在 surface 分册）。
 }
