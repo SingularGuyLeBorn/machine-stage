@@ -86,6 +86,17 @@ describe("分体、吸合和接触面电弧", () => {
       animateKingJoeModules(model, start + 4, `ray_${key}`);
       expect(sample()).not.toEqual(before);
       expect(sample().every(Number.isFinite)).toBe(true);
+      const beam = rays.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
+      // 真正渲染的是单层柔边光带，不能留下封闭管的背面重复叠亮。
+      expect(beam.geometry.index!.count).toBe((p.count / 4 - 1) * 6);
+      for (const name of ["beamCenter", "beamTangent", "beamRadius", "beamUv"]) {
+        const attribute = beam.geometry.getAttribute(name);
+        expect(attribute.count).toBe(p.count);
+        expect(Array.from(attribute.array).every(Number.isFinite)).toBe(true);
+      }
+      expect(beam.material.depthWrite).toBe(false);
+      expect(beam.material.uniforms.flowTime!.value).toBe(start + 4);
+      expect(beam.material.uniforms.power!.value).toBeLessThan(1);
       const widths = Array.from({ length: 30 }, (_, i) => {
         const index = (i + 30) * 4;
         return new THREE.Vector3()
