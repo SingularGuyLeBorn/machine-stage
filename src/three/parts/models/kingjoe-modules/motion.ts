@@ -3,6 +3,8 @@ import { Box3, Vector3 } from "three";
 import { getModuleEffects, hideModuleEffects } from "./effects";
 import { updateModuleIllumination } from "./illumination";
 import { updatePedanRays } from "./rays";
+import { updateCavityDevices } from "./cavity-devices";
+import { updateJointDrives } from "./joint-drives";
 import { updatePedanMachinery, type PedanActivity } from "./machinery";
 import { updateJointCovers } from "./joint-covers";
 
@@ -294,6 +296,7 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
     }
   }
   updateJointCovers(model);
+  updateJointDrives(model);
   const activity: PedanActivity = {
     drive:
       Math.abs(entry.arms[0]) +
@@ -304,6 +307,7 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
     redModule: redModule && time > 2 ? redModule : null,
   };
   updatePedanMachinery(model, seconds, activity);
+  updateCavityDevices(model, seconds, activity);
   updateModuleIllumination(model, seconds, activity);
   model.root.updateMatrixWorld(true);
   updatePedanRays(model, seconds, activity.redModule, activity.yellow);

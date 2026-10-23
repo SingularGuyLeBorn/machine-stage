@@ -9,7 +9,12 @@ import { redRayEnd } from "./rays";
 describe("佩丹内部联动与输能", () => {
   it("四分体内部实例各翻倍，新增附件扫掠留在原设备安全球内", () => {
     const registry = makeKingJoeModuleRegistry();
-    const internal = registry.parts.filter((p) => p.tags?.includes("internal"));
+    // 保留上一轮设备翻倍契约，本轮空腔设备和关节驱动另有独立验证。
+    const internal = registry.parts.filter(
+      (p) =>
+        p.tags?.includes("internal") &&
+        !p.tags.some((tag) => ["cavity-device", "joint-drive", "gel-link"].includes(tag)),
+    );
     for (const [module, before] of Object.entries({ legs: 990, pelvis: 245, chest: 513, head_arms: 1016 })) {
       expect(
         internal.filter((p) => p.assembly === module).reduce((sum, p) => sum + (p.instances ?? 1), 0),

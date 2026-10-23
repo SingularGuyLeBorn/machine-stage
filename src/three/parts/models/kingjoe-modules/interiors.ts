@@ -4,11 +4,23 @@ import type { GeometryBuilder } from "../../assembler/geometry";
 import type { ModelRegistry, PartDefinition, GeometrySpec } from "../../registry/types";
 import data from "./pedan.generated.json";
 import { addPedanDetailAssemblies, addPedanMachinery, powerMaterial } from "./machinery";
+import { addCavityDevices } from "./cavity-devices";
+import { addJointDrives } from "./joint-drives";
 import { CUFF } from "./joint-covers";
 
 // 用户已批准的原创佩丹技术：磁约束能源、计算晶核、场调制器与悬浮线圈。
 // [OM-FREEPLAY] 尺寸由实际壳内设备舱派生；配色、线圈匝数及支架布局为原创机械解释。
 export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
+  pedan_chrome: { base: "#b9cedb", metalness: 0.88, roughness: 0.24 },
+  pedan_gel: {
+    base: "#8ccac5",
+    metalness: 0.18,
+    roughness: 0.2,
+    opacity: 0.42,
+    depthWrite: false,
+    clearcoat: 0.85,
+    clearcoatRoughness: 0.16,
+  },
   pedan_frame: { base: "#94773e", metalness: 0.78, roughness: 0.32 },
   pedan_coil: { base: "#c68b47", metalness: 0.85, roughness: 0.27 },
   pedan_ceramic: { base: "#29383e", metalness: 0.3, roughness: 0.46 },
@@ -129,6 +141,40 @@ export const interiorBuilders: Record<string, GeometryBuilder> = {
       if (b.sub(a).cross(c.sub(a)).length() > 1e-12) indices.push(...ids);
     }
     geometry.setIndex(indices);
+    return geometry;
+  },
+  pedanBall: (spec) =>
+    new THREE.SphereGeometry(Number((spec as { params: Record<string, number> }).params.r), 20, 16),
+  pedanGel: () => {
+    const geometry = new THREE.LatheGeometry(
+      [
+        [0, -0.5],
+        [0.55, -0.48],
+        [0.88, -0.38],
+        [0.63, -0.2],
+        [0.45, 0],
+        [0.56, 0.18],
+        [0.84, 0.36],
+        [0.58, 0.48],
+        [0, 0.5],
+      ].map(([r, y]) => new THREE.Vector2(r, y)),
+      20,
+    );
+    // 轴心环在 LatheGeometry 中会产生退化面；滤掉后端点仍由三角扇封闭。
+    const p = geometry.getAttribute("position"),
+      index = geometry.index!,
+      kept: number[] = [];
+    const a = new THREE.Vector3(),
+      b = new THREE.Vector3(),
+      c = new THREE.Vector3();
+    for (let i = 0; i < index.count; i += 3) {
+      const ids = [index.getX(i), index.getX(i + 1), index.getX(i + 2)];
+      a.fromBufferAttribute(p, ids[0]);
+      b.fromBufferAttribute(p, ids[1]);
+      c.fromBufferAttribute(p, ids[2]);
+      if (b.sub(a).cross(c.sub(a)).length() > 1e-12) kept.push(...ids);
+    }
+    geometry.setIndex(kept);
     return geometry;
   },
   pedanBox: (spec) => {
@@ -391,6 +437,8 @@ export function makeInteriors(): Pick<ModelRegistry, "parts" | "nodes" | "consta
     });
   }
   addPedanDetailAssemblies(parts, nodes);
+  addCavityDevices(wallTrees, parts, nodes);
+  addJointDrives(parts, nodes);
   for (const joint of data.joints) {
     const shoulder = joint.key.startsWith("upper");
     for (let i = 0; i < CUFF.layers; i++) {

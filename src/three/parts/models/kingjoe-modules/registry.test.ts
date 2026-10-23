@@ -145,8 +145,12 @@ describe("参考图四模块闭合分体", () => {
   it("实际渲染几何逐边闭合且绕序一致，包含所有附加细节", () => {
     expect(validateRegistry(registry).filter((e) => e.level === "error")).toEqual([]);
     const model = buildModel(registry, { builders: kingjoeModuleBuilders });
+    // 共享的 BufferGeometry 拓扑相同，只审计一次；仍遍历全部独立导出几何。
+    const checked = new Set<THREE.BufferGeometry>();
     for (const part of model.parts) {
       const geometry = part.geometry;
+      if (checked.has(geometry)) continue;
+      checked.add(geometry);
       const p = geometry.getAttribute("position");
       const index = geometry.index;
       const edges = new Map<string, { count: number; orientation: number }>();

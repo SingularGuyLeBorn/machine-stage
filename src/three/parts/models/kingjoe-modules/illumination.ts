@@ -48,15 +48,17 @@ export function updateModuleIllumination(
             vec2 local = abs(fract(grid) - 0.5);
             float block = 1.0 - smoothstep(0.34, 0.47, max(local.x,local.y));
             float inside = step(0.0,grid.x) * step(0.0,grid.y) * (1.0-step(${VISOR_GRID.columns}.0,grid.x)) * (1.0-step(${VISOR_GRID.rows}.0,grid.y));
-            float cellId = cell.y * ${VISOR_GRID.columns}.0 + cell.x;
             float glow = 0.0;
             for(int i=0;i<6;i++) {
               float weight = (i==0 || i==3) ? 1.0 : (i==1 || i==4) ? 0.38 : 0.16;
-              glow += (1.0-step(0.5,abs(cellId-kjCells[i]))) * weight;
+              vec2 center=vec2(mod(kjCells[i],${VISOR_GRID.columns}.0),floor(kjCells[i]/${VISOR_GRID.columns}.0))+0.5;
+              vec2 delta=grid-center;
+              // 在固定格子中心发光，但把光散射到相邻区域，近景也不出现清晰方形边框。
+              glow += exp(-dot(delta,delta)*3.2)*weight;
             }
-            // 暗格仍可辨认，格间暗缝始终固定；边缘轻微柔化，不再加自由漂移的亮点。
-            diffuseColor.rgb *= 0.2 + inside * block * 0.6;
-            totalEmissiveRadiance = vec3(0.016,0.023,0.012) + inside * block * (vec3(0.16,0.20,0.065) + vec3(1.0,0.78,0.18) * glow * (1.8+kjPower));
+            diffuseColor.rgb *= 0.2 + inside * block * 0.012;
+            totalEmissiveRadiance = vec3(0.012,0.019,0.012) + inside * vec3(1.0,0.78,0.18) * glow * (1.8+kjPower);
+
           `
             : `
             // 玻璃与背后的左右调制核心共用功率，不再各自呼吸。
@@ -68,7 +70,7 @@ export function updateModuleIllumination(
             "#include <emissivemap_fragment>\n" + light,
           );
         };
-        material.customProgramCacheKey = () => `kingjoe-optics-${visor ? "visor-grid-v2" : side}`;
+        material.customProgramCacheKey = () => `kingjoe-optics-${visor ? "visor-diffused-grid-v3" : side}`;
         material.needsUpdate = true;
       }
       clock.time.value = seconds;
