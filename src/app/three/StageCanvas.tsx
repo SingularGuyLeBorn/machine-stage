@@ -255,15 +255,13 @@ function SceneEnvIntensity({ value }: { value: number }) {
 
 function StageEffects() {
   const xray = useStageStore((state) => state.views.xray);
-  // 航母是 260 万三角面 + 4000+ 件；全屏 AO 在低端 GPU 首帧/拖动时会明显卡顿，降为不跑 N8AO。
+  // 航母是 5500+ 件、275 万三角面：EffectComposer 的场景 Pass 在本机会输出黑帧，
+  // 直接走默认帧缓冲；同时省掉 Bloom/Vignette 的全屏开销。透视时同理。
   const heavy = useStageStore((state) => state.modelId === "carrier");
-  // 透视时物体大量重叠，AO/Bloom 意义不大且会放大混合开销；直接走默认帧缓冲。
-  if (xray) return null;
+  if (xray || heavy) return null;
   return (
-    <EffectComposer multisampling={heavy ? 0 : 4}>
-      {heavy ? null : (
-        <N8AO halfRes quality="medium" aoRadius={0.45} intensity={1.15} distanceFalloff={0.9} color="#26303c" />
-      )}
+    <EffectComposer multisampling={4}>
+      <N8AO halfRes quality="medium" aoRadius={0.45} intensity={1.15} distanceFalloff={0.9} color="#26303c" />
       <Bloom luminanceThreshold={0.88} luminanceSmoothing={0.22} intensity={0.55} mipmapBlur />
       <Vignette offset={0.32} darkness={0.28} />
     </EffectComposer>
