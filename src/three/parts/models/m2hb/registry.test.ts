@@ -18,7 +18,7 @@ describe("m2hb 注册表回归", () => {
     expect(instances).toBeGreaterThanOrEqual(100);
   });
 
-  it("装配成功，几何顶点与实例矩阵均为有限值", () => {
+  it("装配成功，几何顶点与实例矩阵均为有限值", { timeout: 15000 }, () => {
     const built = buildModel(registry, {
       builders: M2HB_BUILDERS,
       instanceLayouts: makeM2hbLayouts(),

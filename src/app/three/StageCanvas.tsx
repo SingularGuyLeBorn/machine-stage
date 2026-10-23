@@ -1,8 +1,9 @@
-import { ContactShadows, Environment, Grid, Html, Lightformer, OrbitControls } from "@react-three/drei";
+import { ContactShadows, Environment, Grid, Html, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Bloom, EffectComposer, N8AO, Vignette } from "@react-three/postprocessing";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
 import {
   buildModel,
   createMaterialLibrary,
@@ -32,7 +33,7 @@ import { setM134Mode } from "@/three/parts/models/m134/motion";
 //   1) 注册表 → AssembledModel → 场景（重建时先卸载再释放）
 //   2) 每帧纪律：resetNodes → 动画 → syncInstances → 姿态层（爆炸/透视/高亮）
 //   3) 交互：拾取高亮、相机聚焦（零件树 / 穿模报告点击）
-// 光照为程序化 studio（Lightformer + ACES + SSAO），不依赖 HDR 资产。
+// 光照为 HDRI 摄影棚环境（Poly Haven CC0）+ ACES + Bloom，HDR 资产在 public/hdr。
 // ============================================================================
 
 const HOME_DIRECTION = new THREE.Vector3(1.05, 0.78, 1.15).normalize();
@@ -77,73 +78,86 @@ export function StageCanvas() {
       shadows
       dpr={[1, 1.5]}
       camera={{ position: [4.6, 3.4, 5.2], fov: 34, near: 0.05, far: 200 }}
-      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
+      gl={{
+        antialias: true,
+        toneMapping: THREE.ACESFilmicToneMapping,
+        // QA 时允许 canvas.toDataURL() 直接读像素，绕开 headless 合成器的残影。
+        preserveDrawingBuffer: qaNoFx,
+      }}
+      onCreated={({ gl }) => {
+        // 摄影棚 HDRI 本身亮度很高；ACES + 1.0 曝光会把烤蓝钢压成纯白。
+        gl.toneMappingExposure = 0.9;
+      }}
     >
-      <color attach="background" args={["#e9ecf0"]} />
-      <Studio />
+      <color attach="background" args={["#dce0e6"]} />
+      <Suspense fallback={null}>
+        <Studio />
+      </Suspense>
       <StageRuntime />
       <TigerVfx />
       <MbtVfx />
       <CameraRig />
-      <StageEffects />
+      {!qaNoFx && <StageEffects />}
     </Canvas>
   );
 }
 
-/** 程序化 studio 环境：三面柔光箱 + 顶部条形光 + 暗底，无外部 HDR 资产。
- *  明暗对比是金属感的来源——环境若是一块均匀灰，金属反射出来就是灰塑料。 */
+/** Studio 环境：真实 HDRI 环境反射 + 定向硬光/阴影。
+ *
+ *  金属的识别度来自「它反射到了什么」。程序化 Lightformer 只能给几块纯色
+ *  亮斑，反射在枪管上仍像塑料；这里换成 Poly Haven 的 CC0 摄影棚 HDRI
+ *  （studio_small_08_1k.hdr），柔光箱、暗部、地面明暗分界都是真实拍摄的，
+ *  金属表面才能出现连续、带方向的高光。定向光只负责阴影和轮廓，不负责
+ *  主导反射。 */
 function Studio() {
   return (
     <>
-      <ambientLight intensity={0.3} />
+      <ambientLight intensity={0.1} />
       <directionalLight
         castShadow
         position={[5.5, 8.5, 4.5]}
-        intensity={1.9}
+        intensity={1.0}
         shadow-mapSize={[2048, 2048]}
-        shadow-bias={-0.0006}
-        shadow-normalBias={0.012}
+        shadow-bias={-0.0005}
+        shadow-normalBias={0.01}
       >
         <orthographicCamera attach="shadow-camera" args={[-5, 5, 5, -5, 0.1, 40]} />
       </directionalLight>
-      <directionalLight position={[-6, 3.5, -4.5]} intensity={0.34} color="#dfe7f2" />
-      <Environment resolution={128} frames={1}>
-        <color attach="background" args={["#aab2bc"]} />
-        <Lightformer
-          form="rect"
-          intensity={3.4}
-          position={[0, 6.5, 1.5]}
-          rotation-x={Math.PI / 2}
-          scale={[9, 5, 1]}
-        />
-        <Lightformer
-          form="rect"
-          intensity={2.0}
-          position={[-6.5, 3, 2]}
-          rotation-y={Math.PI / 2}
-          scale={[6, 4, 1]}
-        />
-        <Lightformer
-          form="rect"
-          intensity={1.4}
-          position={[6.5, 2.5, -2]}
-          rotation-y={-Math.PI / 2}
-          scale={[6, 4, 1]}
-        />
-        <Lightformer form="ring" intensity={1.1} position={[0, 3, -7]} scale={4} />
-        {/* 暗底：给金属一条明确的地平线，反射里才有明暗分界 */}
-        <Lightformer
-          form="rect"
-          color="#1d2126"
-          intensity={0.16}
-          position={[0, -3.2, 0]}
-          rotation-x={-Math.PI / 2}
-          scale={[16, 12, 1]}
-        />
-      </Environment>
-      <SceneEnvIntensity value={1.4} />
+      <directionalLight position={[-6, 3.5, -4.5]} intensity={0.25} color="#dfe7f2" />
+      {/* 右前方补光：机匣观察窗/抛壳窗内部在主光背面，纯 PBR 金属会黑成一片。
+          这盏无阴影点光模拟展示台的低强度补光，让枪机、闭锁面读得出来。 */}
+      <pointLight position={[1.35, 0.95, 0.75]} intensity={2.0} distance={3.2} decay={2} color="#e8eef8" />
+      {/* 顶部柔光箱：金属机匣/机盖顶面在 HDRI 顶部是暗区，纯 metalness=1 时
+          会黑成一片，弧形机盖的拱面和冲压折边读不出来。用大面积 RectAreaLight
+          模拟摄影棚顶灯，只加宽而柔和的高光，不制造点状爆白。 */}
+      <TopFill />
+      <Environment
+        files="/hdr/studio_small_08_1k.hdr"
+        background={false}
+        environmentIntensity={1.1}
+        environmentRotation={[0, 0.42, 0]}
+      />
+      <SceneEnvIntensity value={1.1} />
     </>
   );
+}
+
+/** 顶部大面积柔光：让机匣/机盖顶面的金属高光连续，而不是黑成一片。 */
+function TopFill() {
+  const scene = useThree((state) => state.scene);
+  useEffect(() => {
+    RectAreaLightUniformsLib.init();
+    const light = new THREE.RectAreaLight(0xf3f6ff, 1.1, 1.25, 0.8);
+    light.name = "stage-top-fill";
+    light.position.set(0, 1.45, 0.35);
+    light.lookAt(0, 0.18, 0);
+    scene.add(light);
+    return () => {
+      scene.remove(light);
+      light.dispose();
+    };
+  }, [scene]);
+  return null;
 }
 
 /** 环境反射总强度（three r163+ 的 Scene.environmentIntensity）。 */
@@ -161,16 +175,23 @@ function StageEffects() {
   if (xray) return null;
   return (
     <EffectComposer multisampling={4}>
-      <N8AO halfRes quality="medium" aoRadius={0.45} intensity={1.15} distanceFalloff={0.9} color="#26303c" />
-      <Bloom luminanceThreshold={0.88} luminanceSmoothing={0.22} intensity={0.55} mipmapBlur />
+      <Bloom luminanceThreshold={0.95} luminanceSmoothing={0.25} intensity={0.3} mipmapBlur />
       <Vignette offset={0.32} darkness={0.28} />
     </EffectComposer>
   );
 }
 
+/** QA 截图开关：?qa-nofx=1 时跳过 Bloom/Vignette，避免 SwiftShader 后处理把
+ *  截图合成成残影；正式展示不带这个参数，效果不变。 */
+const qaNoFx =
+  import.meta.env.DEV &&
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).has("qa-nofx");
+
 function StageRuntime() {
   const modelId = useStageStore((state) => state.modelId);
   const rebuildToken = useStageStore((state) => state.rebuildToken);
+  const worn = useStageStore((state) => state.worn);
   const overrides = useStageStore((state) => state.overrides);
   const views = useStageStore((state) => state.views);
   const buildIndex = useStageStore((state) => state.buildIndex);
@@ -204,7 +225,7 @@ function StageRuntime() {
     const source = variant?.registry ?? model.registry;
     if (!source) return;
     const store = useStageStore.getState();
-    const key = `${modelId}|${variantId}|${damageSeed}|${JSON.stringify(overrides)}`;
+    const key = `${modelId}|${variantId}|${damageSeed}|${worn ? "worn" : "new"}|${JSON.stringify(overrides)}`;
     const previousKey = currentKeyRef.current;
     const cache = cacheRef.current;
     setBuildError(null);
@@ -290,6 +311,13 @@ function StageRuntime() {
     const tMat = performance.now();
     try {
       library = createMaterialLibrary(registry.materials);
+      if (worn) {
+        for (const material of Object.values(library.materials)) {
+          material.color.multiplyScalar(0.55);
+          material.roughness = Math.min(1, material.roughness + 0.18);
+          material.envMapIntensity = Math.max(0.4, material.envMapIntensity - 0.6);
+        }
+      }
       const tBuild = performance.now();
       next = buildModel(registry, {
         builders: model.builders,
@@ -364,7 +392,7 @@ function StageRuntime() {
     }
     mount(next, stats, home, floor);
     return cleanupFor(next);
-  }, [modelId, variantId, rebuildToken, overrides, damageSeed, gl, rootScene, camera]);
+  }, [modelId, variantId, rebuildToken, overrides, damageSeed, worn, gl, rootScene, camera]);
 
   // 组件卸载时释放所有缓存模型；模型切换时只是缓存/复用，不立即销毁。
   useEffect(() => {
@@ -533,6 +561,12 @@ function StageRuntime() {
     if (!qa) return;
     (window as unknown as { __stage?: unknown }).__stage = {
       store: useStageStore,
+      // 当前目录项本体：QA 可在控制台替换 animate() 把机构钉在指定相位，
+      // 不必依赖动态 import（HMR 会生成第二份模块实例，改了不生效）。
+      // 用 getter：切模型时 assembled 可能被复用，effect 不重跑，直接读会永远停在 test。
+      get model() {
+        return findModel(useStageStore.getState().modelId);
+      },
       assembled,
       scene: three.scene,
       camera: three.camera,
@@ -547,6 +581,39 @@ function StageRuntime() {
       },
     };
   }, [assembled, three]);
+
+  // M134 观察窗检查灯：只在加特林右前方补一点无阴影白光，让 6 套枪机的
+  // 圆柱面/闭锁凸笋在深色机匣里读得出来。命令式挂到 scene 上，跟随模型
+  // 切换增删；不用 JSX 灯是为了避开装配体重建时的场景清理。
+  useEffect(() => {
+    if (modelId !== "m134") return;
+    const light = new THREE.PointLight(0xeef2f8, 0.8, 0.9, 2);
+    light.name = "m134-inspection-light";
+    light.position.set(0.4, 0.43, -0.06);
+    three.scene.add(light);
+    return () => {
+      three.scene.remove(light);
+      light.dispose();
+    };
+  }, [modelId, three.scene]);
+
+  // AK / RPK 抛壳窗检查灯：从右前方补一点冷白光，照进加长后的抛壳窗，
+  // 让枪机框圆柱面、拉机柄和回转枪机头在深色机匣里读得出来。
+  useEffect(() => {
+    if (modelId !== "ak47" && modelId !== "rpk") return;
+    // 用面光源而不是点光：点光在抛壳窗旁边的烤蓝钢板上打出一个白点，
+    // 面光在平板上形成柔和的长方形柔光箱反射，枪机框圆柱面也能读出圆度。
+    RectAreaLightUniformsLib.init();
+    const light = new THREE.RectAreaLight(0xeef3ff, 1.05, 0.34, 0.14);
+    light.name = "ak-inspection-light";
+    light.position.set(0.16, 0.30, -0.07);
+    light.lookAt(0, 0.30, -0.07);
+    three.scene.add(light);
+    return () => {
+      three.scene.remove(light);
+      light.dispose();
+    };
+  }, [modelId, three.scene]);
 
   if (!assembled && !buildError) return null;
 

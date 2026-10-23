@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { mirrorGeometry } from "../kernel/geometry";
+import { computeTangentsSafe, mirrorGeometry } from "../kernel/geometry";
 import { resolveConstants } from "../registry/expression";
 import type {
   BuildLayer,
@@ -362,8 +362,9 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
   // ---- 装配 ----
   const fallbackMaterial = new THREE.MeshStandardMaterial({
     color: 0x9aa0a6,
-    metalness: 0.4,
-    roughness: 0.6,
+    metalness: 1,
+    roughness: 0.42,
+    envMapIntensity: 1.25,
   });
   const materialFor = (name: string): THREE.Material => options.materials?.[name] ?? fallbackMaterial;
   const parts: PartHandle[] = [];
@@ -391,6 +392,11 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
       throw new Error(
         `assembler：零件 "${item.id}" 声明了 ${item.def.materialGroups.length} 个材质组，但几何只有 ${geometry.groups.length} 个 group`,
       );
+    }
+    // 各向异性材质（拉丝钢）需要稳定的切线基：给几何补一份安全 tangent。
+    // 否则 three 用 UV 导数重建切线，UV 退化的三角形会产生 NaN → 金属发黑。
+    if (!item.def.materialGroups?.length && (material as THREE.MeshPhysicalMaterial).anisotropy > 0) {
+      computeTangentsSafe(geometry);
     }
     const count = item.def.instances ?? 1;
     const instanceNodes = item.def.instance_nodes ?? null;

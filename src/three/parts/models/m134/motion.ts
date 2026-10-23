@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { BELT_PITCH, BELT_LINKS, BELT_X0, BELT_Y, BELT_Z } from "./belt";
 import { M134_CONSTANTS } from "./constants";
+import { M134_BOLT_DETAIL_OFFSETS } from "./extra";
 import type { AssembledModel } from "@/three/parts";
 
 // ============================================================================
@@ -89,10 +90,41 @@ export function animateM134(
   if (rotor) rotor.rotation.z = angle;
   if (gear) gear.rotation.z = angle * 0.28; // 36:10 减速比的反向表达
 
+  // 6 根枪管/枪管子件是 instanced（instance_layout 没有 instance_nodes），
+  // 不会自动继承 M134Rotor 的旋转。这里把它们作为一个刚性管束绕枪轴
+  // 一起转：枪管、枪口螺帽、准星、膛线全部同步，否则会出现“管束不转、
+  // 只有转子骨架在转”的假动作。绕 (0, SY) 旋转，而不是绕世界原点。
+  const clusterPivot = new THREE.Matrix4().makeTranslation(0, SY, 0);
+  const clusterPivotInv = new THREE.Matrix4().makeTranslation(0, -SY, 0);
+  const clusterSpin = new THREE.Matrix4()
+    .copy(clusterPivot)
+    .multiply(new THREE.Matrix4().makeRotationZ(angle))
+    .multiply(clusterPivotInv);
+  const clusterMatrix = new THREE.Matrix4();
+  for (const id of [
+    "m134.barrel.barrel",
+    "m134.barrel.nut",
+    "m134.barrel.sleeve",
+    "m134.barrel.front_sight",
+    "m134.barrel.muzzle_nut",
+    "m134.barrel.muzzle_crown",
+    "m134.barrel.rifling",
+  ]) {
+    const handle = assembled.getPart(id);
+    if (!handle) continue;
+    for (let i = 0; i < handle.instances.length; i++) {
+      clusterMatrix.copy(handle.instances[i].restMatrix);
+      clusterMatrix.premultiply(clusterSpin);
+      handle.setInstanceMatrix(i, clusterMatrix);
+    }
+  }
+
   // ---- 6 套独立枪机：随转子公转 + 凸轮槽驱动的往复 ----
   const bolt = assembled.getPart("m134.bolt.bolt");
   const matrix = new THREE.Matrix4();
   const tmp = new THREE.Matrix4();
+  const detailMatrix = new THREE.Matrix4();
+  const detailOffset = new THREE.Matrix4();
   if (bolt) {
     for (let i = 0; i < bolt.instances.length; i++) {
       const theta = angle + (i / COUNT) * Math.PI * 2;
@@ -104,6 +136,14 @@ export function animateM134(
       tmp.makeRotationZ(theta);
       matrix.multiply(tmp.invert());
       bolt.setInstanceMatrix(i, matrix);
+      // 每套枪机的子件跟随同一公转/往复矩阵，只叠加各自的局部偏移。
+      for (const [id, offset] of Object.entries(M134_BOLT_DETAIL_OFFSETS)) {
+        const handle = assembled.getPart(id);
+        if (!handle) continue;
+        detailOffset.makeTranslation(offset[0], offset[1], offset[2]);
+        detailMatrix.copy(matrix).multiply(detailOffset);
+        handle.setInstanceMatrix(i, detailMatrix);
+      }
     }
   }
 
@@ -113,12 +153,24 @@ export function animateM134(
   const sinceShot = (t * shotsPerSec) % 1;
   const firing = mode !== "idle" && sinceShot < 0.35; // 击发瞬间的焰光脉冲
 
-  // 枪口焰 / 曳光：只在击发位闪
+  // 枪口焰 / 曳光：只在击发位闪。静止时必须缩到 0，否则 1m 长的
+  // 曳光柱会平躺在枪口前方，看起来像一段悬空的弹链。
+  const fxPos = new THREE.Vector3(0, 0.032 + SY, 0.62);
+  const fxQuat = new THREE.Quaternion();
   const flash = assembled.getPart("m134.fx.muzzle_flash");
   if (flash) {
     const s = firing ? 1 : 0.0001;
-    matrix.makeScale(s, s, s);
+    matrix.compose(fxPos, fxQuat, new THREE.Vector3(s, s, s));
     flash.setInstanceMatrix(0, matrix);
+  }
+  const tracer = assembled.getPart("m134.fx.tracer");
+  if (tracer) {
+    // 曳光柱几何沿局部 +Y 生长，绕 X 转 90° 后沿枪管 +Z 出膛。
+    const tracerQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
+    const tracerPos = new THREE.Vector3(0, 0.032 + SY, 0.64);
+    const s = firing ? 1 : 0.0001;
+    matrix.compose(tracerPos, tracerQuat, new THREE.Vector3(s, s, s));
+    tracer.setInstanceMatrix(0, matrix);
   }
 
   // ---- 供弹：弹链随射速步进（每发一节）----
@@ -179,6 +231,15 @@ export function animateM134(
 /** motionParts：由 animate 直接改写实例矩阵的零件。 */
 export const M134_MOTION_PARTS = [
   "m134.bolt.bolt",
+  "m134.bolt.carrier",
+  "m134.bolt.firing_pin",
+  "m134.bolt.extractor",
+  "m134.bolt.cam_pin",
+  "m134.bolt.return_spring",
+  "m134.bolt.locking_lug",
+  "m134.bolt.roller",
+  "m134.bolt.roller_pin",
+  "m134.bolt.extractor_spring",
   "m134.belt.link",
   "m134.feed.case",
   "m134.feed.bullet",
@@ -187,4 +248,5 @@ export const M134_MOTION_PARTS = [
   "m134.feed.propellant",
   "m134.fx.brass",
   "m134.fx.muzzle_flash",
+  "m134.fx.tracer",
 ];

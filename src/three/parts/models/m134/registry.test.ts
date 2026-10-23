@@ -42,6 +42,6 @@ describe("m134 注册表回归", () => {
 
   it("枪管束分布半径 + 枪机行程关系（凸轮驱动往复）", () => {
     expect(M134_CONSTANTS.BARREL_RING_R).toBeCloseTo(0.032, 5);
-    expect(M134_CONSTANTS.BOLT_STROKE).toBeCloseTo(0.05, 5);
+    expect(M134_CONSTANTS.BOLT_STROKE).toBeCloseTo(0.065, 5);
   });
 });

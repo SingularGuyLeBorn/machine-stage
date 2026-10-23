@@ -6,6 +6,7 @@ import {
   mergeGeometries,
   tubeGeometry,
 } from "../../kernel/geometry";
+import { box, cylinderX, cylinderY } from "@/three/parts/models/guns7/kits";
 
 type Params = Record<string, unknown>;
 
@@ -27,11 +28,14 @@ const m134Rotor: GeometryBuilder = (spec) => {
   const ringR = num(p, "ringR", 0.032);
   const count = Math.round(num(p, "count", 6));
   const parts: THREE.BufferGeometry[] = [];
-  // 旋转机匣主体（中空筒：6 根枪管从中间穿过）
-  const body = tubeGeometry(r, ringR + 0.009, len, 24);
-  body.rotateX(Math.PI / 2);
-  body.translate(0, 0, len / 2);
-  parts.push(body);
+  // 后段筒身只包住凸轮环/枪机尾座（z 0..0.05）；枪机工作段（0.05..0.14）
+  // 做成开放式骨架：前后环 + 6 条纵向轨。真实 M134 的转子本来就是让枪机
+  // 在导轨之间前后滑动的框架，不是把枪机封在实心筒里——这样从右侧窗口能
+  // 直接看到 6 套枪机随转子公转并往复。
+  const rearTube = tubeGeometry(r, ringR + 0.009, 0.05, 24);
+  rearTube.rotateX(Math.PI / 2);
+  rearTube.translate(0, 0, 0.025);
+  parts.push(rearTube);
   // 6 个枪管孔座（前端凸台，枪管从这里伸出）
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
@@ -45,6 +49,16 @@ const m134Rotor: GeometryBuilder = (spec) => {
   camRing.rotateX(Math.PI / 2);
   camRing.translate(0, 0, 0.008);
   parts.push(camRing);
+  // 开放式枪机笼：6 条**细导杆**（不是宽板），位于相邻枪机之间（偏转 30°），
+  // 径向 45..50mm。原来 7mm 宽的板条从侧面看会把枪机整排挡住；改成 2.6mm
+  // 圆角方杆后，窗口里能直接看到枪机本体的往复，杆只作为转子框架的读点。
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 + Math.PI / count;
+    const rail = bevelBoxGeometry(0.0026, 0.0045, 0.09, 0.0004, 1);
+    rail.rotateZ(angle);
+    rail.translate(Math.cos(angle) * 0.0475, Math.sin(angle) * 0.0475, 0.095);
+    parts.push(rail);
+  }
   // 转子前端面环
   const front = latheGeometry(
     [
@@ -83,14 +97,31 @@ const m134Housing: GeometryBuilder = (spec) => {
   bottom.translate(0, -h / 2 + 0.003, (z0 + z1) / 2);
   parts.push(bottom);
   // 两侧板（后段：包住电机；前段开口让旋转机匣露出）
-  for (const side of [-1, 1]) {
+  // 左侧：整块侧板 + 抛壳导板（抛壳口在左侧）
+  {
     const rearPlate = new THREE.BoxGeometry(0.006, h, 0.14);
-    rearPlate.translate(side * (w / 2 - 0.003), 0, z0 + 0.07);
+    rearPlate.translate(-(w / 2 - 0.003), 0, z0 + 0.07);
     parts.push(rearPlate);
-    // 抛壳口下沿（左侧的抛壳导板）
     const chute = new THREE.BoxGeometry(0.004, 0.05, 0.06);
-    chute.translate(side * (w / 2 - 0.003), -0.02, -0.02);
+    chute.translate(-(w / 2 - 0.003), -0.02, -0.02);
     parts.push(chute);
+  }
+  // 右侧：上/下两段侧板，中间留出观察窗（z -0.18..-0.06, y -0.02..+0.02），
+  //   使 6 套枪机的往复在连发时可见。
+  {
+    const rearPlateUpper = new THREE.BoxGeometry(0.006, 0.05, 0.14);
+    rearPlateUpper.translate(w / 2 - 0.003, h / 2 - 0.025, z0 + 0.07);
+    parts.push(rearPlateUpper);
+    const rearPlateLower = new THREE.BoxGeometry(0.006, 0.05, 0.14);
+    rearPlateLower.translate(w / 2 - 0.003, -h / 2 + 0.025, z0 + 0.07);
+    parts.push(rearPlateLower);
+    // 观察窗边框（机加工倒角）
+    const frameTop = new THREE.BoxGeometry(0.006, 0.004, 0.12);
+    frameTop.translate(w / 2 - 0.003, 0.022, z0 + 0.07);
+    parts.push(frameTop);
+    const frameBottom = new THREE.BoxGeometry(0.006, 0.004, 0.12);
+    frameBottom.translate(w / 2 - 0.003, -0.022, z0 + 0.07);
+    parts.push(frameBottom);
   }
   // 供弹机座（顶部：弹链从这里进入旋转机匣的进弹位置）
   const feedBase = new THREE.BoxGeometry(0.07, 0.03, 0.08);
@@ -100,6 +131,188 @@ const m134Housing: GeometryBuilder = (spec) => {
   const motorSeat = new THREE.BoxGeometry(w * 0.7, 0.05, 0.06);
   motorSeat.translate(0, -0.02, z0 + 0.03);
   parts.push(motorSeat);
+  const merged = mergeGeometries(parts);
+  for (const piece of parts) piece.dispose();
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
+// m134FrontHousing —— 固定机匣前段闭合壳：左右侧板 + 前端框 + 枪管束导环 +
+// 抛壳槽 + 耳轴座。后段仍由 m134Housing 的电机座/侧板承担。
+// 局部系：origin = 旋转轴中心，几何按模型坐标布置。
+// ---------------------------------------------------------------------------
+const m134FrontHousing: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.13);
+  const h = num(p, "h", 0.15);
+  const z0 = num(p, "z0", -0.20);
+  const z1 = num(p, "z1", 0.06);
+  const parts: THREE.BufferGeometry[] = [];
+  const len = z1 - z0;
+  const zc = (z0 + z1) / 2;
+
+  // 左侧：整块侧板 + 加强筋。右侧：只留上下/前后边框，中间开一个
+  // 覆盖枪机实际行程（世界 z -0.16..-0.01、y ±0.045）的大观察窗。
+  // 原来的整块右墙在 z -0.20..0.06 把 6 套枪机完全挡住；电机/供弹机都
+  // 在窗口之外，所以这个开口是纯展示性 cutaway，不切断承力件。
+  {
+    const leftWall = bevelBoxGeometry(0.006, h, len, 0.0008, 1);
+    leftWall.translate(-(w / 2 - 0.003), 0, zc);
+    parts.push(leftWall);
+    const leftRib = bevelBoxGeometry(0.0018, 0.010, len * 0.74, 0.0004, 1);
+    leftRib.translate(-(w / 2 + 0.0008), -0.022, zc + 0.01);
+    parts.push(leftRib);
+
+    const x = w / 2 - 0.003;
+    const topStrip = bevelBoxGeometry(0.006, 0.030, len, 0.0008, 1);
+    topStrip.translate(x, h / 2 - 0.015, zc);
+    parts.push(topStrip);
+    const bottomStrip = bevelBoxGeometry(0.006, 0.030, len, 0.0008, 1);
+    bottomStrip.translate(x, -h / 2 + 0.015, zc);
+    parts.push(bottomStrip);
+    const rearStrip = bevelBoxGeometry(0.006, 0.090, 0.040, 0.0008, 1);
+    rearStrip.translate(x, 0, z0 + 0.020);
+    parts.push(rearStrip);
+    const frontStrip = bevelBoxGeometry(0.006, 0.090, 0.070, 0.0008, 1);
+    frontStrip.translate(x, 0, z1 - 0.035);
+    parts.push(frontStrip);
+    // 窗口倒角框：略高于侧板，读作机加工 cutaway 边缘，而不是破洞。
+    const rimY = 0.047;
+    for (const y of [-1, 1]) {
+      const rim = bevelBoxGeometry(0.008, 0.005, 0.158, 0.001, 1);
+      rim.translate(x + 0.001, y * rimY, zc);
+      parts.push(rim);
+    }
+    for (const z of [z0 + 0.042, z1 - 0.072]) {
+      const rim = bevelBoxGeometry(0.008, 0.094, 0.005, 0.001, 1);
+      rim.translate(x + 0.001, 0, z);
+      parts.push(rim);
+    }
+    // 下边框上的一道压筋，保留固定机匣的冲压感。
+    const rightRib = bevelBoxGeometry(0.0018, 0.010, len * 0.74, 0.0004, 1);
+    rightRib.translate(x + 0.0008, -h / 2 + 0.022, zc + 0.01);
+    parts.push(rightRib);
+  }
+
+  // 前端框：上下横梁 + 左右立柱，中间留 90×90mm 枪管束出口
+  const barT = 0.030;
+  for (const y of [-1, 1]) {
+    const bar = bevelBoxGeometry(w, barT, 0.010, 0.0008, 1);
+    bar.translate(0, y * (h / 2 - barT / 2), z1);
+    parts.push(bar);
+  }
+  for (const side of [-1, 1]) {
+    const post = bevelBoxGeometry(0.020, h - barT * 2, 0.010, 0.0008, 1);
+    post.translate(side * (w / 2 - 0.010), 0, z1);
+    parts.push(post);
+  }
+
+  // 枪管束导环：环内径 43mm，六根枪管从中间穿过
+  const collar = tubeGeometry(0.050, 0.043, 0.010, 28);
+  collar.rotateX(Math.PI / 2);
+  collar.translate(0, 0, z1 + 0.005);
+  parts.push(collar);
+
+  // 左侧抛壳槽：空壳从机匣左下侧排出
+  const chute = bevelBoxGeometry(0.038, 0.036, 0.075, 0.0012, 1);
+  chute.translate(-(w / 2 + 0.014), -0.036, -0.065);
+  parts.push(chute);
+  const chuteLip = bevelBoxGeometry(0.042, 0.005, 0.008, 0.0006, 1);
+  chuteLip.translate(-(w / 2 + 0.014), -0.052, -0.030);
+  parts.push(chuteLip);
+
+  // 左右耳轴座（枪架抱箍的连接点）
+  for (const side of [-1, 1]) {
+    const boss = new THREE.CylinderGeometry(0.018, 0.018, 0.024, 16);
+    boss.rotateZ(Math.PI / 2);
+    boss.translate(side * (w / 2 + 0.010), -0.010, -0.135);
+    parts.push(boss);
+  }
+
+  const merged = mergeGeometries(parts);
+  for (const piece of parts) piece.dispose();
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
+// m134FeedCover —— 供弹机大盖：把脱链器/拨链轮/链道盖住，正常状态只见
+// 一个带铰链和卡榫的盒盖。
+// 局部系：origin = 供弹机中心，几何按模型坐标布置。
+// ---------------------------------------------------------------------------
+const m134FeedCover: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const w = num(p, "w", 0.086);
+  const y = num(p, "y", 0.098);
+  const zc = num(p, "zc", -0.020);
+  const parts: THREE.BufferGeometry[] = [];
+  const top = bevelBoxGeometry(w, 0.014, 0.125, 0.0012, 1);
+  top.translate(0, y, zc);
+  parts.push(top);
+  const rib = bevelBoxGeometry(w * 0.78, 0.005, 0.104, 0.0008, 1);
+  rib.translate(0, y + 0.0095, zc);
+  parts.push(rib);
+  for (const side of [-1, 1]) {
+    const skirt = bevelBoxGeometry(0.004, 0.022, 0.118, 0.0008, 1);
+    skirt.translate(side * (w / 2 - 0.002), y - 0.012, zc);
+    parts.push(skirt);
+  }
+  const hinge = new THREE.CylinderGeometry(0.004, 0.004, 0.082, 12);
+  hinge.rotateZ(Math.PI / 2);
+  hinge.translate(0, y - 0.002, zc - 0.058);
+  parts.push(hinge);
+  const latch = bevelBoxGeometry(0.018, 0.012, 0.012, 0.0007, 1);
+  latch.translate(0, y - 0.005, zc + 0.058);
+  parts.push(latch);
+  const merged = mergeGeometries(parts);
+  for (const piece of parts) piece.dispose();
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
+// m134BarrelShroud —— 枪管护罩：固定筒壳 + 四道加强箍 + 六条纵向筋，
+// 从固定机匣前端伸到枪管中段；枪口段六管仍外露。
+// 局部系：origin = 旋转轴中心，几何按模型坐标布置。
+// ---------------------------------------------------------------------------
+const m134BarrelShroud: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: Params }).params;
+  const rOuter = num(p, "rOuter", 0.058);
+  const rInner = num(p, "rInner", 0.050);
+  const z0 = num(p, "z0", 0.075);
+  const z1 = num(p, "z1", 0.225);
+  const parts: THREE.BufferGeometry[] = [];
+  const len = z1 - z0;
+  const zc = (z0 + z1) / 2;
+  const tube = tubeGeometry(rOuter, rInner, len, 32);
+  tube.rotateX(Math.PI / 2);
+  tube.translate(0, 0, zc);
+  parts.push(tube);
+
+  // 四道加强箍
+  for (const t of [0.10, 0.38, 0.66, 0.92]) {
+    const band = tubeGeometry(rOuter + 0.004, rInner, 0.009, 32);
+    band.rotateX(Math.PI / 2);
+    band.translate(0, 0, z0 + len * t);
+    parts.push(band);
+  }
+
+  // 六条纵向加强筋
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    const rib = bevelBoxGeometry(0.008, 0.006, len * 0.86, 0.0006, 1);
+    rib.rotateZ(angle);
+    rib.translate(Math.cos(angle) * (rOuter + 0.002), Math.sin(angle) * (rOuter + 0.002), zc);
+    parts.push(rib);
+  }
+
+  // 前端箍 + 顶部提把导轨
+  const frontRing = tubeGeometry(rOuter + 0.006, rInner, 0.012, 32);
+  frontRing.rotateX(Math.PI / 2);
+  frontRing.translate(0, 0, z1 - 0.004);
+  parts.push(frontRing);
+  const rail = bevelBoxGeometry(0.022, 0.008, len * 0.84, 0.0008, 1);
+  rail.translate(0, rOuter + 0.007, zc);
+  parts.push(rail);
+
   const merged = mergeGeometries(parts);
   for (const piece of parts) piece.dispose();
   return merged;
@@ -236,35 +449,83 @@ const m134Delinker: GeometryBuilder = (spec) => {
 // m134Mount —— 枪架（立柱 + 耳轴座）：加特林装在载具/三脚架上。
 // 局部系：origin = 枪架顶（耳轴中心）。
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// m134Mount —— 铳架/基座（取代原来的绿色圆盘）。
+//
+// 真实 M134 的支架是**枪架**（pintle）：底板 + 垂直立柱 + 两叉耳（trunnion）
+// + 锁紧手柄，枪机座在叉耳之间俯仰。这里做机加工钢件，不是圆盘。
+// 局部系：origin = 机匣底座下的安装面，+Y 向上。
+// ---------------------------------------------------------------------------
 const m134Mount: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Params }).params;
   const drop = num(p, "drop", 0.18);
   const parts: THREE.BufferGeometry[] = [];
+  // 底板：阶梯机加工底板
+  const foot = box(0.16, 0.008, 0.06, 0.002);
+  foot.translate(0, -0.012, 0);
+  parts.push(foot);
+  const deck = box(0.14, 0.006, 0.048, 0.0015);
+  deck.translate(0, -0.003, 0);
+  parts.push(deck);
+  const topPlate = box(0.12, 0.002, 0.04, 0.001);
+  topPlate.translate(0, 0.002, 0);
+  parts.push(topPlate);
   // 立柱
-  const post = new THREE.CylinderGeometry(0.022, 0.026, drop, 14);
-  post.translate(0, -drop / 2, 0);
+  const postH = Math.max(drop - 0.16, 0.03);
+  const post = cylinderY(0.014, postH, 32);
+  post.translate(0, -0.012 + postH / 2, 0);
   parts.push(post);
-  // 耳轴座（顶部 U 形叉）
+  const footFlange = cylinderY(0.024, 0.008, 32);
+  footFlange.translate(0, -0.008, 0);
+  parts.push(footFlange);
+  const topFlange = cylinderY(0.020, 0.006, 32);
+  topFlange.translate(0, -0.012 + postH, 0);
+  parts.push(topFlange);
+  // 叉耳（trunnion）：左右两片，包住机匣尾部
   for (const side of [-1, 1]) {
-    const fork = new THREE.BoxGeometry(0.008, 0.05, 0.03);
-    fork.translate(side * 0.06, 0.012, 0);
+    const fork = box(0.006, 0.055, 0.04, 0.001);
+    fork.translate(side * 0.062, -0.012 + postH + 0.015, 0);
     parts.push(fork);
+    const cap = box(0.006, 0.008, 0.04, 0.0006);
+    cap.translate(side * 0.062, -0.012 + postH + 0.046, 0);
+    parts.push(cap);
   }
-  const base = new THREE.BoxGeometry(0.13, 0.008, 0.05);
-  base.translate(0, -0.012, 0);
-  parts.push(base);
-  // 底板（圆形底座）
-  const plate = new THREE.CylinderGeometry(0.09, 0.09, 0.012, 16);
-  plate.translate(0, -drop + 0.006, 0);
-  parts.push(plate);
+  // 锁紧手柄
+  const knobStem = cylinderX(0.0035, 0.024, 20);
+  knobStem.translate(0.016, -0.012 + postH * 0.5, 0);
+  parts.push(knobStem);
+  const knob = latheGeometry(
+    [
+      [0, -0.006],
+      [0.009, -0.006],
+      [0.011, -0.003],
+      [0.011, 0.003],
+      [0.009, 0.006],
+      [0, 0.006],
+    ],
+    24,
+  );
+  knob.rotateZ(Math.PI / 2);
+  knob.translate(0.030, -0.012 + postH * 0.5, 0);
+  parts.push(knob);
+  // 铆钉列
+  for (const z of [-0.015, 0, 0.015]) {
+    const rivet = cylinderY(0.002, 0.004, 12);
+    rivet.translate(0.055, -0.006, z);
+    parts.push(rivet);
+  }
   const merged = mergeGeometries(parts);
   for (const piece of parts) piece.dispose();
   return merged;
-};
+};;
+
 
 export const m134KitBuilders: Record<string, GeometryBuilder> = {
   m134Rotor,
   m134Housing,
+  m134FrontHousing,
+  m134FeedCover,
+  m134BarrelShroud,
   m134Bolt,
   m134Motor,
   m134Delinker,

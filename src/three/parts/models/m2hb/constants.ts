@@ -36,7 +36,7 @@ export const M2HB_CONSTANTS = {
 
   // ---- 供弹（M9 可散链，从左侧进、空链右侧出）----
   BELT_PITCH: 0.035, // M9 链节距
-  BELT_LINKS: 14, // 可见链节
+  BELT_LINKS: 17, // 可见链节
   FEED_PATH_Y: 0.026, // 供弹通道高度
   FEED_PATH_Z0: -0.12, // 供弹口（链入口）
   FEED_PATH_Z1: 0.01, // 拨弹到位（抱弹）

@@ -25,6 +25,11 @@ export type TexturePreset =
   | "primer"
   | "none";
 
+/** 真实金属 PBR 贴图组（public/textures/metal 下的 ambientCG CC0 资产）。 */
+export type MetalPbrPreset = "brushed" | "scratched" | "plates" | "rust";
+/** 外部 PBR 贴图组：金属 + 胡桃木。 */
+export type PbrPreset = MetalPbrPreset | "wood";
+
 export interface MaterialSpec {
   /** 基色（最终观感主色）。 */
   base: string;
@@ -49,6 +54,26 @@ export interface MaterialSpec {
   vertexColors?: boolean;
   /** 战术编号 / 贴花：canvas 文字贴图（透明底，白字黑边）。 */
   decal?: string;
+  /**
+   * 真实金属 PBR 贴图组。指定后，程序化 map/roughnessMap/normalMap 作为
+   * 加载中的回退，贴图加载完成后替换为 Metal009/Metal038/MetalPlates001/
+   * Metal041B 的 color + normal + roughness (+ metalness) 贴图。
+   */
+  pbr?: PbrPreset;
+  /** 金属法线强度（0 关闭，1 原图）。默认 0.55，避免 1K 法线在枪械小件上过噪。 */
+  normalScale?: number;
+  /** 拉丝金属的各向异性强度（0~1）；会强制使用 MeshPhysicalMaterial。 */
+  anisotropy?: number;
+  /** 各向异性方向（弧度），默认 0。 */
+  anisotropyRotation?: number;
+  /** 金属度贴图强度：默认 0（不挂 metalnessMap，保证金属度恒为 1）。 */
+  metalnessMapIntensity?: number;
+  /**
+   * 是否用外部 PBR 的 Color 贴图作为基色。默认 true。
+   * 黄铜/紫铜等有色金属要关掉：ambientCG 金属 Color 贴图是灰白的，
+   * 直接乘上去会把黄铜洗成灰色；这类材质用基色 + 粗糙度/法线贴图。
+   */
+  pbrColor?: boolean;
 }
 
 export interface TextureSet {
@@ -649,6 +674,157 @@ function decalTexture(text: string): THREE.CanvasTexture | null {
   return texture;
 }
 
+// ---------------------------------------------------------------------------
+// 真实金属 PBR 贴图：ambientCG 1K CC0 资产（public/textures/metal）。
+//
+// 为什么需要外部贴图：程序化 canvas 只能给出「像金属的噪声」，给不出真实
+// 拉丝方向、轧制划痕、板缝和锈蚀边缘。金属的识别度一半来自反射，另一半
+// 来自这些微观起伏。贴图异步加载，加载完成前保留程序化贴图作为回退，
+// 因此测试环境（jsdom，无 Image）仍可同步构建材质。
+// ---------------------------------------------------------------------------
+const PBR_FILES: Record<
+  PbrPreset,
+  {
+    base: string;
+    color: string;
+    normal: string;
+    roughness: string;
+    metalness?: string;
+    srgb: boolean;
+  }
+> = {
+  brushed: {
+    base: "/textures/metal/Metal009/Metal009_1K-JPG_",
+    color: "Color",
+    normal: "NormalGL",
+    roughness: "Roughness",
+    metalness: "Metalness",
+    srgb: true,
+  },
+  scratched: {
+    base: "/textures/metal/Metal038/Metal038_1K-JPG_",
+    color: "Color",
+    normal: "NormalGL",
+    roughness: "Roughness",
+    metalness: "Metalness",
+    srgb: true,
+  },
+  plates: {
+    base: "/textures/metal/MetalPlates001/MetalPlates001_1K-JPG_",
+    color: "Color",
+    normal: "NormalGL",
+    roughness: "Roughness",
+    metalness: "Metalness",
+    srgb: true,
+  },
+  rust: {
+    base: "/textures/metal/Metal041B/Metal041B_1K-JPG_",
+    color: "Color",
+    normal: "NormalGL",
+    roughness: "Roughness",
+    metalness: "Metalness",
+    srgb: true,
+  },
+  wood: {
+    base: "/textures/wood/Wood027/Wood027_1K-JPG_",
+    color: "Color",
+    normal: "NormalGL",
+    roughness: "Roughness",
+    srgb: true,
+  },
+};
+
+interface MetalPbrSet {
+  color: THREE.Texture;
+  normal: THREE.Texture;
+  roughness: THREE.Texture;
+  metalness: THREE.Texture | null;
+  expected: number;
+  ready: boolean;
+  callbacks: Set<(set: MetalPbrSet) => void>;
+}
+
+const metalPbrCache = new Map<string, MetalPbrSet>();
+
+/** 创建（或复用）一组外部 PBR 贴图；贴图异步加载，全部就绪后触发 ready。 */
+function metalPbrSet(preset: PbrPreset, repeat: [number, number]): MetalPbrSet | null {
+  // Node / jsdom 没有可用的 Image 加载器；保持程序化回退。
+  if (typeof document === "undefined") return null;
+  const key = `${preset}:${repeat[0]}x${repeat[1]}`;
+  const cached = metalPbrCache.get(key);
+  if (cached) return cached;
+
+  const meta = PBR_FILES[preset];
+  const loader = new THREE.TextureLoader();
+  let loaded = 0;
+  let failed = false;
+  let finishIfReady: () => void = () => {};
+  const make = (file: string, colorSpace: THREE.ColorSpace): THREE.Texture => {
+    const texture = loader.load(
+      `${meta.base}${file}.jpg`,
+      () => {
+        loaded += 1;
+        finishIfReady();
+      },
+      undefined,
+      () => {
+        failed = true;
+      },
+    );
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(repeat[0], repeat[1]);
+    texture.anisotropy = 8;
+    texture.colorSpace = colorSpace;
+    return texture;
+  };
+
+  const expected = meta.metalness ? 4 : 3;
+  const set: MetalPbrSet = {
+    color: make(meta.color, THREE.SRGBColorSpace),
+    normal: make(meta.normal, THREE.NoColorSpace),
+    roughness: make(meta.roughness, THREE.NoColorSpace),
+    metalness: meta.metalness ? make(meta.metalness, THREE.NoColorSpace) : null,
+    expected,
+    ready: false,
+    callbacks: new Set(),
+  };
+  finishIfReady = () => {
+    if (set.ready || failed || loaded < expected) return;
+    set.ready = true;
+    for (const callback of set.callbacks) callback(set);
+    set.callbacks.clear();
+  };
+  metalPbrCache.set(key, set);
+  return set;
+}
+
+/** 将已就绪的外部贴图挂到材质上；未就绪时注册回调。 */
+function applyMetalPbr(
+  material: THREE.MeshStandardMaterial,
+  spec: MaterialSpec,
+  set: MetalPbrSet,
+): void {
+  const assign = (ready: MetalPbrSet) => {
+    // 金属件的基色就是它的镜面反射率（F0）。ambientCG 金属 Color 贴图是
+    // 通用灰钢板（sRGB 0.6），直接乘上去会把烤蓝钢压到 0.05 反射率 →
+    // 在任何环境里都是死黑。所以金属件只用这套贴图的粗糙度/法线（真正的
+    // 拉丝、划痕、板缝起伏），基色由材质 color 决定。
+    const useColorMap = spec.pbrColor === true || (spec.pbrColor === undefined && spec.metalness < 0.5);
+    if (useColorMap) {
+      material.map = ready.color;
+    } else {
+      material.map = null;
+    }
+    material.roughnessMap = ready.roughness;
+    material.normalMap = ready.normal;
+    material.normalScale.setScalar(spec.normalScale ?? 0.55);
+    // 真实枪钢的金属度是 1.0；ambientCG 的 Metalness 贴图会带灰尘/氧化暗斑，\n    // 默认不挂 metalnessMap，避免把钢的金属度压到 0.6 而变成塑料。只有显式\n    // 声明 metalnessMapIntensity > 0 的材质才使用贴图。\n    if ((spec.metalnessMapIntensity ?? 0) > 0 && ready.metalness) {\n      material.metalnessMap = ready.metalness;\n    } else {\n      material.metalnessMap = null;\n    }
+    material.needsUpdate = true;
+  };
+  if (set.ready) assign(set);
+  else set.callbacks.add(assign);
+}
+
 /** 由材质声明批量构建 THREE 材质库；返回 dispose 统一释放。
  *  金属三要素都在这里落地：metalness 分档 / roughness 不与全场一致 / envMapIntensity 让反射可见。 */
 export function createMaterialLibrary(specs: Record<string, MaterialSpec>): {
@@ -674,13 +850,15 @@ export function createMaterialLibrary(specs: Record<string, MaterialSpec>): {
       flatShading: spec.flatShading ?? false,
       vertexColors: spec.vertexColors ?? false,
     };
-    // 漆面用 physical（clearcoat）：标准材质给不出清漆的二次高光。
+    // 漆面 / 拉丝金属用 physical：标准材质给不出清漆二次高光与各向异性拉丝高光。
     const material =
-      spec.clearcoat && spec.clearcoat > 0
+      (spec.clearcoat && spec.clearcoat > 0) || (spec.anisotropy && spec.anisotropy > 0)
         ? new THREE.MeshPhysicalMaterial({
             ...params,
-            clearcoat: spec.clearcoat,
+            clearcoat: spec.clearcoat ?? 0,
             clearcoatRoughness: spec.clearcoatRoughness ?? 0.3,
+            anisotropy: spec.anisotropy ?? 0,
+            anisotropyRotation: spec.anisotropyRotation ?? 0,
           })
         : new THREE.MeshStandardMaterial(params);
     if (spec.emissive) {
@@ -696,6 +874,10 @@ export function createMaterialLibrary(specs: Record<string, MaterialSpec>): {
       usedTextures.add(set.map);
       usedTextures.add(set.roughnessMap);
       usedTextures.add(set.normalMap);
+    }
+    if (spec.pbr) {
+      const set = metalPbrSet(spec.pbr, spec.repeat ?? [1, 1]);
+      if (set) applyMetalPbr(material, spec, set);
     }
     material.name = name;
     if (spec.decal) {

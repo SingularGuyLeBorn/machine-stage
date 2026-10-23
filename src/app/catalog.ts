@@ -51,14 +51,43 @@ import {
   t800AllBuilders,
 } from "@/three/parts/models/t800/registry";
 import { animateT800, t800Readouts } from "@/three/parts/models/t800/motion";
-import { AK47_BUILDERS, makeAk47Layouts, makeAk47Registry } from "@/three/parts/models/ak47/registry";
-import { AK47_MOTION_PARTS, animateAk47, getAk47Mode } from "@/three/parts/models/ak47/motion";
-import { M249_BUILDERS, makeM249Layouts, makeM249Registry } from "@/three/parts/models/m249/registry";
-import { M249_MOTION_PARTS, animateM249, getM249Mode } from "@/three/parts/models/m249/motion";
+import {
+  AK47_BUILDERS as AK47_G7_BUILDERS,
+  makeAk47Layouts as makeAk47G7Layouts,
+  makeAk47Registry as makeAk47G7Registry,
+} from "@/three/parts/models/guns7/ak47/registry";
+import {
+  AK47_MOTION_PARTS as AK47_G7_MOTION_PARTS,
+  animateAk47 as animateAk47G7,
+} from "@/three/parts/models/guns7/ak47/motion";
+import {
+  BISON_BUILDERS,
+  BISON_LAYOUTS_EXPORT,
+  bisonRegistry,
+} from "@/three/parts/models/guns7/bison/registry";
+import { BISON_MOTION_PARTS, animateBison } from "@/three/parts/models/guns7/bison/motion";
+import {
+  makeRpkRegistry,
+  makeRpkLayouts,
+  RPK_BUILDERS,
+} from "@/three/parts/models/guns7/rpk/registry";
+import { RPK_MOTION_PARTS, animateRpk } from "@/three/parts/models/guns7/rpk/motion";
+import {
+  M60_BUILDERS,
+  makeM60Layouts,
+  makeM60Registry,
+} from "@/three/parts/models/guns7/m60/registry";
+import { M60_MOTION_PARTS, animateM60 } from "@/three/parts/models/guns7/m60/motion";
 import { M2HB_BUILDERS, makeM2hbLayouts, makeM2hbRegistry } from "@/three/parts/models/m2hb/registry";
-import { M2HB_MOTION_PARTS, animateM2hb, getM2hbMode } from "@/three/parts/models/m2hb/motion";
+import { M2HB_MOTION_PARTS, animateM2hb } from "@/three/parts/models/m2hb/motion";
 import { M134_BUILDERS, makeM134Layouts, makeM134Registry } from "@/three/parts/models/m134/registry";
-import { M134_MOTION_PARTS, animateM134, getM134Mode } from "@/three/parts/models/m134/motion";
+import { M134_MOTION_PARTS, animateM134 } from "@/three/parts/models/m134/motion";
+import {
+  type38Builders,
+  type38Layouts,
+  type38Registry,
+} from "@/three/parts/models/guns7/type38/registry";
+import { T38_MOTION_PARTS, animateType38 } from "@/three/parts/models/guns7/type38/motion";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -575,35 +604,40 @@ export const CATALOG: StageModel[] = [
     ],
   },
   {
-    id: "m249",
-    title: "M249 班用自动武器",
-    subtitle: "导气式 + 弹链供弹 · M27 可散链步进 · 快拆枪管",
-    milestone: "M-E",
+    id: "type38",
+    title: "三八式步枪",
+    subtitle: "手动旋转后拉枪机 · 5 发固定弹仓 · 6.5×50mmSR 有坂弹",
+    milestone: "G-1",
     status: "ready",
-    registry: makeM249Registry(),
-    layouts: makeM249Layouts(),
-    builders: M249_BUILDERS,
-    motionParts: M249_MOTION_PARTS,
-    animate: (assembled, seconds) => {
-      animateM249(assembled, seconds, getM249Mode());
+    registry: type38Registry,
+    layouts: type38Layouts,
+    builders: type38Builders,
+    motionParts: T38_MOTION_PARTS,
+    animate: (assembled, seconds, state) => {
+      animateType38(
+        assembled,
+        seconds,
+        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
+      );
     },
     readouts: () => [
-      { label: "自动原理", value: "导气式（短行程活塞）" },
-      { label: "闭锁方式", value: "枪机头回转 30°" },
-      { label: "供弹方式", value: "M27 可散弹链（步进 15mm/发）" },
-      { label: "循环周期", value: "1.4 s/发" },
-      { label: "弹药", value: "5.56×45 M855（六分件）×20 链上" },
+      { label: "自动原理", value: "手动旋转后拉枪机" },
+      { label: "闭锁方式", value: "双闭锁凸榫 + 机匣前环" },
+      { label: "供弹方式", value: "5 发固定弹仓 + 桥夹" },
+      { label: "循环周期", value: "2.6 s/发（手动）" },
+      { label: "弹药", value: "6.5×50mmSR 有坂（六分件）×6" },
+      { label: "零件", value: "81 种定义 / 137 件实例" },
     ],
     states: [
-      { id: "idle", label: "装填静止", hint: "满链待击：可爆炸视图看供弹机构" },
-      { id: "semi", label: "单发", hint: "打一发：拨弹齿步进一节，空链脱落" },
-      { id: "running", label: "连发", hint: "连续射击：弹链逐节前移，弹壳下抛" },
+      { id: "idle", label: "装填静止", hint: "满仓待击：膛内 1 发 + 弹仓 5 发，可爆炸视图看枪机与弹仓" },
+      { id: "semi", label: "单发", hint: "手动旋转后拉枪机：击发→开锁→抽壳→推弹→闭锁，只打一发" },
+      { id: "running", label: "连发演示", hint: "连续完成 6 发手动循环，空仓后停在闭锁状态" },
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
     ],
     actions: [
-      { id: "m249-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
-      { id: "m249-auto", group: "射击", label: "连发", kind: "machine-state", state: "running" },
-      { id: "m249-idle", group: "射击", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "type38-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
+      { id: "type38-auto", group: "射击", label: "连发 6 发", kind: "machine-state", state: "running" },
+      { id: "type38-idle", group: "射击", label: "停机", kind: "machine-state", state: "idle" },
       { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
       { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
       { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
@@ -612,10 +646,108 @@ export const CATALOG: StageModel[] = [
       { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
     ],
     notes: [
-      "弹链供弹：拨弹齿随枪机往复，每次把 M27 链钩进一个节距（15mm）；空链节从受弹机左侧脱落（可散链）。",
-      "导气式核心零件：导气箍（⌀3.8 导气孔 + 两档调节器）→ 活塞 = 操作杆 → 枪机框。",
-      "快拆枪管：捏提把旋转 1/4 圈即可更换过热枪管（连射发烫要换——班组火力的设计）。",
-      "M249 向下抛壳（车内射击时弹壳不砸人），与 AK-47 的右侧抛壳不同。",
+      "手动旋转后拉枪机：拉机柄上抬 90° 解锁→后拉 100mm 抽壳→复进推弹→下压闭锁；2.6s 一发，是七把枪里唯一的纯手动循环。",
+      "防尘盖随枪机前后滑动，机匣右侧上导轨在拉机柄行程段断开，给手柄上抬/后拉让位。",
+      "5 发固定弹仓：托弹板与弹仓簧逐发上升，桥夹压弹；弹仓口/机匣底板开口从 z=-0.155 起，让托弹板升到空仓高度也不撞机匣。",
+      "弹药六分件（被甲/铅芯/钢芯/弹壳/发射药/底火）全部独立实例；抛壳、枪口焰、硝烟、后坐上跳都按 6 发循环驱动。",
+      "展示台用前后 V 形托架 + 毛毡垫支撑枪身，枪托/护木落座，枪管悬空。",
+    ],
+  },
+  {
+    id: "bison",
+    title: "PP-19 野牛冲锋枪",
+    subtitle: "自由枪机 + 30 发螺旋弹筒 + 侧折叠骨架托 · 9×18mm PM",
+    milestone: "G-2",
+    status: "ready",
+    registry: bisonRegistry,
+    layouts: BISON_LAYOUTS_EXPORT,
+    builders: BISON_BUILDERS,
+    motionParts: BISON_MOTION_PARTS,
+    animate: (assembled, seconds, state) => {
+      animateBison(
+        assembled,
+        seconds,
+        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
+      );
+    },
+    readouts: () => [
+      { label: "自动原理", value: "自由枪机（无导气/无回转闭锁）" },
+      { label: "供弹方式", value: "30 发螺旋弹筒（膛内 1 + 螺旋槽 29）" },
+      { label: "循环速度", value: "1.15 s/发（约 700 发/分）" },
+      { label: "弹药", value: "9×18mm PM 马卡洛夫（六分件逐发独立）" },
+      { label: "零件", value: "64 定义 / 259 实例" },
+    ],
+    states: [
+      { id: "idle", label: "装配静止", hint: "满仓 30 发，可开爆炸视图看弹筒内部螺旋导轨" },
+      { id: "semi", label: "单发", hint: "一次自由枪机循环：击发、后坐、抽壳、托弹板推进一个槽" },
+      { id: "running", label: "连发", hint: "30 发连续循环，螺旋托弹板旋转 29 个槽距，空仓后停住" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 循环扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "bison-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
+      { id: "bison-auto", group: "射击", label: "连发 30 发", kind: "machine-state", state: "running" },
+      { id: "bison-idle", group: "射击", label: "停火", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "扫掠检测", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "野牛不是导气式：枪机/枪机框作为一个自由枪机整体后坐 58mm，没有导气活塞和回转闭锁凸笋；枪机节点保持 0°。",
+      "30 发弹筒由 29 个螺旋槽位 + 膛内 1 发组成；托弹板是单臂螺旋推板，沿导轨旋转并把弹推到供弹唇，不占用整圆截面。",
+      "弹筒外壳顶部开 110° 供弹口，前/后盖是环板；螺旋导轨只放在筒体中后段，避让供弹口的抬弹路径。",
+      "骨架托挂在机匣左侧的铰链座上，向左侧折叠 180°；这样后坐时枪机框不会撞到托架。",
+    ],
+  },
+  {
+    id: "m60",
+    title: "M60 通用机枪",
+    subtitle: "7.62×51 NATO · 导气式 + 回转闭锁 · 100 发可散链 · M60 大机盖",
+    milestone: "G-4",
+    status: "ready",
+    registry: makeM60Registry(),
+    layouts: makeM60Layouts(),
+    builders: M60_BUILDERS,
+    motionParts: M60_MOTION_PARTS,
+    animate: (assembled, seconds, state) => {
+      animateM60(
+        assembled,
+        seconds,
+        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
+      );
+    },
+    readouts: () => [
+      { label: "自动原理", value: "导气式（长行程活塞）" },
+      { label: "闭锁方式", value: "枪机头回转 30°" },
+      { label: "供弹方式", value: "M13 可散弹链（7.62×51，20mm 节距）" },
+      { label: "循环周期", value: "1.4 s/发" },
+      { label: "弹药", value: "7.62×51 NATO M80（六分件）×20 链上" },
+      { label: "零件", value: "56 定义 / 191 实例" },
+    ],
+    states: [
+      { id: "idle", label: "架设静止", hint: "两脚架展开，满链待击；可爆炸视图看 M60 大机盖与供弹机构" },
+      { id: "semi", label: "单发", hint: "打一发：拨弹齿步进一节，空链脱落" },
+      { id: "running", label: "连发", hint: "连续射击：7.62 弹链逐节前移，弹壳下抛" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "m60-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
+      { id: "m60-auto", group: "射击", label: "连发", kind: "machine-state", state: "running" },
+      { id: "m60-idle", group: "射击", label: "停机", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "M60 由 M249 基座派生：机匣、导气活塞、回转闭锁枪机、击发机构沿用 Ak* 节点；枪管延长到 560mm，弹链按 7.62×51 重新排布。",
+      "供弹：M13 可散链节距 20mm，拨弹齿随枪机往复，每次把链钩进一节；100 发弹链箱挂机匣左下，空链节从受弹机左侧脱落。",
+      "M60 特征件：整体冲压受弹大盖 + 铰链轴/卡榫、固定枪托 + 橡胶托底板、独立手枪握把、260mm 两脚架双腿/脚座/回位簧。",
+      "弹链/弹药共 20 组可见链节，每组 6 个 partId（链节 + 弹壳 + 弹头 + 铅套 + 钢芯 + 发射药），动画时逐发前移、进膛、抛壳。",
     ],
   },
   {
@@ -756,15 +888,20 @@ export const CATALOG: StageModel[] = [
     layouts: makeM2hbLayouts(),
     builders: M2HB_BUILDERS,
     motionParts: M2HB_MOTION_PARTS,
-    animate: (assembled, seconds) => {
-      animateM2hb(assembled, seconds, getM2hbMode());
+    animate: (assembled, seconds, state) => {
+      animateM2hb(
+        assembled,
+        seconds,
+        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
+      );
     },
     readouts: () => [
       { label: "自动原理", value: "枪管短后坐 + 半自由枪机" },
       { label: "短后坐行程", value: "12 mm（枪管+延伸部）" },
       { label: "枪机行程", value: "100 mm（加速子传能）" },
       { label: "循环周期", value: "2.2 s/发" },
-      { label: "弹药", value: ".50 BMG M33（六分件）×14 链上" },
+      { label: "弹药", value: ".50 BMG M33（六分件）×17 链上" },
+      { label: "零件", value: "68 定义 / 201 实例" },
     ],
     states: [
       { id: "idle", label: "装填静止", hint: "满链待击：可爆炸视图看半自由枪机" },
@@ -789,6 +926,7 @@ export const CATALOG: StageModel[] = [
       "拉壳槽随动：枪机前端的螺面凹槽收着撞针——枪机后坐时撞针边退边抽壳；L 形退壳杠杆放大退壳力。",
       "重力排壳：M2 无弹匣弹簧——空弹壳靠重力从枪身底部排出（12 槽弹壳池在枪下堆积）。",
       "M3 三脚架 + T&E：高低/方向手轮每点击 50 密位（1 密位 ≈ 1m/1000m）；枪管深灰发蓝 vs 机匣磷化灰绿分色。",
+      "细部件：加速子销/回位簧、扳机与阻铁销、保险定位珠/簧、三级供弹杠杆销、弹链导板/阻弹齿、供弹盖铰链/卡榫、枪管支撑轴承/闭锁环定位榫、T&E 高低/方向齿轮、三条腿驻锄、架座销轴、M9 弹链箱/卡扣。",
     ],
   },
   {
@@ -797,16 +935,20 @@ export const CATALOG: StageModel[] = [
     subtitle: "导气式 + 枪机回转闭锁 · 30 发弹匣零件化 · 完整射击循环",
     milestone: "M-E",
     status: "ready",
-    registry: makeAk47Registry(),
-    layouts: makeAk47Layouts(),
-    builders: AK47_BUILDERS,
-    motionParts: AK47_MOTION_PARTS,
-    animate: (assembled, seconds) => {
-      animateAk47(assembled, seconds, getAk47Mode());
+    registry: makeAk47G7Registry(),
+    layouts: makeAk47G7Layouts(),
+    builders: AK47_G7_BUILDERS,
+    motionParts: AK47_G7_MOTION_PARTS,
+    animate: (assembled, seconds, state) => {
+      animateAk47G7(
+        assembled,
+        seconds,
+        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
+      );
     },
     readouts: () => [
       { label: "自动原理", value: "导气式（活塞长行程）" },
-      { label: "闭锁方式", value: "枪机头回转 38°" },
+      { label: "闭锁方式", value: "枪机头回转 48°" },
       { label: "循环周期", value: "1.8 s/发" },
       { label: "理论射速", value: "600 发/分" },
       { label: "弹药", value: "7.62×39（六分件）×30" },
@@ -831,7 +973,55 @@ export const CATALOG: StageModel[] = [
     notes: [
       "射击循环（1.8s）：扣扳机→阻铁释放击锤→击针击底火→弹头出膛（枪口焰）→燃气推活塞→枪机框后坐→枪机头回转开锁→抽壳抛壳→复进簧推回→推弹上膛→闭锁待击。",
       "弹药零件化：每发 = 弹头(被甲+铅套+钢芯) + 弹壳 + 发射药 + 底火，30 发实例化堆叠在弧形弹匣内。",
-      "导气式核心零件：导气箍（⌀4.4 导气孔）→ 活塞+活塞杆 → 枪机框；闭锁由枪机头双凸笋在节套闭锁窗回转 38° 完成。",
+      "导气式核心零件：导气箍（⌀4.4 导气孔）→ 活塞+活塞杆 → 枪机框；闭锁由枪机头双凸笋在节套闭锁窗回转 48° 完成。",
+    ],
+  },
+  {
+    id: "rpk",
+    title: "RPK 轻机枪",
+    subtitle: "590mm 长枪管 + 两脚架 + 固定木托 · 导气式 + 枪机回转闭锁",
+    milestone: "G-3",
+    status: "ready",
+    registry: makeRpkRegistry(),
+    layouts: makeRpkLayouts(),
+    builders: RPK_BUILDERS,
+    motionParts: RPK_MOTION_PARTS,
+    animate: (assembled, seconds, state) => {
+      animateRpk(
+        assembled,
+        seconds,
+        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
+      );
+    },
+    readouts: () => [
+      { label: "自动原理", value: "导气式 + 双凸笋回转闭锁（AK 派生）" },
+      { label: "枪管", value: "590mm，4 条右旋膛线，缠距 240mm" },
+      { label: "供弹", value: "30 发弧形弹匣（7.62×39 六分件）" },
+      { label: "两脚架", value: "260mm 折叠腿 + 独立脚座 + 回位簧" },
+      { label: "零件", value: "69 定义 / 269 实例" },
+    ],
+    states: [
+      { id: "idle", label: "架设静止", hint: "两脚架展开，满弹待击；可爆炸视图看长枪管与导气箍" },
+      { id: "semi", label: "单发", hint: "AK 同源自动机：导气、回转开锁、抽壳、复进闭锁" },
+      { id: "running", label: "连发", hint: "连续射击：弹壳堆积、枪口上跳、弹匣托弹板逐发上顶" },
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "rpk-semi", group: "射击", label: "单发", kind: "machine-state", state: "semi" },
+      { id: "rpk-auto", group: "射击", label: "连发", kind: "machine-state", state: "running" },
+      { id: "rpk-idle", group: "射击", label: "停火", kind: "machine-state", state: "idle" },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "RPK 是 AK-47 的轻机枪化：机匣、枪机、击发机构、弹匣与 AK 同源；枪管延长到 590mm，导气箍/准星/消焰器随之前移。",
+      "两脚架卡箍环抱枪管，两条 260mm 矩形钢管腿可折叠；脚座橡胶/钢爪独立自位，腿内回位簧在展开到位后压紧锁定槽。",
+      "固定木托加钢制托底板，表尺改为 100–1000m 长叶片；全枪 69 个定义 / 269 个实例，两脚架每根销轴和弹簧独立 partId。",
+      "扫掠动画复用 AK 的导气+回转闭锁节点：AkRecoil/AkCarrier/AkBolt 等节点名不变，弹匣/弹药 ID 已改为 rpk.*。",
     ],
   },
   {
@@ -844,8 +1034,12 @@ export const CATALOG: StageModel[] = [
     layouts: makeM134Layouts(),
     builders: M134_BUILDERS,
     motionParts: M134_MOTION_PARTS,
-    animate: (assembled, seconds) => {
-      animateM134(assembled, seconds, getM134Mode());
+    animate: (assembled, seconds, state) => {
+      animateM134(
+        assembled,
+        seconds,
+        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
+      );
     },
     readouts: () => [
       { label: "自动原理", value: "转管式（外能源电机）" },
@@ -853,6 +1047,8 @@ export const CATALOG: StageModel[] = [
       { label: "枪机", value: "6 套独立（凸轮槽驱动往复）" },
       { label: "转子转速", value: "300 rpm（演示）" },
       { label: "理论射速", value: "1800 发/分（真机 6000）" },
+      { label: "弹药", value: "7.62×51 NATO（六分件）×24 链上" },
+      { label: "零件", value: "35 定义 / 306 实例" },
     ],
     states: [
       { id: "idle", label: "停机", hint: "转子静止：可爆炸视图看 6 管 + 6 枪机" },
@@ -874,8 +1070,10 @@ export const CATALOG: StageModel[] = [
     notes: [
       "转管式（皇冠机构）：6 根枪管 + 6 套独立枪机绕中心轴旋转，枪机导销插在转子尾端凸轮槽里——旋转中每套枪机依次完成 装填→闭锁→击发→抽壳→抛壳。",
       "外能源：加特林没有导气/后坐自动机，全靠电机经 36:10 减速齿轮组驱动转子；射速 = 6 × 转子转速（真机 1000rpm → 6000 发/分）。",
-      "枪口焰只在击发位（正上方那根枪管）闪——与 AK/M249/M2HB 的「每发必闪」不同。",
+      "枪口焰只在击发位（正上方那根枪管）闪——与 AK/M60/M2HB 的「每发必闪」不同。",
       "弹壳瀑布：6 管轮流抛壳，从左侧抛壳口连续抛出（14 槽弹壳池循环）。",
+      "细部零件：每套枪机的枪机框、击针、抽壳钩、导销、复进簧、闭锁凸榫、滚轮/滚轮销、抽壳钩簧；每根枪管的固定螺帽、套管、准星、枪口螺帽、枪口冠、独立膛线；减速大齿轮 36 齿独立成实例。35 定义 / 306 实例。",
+      "弹链由 16 节增至 24 节；24 组弹/链节各 6 个 partId，动画时逐发步进，枪机子件跟随各自枪机的公转与凸轮往复。",
     ],
   },
   {
@@ -886,6 +1084,17 @@ export const CATALOG: StageModel[] = [
     status: "planned",
   },
 ];
+
+// 枪械按自动原理顺序展示：栓动 → 自由枪机 → 导气/回转闭锁 → 轻机枪 →
+// 通用机枪 → 枪管短后坐重机枪 → 转管。只重排这 7 个 ready 枪械，
+// 不改变坦克/飞机等其它条目的相对位置。
+const GUN_ORDER = ["type38", "bison", "ak47", "rpk", "m60", "m2hb", "m134"];
+CATALOG.sort((a, b) => {
+  const ia = GUN_ORDER.indexOf(a.id);
+  const ib = GUN_ORDER.indexOf(b.id);
+  if (ia >= 0 && ib >= 0) return ia - ib;
+  return 0;
+});
 
 export function findModel(modelId: string): StageModel {
   const found = CATALOG.find((model) => model.id === modelId);

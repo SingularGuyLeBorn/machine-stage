@@ -138,6 +138,8 @@ interface StageState {
   overrides: Record<string, number>;
   /** 每次自增触发重建。 */
   rebuildToken: number;
+  /** 做旧：true 时金属/木件使用更暗、更粗糙的表面（ veterans look）。 */
+  worn: boolean;
 
   assembled: AssembledModel | null;
   stats: StageStats | null;
@@ -191,6 +193,7 @@ interface StageState {
   setModel(modelId: string): void;
   setParam(name: string, value: number): void;
   resetParams(): void;
+  toggleWorn(): void;
   attach(assembled: AssembledModel | null): void;
   detach(): void;
   setStats(stats: StageStats): void;
@@ -287,6 +290,7 @@ export const useStageStore = create<StageState>((set, get) => ({
   variantId: initialModel.variants?.[0]?.id ?? "",
   overrides: {},
   rebuildToken: 0,
+  worn: false,
 
   assembled: null,
   stats: null,
@@ -371,6 +375,7 @@ export const useStageStore = create<StageState>((set, get) => ({
     })),
 
   resetParams: () => set((state) => ({ overrides: {}, rebuildToken: state.rebuildToken + 1 })),
+  toggleWorn: () => set((state) => ({ worn: !state.worn, rebuildToken: state.rebuildToken + 1 })),
 
   attach: (assembled) => {
     // 切换模型时不再自动跑整机静态扫描：MBT 级模型一次扫描数十秒，

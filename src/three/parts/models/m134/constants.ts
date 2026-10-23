@@ -29,7 +29,7 @@ export const M134_CONSTANTS = {
   BOLT_R: 0.0092, // 每管独立枪机半径
   BOLT_LEN: 0.085,
   CAM_TRACK_R: 0.046, // 枪机导销凸轮槽半径（决定枪机在旋转中的往复）
-  BOLT_STROKE: 0.05, // 枪机往复行程（装填/抽壳段）
+  BOLT_STROKE: 0.065, // 枪机往复行程（真机约 63.5mm；加大到 65mm 便于展示）
 
   // ---- 枪管箍 ----
   CLAMP_R: 0.045,
