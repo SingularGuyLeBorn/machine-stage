@@ -121,3 +121,6 @@ for (const side of [-1, 1])
       mate: { type: "absolute", position: [0, 0, 0] },
     });
   }
+
+// 内层光学总成复用外窗边界与曲率，避免两份轮廓逐渐漂移。
+export const chestWindowProfile = { center, edge, front };

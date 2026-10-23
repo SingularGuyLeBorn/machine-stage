@@ -130,3 +130,5 @@ export const visorParts: PartDefinition[] = ["housing", "seal", "glass"].map((ki
   material: ["kjr_silver", "kjm_visor_seal", "kjm_visor_glass"][i],
   mate: { type: "absolute", position: [0, 0, 0] },
 }));
+
+export const visorProfile = { center, boundary, surface: smoothSurface };

@@ -13,6 +13,7 @@ import pedan from "./pedan.generated.json";
 import { interiorBuilders, INTERIOR_MATERIALS, makeInteriors } from "./interiors";
 import { flexFrameBuilders } from "./flex-frame";
 import { orbitalBuilders } from "./orbital-cores";
+import { opticalBuilders, opticalParts, opticalMaterials } from "./optical-interiors";
 
 // 四分体沿用原阶梯接口，外壳加工设备舱；肩肘分件保留原外表面，贴壳内骨架由实际内壁生成。
 function decode(value: string): ArrayBuffer {
@@ -74,6 +75,7 @@ Object.assign(kingjoeModuleBuilders, chestWindowBuilders);
 Object.assign(kingjoeModuleBuilders, interiorBuilders);
 Object.assign(kingjoeModuleBuilders, flexFrameBuilders);
 Object.assign(kingjoeModuleBuilders, orbitalBuilders);
+Object.assign(kingjoeModuleBuilders, opticalBuilders);
 Object.assign(kingjoeModuleBuilders, makeVisorBuilders(kingjoeModuleBuilders.kjModule_head_arms!));
 
 const NAMES: Record<string, string> = {
@@ -278,6 +280,7 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
     ...details,
     ...visorParts,
     ...chestWindowParts,
+    ...opticalParts,
     ...antennaParts,
   ];
   // 本卡早期用 1..47 的局部 build_order；并入主线后统一抬到 ≥100，
@@ -346,6 +349,7 @@ export function makeKingJoeModuleRegistry(): ModelRegistry {
       kjr_silver_dark: { ...KINGJOE_SKIN_MATERIALS.kjr_silver_dark, base: "#968254", metalness: 0.58 },
       kjr_dark: { ...KINGJOE_SKIN_MATERIALS.kjr_dark, base: "#514a36" },
       ...INTERIOR_MATERIALS,
+      ...opticalMaterials,
       kjm_glass_l: {
         base: "#ffffff",
         metalness: 0.18,

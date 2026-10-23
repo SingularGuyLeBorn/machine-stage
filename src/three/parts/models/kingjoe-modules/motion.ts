@@ -1,3 +1,4 @@
+import { updateOpticalInteriors } from "./optical-interiors";
 import type { AssembledModel } from "../../assembler/assembler";
 import { Box3, Vector3 } from "three";
 import { getModuleEffects, hideModuleEffects } from "./effects";
@@ -317,6 +318,7 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
   updateEnergyExchange(model, planCavityDevices(new Map()), seconds, activity.charge);
   updateFlexibleFrame(model, seconds);
   updateModuleIllumination(model, seconds, activity);
+  updateOpticalInteriors(model, seconds, activity);
   model.root.updateMatrixWorld(true);
   updatePedanRays(model, seconds, activity.redModule, activity.yellow);
   if (state === "combining" || state === "separation" || (state === "beam" && time < beamDockTime)) {

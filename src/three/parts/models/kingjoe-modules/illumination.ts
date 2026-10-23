@@ -1,5 +1,6 @@
 import { MeshStandardMaterial } from "three";
 import { displayMaterialSource } from "../../kernel/displayMaterial";
+import { opticalVisorIds } from "./optical-interiors";
 import { VISOR_GRID, visorHighlights } from "./visor-grid";
 import type { AssembledModel } from "../../assembler/assembler";
 import { pedanPower, QUIET_ACTIVITY, type PedanActivity } from "./machinery";
@@ -16,6 +17,7 @@ export function updateModuleIllumination(
   activity: PedanActivity = QUIET_ACTIVITY,
 ): void {
   for (const [id, visor, side] of [
+    ...opticalVisorIds.map((id) => [id.replace("kingjoemodules.", ""), true, 0] as const),
     ["ship.visor_glass", true, 0],
     ["chest.glass_l", false, -1],
     ["chest.glass_r", false, 1],
