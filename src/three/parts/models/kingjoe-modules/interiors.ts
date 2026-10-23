@@ -6,7 +6,7 @@ import data from "./pedan.generated.json";
 import { addPedanDetailAssemblies, addPedanMachinery, powerMaterial } from "./machinery";
 import { addCavityDevices, planCavityDevices } from "./cavity-devices";
 import { addHandCouplings } from "./hand-couplings";
-import { addEnergyExchange } from "./energy-exchange";
+import { addEnergyExchange, exchangeMaterials } from "./energy-exchange";
 import { addJointDrives } from "./joint-drives";
 import { CUFF } from "./joint-covers";
 import { flexibleFrame } from "./flex-frame";
@@ -17,6 +17,7 @@ import { CORE_MODES } from "./core-dynamics.mjs";
 // [OM-FREEPLAY] 尺寸由实际壳内设备舱派生；配色、线圈匝数及支架布局为原创机械解释。
 export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
   ...orbitalMaterials,
+  ...exchangeMaterials,
   // [OM-FREEPLAY] 内部试用钛灰／暗铜／青蓝与琥珀配色；外壳黄色金属独立保留。
   pedan_flex: {
     base: "#415963",
@@ -25,14 +26,6 @@ export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
     emissive: "#48606b",
     emissiveIntensity: 0.03,
   },
-  // [OM-FREEPLAY] 四组错相的低亮能量端环，避免全机齐闪；每一对仍严格同步。
-  ...Object.fromEntries(
-    // [OM-FREEPLAY] 颜色集中到输能通道，提升色彩辨识度；承力金属仍保持钛灰与暗铜。
-    ["#38b7b3", "#7f89cb", "#c59b54", "#4c98c4"].map((color, i) => [
-      `pedan_exchange_${i}`,
-      { base: color, metalness: 0.12, roughness: 0.42, emissive: color, emissiveIntensity: 0.2 },
-    ]),
-  ),
   pedan_hand_gel: {
     base: "#3d9ca9",
     metalness: 0.1,

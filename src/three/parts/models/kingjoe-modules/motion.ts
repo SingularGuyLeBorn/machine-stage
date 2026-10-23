@@ -303,6 +303,7 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
   updateJointCovers(model);
   updateJointDrives(model);
   const activity: PedanActivity = {
+    beamTime: state === "beam" ? beamTime : null,
     drive:
       Math.abs(entry.arms[0]) +
       Math.abs(entry.arms[1]) * 0.7 +
@@ -315,7 +316,7 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
   updateCavityDevices(model, seconds, activity);
   updateOrbitalCores(model, seconds, activity);
   updateHandCouplings(model, seconds, activity.charge);
-  updateEnergyExchange(model, planCavityDevices(new Map()), seconds, activity.charge);
+  updateEnergyExchange(model, planCavityDevices(new Map()), seconds, activity);
   updateFlexibleFrame(model, seconds);
   updateModuleIllumination(model, seconds, activity);
   updateOpticalInteriors(model, seconds, activity);

@@ -4,30 +4,50 @@ import * as THREE from "three";
 import type { MeshBVH } from "three-mesh-bvh";
 import type { GeometrySpec, ModelRegistry, PartDefinition } from "../../registry/types";
 import type { AssembledModel } from "../../assembler/assembler";
+import { TRANSIT_DELAY, transitArrival, sampleTransit } from "./energy-transit.mjs";
 import data from "./pedan.generated.json";
 
 type Room = (typeof data.rooms)[number];
 type V3 = [number, number, number];
 export interface PedanActivity {
+  beamTime: number | null;
   drive: number;
   charge: number;
   yellow: number;
   redModule: string | null;
 }
-export const QUIET_ACTIVITY: PedanActivity = { drive: 0, charge: 0, yellow: 0, redModule: null };
+export const QUIET_ACTIVITY: PedanActivity = {
+  beamTime: null,
+  drive: 0,
+  charge: 0,
+  yellow: 0,
+  redModule: null,
+};
 const smooth = (x: number) => {
   const t = THREE.MathUtils.clamp(x, 0, 1);
   return t * t * (3 - 2 * t);
 };
 export function pedanPower(seconds: number, channel: string, activity = QUIET_ACTIVITY): number {
+  const arrival = transitArrival(
+    activity.beamTime,
+    channel.startsWith("modulator")
+      ? TRANSIT_DELAY.chest
+      : channel === "brain"
+        ? TRANSIT_DELAY.head
+        : TRANSIT_DELAY.core,
+  );
   if (channel.startsWith("modulator")) {
     const side = channel.endsWith("l") ? -1 : 1;
     const wave = 0.5 + 0.5 * Math.sin(seconds * 2.1 + side * 1.3 + 4.77 * 3);
     const lit = smooth((Math.sin(seconds * 0.95) + 0.35) / 0.75);
-    return Math.max(0.006 + lit * (0.15 + 0.85 * wave * wave), activity.charge * 0.85, activity.yellow);
+    return Math.max(
+      0.006 + lit * (0.15 + 0.85 * wave * wave),
+      activity.charge * 0.85 * arrival,
+      activity.yellow * arrival,
+    );
   }
   if (channel === "brain")
-    return 0.3 + 0.12 * Math.sin(seconds * 1.35) ** 2 + activity.charge * 0.8 + activity.yellow;
+    return 0.3 + 0.12 * Math.sin(seconds * 1.35) ** 2 + (activity.charge * 0.8 + activity.yellow) * arrival;
   return (
     0.13 +
     0.08 * Math.sin(seconds * 1.7) ** 2 +
@@ -411,12 +431,20 @@ export function updatePedanMachinery(model: AssembledModel, seconds: number, act
     if (role === "slider") node.position.y = rest.y + Math.sin(a) * extent;
     if (role === "spring") node.scale.y = 1 + 0.35 * Math.sin(a);
     if (role === "flow") {
-      const energized = activity.yellow > 0 || activity.redModule === module || activity.charge > 0;
-      const t =
-        (((seconds * (energized ? 1.5 : 0.25) + index / (node.name.includes("_output_") ? 7 : 3)) % 1) + 1) %
-        1;
+      const delay =
+        module === "chest"
+          ? TRANSIT_DELAY.chest
+          : module === "head_arms"
+            ? TRANSIT_DELAY.head
+            : TRANSIT_DELAY.core;
+      const energized = Math.max(
+        sampleTransit(activity.beamTime, delay),
+        activity.redModule === module ? 1 : 0,
+      );
+      // 固定载波相位，活动只改变光包尺度；状态切换不再让光包瞬移。
+      const t = (((seconds * 0.25 + index / (node.name.includes("_output_") ? 7 : 3)) % 1) + 1) % 1;
       node.position.y = (t - 0.5) * extent * 0.88;
-      node.scale.setScalar(energized ? 1.3 : 0.65);
+      node.scale.setScalar(0.65 + energized * 0.65);
     }
   }
   for (const { material, channel } of cache.lights)
