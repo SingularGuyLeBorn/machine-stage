@@ -652,5 +652,8 @@ export function makeInteriors(): Pick<ModelRegistry, "parts" | "nodes" | "consta
       });
   }
   for (const tree of wallTrees.values()) tree.geometry.dispose();
-  return { parts, nodes, constants, expectedContacts };
+  // 用户要求胸甲内部不要被一圈圈铁丝状骨架包围：移除胸部环绕横肋及其柔性接头。
+  // 在设备细节生成后过滤，保留已确认的设备密度；纵向支撑、光导内框和其他分体不变。
+  const retainedParts = parts.filter((part) => !/\.chest\.(?:internal|flex)_chest_rib_/.test(part.id));
+  return { parts: retainedParts, nodes, constants, expectedContacts };
 }
