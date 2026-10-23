@@ -5,12 +5,17 @@
 > 本节为**最新状态**。下方历史段落里的 S-01..S-13 逐站封边、5810 件、旧相机角度限制等均已被本节取代。
 
 ### 规模与门禁
-- 零件定义 **5510** / 展开 **5510** / 实例 **6810**；分层 L1=1812、L2=317、L3=424、L4=997、L5=1960；三角面 **2,838,038**。
-- 注册表校验 0 错；悬空 0；悬空孤岛 0；合并件内部悬空 0（最大连通分量 6806/6806）。
-- 静态穿模：**12121 报告 / 未豁免 0**（白名单 96 条）。
-- 动画扫掠：**flight_ops 745/0、engine 550/0、hangar 35/0、ciws 158/0**。
+- 零件定义 **5565** / 展开 **5565** / 实例 **6865**；分层 L1=1812、L2=317、L3=478、L4=998、L5=1960；三角面 **2,836,094**。
+- 注册表校验 0 错；悬空 0；悬空孤岛 0；合并件内部悬空 0（最大连通分量 6861/6861）。
+- 静态穿模：**12237 报告 / 未豁免 0**（白名单 96 条）。
+- 动画扫掠：**flight_ops 775/0、engine 550/0、hangar 35/0、ciws 158/0**。
 - **门禁不再有整船豁免**：删除原 `carrier.* ↔ carrier.*` 2000mm 兜底规则；改为按装配层的窄规则，并把外露件深度上限收紧（deck↔deck 80mm、deck↔hull 100mm、surface↔hull/deck 100mm 等）。`diag-carrier-exterior --active` 在绕开白名单后实测 **0 条未豁免**。
 - `npx tsc --noEmit` 通过；`npm test` 通过（313 passed / 1 skipped）；`npm run build` 通过。
+
+### 飞行甲板分板 / 舷缘线 / 升降机
+- [x] **甲板装甲板切块**：水密基层保留为一件，顶面降到 y=4.562；上面按甲板真实折线、z 带与 2–3 列切成 **65 块独立“飞行甲板装甲板”**（`carrier.deck.deck_armor_*`），横缝逐带错位，板缝 0.022、深 18mm，露出深色基层；相邻板有明暗两档甲板材质。不再是一整块大板。
+- [x] **右/左舷甲板外缘线**：删除改轮廓前的硬编码折线（它还带已不存在的升降机缺口），改为直接沿 `deckPlan()` 的真实折线内偏 0.05 生成；右舷 3-1/3-2 和左舷艏段线外的“多余甲板”消失。新件名：`右舷甲板外缘线 1..N`、`左舷甲板外缘线 1..N`、艏/艉端线。
+- [x] **舷侧升降机与甲板齐平**：平台顶面只比装甲板高 3mm，四周用 8mm 细围边勾出轮廓；删除凸起的大平台/高围框，导向轮下沉，导轨顶端降到甲板面附近；远看是一块与甲板齐平的升降机板，不再是甲板外缘外的一块大棱角板。
 
 ### 穿模/封边修复
 - [x] **舷侧外飘封边彻底重做**：删除左右舷各 13 块 3.6m 长的分段封边板/底封板/斜撑盒子（它们在甲板硬角处必然伸出或留缝，正是 S-9/S-10/S-11 穿模的来源）；改为 `carrier.deck.sponson_skirt` + `carrier.deck.sponson_bottom` 两个**整圈连续**件：外圈严格沿甲板折线，下缘 y=4.08；底封板从甲板折线连续封到 y=4.03 的**真实外板型线**，艏端/艉端整圈闭合。证据：`carrier-qa-bow-seal.jpeg`、`carrier-qa-stern-sponson.jpeg`。
@@ -29,7 +34,7 @@
 - [x] **双跑道重叠说明**：斜角着舰区与 3 号腰部弹射器在甲板平面交叉是真实航母布置（着舰区斜穿中后部甲板），起降按作业阶段错开；本轮已把舰艏直通起飞区的浅灰底色前移到 z≈7.8..17，俯视不再与斜角跑道底色叠成两片。
 
 ### 本轮证据
-`carrier-qa-bow-seal.jpeg`、`carrier-qa-hull-side.jpeg`、`carrier-qa-stern-sponson.jpeg`、`carrier-qa-transom.jpeg`、`carrier-qa-catapults.jpeg`、`carrier-qa-emals-isolated.jpeg`、`carrier-qa-emals-xray.jpeg`、`carrier-qa-sea-on.jpeg`、`carrier-qa-sea-off.jpeg`、`carrier-qa-360-e/s/w/n.jpeg`、`carrier-qa-final-home.jpeg`。
+`carrier-qa-bow-seal.jpeg`、`carrier-qa-hull-side.jpeg`、`carrier-qa-stern-sponson.jpeg`、`carrier-qa-transom.jpeg`、`carrier-qa-catapults.jpeg`、`carrier-qa-deck-plates.jpeg`、`carrier-qa-elevator.jpeg`、`carrier-qa-emals-isolated.jpeg`、`carrier-qa-emals-xray.jpeg`、`carrier-qa-sea-on.jpeg`、`carrier-qa-sea-off.jpeg`、`carrier-qa-360-e/s/w/n.jpeg`、`carrier-qa-final-home.jpeg`。
 
 ---
 

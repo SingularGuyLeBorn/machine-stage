@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { CV } from "./constants";
-import { deckEdgeAt, hullSurfaceHalfAt } from "./kits";
+import { deckEdgeAt, deckPlan, hullSurfaceHalfAt } from "./kits";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
 
 // ============================================================================
@@ -32,40 +32,73 @@ export function addFlightDeck(ctx: CarrierCtx): void {
 
   add({
     id: `${P}flight_deck`,
-    name_cn: "飞行甲板装甲板",
-    name_en: "flight deck armor",
+    name_cn: "飞行甲板基层（水密）",
+    name_en: "flight deck base",
     assembly: ASSEMBLY,
     build_layer: 3,
     geometry: { type: "kit", kit: "carrierFlightDeck" },
-    material: "cv_deck",
+    material: "cv_deck_plate",
     mate: A([0, 0, 0]),
-    source: "1:8 展示尺度；平直甲板 + 斜角艏 + 左舷外飘，甲板面 y=4.58m。",
+    source: "1:8 展示尺度；连续水密基层顶面 y=4.57，上面分块铺装甲板，板缝露出深色基层。",
   });
-  // 甲板面不再铺 18 块横向矩形装甲板——那样俯视像货船甲板，还会把斜角轮廓盖成方盒。
-  // 只保留细的纵向/横向拼板缝，甲板面本身由 carrierFlightDeck 的连续外飘轮廓承担。
-  for (let s = 0; s < 8; s++) {
-    add({
-      id: `${P}deck_seam_cross_${pad(s + 1)}`,
-      name_cn: `甲板横向拼缝 ${s + 1}`,
-      name_en: `deck transverse seam ${s + 1}`,
-      assembly: ASSEMBLY,
-      build_layer: 3,
-      geometry: M(B(5.0, 0.004, 0.035, [0, 0, 0], 0.001)),
-      material: "cv_deck_plate",
-      mate: A([0, deckTop + 0.002, -14 + s * 2.6]),
-    });
+  // ---- 飞行甲板装甲板：沿真实甲板折线按 z 带 + 横向列切块 ----
+  // 不是一整块板：每块装甲板独立成件，板缝（约 0.012 编辑单位）露出下面的深色水密基层。
+  const armorJoint = 0.022;
+  const armorTop = deckTop;
+  const armorThickness = 0.02;
+  const outline = deckPlan();
+  const zVertices = [...new Set(outline.map(([, z]) => z))].sort((a, b) => a - b);
+  const zLines: number[] = [zVertices[0]!];
+  for (let i = 1; i < zVertices.length; i++) {
+    const z0 = zVertices[i - 1]!;
+    const z1 = zVertices[i]!;
+    const parts = Math.max(1, Math.ceil((z1 - z0) / 3.4));
+    for (let k = 1; k <= parts; k++) zLines.push(z0 + ((z1 - z0) * k) / parts);
   }
-  for (let s = 0; s < 3; s++) {
-    add({
-      id: `${P}deck_seam_long_${pad(s + 1)}`,
-      name_cn: `甲板纵向拼缝 ${s + 1}`,
-      name_en: `deck longitudinal seam ${s + 1}`,
-      assembly: ASSEMBLY,
-      build_layer: 3,
-      geometry: M(B(0.035, 0.004, 20.0, [0, 0, 0], 0.001)),
-      material: "cv_deck_plate",
-      mate: A([-2.6 + s * 2.6, deckTop + 0.002, -5.0]),
-    });
+  for (let zi = 0; zi < zLines.length - 1; zi++) {
+    const rawZ0 = zLines[zi]!;
+    const rawZ1 = zLines[zi + 1]!;
+    if (rawZ1 - rawZ0 < 0.1) continue;
+    const z0 = zi === 0 ? rawZ0 : rawZ0 + armorJoint / 2;
+    const z1 = zi === zLines.length - 2 ? rawZ1 : rawZ1 - armorJoint / 2;
+    const port0 = deckEdgeAt(z0, -1).x;
+    const star0 = deckEdgeAt(z0, 1).x;
+    const port1 = deckEdgeAt(z1, -1).x;
+    const star1 = deckEdgeAt(z1, 1).x;
+    if (star0 - port0 < 0.12 || star1 - port1 < 0.12) continue;
+    const width = ((star0 - port0) + (star1 - port1)) / 2;
+    const cols = width > 4.2 ? 3 : 2;
+    // 横向板缝逐带错位，避免所有纵缝从头到尾一条直线，像一整块大板。
+    const stagger = (zi % 2 === 0 ? 1 : -1) * 0.035;
+    for (let col = 0; col < cols; col++) {
+      const t0 = col === 0 ? 0 : col / cols + stagger;
+      const t1 = col === cols - 1 ? 1 : (col + 1) / cols + stagger;
+      const xl0 = port0 + (star0 - port0) * t0 + (col === 0 ? 0 : armorJoint / 2);
+      const xl1 = port1 + (star1 - port1) * t0 + (col === 0 ? 0 : armorJoint / 2);
+      const xr0 = port0 + (star0 - port0) * t1 - (col === cols - 1 ? 0 : armorJoint / 2);
+      const xr1 = port1 + (star1 - port1) * t1 - (col === cols - 1 ? 0 : armorJoint / 2);
+      if (xr0 - xl0 < 0.1 || xr1 - xl1 < 0.1) continue;
+      // 顺时针折线，和 deckPlan 的绕序一致。
+      const points: Array<[number, number]> = [
+        [xl0, z0],
+        [xl1, z1],
+        [xr1, z1],
+        [xr0, z0],
+      ];
+      const zone = (z0 + z1) / 2 > 10 ? "艏" : (z0 + z1) / 2 > 2 ? "前" : (z0 + z1) / 2 > -8 ? "中" : (z0 + z1) / 2 > -16 ? "后" : "艉";
+      const band = col === 0 ? "左" : col === cols - 1 ? "右" : "中";
+      add({
+        id: `${P}deck_armor_${pad(zi + 1)}_${pad(col + 1)}`,
+        name_cn: `飞行甲板装甲板 ${zone}${band} ${zi + 1}-${col + 1}`,
+        name_en: `flight deck armor plate ${zi + 1}-${col + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 3,
+        geometry: { type: "kit", kit: "carrierDeckArmorPlate", params: { points, topY: armorTop, thickness: armorThickness } },
+        material: (zi + col) % 2 === 0 ? "cv_deck" : "cv_deck_panel",
+        mate: A([0, 0, 0]),
+        source: "按甲板真实折线与横向分列切块；板缝 0.022，露出水密基层，非整块甲板。",
+      });
+    }
   }
 
   // ---- 电磁弹射器 ×3 ----
@@ -840,18 +873,28 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       name_en: `aircraft elevator ${index + 1} platform`,
       assembly: ASSEMBLY,
       build_layer: 3,
-      geometry: M(B(CV.ELEVATOR_W, 0.1, CV.ELEVATOR_L, [0, 0.02, 0], 0.008), B(CV.ELEVATOR_W - 0.12, 0.025, CV.ELEVATOR_L - 0.12, [0, 0.083, 0], 0.004)),
-      material: "cv_deck_plate",
+      // 平台顶面与装甲板齐平（只高 3mm），四周用细边框勾出升降机轮廓，不再是凸起的大甲板块。
+      geometry: M(
+        B(CV.ELEVATOR_W, 0.07, CV.ELEVATOR_L, [0, -0.035, 0], 0.006),
+        B(CV.ELEVATOR_W - 0.12, 0.008, CV.ELEVATOR_L - 0.12, [0, 0.003, 0], 0.003),
+      ),
+      // 台面颜色跟甲板装甲板一致，只用细围边勾出升降机，不再显示成一块深色大甲板。
+      material: "cv_deck",
       node,
       mate: A([0, 0, 0]),
     });
     add({
       id: `${P}elevator_${index + 1}_frame`,
-      name_cn: `升降机 ${index + 1} 支撑框`,
-      name_en: `elevator ${index + 1} frame`,
+      name_cn: `升降机 ${index + 1} 围边`,
+      name_en: `elevator ${index + 1} rim`,
       assembly: ASSEMBLY,
       build_layer: 3,
-      geometry: M(B(CV.ELEVATOR_W + 0.08, 0.08, 0.12, [0, 0.035, CV.ELEVATOR_L / 2], 0.006), B(CV.ELEVATOR_W + 0.08, 0.08, 0.12, [0, 0.035, -CV.ELEVATOR_L / 2], 0.006), B(0.12, 0.08, CV.ELEVATOR_L, [-CV.ELEVATOR_W / 2, 0.035, 0], 0.006)),
+      geometry: M(
+        B(CV.ELEVATOR_W + 0.12, 0.008, 0.06, [0, 0.004, CV.ELEVATOR_L / 2], 0.003),
+        B(CV.ELEVATOR_W + 0.12, 0.008, 0.06, [0, 0.004, -CV.ELEVATOR_L / 2], 0.003),
+        B(0.06, 0.008, CV.ELEVATOR_L, [-CV.ELEVATOR_W / 2, 0.004, 0], 0.003),
+        B(0.06, 0.008, CV.ELEVATOR_L, [CV.ELEVATOR_W / 2, 0.004, 0], 0.003),
+      ),
       material: "cv_steel_dark",
       node,
       mate: A([0, 0, 0]),
@@ -866,7 +909,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         geometry: M(C(0.09, 0.06, [0, 0, 0], 14)),
         material: "cv_steel",
         node,
-        mate: A([w % 2 === 0 ? -CV.ELEVATOR_W / 2 - 0.05 : CV.ELEVATOR_W / 2 + 0.05, 0.02, -1.0 + Math.floor(w / 2) * 1.0], [0, 0, 90]),
+        mate: A([w % 2 === 0 ? -CV.ELEVATOR_W / 2 - 0.05 : CV.ELEVATOR_W / 2 + 0.05, -0.02, -1.0 + Math.floor(w / 2) * 1.0], [0, 0, 90]),
       });
     }
     for (const side of [-1, 1] as const) {
@@ -876,9 +919,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         name_en: `elevator ${index + 1} rail ${side === -1 ? "l" : "r"}`,
         assembly: ASSEMBLY,
         build_layer: 3,
-        geometry: M(B(0.08, 2.2, 0.12, [0, 0, 0], 0.006)),
+        geometry: M(B(0.08, 2.16, 0.12, [0, 0, 0], 0.006)),
         material: "cv_steel_dark",
-        mate: A([CV.ELEVATOR_X + side * (CV.ELEVATOR_W / 2 + 0.06), deckTop - 1.05, z + CV.ELEVATOR_L / 2 + 0.06]),
+        mate: A([CV.ELEVATOR_X + side * (CV.ELEVATOR_W / 2 + 0.06), deckTop - 1.08, z + CV.ELEVATOR_L / 2 + 0.06]),
       });
       add({
         id: `${P}elevator_${index + 1}_cylinder_${side === -1 ? "l" : "r"}`,
@@ -1181,17 +1224,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     });
     drawDigit(String(n), `parking_num_${n}`, sx + w / 2 - 0.16, sz + 0.52, 0.36);
   });
-  // 甲板外缘线：按新甲板宽度剖面逐段勾边（艏部窄长、舯部外飘、艉部收窄）。
-  const portEdge: Array<[number, number]> = [
-    [-2.5, -20], [-2.5, -18], [-3.2, -16.5], [-4.2, -15.9],
-    [-4.4, -9], [-4.5, -6], [-4.3, -2.7], [-4.8, 4.7], [-4.8, 9],
-    [-2.04, 10.7], [-1.55, 20.7],
-  ];
-  const starboardEdgeSegments: Array<Array<[number, number]>> = [
-    [[2.9, -19.4], [3.5, -17.5], [4.68, -15.8], [4.68, -14.52]],
-    [[4.68, -11.08], [4.68, 0.28], [4.68, 3.72], [4.68, 6.0]],
-    [[4.18, 9.53], [2.4, 11.4], [1.85, 20.7]],
-  ];
+  // 甲板外缘线：直接沿真实 deckPlan 折线勾边，向甲板内侧偏 0.05。
+  // 旧版用的是改轮廓之前的硬编码折线（还带升降机缺口），线画在甲板里面，
+  // 线外就会多出一圈“甲板”，右舷 3-1/3-2、左舷艏段都会被看成多余的甲板块。
   const edgeLine = (x0: number, z0: number, x1: number, z1: number, id: string, label: string) => {
     const dx = x1 - x0;
     const dz = z1 - z0;
@@ -1206,18 +1241,36 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       mate: A([(x0 + x1) / 2, markY + 0.006, (z0 + z1) / 2], [0, (Math.atan2(dx, dz) * 180) / Math.PI, 0]),
     });
   };
-  for (let i = 0; i < portEdge.length - 1; i++) {
-    const [x0, z0] = portEdge[i]!;
-    const [x1, z1] = portEdge[i + 1]!;
-    edgeLine(x0 + 0.05, z0, x1 + 0.05, z1, `deck_edge_port_${i + 1}`, `左舷甲板外缘线 ${i + 1}`);
-  }
-  starboardEdgeSegments.forEach((seg, segIndex) => {
-    for (let i = 0; i < seg.length - 1; i++) {
-      const [x0, z0] = seg[i]!;
-      const [x1, z1] = seg[i + 1]!;
-      edgeLine(x0 - 0.05, z0, x1 - 0.05, z1, `deck_edge_stbd_${segIndex + 1}_${i + 1}`, `右舷甲板外缘线 ${segIndex + 1}-${i + 1}`);
+  let stbdEdgeIndex = 0;
+  let portEdgeIndex = 0;
+  let endEdgeIndex = 0;
+  for (let i = 0; i < outline.length; i++) {
+    const [ax, az] = outline[i]!;
+    const [bx, bz] = outline[(i + 1) % outline.length]!;
+    const dx = bx - ax;
+    const dz = bz - az;
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-6) continue;
+    const inX = (dz / len) * 0.05;
+    const inZ = (-dx / len) * 0.05;
+    const midX = (ax + bx) / 2;
+    let id: string;
+    let label: string;
+    if (midX > 0.15) {
+      stbdEdgeIndex++;
+      id = `deck_edge_stbd_${stbdEdgeIndex}`;
+      label = `右舷甲板外缘线 ${stbdEdgeIndex}`;
+    } else if (midX < -0.15) {
+      portEdgeIndex++;
+      id = `deck_edge_port_${portEdgeIndex}`;
+      label = `左舷甲板外缘线 ${portEdgeIndex}`;
+    } else {
+      endEdgeIndex++;
+      id = `deck_edge_end_${endEdgeIndex}`;
+      label = az + bz < 0 ? `艉甲板外缘线 ${endEdgeIndex}` : `艏甲板外缘线 ${endEdgeIndex}`;
     }
-  });
+    edgeLine(ax + inX, az + inZ, bx + inX, bz + inZ, id, label);
+  }
 
   // 直升机停靠点（圆圈 + H）。
   add({

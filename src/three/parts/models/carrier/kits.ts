@@ -380,8 +380,27 @@ export const carrierBowRake: GeometryBuilder = () => {
 export const carrierBottom: GeometryBuilder = () =>
   extrudedPlan(hullPlan(0.08).map(([x, z]) => [x * 0.42, z] as [number, number]), 0.14, CV.HULL_BOTTOM + 0.14);
 
-/** 飞行甲板（装甲板）。外飘段的侧面/底面由连续外飘封边件封闭，不再叠薄片。 */
-export const carrierFlightDeck: GeometryBuilder = () => extrudedPlan(deckPlan(), CV.DECK_T, CV.DECK_Y + CV.DECK_T);
+/** 飞行甲板水密基层：顶面比装甲板低 0.018，装甲板之间的板缝会露出深色基层。 */
+export const carrierFlightDeck: GeometryBuilder = () =>
+  extrudedPlan(deckPlan(), CV.DECK_T - 0.018, CV.DECK_Y + CV.DECK_T - 0.018);
+
+/** 单块飞行甲板装甲板：points 为该板在 x-z 平面的封闭折线。 */
+export const carrierDeckArmorPlate: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: { points?: Array<[number, number]>; topY?: number; thickness?: number } }).params ?? {};
+  const points = params.points ?? [];
+  if (points.length < 3) return new THREE.BufferGeometry();
+  const shape = new THREE.Shape(points.map(([x, z]) => new THREE.Vector2(x, z)));
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: params.thickness ?? 0.012,
+    bevelEnabled: false,
+    curveSegments: 1,
+    steps: 1,
+  });
+  geometry.rotateX(Math.PI / 2);
+  geometry.translate(0, params.topY ?? CV.DECK_Y + CV.DECK_T, 0);
+  geometry.computeVertexNormals();
+  return geometry;
+};
 
 /** 外飘封边板：沿甲板折线一整圈连续的舷墙，从甲板底包到外飘底。 */
 export const carrierSponsonSkirt: GeometryBuilder = () => {
