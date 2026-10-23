@@ -189,9 +189,21 @@ function CockpitCanopyVisibility() {
 function InteriorFillLight() {
   const cameraMode = useStageStore((state) => state.cameraMode);
   if (!isCarrierInteriorMode(cameraMode)) return null;
-  // 舱内是封闭空间，主光/HDRI 被围壁遮挡；进入内部视角时补一层柔和环境光，
-  // 不用贴着相机的点光源（会在近距离把仪表和玻璃打成一片白）。
-  return <ambientLight intensity={1.05} color="#eaf5ff" />;
+  // 舱内是封闭空间，主光/HDRI 被围壁遮挡；进入内部视角时补一层柔和环境光。
+  // 机舱里还有大量金属转子，单靠环境光会发黑，再补一盏舱顶点光。
+  return (
+    <>
+      <ambientLight intensity={cameraMode === "engine_room" ? 1.8 : 1.05} color="#eaf5ff" />
+      {cameraMode === "engine_room" ? (
+        <>
+          <pointLight position={[0, 12.5, -34]} intensity={4.0} distance={26} decay={1.3} color="#dff1ff" />
+          <pointLight position={[-5.5, 7.6, -27]} intensity={4.0} distance={13} decay={1.2} color="#eef7ff" />
+          <pointLight position={[-3.5, 7.6, -33]} intensity={3.5} distance={13} decay={1.2} color="#eef7ff" />
+          <pointLight position={[5.5, 7.6, -39]} intensity={3.5} distance={13} decay={1.2} color="#eef7ff" />
+        </>
+      ) : null}
+    </>
+  );
 }
 
 function Studio() {

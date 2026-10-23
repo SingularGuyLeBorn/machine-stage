@@ -1,4 +1,5 @@
 import type { AssembledModel } from "../../assembler/assembler";
+import { MISSILES, VLS_HEROES, missileRestY } from "./vls";
 
 // ============================================================================
 // models/type055/motion —— 055 状态动画
@@ -16,9 +17,8 @@ const PROP_R = "CV_055_PropR";
 const HANGAR_DOORS = ["CV_055_HangarDoor_L", "CV_055_HangarDoor_R"] as const;
 const PAD_MAIN_ROTOR = "CV_055_Z20_pad_MainRotor";
 const PAD_TAIL_ROTOR = "CV_055_Z20_pad_TailRotor";
+const GT_ROTORS = ["CV_055_GT1_Rotor", "CV_055_GT2_Rotor", "CV_055_GT3_Rotor", "CV_055_GT4_Rotor"] as const;
 
-const HERO_TAGS = ["fwd_2", "fwd_3", "fwd_4", "aft_2", "aft_3", "aft_4"] as const;
-const MISSILE_REST_Y = 10.4;
 const LAUNCH_CYCLE = 10.5;
 const LAUNCH_STAGGER = 0.6;
 const LAUNCH_RISE = 34;
@@ -30,9 +30,12 @@ const smooth = (v: number) => {
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 function animateLaunch(assembled: AssembledModel, t: number, active: boolean): void {
-  for (const [index, tag] of HERO_TAGS.entries()) {
+  for (const [index, hero] of VLS_HEROES.entries()) {
+    const tag = hero.tag;
+    const spec = MISSILES[hero.type];
     const lid = assembled.getNode(`CV_055_VlsLid_${tag}`);
     const missile = assembled.getNode(`CV_055_VlsMissile_${tag}`);
+    const fins = assembled.getPart(`type055.vls.fins_${tag}`);
     const flame = assembled.getPart(`type055.vls.flame_${tag}`);
     if (!lid || !missile) continue;
 
@@ -43,12 +46,22 @@ function animateLaunch(assembled: AssembledModel, t: number, active: boolean): v
       active ? smooth(clamp01((local - 0.15) / 0.9)) * (1 - smooth(clamp01((local - 6.6) / 0.7))) : 0;
     lid.rotation.x = -1.32 * open;
 
-    const visible = active && local > 1.0 && local < 5.6;
-    const rise = active ? LAUNCH_RISE * Math.pow(clamp01((local - 1.0) / 3.8), 2) : 0;
+    // 冷发射先由燃气发生器弹射出筒，出筒后点火；热发射在筒内直接点火、加速更快。
+    const start = spec.launch === "cold" ? 1.0 : 0.75;
+    const riseTime = spec.launch === "hot" ? 3.0 : 3.9;
+    const visible = active && local > start + 0.1 && local < 5.6;
+    const rise = active ? LAUNCH_RISE * Math.pow(clamp01((local - start) / riseTime), 2) : 0;
     const shrink = active ? 1 - smooth(clamp01((local - 4.9) / 0.6)) : 0;
-    missile.position.y = MISSILE_REST_Y + rise;
+    missile.position.y = missileRestY(hero.type) + rise;
     missile.scale.setScalar(visible ? Math.max(0, shrink) : 0);
-    if (flame) flame.object.visible = visible && local > 2.7;
+    if (fins) {
+      const deployed = visible && local > start + (spec.launch === "hot" ? 0.6 : 1.1);
+      fins.object.scale.setScalar(deployed ? 1 : 0.001);
+    }
+    if (flame) {
+      const ignite = spec.launch === "hot" ? start + 0.15 : start + 2.1;
+      flame.object.visible = visible && local > ignite;
+    }
   }
 }
 
@@ -71,6 +84,11 @@ export function animateType055(assembled: AssembledModel, seconds: number, state
 
   const radar = assembled.getNode(RADAR_NODE);
   if (radar) radar.rotation.y = t * (engine ? 2.4 : launch ? 1.4 : 0.7);
+
+  GT_ROTORS.forEach((name, index) => {
+    const rotor = assembled.getNode(name);
+    if (rotor) rotor.rotation.z = engine ? t * (13.5 + index * 0.6) : 0;
+  });
 
   for (const node of [PROP_L, PROP_R]) {
     const prop = assembled.getNode(node);

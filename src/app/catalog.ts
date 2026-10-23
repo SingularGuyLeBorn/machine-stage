@@ -1015,8 +1015,8 @@ export const CATALOG: StageModel[] = [
       { label: "舰长", value: "约 180m" },
       { label: "舷宽", value: "约 20m（水线）" },
       { label: "吃水", value: "约 6.6m" },
-      { label: "VLS", value: "112 单元（前 64 + 后 48）" },
-      { label: "动力", value: "COGAG 4×QC-280 / 双轴双桨" },
+      { label: "VLS", value: "112 单元 · 850mm × 9m · 冷热共架" },
+      { label: "动力", value: "4×QC-280 28MW / 112MW · 双轴 CPP" },
       { label: "航空", value: "直-20 ×3（甲板 1 + 机库 2）" },
     ],
     notes: [

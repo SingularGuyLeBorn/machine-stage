@@ -4,6 +4,7 @@ import { detectStatic } from "@/three/parts/solver/detect";
 import { detectFloatingIslands, detectUnsupportedParts } from "@/three/parts/solver/support";
 import { partitionExpectedContacts } from "@/three/parts/solver/whitelist";
 import { makeType055Layouts, makeType055Registry, TYPE055_BUILDERS } from "./registry";
+import { MISSILES, VLS, vlsCells } from "./vls";
 
 const registry = makeType055Registry();
 const built = buildModel(registry, {
@@ -16,7 +17,7 @@ afterAll(() => built.dispose());
 
 describe("055 型驱逐舰", () => {
   it("舰体/112 VLS/主炮/相控阵/动力/机库都装出来了", () => {
-    expect(built.parts.length).toBeGreaterThanOrEqual(600);
+    expect(built.parts.length).toBeGreaterThanOrEqual(620);
     const hatchInstances = built.parts
       .filter((part) => part.partId === "type055.vls.hatch" || part.partId.startsWith("type055.vls.hatch_hero"))
       .reduce((sum, part) => sum + part.instances.length, 0);
@@ -36,9 +37,25 @@ describe("055 型驱逐舰", () => {
     expect(built.getPart("type055.hangar.z20_hangar_l_cabin_upper")).toBeDefined();
     expect(built.getNode("CV_055_Z20_pad_MainRotor")).toBeDefined();
     expect(built.getNode("CV_055_HangarDoor_L")).toBeDefined();
+    expect(built.getNode("CV_055_GT1_Rotor")).toBeDefined();
+    expect(built.getPart("type055.power.gt1_rotor")).toBeDefined();
+    expect(built.getPart("type055.vls.missile_fwd_3")).toBeDefined();
+    expect(built.getPart("type055.vls.fins_fwd_4")).toBeDefined();
     expect(built.getPart("type055.hangar.door_l")).toBeDefined();
     const physical = built.parts.reduce((sum, part) => sum + part.instances.length, 0);
-    expect(physical).toBeGreaterThanOrEqual(1700);
+    expect(physical).toBeGreaterThanOrEqual(1750);
+  });
+
+  it("垂发与导弹按公开数据建模", () => {
+    expect(vlsCells()).toHaveLength(112);
+    expect(VLS.PITCH).toBeCloseTo(0.95, 3);
+    expect(VLS.DEPTH).toBe(9);
+    expect(MISSILES.hhq9b.length).toBeCloseTo(6.5, 2);
+    expect(MISSILES.yj18.length).toBeCloseTo(8.0, 2);
+    expect(MISSILES.yj21.length).toBeCloseTo(8.8, 2);
+    expect(MISSILES.yj21.diameter).toBeCloseTo(0.82, 2);
+    expect(built.getPart("type055.vls.missile_fwd_2")).toBeDefined();
+    expect(built.getPart("type055.vls.missile_fwd_4")).toBeDefined();
   });
 
   it("零悬空 / 零悬空孤岛 / 静态未豁免 0", () => {

@@ -241,10 +241,26 @@ export const type055HullNumber: GeometryBuilder = () => {
 /** 通用垂发井盖：盖板 + 加强筋 + 锁钩。 */
 export const type055VlsHatch: GeometryBuilder = () =>
   merge([
-    new THREE.BoxGeometry(1.04, 0.08, 1.04).translate(0, 0, 0),
-    new THREE.BoxGeometry(0.88, 0.03, 0.88).translate(0, 0.055, 0),
-    new THREE.BoxGeometry(0.12, 0.13, 0.08).translate(-0.4, 0.03, 0.4),
-    new THREE.BoxGeometry(0.12, 0.13, 0.08).translate(0.4, 0.03, 0.4),
+    new THREE.BoxGeometry(0.86, 0.075, 0.86).translate(0, 0, 0),
+    new THREE.BoxGeometry(0.7, 0.03, 0.7).translate(0, 0.052, 0),
+    new THREE.BoxGeometry(0.1, 0.12, 0.07).translate(-0.33, 0.025, 0.33),
+    new THREE.BoxGeometry(0.1, 0.12, 0.07).translate(0.33, 0.025, 0.33),
+  ]);
+
+/** 垂发井筒：开口圆筒 + 上下加强环（导弹能从中间穿出，不能有实体端盖）。 */
+export const type055VlsTube: GeometryBuilder = () =>
+  merge([
+    new THREE.CylinderGeometry(0.425, 0.425, 8.8, 22, 1, true),
+    new THREE.TorusGeometry(0.45, 0.024, 6, 22).translate(0, 4.35, 0),
+    new THREE.TorusGeometry(0.45, 0.024, 6, 22).translate(0, -4.35, 0),
+  ]);
+
+/** 垂发发射筒：开口圆筒 + 上下法兰环。 */
+export const type055VlsCanister: GeometryBuilder = () =>
+  merge([
+    new THREE.CylinderGeometry(0.415, 0.415, 8.4, 22, 1, true),
+    new THREE.TorusGeometry(0.44, 0.022, 6, 22).translate(0, 4.18, 0),
+    new THREE.TorusGeometry(0.44, 0.022, 6, 22).translate(0, -4.18, 0),
   ]);
 
 /** 冷发射导弹：弹体 + 头锥 + 尾翼 + 底部燃气发生器。原点在弹体中心。 */
@@ -266,9 +282,86 @@ export const type055VlsMissile: GeometryBuilder = () => {
   ]);
 };
 
+function foldedFins(count: number, root: number, chord: number, width: number, y: number): THREE.BufferGeometry[] {
+  const parts: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < count; i++) {
+    const fin = new THREE.BoxGeometry(0.018, chord, width);
+    fin.translate(root, 0, 0);
+    fin.rotateY((i * Math.PI * 2) / count);
+    fin.translate(0, y, 0);
+    parts.push(fin);
+  }
+  return parts;
+}
+
+function missileFins(count: number, root: number, span: number, chord: number, thick: number, y: number, phase = 0): THREE.BufferGeometry[] {
+  const parts: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < count; i++) {
+    const fin = new THREE.BoxGeometry(span, thick, chord);
+    fin.translate(root + span / 2 - 0.02, 0, 0);
+    fin.rotateZ(phase + (i * Math.PI * 2) / count);
+    fin.translate(0, y, 0);
+    parts.push(fin);
+  }
+  return parts;
+}
+
+/** 海红旗-9B：6.5m × 0.5m，冷发射，细长弹体 + 尾部助推 + 4 片大尾翼。 */
+export const type055Hhq9bMissile: GeometryBuilder = () =>
+  merge([
+    new THREE.CylinderGeometry(0.25, 0.25, 4.25, 22).translate(0, 0.075, 0),
+    new THREE.CylinderGeometry(0.02, 0.25, 1.05, 22).translate(0, 2.725, 0),
+    new THREE.CylinderGeometry(0.28, 0.28, 1.25, 22).translate(0, -2.675, 0),
+    new THREE.CylinderGeometry(0.22, 0.28, 0.18, 22).translate(0, -3.35, 0),
+    new THREE.SphereGeometry(0.055, 10, 8).translate(0, 3.27, 0),
+    ...foldedFins(4, 0.255, 0.82, 0.16, -2.62),
+  ]);
+
+/** 海红旗-9B 展开尾翼（出筒后展开；静止时由动画缩到 0 藏在筒内）。 */
+export const type055Hhq9bFins: GeometryBuilder = () =>
+  merge([
+    ...missileFins(4, 0.28, 0.62, 0.82, 0.035, -2.72),
+    ...missileFins(4, 0.25, 0.27, 1.05, 0.025, 0.35, Math.PI / 4),
+  ]);
+
+/** 鹰击-18：8.0m × 0.5m，热发射，亚超结合，尾部助推 + 折叠翼 + 腹部进气道。 */
+export const type055Yj18Missile: GeometryBuilder = () =>
+  merge([
+    new THREE.CylinderGeometry(0.25, 0.25, 5.8, 22).translate(0, 0.1, 0),
+    new THREE.CylinderGeometry(0.02, 0.25, 1.0, 22).translate(0, 3.5, 0),
+    new THREE.CylinderGeometry(0.3, 0.3, 1.2, 22).translate(0, -3.4, 0),
+    new THREE.CylinderGeometry(0.23, 0.3, 0.2, 22).translate(0, -4.08, 0),
+    ...foldedFins(4, 0.305, 1.0, 0.18, -3.45),
+    new THREE.BoxGeometry(0.24, 0.22, 0.9).translate(0, -0.31, 0.8),
+  ]);
+
+/** 鹰击-18 展开尾翼/折叠翼。 */
+export const type055Yj18Fins: GeometryBuilder = () =>
+  merge([
+    ...missileFins(4, 0.3, 0.7, 0.9, 0.04, -3.55),
+    ...missileFins(4, 0.25, 0.44, 1.35, 0.028, 0.5, Math.PI / 4),
+  ]);
+
+/** 鹰击-21：9m 级 × 0.85m，冷发射，两级：大助推 + 高超滑翔体。 */
+export const type055Yj21Missile: GeometryBuilder = () =>
+  merge([
+    new THREE.CylinderGeometry(0.41, 0.41, 3.2, 24).translate(0, -2.8, 0),
+    new THREE.CylinderGeometry(0.34, 0.34, 3.6, 24).translate(0, 0.6, 0),
+    new THREE.CylinderGeometry(0.02, 0.34, 2.0, 24).translate(0, 3.4, 0),
+    new THREE.CylinderGeometry(0.3, 0.41, 0.26, 24).translate(0, -4.35, 0),
+    ...foldedFins(4, 0.405, 1.2, 0.2, -3.45),
+  ]);
+
+/** 鹰击-21 展开助推尾翼/滑翔体控制翼。 */
+export const type055Yj21Fins: GeometryBuilder = () =>
+  merge([
+    ...missileFins(4, 0.41, 0.72, 1.0, 0.045, -3.5),
+    ...missileFins(4, 0.34, 0.54, 0.8, 0.035, 0.4, Math.PI / 4),
+  ]);
+
 /** 导弹尾焰（挂在弹体节点上，静止时藏在发射筒内）。 */
 export const type055VlsFlame: GeometryBuilder = () =>
-  new THREE.CylinderGeometry(0.32, 0.04, 3.0, 14, 1, true).translate(0, -4.2, 0);
+  new THREE.CylinderGeometry(0.32, 0.04, 3.2, 14, 1, true).translate(0, -1.6, 0);
 
 /**
  * 双机库壳体：左右壁 + 顶盖 + 前壁，艉端敞开装门。
@@ -560,21 +653,113 @@ function merge(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry {
   return out;
 }
 
-/** 五叶可调距螺旋桨：桨毂 + 5 片扭转桨叶（用 weld 圆柱近似真实叶片）。 */
-export const type055Propeller: GeometryBuilder = () => {
-  const blades: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2;
-    const r = 2.4;
-    const blade = new THREE.CylinderGeometry(0.16, 0.42, r, 8);
-    blade.translate(0, r / 2, 0);
-    blade.rotateZ(a);
-    blade.rotateX(0.42);
-    blades.push(blade);
+/**
+ * QC-280 / GT-25000 燃气轮机静子与机匣（8.2m × 2.5m × 3.2m）。
+ * 外侧保留机匣板，内侧/顶部敞开，便于机舱第一人称看到转子和 16 个火焰筒。
+ */
+export const type055GasTurbineStatic: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  // 公共底座
+  parts.push(new THREE.BoxGeometry(8.4, 0.4, 2.7).translate(0, 0.2, 0));
+  // 检修状态：机匣上半与侧板已拆下（面板靠舷侧放置），只留转子托架。
+  for (const z of [-2.4, 2.4]) {
+    parts.push(new THREE.BoxGeometry(0.12, 1.7, 0.12).translate(-0.8, 0.85, z));
+    parts.push(new THREE.BoxGeometry(0.12, 1.7, 0.12).translate(0.8, 0.85, z));
+    parts.push(new THREE.BoxGeometry(1.7, 0.12, 0.12).translate(0, 1.7, z));
   }
-  const hub = new THREE.CylinderGeometry(0.42, 0.5, 0.7, 16);
-  blades.push(hub);
-  return merge(blades);
+  // 进气/排气道
+  parts.push(new THREE.BoxGeometry(2.1, 2.2, 1.1).translate(0, 1.75, 4.6));
+  parts.push(new THREE.CylinderGeometry(0.95, 1.1, 0.7, 20).rotateX(Math.PI / 2).translate(0, 1.75, 5.15));
+  parts.push(new THREE.BoxGeometry(2.1, 2.0, 1.2).translate(0, 1.75, -4.6));
+  // 环管燃烧室 + 16 个火焰筒
+  parts.push(new THREE.TorusGeometry(1.02, 0.2, 8, 28).translate(0, 1.8, -0.35));
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    const tube = new THREE.CylinderGeometry(0.075, 0.075, 1.15, 10);
+    tube.rotateX(Math.PI / 2);
+    tube.translate(Math.cos(a) * 0.86, 1.8 + Math.sin(a) * 0.86, -0.35);
+    parts.push(tube);
+  }
+  // 附件管路/机脚
+  const pipe = new THREE.CylinderGeometry(0.05, 0.05, 2.25, 8);
+  pipe.translate(-1.15, 1.68, 3.4);
+  parts.push(pipe);
+  return merge(parts);
+};
+
+/**
+ * QC-280 转子：9 级低压压气机 + 9 级高压压气机 + 高压/低压涡轮 + 4 级动力涡轮。
+ * 整体作为一根转子挂在旋转节点上；机舱里能看到级盘与叶片随 engine 状态旋转。
+ */
+export const type055GasTurbineRotor: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  const disc = (z: number, r: number, blades: number, chord = 0.18, span = 0.28) => {
+    const discBody = new THREE.CylinderGeometry(r, r, 0.07, 22);
+    discBody.rotateX(Math.PI / 2);
+    discBody.translate(0, 0, z);
+    parts.push(discBody);
+    for (let i = 0; i < blades; i++) {
+      const a = (i / blades) * Math.PI * 2;
+      const blade = new THREE.BoxGeometry(span, chord, 0.035);
+      blade.translate(r + span / 2 - 0.02, 0, 0);
+      blade.rotateZ(a);
+      blade.translate(0, 0, z);
+      parts.push(blade);
+    }
+  };
+  // 中央轴
+  parts.push(new THREE.CylinderGeometry(0.16, 0.16, 8.2, 14).rotateX(Math.PI / 2));
+  // 9 级低压压气机（前部 z+1.9..3.6）
+  parts.push(new THREE.CylinderGeometry(0.88, 0.88, 1.9, 24).rotateX(Math.PI / 2).translate(0, 0, 2.78));
+  for (let i = 0; i < 9; i++) disc(1.9 + i * 0.21, 0.96 - i * 0.02, 12, 0.16, 0.3);
+  // 9 级高压压气机（z 0.0..1.5）
+  parts.push(new THREE.CylinderGeometry(0.75, 0.75, 1.7, 24).rotateX(Math.PI / 2).translate(0, 0, 0.75));
+  for (let i = 0; i < 9; i++) disc(0.0 + i * 0.19, 0.84 - i * 0.014, 12, 0.15, 0.26);
+  // 高压/低压涡轮
+  disc(-1.2, 0.86, 12);
+  disc(-1.65, 0.92, 12);
+  // 4 级动力涡轮
+  for (let i = 0; i < 4; i++) disc(-2.3 - i * 0.35, 0.84, 14);
+  return merge(parts);
+};
+
+/**
+ * 五叶可调距螺旋桨（CPP）：半径 2.5m，桨毂/桨叶座/可调距机构 + 5 片分段扭转桨叶。
+ * 桨叶用 4 段不同弦长/厚度/螺距角的箱体拼接，比圆柱叶片更接近真实侧斜桨。
+ */
+export const type055Propeller: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  // 桨毂（轴线 Z）与整流帽
+  const hub = new THREE.CylinderGeometry(0.52, 0.6, 0.9, 20);
+  hub.rotateX(Math.PI / 2);
+  parts.push(hub);
+  const cap = new THREE.CylinderGeometry(0.02, 0.55, 0.85, 20);
+  cap.rotateX(Math.PI / 2);
+  cap.translate(0, 0, -0.8);
+  parts.push(cap);
+  const pitchRing = new THREE.TorusGeometry(0.67, 0.08, 6, 24);
+  pitchRing.translate(0, 0, 0.45);
+  parts.push(pitchRing);
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2;
+    for (let seg = 0; seg < 4; seg++) {
+      const r0 = 0.55 + seg * 0.5;
+      const chord = 0.92 - seg * 0.12;
+      const thick = 0.13 - seg * 0.025;
+      const blade = new THREE.BoxGeometry(0.5, chord, thick);
+      blade.translate(r0 + 0.25, 0, 0);
+      blade.rotateX(0.58);
+      blade.rotateZ(angle);
+      parts.push(blade);
+    }
+    // 桨叶座
+    const socket = new THREE.CylinderGeometry(0.2, 0.26, 0.35, 12);
+    socket.rotateX(Math.PI / 2);
+    socket.translate(0.55, 0, 0);
+    socket.rotateZ(angle);
+    parts.push(socket);
+  }
+  return merge(parts);
 };
 
 /** 直升机甲板：防滑涂层圆 + 中心 H + 系留格栅，作为甲板贴面。 */
