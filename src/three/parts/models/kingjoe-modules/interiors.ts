@@ -16,7 +16,7 @@ export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
     base: "#8ccac5",
     metalness: 0.18,
     roughness: 0.2,
-    opacity: 0.42,
+    opacity: 0.58,
     depthWrite: false,
     clearcoat: 0.85,
     clearcoatRoughness: 0.16,

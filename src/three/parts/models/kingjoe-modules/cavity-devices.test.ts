@@ -18,6 +18,27 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
     model.dispose();
     library.dispose();
   });
+  it("头侧、脚掌和手掌双侧都有新增实体，填隙包络不挤进已有设备", () => {
+    const plan = planCavityDevices(new Map());
+    for (const region of ["head", "foot", "hand"])
+      for (const side of [-1, 1])
+        expect(
+          plan.filter((p) => p.infill === region && Math.sign(p.center[0]) === side).length,
+        ).toBeGreaterThan(5);
+    for (const device of plan.filter((p) => p.infill))
+      for (const other of plan.filter((p) => p !== device && p.owner === device.owner))
+        expect(
+          new THREE.Vector3(...device.center).distanceTo(new THREE.Vector3(...other.center)),
+        ).toBeGreaterThanOrEqual(device.radius + other.radius);
+    for (const side of ["l", "r"])
+      expect(
+        model.parts.filter(
+          (p) =>
+            p.partId.endsWith("gel_capsule") &&
+            model.getNode(p.def.node!)!.parent?.name === `Joint_fore_${side}`,
+        ).length,
+      ).toBeGreaterThan(10);
+  });
   it("八片壳体都有体积设备，空腔设备动作采样仍在内壁约束的安装球内", () => {
     const plan = planCavityDevices(new Map());
     expect(plan.length).toBeGreaterThan(100);
@@ -96,7 +117,7 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
       expect(part.def.tags).toContain("internal");
       const material = part.object.material as THREE.MeshStandardMaterial;
       expect(material.transparent).toBe(true);
-      expect(material.opacity).toBeLessThan(0.5);
+      expect(material.opacity).toBeLessThan(0.65);
       expect(material.depthWrite).toBe(false);
     }
   });

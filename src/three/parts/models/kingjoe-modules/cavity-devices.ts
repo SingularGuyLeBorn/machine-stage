@@ -10,6 +10,14 @@ export interface CavityDevice {
   owner: string;
   center: V3;
   radius: number;
+  infill?: "head" | "foot" | "hand";
+}
+/** 原壳装配坐标下的末端区域；细采样补大网格遗漏的薄掌、脚尖与头侧。 */
+export function cavityInfillRegion(owner: string, center: V3): CavityDevice["infill"] {
+  if (owner === "head_arms" && Math.abs(center[0]) > 0.42 && center[1] > 5.2) return "head";
+  if (owner === "legs" && center[1] < 0.68) return "foot";
+  if (owner.startsWith("fore") && center[1] < 3.5) return "hand";
+  return undefined;
 }
 let cachedPlan: CavityDevice[] | undefined;
 const axes = [
@@ -66,6 +74,47 @@ export function planCavityDevices(trees: Map<string, MeshBVH>): CavityDevice[] {
         continue;
       occupied.push(candidate);
     }
+    // [OM-FREEPLAY] 保留已确认的大设备，在用户点名的末端空区二次填隙。
+    // 剩余半径同时扣除已安装设备包络，不能整片覆盖或原位重叠凑密度。
+    const fineStep = owner.startsWith("fore") ? 0.045 : 0.085;
+    if (owner === "head_arms" || owner === "legs" || owner.startsWith("fore")) {
+      const infill: CavityDevice[] = [];
+      for (let x = bounds.min.x + fineStep / 2; x < bounds.max.x; x += fineStep)
+        for (let y = bounds.min.y + fineStep / 2; y < bounds.max.y; y += fineStep)
+          for (let z = bounds.min.z + fineStep / 2; z < bounds.max.z; z += fineStep) {
+            const point: V3 = [x, y, z],
+              region = cavityInfillRegion(owner, point);
+            if (!region) continue;
+            const center = new THREE.Vector3(...point);
+            if (roomBoxes.some((b) => b.containsPoint(center))) continue;
+            let radius = Math.min(0.23, tree.closestPointToPoint(center)!.distance * 0.86);
+            for (const prior of occupied)
+              radius = Math.min(
+                radius,
+                center.distanceTo(new THREE.Vector3(...prior.center)) - prior.radius - 0.006,
+              );
+            if (radius < (region === "hand" ? 0.026 : 0.05)) continue;
+            if (
+              !axes.every((dir) => {
+                const hit = tree.raycastFirst(new THREE.Ray(center, dir), THREE.DoubleSide);
+                return hit && hit.face!.normal.dot(dir) < -0.0001;
+              })
+            )
+              continue;
+            infill.push({ owner, center: point, radius, infill: region });
+          }
+      infill.sort((a, b) => b.radius - a.radius);
+      for (const candidate of infill) {
+        const center = new THREE.Vector3(...candidate.center);
+        if (
+          occupied.some(
+            (p) => center.distanceTo(new THREE.Vector3(...p.center)) < candidate.radius + p.radius + 0.006,
+          )
+        )
+          continue;
+        occupied.push(candidate);
+      }
+    }
     planned.push(...occupied);
   }
   cachedPlan = planned;
@@ -118,6 +167,20 @@ export function addCavityDevices(
       });
     };
     const family = i % 3;
+    // 手掌用胶囊填充器件之间的空白；脚底和头侧新增设备也带低亮度柔性场包覆。
+    if (device.infill || device.owner.startsWith("fore")) {
+      add(
+        "gel_capsule",
+        device.owner.startsWith("fore") ? "手掌虹彩凝胶肌束" : "设备柔性场囊",
+        "pedanGel",
+        {},
+        "pedan_gel",
+        base,
+        [0, 0, 0],
+        [0, 0, 0],
+        [r * 0.9, r * 1.6, r * 0.9],
+      );
+    }
     // 主体占据安装球的大部分体积；不要只给小晶核加一圈细骨架。
     add(
       "body",
@@ -209,7 +272,7 @@ export function addCavityDevices(
       const tree = trees.get(a.owner)!;
       const wall = tree.raycastFirst(new THREE.Ray(start, direction), THREE.DoubleSide);
       if (wall && wall.distance < span) continue;
-      let radius = Math.min(a.radius, b.radius) * 0.42;
+      let radius = Math.min(a.radius, b.radius) * 0.65;
       for (let sample = 0; sample <= 12; sample++)
         radius = Math.min(
           radius,
@@ -283,12 +346,12 @@ export function updateCavityDevices(model: AssembledModel, seconds: number, acti
           float flow=gelPoint.y*9.0-gelTime*(0.55+gelCharge*1.8)+sin(gelPoint.x*3.0+gelPoint.z*4.0);
           vec3 film=0.55+0.45*cos(flow+vec3(0.0,2.1,4.2));
           diffuseColor.rgb=mix(vec3(0.24,0.48,0.52),film,0.8);
-          diffuseColor.a*=0.25+0.65*pow(0.5+0.5*sin(flow*1.7),2.0);
-          totalEmissiveRadiance+=film*(0.15+gelCharge*0.4);
+          diffuseColor.a*=0.58+0.34*pow(0.5+0.5*sin(flow*1.7),2.0);
+          totalEmissiveRadiance+=film*(0.07+gelCharge*0.18);
         `,
         );
       };
-      material.customProgramCacheKey = () => "pedan-fluid-field-v1";
+      material.customProgramCacheKey = () => "pedan-fluid-field-v2";
       material.needsUpdate = true;
       gels.push({ material, time, charge });
     }
