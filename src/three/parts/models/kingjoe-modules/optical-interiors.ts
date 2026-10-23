@@ -11,11 +11,21 @@ import { pedanPower, type PedanActivity } from "./machinery";
 import { displayMaterialSource } from "../../kernel/displayMaterial";
 
 export const opticalBuilders: Record<string, GeometryBuilder> = {};
+const opticalGeometryFactories = new Map<string, () => THREE.BufferGeometry>();
 export const opticalParts: PartDefinition[] = [];
 export const opticalMaterials: ModelRegistry["materials"] = {
   pedan_optic_cells: { base: "#274843", roughness: 0.6, metalness: 0.12 },
 };
 export const opticalVisorIds: string[] = [];
+// 接口随实体创建，避免能量特效另猜坐标；两端均取实际零件表面。
+export const opticalContactFaces: {
+  owner: string;
+  label: string;
+  faces: [string, string];
+  a: [number, number, number];
+  b: [number, number, number];
+  radius: number;
+}[] = [];
 
 // 先在 XY 轮廓上挤出有厚度的零件，再映射到现有光学曲面；前后都跟随曲率。
 function plate(
@@ -94,6 +104,7 @@ function add(
   const kit = `pedanOptic_${name}`;
   opticalBuilders[kit] = builder;
   const id = `kingjoemodules.${module}.internal_optic_${name}`;
+  opticalGeometryFactories.set(id, builder);
   opticalParts.push({
     id,
     name_cn: label,
@@ -126,6 +137,23 @@ for (const side of [-1, 1]) {
       () => plate(segment(center, edge, i, 12, 0.83, 0.95), surface, 0.018, 0.055),
     );
   for (let i = 0; i < 8; i++) {
+    // 光导瓣外缘到分段承座内缘；避开承座自身的分段缝。
+    const t = (i + 0.5) / 8;
+    const f = t * edge.length;
+    const boundary = edge[Math.floor(f)]!.clone().lerp(edge[(Math.floor(f) + 1) % edge.length]!, f % 1);
+    const guide = center.clone().lerp(boundary, 0.75);
+    const seat = center.clone().lerp(boundary, 0.83);
+    opticalContactFaces.push({
+      owner: "chest",
+      label: `${suffix === "l" ? "左" : "右"}胸光导接口 ${i + 1}`,
+      faces: [
+        `kingjoemodules.chest.internal_optic_chest_${suffix}_guide_${i}`,
+        `kingjoemodules.chest.internal_optic_chest_${suffix}_seat_${Math.floor(t * 12)}`,
+      ],
+      a: [guide.x, guide.y, surface(guide.x) - 0.03],
+      b: [seat.x, seat.y, surface(seat.x) - 0.03],
+      radius: 0.009,
+    });
     add(`chest_${suffix}_cassette_${i}`, `胸窗分瓣光导背匣 ${i + 1}`, "chest", "pedan_ceramic", () =>
       plate(segment(center, edge, i, 8, 0.13, 0.81), surface, 0.075, 0.045),
     );
@@ -187,6 +215,18 @@ for (let row = 0; row < VISOR_GRID.rows; row++) {
   );
   for (let col = 0; col < VISOR_GRID.columns; col++) {
     const x = ((col + 0.5) / VISOR_GRID.columns - 0.5) * VISOR_GRID.width;
+    if (col === 0 || col === VISOR_GRID.columns - 1)
+      opticalContactFaces.push({
+        owner: "head_arms",
+        label: `头屏第 ${row + 1} 排${col === 0 ? "左" : "右"}背板接口`,
+        faces: [
+          `kingjoemodules.head_arms.internal_optic_visor_driver_${row}`,
+          `kingjoemodules.head_arms.internal_optic_visor_cell_${row}_${col}`,
+        ],
+        a: [x, y, visorProfile.surface(x, y) - 0.068],
+        b: [x, y, visorProfile.surface(x, y) - 0.03 - 0.025],
+        radius: 0.009,
+      });
     opticalVisorIds.push(
       add(
         `visor_cell_${row}_${col}`,
@@ -209,6 +249,26 @@ for (let row = 0; row < VISOR_GRID.rows; row++) {
     );
   }
 }
+
+// 头屏背板是有限三角面，不等于拟合曲面本身。沿 Z 取实际前/后表面，
+// 防止用拟合 z 值放端口时，接口浮在背板前方（宽背板两侧尤为明显）。
+const contactMaterial = new THREE.MeshBasicMaterial();
+for (const contact of opticalContactFaces.filter((p) => p.owner === "head_arms")) {
+  for (const [i, point] of [contact.a, contact.b].entries()) {
+    const geometry = opticalGeometryFactories.get(contact.faces[i]!)!();
+    const direction = i === 0 ? -1 : 1;
+    const ray = new THREE.Raycaster(
+      new THREE.Vector3(point[0], point[1], -direction * 10),
+      new THREE.Vector3(0, 0, direction),
+    );
+    const hit = ray.intersectObject(new THREE.Mesh(geometry, contactMaterial), false)[0];
+    if (!hit) throw new Error(`光学接口未命中安装面：${contact.label}`);
+    point[2] = hit.point.z;
+    geometry.dispose();
+  }
+}
+contactMaterial.dispose();
+opticalGeometryFactories.clear();
 
 const caches = new WeakMap<AssembledModel, { material: THREE.MeshStandardMaterial; channel: string }[]>();
 export function updateOpticalInteriors(model: AssembledModel, seconds: number, activity: PedanActivity) {

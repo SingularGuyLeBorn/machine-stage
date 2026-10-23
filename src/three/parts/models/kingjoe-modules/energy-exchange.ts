@@ -5,6 +5,8 @@ import type { AssembledModel } from "../../assembler/assembler";
 import type { ModelRegistry, PartDefinition } from "../../registry/types";
 import { planDeviceTree, FLOW_PACKET_COUNT, flowPacketScale } from "./hand-couplings";
 import type { CavityDevice } from "./cavity-devices";
+import { opticalContactFaces } from "./optical-interiors";
+import { JOINT_DRIVE } from "./joint-drives";
 import data from "./pedan.generated.json";
 
 export const EXCHANGE_MODES = ["rings", "breath", "current", "rings", "breath", "membrane"] as const;
@@ -17,6 +19,7 @@ export interface ExchangeRoute {
   b: V3;
   radius: number;
   anchors?: [string, string];
+  faceLabel?: string;
 }
 /** 同壳体设备按最短树组织；跨关节只使用真实安装端，不用距离猜跨分体连接。 */
 export function planEnergyExchange(devices: CavityDevice[]): ExchangeRoute[] {
@@ -50,6 +53,31 @@ export function planEnergyExchange(devices: CavityDevice[]): ExchangeRoute[] {
           b: [0.075, 0, 0],
           radius: 0.048,
           anchors: [`${ram}_a`, `${ram}_b`],
+        });
+      }
+  // [OM-FREEPLAY] 短接口用三个光包，交错使用呼吸/电流，保持局部低亮而非整圈胸甲发光。
+  opticalContactFaces.forEach((face, i) =>
+    routes.push({
+      ...face,
+      parent: `Module_${face.owner}`,
+      faceLabel: face.label,
+      mode: (["rings", "breath", "current"] as const)[i % 3]!,
+    }),
+  );
+  for (const side of ["l", "r"])
+    for (const kind of ["upper", "fore"] as const)
+      for (const sign of [-1, 1]) {
+        const r = JOINT_DRIVE[kind],
+          base = `JointDrive_${kind}_${side}`;
+        routes.push({
+          owner: `joint_${kind}_${side}`,
+          parent: "Module_head_arms",
+          faceLabel: `${side === "l" ? "左" : "右"}${kind === "upper" ? "肩" : "肘"}轴承端面耦合`,
+          mode: sign < 0 ? "rings" : "current",
+          a: [sign * r * (JOINT_DRIVE.bearingCenter - JOINT_DRIVE.bearingWire), 0, 0],
+          b: [sign * r * (JOINT_DRIVE.hubCenter + JOINT_DRIVE.hubThickness / 2), 0, 0],
+          radius: r * JOINT_DRIVE.bearingRadius,
+          anchors: [base, `${base}_rotor`],
         });
       }
   return routes;
@@ -91,7 +119,7 @@ export function addEnergyExchange(
     ) => {
       const p: PartDefinition = {
         id: `kingjoemodules.${module}.exchange_${i}_${key}`,
-        name_cn: label,
+        name_cn: route.faceLabel ? `${route.faceLabel} · ${label}` : label,
         name_en: key,
         assembly: module,
         node,
@@ -101,7 +129,7 @@ export function addEnergyExchange(
         material,
         mate: { type: "absolute", position: [0, 0, 0] },
         scale,
-        tags: ["internal", "energy-exchange", "gel-link"],
+        tags: ["internal", "energy-exchange", "gel-link", ...(route.faceLabel ? ["interface-coupling"] : [])],
         source: "原创佩丹能量交换；按真实器件端点规划，表现不等于实体管路",
       };
       parts.push(p);
@@ -124,12 +152,12 @@ export function addEnergyExchange(
       "成对呼吸的能量截面",
       base,
       "pedanRing",
-      { r: route.radius, wire: 0.003 },
+      { r: route.radius, wire: route.faceLabel ? Math.min(0.002, route.radius * 0.15) : 0.003 },
       `pedan_exchange_${i % 4}`,
     );
     Object.assign(terminals, { instances: 2, indexed: true, instance_nodes: ends });
     if (route.mode === "rings") {
-      const packets = Array.from({ length: FLOW_PACKET_COUNT }, (_, k) => {
+      const packets = Array.from({ length: route.faceLabel ? 3 : FLOW_PACKET_COUNT }, (_, k) => {
         const name = `${base}_packet_${k}`;
         nodes.push({ name, parent: base, pivot: [0, 0, 0], rest_rotation: [-90, 0, 0], motion: "translate" });
         return name;
@@ -139,10 +167,10 @@ export function addEnergyExchange(
         "非接触传递光环",
         base,
         "pedanRing",
-        { r: route.radius * 1.02, wire: 0.0027 },
+        { r: route.radius * 1.02, wire: route.faceLabel ? Math.min(0.0015, route.radius * 0.1) : 0.0027 },
         "pedan_hand_flow",
       );
-      Object.assign(p, { instances: FLOW_PACKET_COUNT, indexed: true, instance_nodes: packets });
+      Object.assign(p, { instances: packets.length, indexed: true, instance_nodes: packets });
     } else if (route.mode === "current") {
       const name = `${base}_arc`;
       nodes.push({ name, parent: base, motion: "scalar" });
@@ -231,9 +259,10 @@ export function updateEnergyExchange(
     link.base.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
     const breath = 0.5 + 0.5 * Math.sin(time * 1.35 + (i % 4) * 1.7);
     link.ends[1].position.y = length;
-    for (const end of link.ends) end.scale.setScalar(0.95 + 0.08 * breath);
+    // 安装面固定在实体上，只让光包收放；不能把端环呼吸成漂浮的装饰。
+    for (const end of link.ends) end.scale.setScalar(route.faceLabel ? 1 : 0.95 + 0.08 * breath);
     for (const [k, node] of link.packets.entries()) {
-      const p = (time * 0.36 + i * 0.19 + k / FLOW_PACKET_COUNT) % 1;
+      const p = (time * (route.faceLabel ? 0.6 : 0.36) + i * 0.19 + k / link.packets.length) % 1;
       node.position.y = length * p;
       node.scale.setScalar(flowPacketScale(p) * (0.85 + charge * 0.1));
     }

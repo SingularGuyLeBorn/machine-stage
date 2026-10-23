@@ -3,13 +3,23 @@ import * as THREE from "three";
 import type { ModelRegistry, PartDefinition } from "../../registry/types";
 import type { AssembledModel } from "../../assembler/assembler";
 import { CUFF } from "./joint-covers";
+// 轴承与轮毂的相对尺寸也供端面耦合使用，运动和特效共用安装面。
+export const JOINT_DRIVE = {
+  upper: 0.14,
+  fore: 0.16,
+  bearingCenter: 0.9,
+  bearingWire: 0.12,
+  bearingRadius: 0.76,
+  hubCenter: 0.55,
+  hubThickness: 0.16,
+} as const;
 const UP = new THREE.Vector3(0, 1, 0);
 export function addJointDrives(parts: PartDefinition[], nodes: ModelRegistry["nodes"]): void {
   for (const side of ["l", "r"]) {
-    for (const kind of ["upper", "fore"]) {
+    for (const kind of ["upper", "fore"] as const) {
       const key = `${kind}_${side}`,
         base = `JointDrive_${key}`,
-        r = kind === "upper" ? 0.14 : 0.16;
+        r = JOINT_DRIVE[kind];
       nodes.push({ name: base, parent: "Module_head_arms", motion: "rotate" });
       const rotor = `${base}_rotor`;
       nodes.push({ name: rotor, parent: base, motion: "rotate" });
@@ -54,9 +64,9 @@ export function addJointDrives(parts: PartDefinition[], nodes: ModelRegistry["no
           "关节轴承外圈",
           base,
           "pedanRing",
-          { r: r * 0.76, wire: r * 0.12 },
+          { r: r * JOINT_DRIVE.bearingRadius, wire: r * JOINT_DRIVE.bearingWire },
           "pedan_coil",
-          [sign * r * 0.9, 0, 0],
+          [sign * r * JOINT_DRIVE.bearingCenter, 0, 0],
           [0, 90, 0],
         );
         add(
@@ -64,9 +74,9 @@ export function addJointDrives(parts: PartDefinition[], nodes: ModelRegistry["no
           "差动齿轮轮毂",
           rotor,
           "pedanCylinder",
-          { r: r * 0.88, h: r * 0.16 },
+          { r: r * 0.88, h: r * JOINT_DRIVE.hubThickness },
           "pedan_titanium",
-          [sign * r * 0.55, 0, 0],
+          [sign * r * JOINT_DRIVE.hubCenter, 0, 0],
           [0, 0, 90],
         );
       }
@@ -152,7 +162,7 @@ export function updateJointDrives(model: AssembledModel): void {
       fore = model.getNode(`Joint_fore_${suffix}`)!;
     upper.updateMatrix();
     fore.updateMatrix();
-    for (const kind of ["upper", "fore"]) {
+    for (const kind of ["upper", "fore"] as const) {
       const key = `${kind}_${suffix}`,
         base = model.getNode(`JointDrive_${key}`)!;
       const first = model.getNode(`Cuff_${key}_0`)!,
