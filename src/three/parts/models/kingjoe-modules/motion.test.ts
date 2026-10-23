@@ -15,6 +15,7 @@ import {
 import { CONTACT_PAIRS, contactTriangles, randomSurfacePoint, getModuleEffects } from "./effects";
 import { createMaterialLibrary } from "../../kernel/textures";
 import { exchangeMaterials } from "./energy-exchange";
+import { RAY_SUBDIVISIONS } from "./rays";
 import skin from "../kingjoe-skin/segments.generated.json";
 import { exteriorGeometry } from "./test-geometry";
 
@@ -68,9 +69,30 @@ describe("分体、吸合和接触面电弧", () => {
       expect(origins[0].distanceTo(origins[1])).toBeGreaterThan(0.1);
       origins.forEach((point, i) => expect(point.distanceTo(origins[i % 2])).toBeLessThan(1e-5));
       const p = (rays.children[0] as THREE.Mesh).geometry.getAttribute("position");
-      const bends = Array.from({ length: 10 }, (_, j) => p.getX((j + 5) * 4) - p.getX((j + 4) * 4));
+      const bends = Array.from(
+        { length: 10 },
+        (_, j) => p.getX((j + 5) * RAY_SUBDIVISIONS * 4) - p.getX((j + 4) * RAY_SUBDIVISIONS * 4),
+      );
       expect(bends.filter((n) => n > 0).length).toBeGreaterThan(2);
       expect(bends.filter((n) => n < 0).length).toBeGreaterThan(2);
+      // 毛边来自细分截面，时间连续变化；不能用逐帧随机点或多条完整 Z 冒充。
+      const sample = () => Array.from(p.array);
+      const before = sample();
+      animateKingJoeModules(model, start + 3.9, `ray_${key}`);
+      expect(sample()).toEqual(before);
+      animateKingJoeModules(model, start + 3.90001, `ray_${key}`);
+      const near = sample();
+      expect(Math.max(...near.map((v, i) => Math.abs(v - before[i]!)))).toBeLessThan(0.001);
+      animateKingJoeModules(model, start + 4, `ray_${key}`);
+      expect(sample()).not.toEqual(before);
+      expect(sample().every(Number.isFinite)).toBe(true);
+      const widths = Array.from({ length: 30 }, (_, i) => {
+        const index = (i + 30) * 4;
+        return new THREE.Vector3()
+          .fromBufferAttribute(p, index)
+          .distanceTo(new THREE.Vector3().fromBufferAttribute(p, index + 1));
+      });
+      expect(Math.max(...widths) / Math.min(...widths)).toBeGreaterThan(1.3);
     }
     animateKingJoeModules(model, 30, "closed");
     animateKingJoeModules(model, 32, "closed");
