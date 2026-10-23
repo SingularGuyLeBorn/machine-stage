@@ -24,7 +24,7 @@
 - [x] **低端 GPU 首帧/切换不卡**：
   - 装配前先绘制 DOM 加载层（`assembling`），再延迟 140ms 开始同步装配；着色器用 `gl.compileAsync` 预热并保留 DOM 提示。实测切换航母：提示层在 367ms 出现，随后才进入 1.7s 装配/编译长任务，不再“黑屏无响应”。
   - 外部视角按舱内判定剔除 2716 个被舰体遮挡的网格（动力舱/机库/舰桥与 CIC 内设/舰体肋骨），draw call 5443→2876，实测 20.5→29.8fps；进入舰桥/CIC/机舱/反应堆/弹药库/机库第一人称、透视、爆炸或选中内部件时自动恢复显示。
-  - 航母关 N8AO、dpr 0.9–1.1、大模型复位 FOV 56°/距离约 410m。证据：`probe-carrier-perf.jpeg`、`probe-bridge.jpeg`、`probe-hangar.jpeg`。
+  - 航母跳过 EffectComposer（本机 5500+ 件时场景 Pass 会输出黑帧；直接默认帧缓冲已验证 draw call 2752、正常出图），并无 N8AO、dpr 0.9–1.1、大模型复位 FOV 56°/距离约 410m。证据：`probe-carrier-perf.jpeg`、`probe-bridge.jpeg`、`probe-hangar.jpeg`、`carrier-home.jpeg`。
 - [x] **舰岛顶棚改结构件**：删除黑色斜坡篷布；顶部改灰色传感器甲板室 + 结构平台（1.36×4.5m）+ 围板 + 立柱/双层栏杆 + 设备柜/刀形天线 + 桅杆基座（法兰+两根肘板）+ 竖直烟囱结构。证据：`island-roof-after.jpeg`、`island-support-close.jpeg`。
 - [x] **反射压到位**：舰体 metalness 0.35/roughness 0.70/env 0.7；甲板 env 0.35；钢件 roughness 0.64–0.70；相控阵 roughness 0.64–0.66；海面 metalness 0、roughness 0.68、env 0.35、非金属水贴图；泡沫 roughness 0.9/env 0.18。强反射白斑与碎反光已消除。证据：`carrier-home.jpeg`、`probe-reset.jpeg`。
 - [x] **近防炮/卫通支撑可见**：1130 下加独立基座（法兰+立柱+底板）、四块肘板、围栏立柱/横杆；卫通罩下加基板+立柱+安装环，不再悬空。证据：`island-support-close.jpeg`（近景可一眼看到炮座/卫通基座与舰岛顶板的连接）。
