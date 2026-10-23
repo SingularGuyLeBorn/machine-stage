@@ -2109,7 +2109,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 2,
       geometry: M(B(7.6, 2.6, 0.08, [0, 0, 0], 0.02), C(0.07, 0.1, [-2.8, 0.9, 0.06], 8), C(0.07, 0.1, [2.8, 0.9, 0.06], 8)),
       material: "cv_055_hull",
-      mate: A([side * 7.86, 5.9, side === -1 ? -29 : -39.8], [0, 90, 0]),
+      mate: A([side * 9.04, 5.9, side === -1 ? -29 : -39.8], [0, 90, 0]),
     });
   }
 
@@ -2143,7 +2143,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       name_en: `engine room floor ${tag}`,
       assembly: "propulsion",
       build_layer: 3,
-      geometry: M(B(8.6, 0.12, 13.6, [0, 0, 0], 0.02), B(8.6, 0.05, 0.2, [0, 0.08, 6.6], 0.006)),
+      geometry: M(B(18.2, 0.12, 13.6, [0, 0, 0], 0.02), B(18.2, 0.05, 0.2, [0, 0.08, 6.6], 0.006)),
       material: "cv_deck_plate",
       mate: A([0, 4.2, z]),
     });
@@ -2153,11 +2153,268 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       name_en: `engine room light ${tag}`,
       assembly: "propulsion",
       build_layer: 5,
-      geometry: M(B(4.0, 0.05, 0.25, [0, 0, 0], 0.004)),
-      material: "cv_glow",
-      mate: A([0, 13.4, z]),
+      geometry: M(
+        B(4.0, 0.05, 0.25, [0, 0, 0], 0.004),
+        B(3.0, 0.05, 0.25, [-5.0, 0, 0], 0.004),
+        B(3.0, 0.05, 0.25, [5.0, 0, 0], 0.004),
+      ),
+      material: "cv_055_lamp",
+      mate: A([0, 10.225, z]),
     });
   }
+
+  // 燃机接油盘与舷侧防滑走道
+  for (const e of engines) {
+    add({
+      id: `${P}power.er_drip_tray_${e.tag}`,
+      name_cn: `QC-280 燃气轮机 ${e.tag} 接油盘`,
+      name_en: `GT ${e.tag} drip tray`,
+      assembly: "propulsion",
+      build_layer: 3,
+      geometry: M(
+        B(2.9, 0.07, 8.3, [0, 0, 0], 0.01),
+        B(2.9, 0.12, 0.08, [0, 0.06, 4.12], 0.006),
+        B(2.9, 0.12, 0.08, [0, 0.06, -4.12], 0.006),
+        B(0.08, 0.12, 8.3, [1.42, 0.06, 0], 0.006),
+        B(0.08, 0.12, 8.3, [-1.42, 0.06, 0], 0.006),
+      ),
+      material: "cv_steel_dark",
+      mate: A([e.x, 4.31, e.z]),
+    });
+  }
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}power.er_walkway_${side === -1 ? "l" : "r"}`,
+      name_cn: `机舱舷侧防滑走道 ${side === -1 ? "左" : "右"}`,
+      name_en: `engine room side walkway ${side === -1 ? "l" : "r"}`,
+      assembly: "propulsion",
+      build_layer: 3,
+      geometry: M(B(0.9, 0.04, 24.0, [0, 0, 0], 0.004)),
+      material: "cv_grate",
+      mate: A([side * 8.2, 4.29, -34]),
+    });
+  }
+
+  // 机舱是封闭机器处所：补齐顶棚、围壁隔音板、桁架、管系与走台，
+  // 让内部 FPV 看到完整的机舱边界，避免机匣悬在空腔里。
+  add({
+    id: `${P}power.er_ceiling`,
+    name_cn: "机舱顶棚/甲板下表面",
+    name_en: "engine room deckhead",
+    assembly: "propulsion",
+    build_layer: 1,
+    geometry: M(
+      B(18.2, 0.08, 26.4, [0, 0, 0], 0.01),
+      B(0.22, 0.14, 26.4, [-7.2, -0.08, 0], 0.008),
+      B(0.22, 0.14, 26.4, [7.2, -0.08, 0], 0.008),
+    ),
+    material: "cv_hull_dark",
+    mate: A([0, 10.3, -34]),
+  });
+
+  // 舷侧隔音围壁（带竖向加强筋），紧贴内壳
+  for (const side of [-1, 1] as const) {
+    for (const [tag, z] of [
+      ["a", -24.5],
+      ["b", -31.0],
+      ["c", -37.5],
+      ["d", -44.0],
+    ] as const) {
+      add({
+        id: `${P}power.er_lining_${side === -1 ? "l" : "r"}_${tag}`,
+        name_cn: `机舱隔音围壁 ${side === -1 ? "左" : "右"} ${tag}`,
+        name_en: `engine room acoustic lining ${side === -1 ? "l" : "r"} ${tag}`,
+        assembly: "propulsion",
+        build_layer: 1,
+        geometry: M(
+          B(0.10, 4.8, 5.4, [0, 0, 0], 0.01),
+          B(0.07, 4.6, 0.10, [0, 0, -2.2], 0.006),
+          B(0.07, 4.6, 0.10, [0, 0, -0.73], 0.006),
+          B(0.07, 4.6, 0.10, [0, 0, 0.73], 0.006),
+          B(0.07, 4.6, 0.10, [0, 0, 2.2], 0.006),
+        ),
+        material: side === -1 ? "cv_055_hull" : "cv_hull_dark",
+        mate: A([side * 9.12, 6.9, z]),
+      });
+    }
+  }
+
+  // 顶部横桁/纵桁
+  for (const [tag, z] of [
+    ["a", -22.5],
+    ["b", -28.0],
+    ["c", -33.5],
+    ["d", -39.0],
+    ["e", -44.5],
+  ] as const) {
+    add({
+      id: `${P}power.er_girder_${tag}`,
+      name_cn: `机舱顶部横桁 ${tag}`,
+      name_en: `engine room deck girder ${tag}`,
+      assembly: "propulsion",
+      build_layer: 1,
+      geometry: M(
+        B(18.4, 0.30, 0.20, [0, 0, 0], 0.01),
+        B(0.5, 0.06, 0.28, [-8.6, -0.12, 0], 0.006),
+        B(0.5, 0.06, 0.28, [8.6, -0.12, 0], 0.006),
+      ),
+      material: "cv_steel_dark",
+      mate: A([0, 10.12, z]),
+    });
+  }
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}power.er_stringer_${side === -1 ? "l" : "r"}`,
+      name_cn: `机舱顶部纵桁 ${side === -1 ? "左" : "右"}`,
+      name_en: `engine room longitudinal girder ${side === -1 ? "l" : "r"}`,
+      assembly: "propulsion",
+      build_layer: 1,
+      geometry: M(B(0.14, 0.20, 26.0, [0, 0, 0], 0.006)),
+      material: "cv_steel_dark",
+      mate: A([side * 7.4, 9.95, -34]),
+    });
+    // 高位燃油/滑油管与蒸汽伴热管，壁面支架固定
+    add({
+      id: `${P}power.er_high_pipe_${side === -1 ? "l" : "r"}`,
+      name_cn: `机舱高位管系 ${side === -1 ? "左" : "右"}`,
+      name_en: `engine room high pipe run ${side === -1 ? "l" : "r"}`,
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(
+        { type: "weld", from: [0, 0, -12], to: [0, 0, 12], radius: 0.11 },
+        { type: "weld", from: [0.22, 0.24, -12], to: [0.22, 0.24, 12], radius: 0.06 },
+        { type: "weld", from: [0, 0, -9], to: [side * 0.77, 0.25, -9], radius: 0.05 },
+        { type: "weld", from: [0, 0, 0], to: [side * 0.77, 0.25, 0], radius: 0.05 },
+        { type: "weld", from: [0, 0, 9], to: [side * 0.77, 0.25, 9], radius: 0.05 },
+      ),
+      material: "cv_steel",
+      mate: A([side * 8.35, 8.75, -34]),
+    });
+    // 低位海水/燃油管，管鞋落地
+    add({
+      id: `${P}power.er_low_pipe_${side === -1 ? "l" : "r"}`,
+      name_cn: `机舱低位管系 ${side === -1 ? "左" : "右"}`,
+      name_en: `engine room low pipe run ${side === -1 ? "l" : "r"}`,
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(
+        { type: "weld", from: [0, 0, -12], to: [0, 0, 12], radius: 0.09 },
+        B(0.22, 0.05, 0.22, [0, -0.10, -9], 0.004),
+        B(0.22, 0.05, 0.22, [0, -0.10, 0], 0.004),
+        B(0.22, 0.05, 0.22, [0, -0.10, 9], 0.004),
+        B(0.18, 0.24, 0.18, [-0.22, 0.03, -6], 0.006),
+        B(0.18, 0.24, 0.18, [-0.22, 0.03, 6], 0.006),
+      ),
+      material: "cv_steel_dark",
+      mate: A([side * 8.95, 4.38, -34]),
+    });
+    // 电缆桥架
+    add({
+      id: `${P}power.er_cable_tray_${side === -1 ? "l" : "r"}`,
+      name_cn: `机舱电缆桥架 ${side === -1 ? "左" : "右"}`,
+      name_en: `engine room cable tray ${side === -1 ? "l" : "r"}`,
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(
+        B(0.46, 0.06, 26.0, [0, 0, 0], 0.004),
+        B(0.04, 0.16, 26.0, [-0.21, 0.05, 0], 0.004),
+        B(0.04, 0.16, 26.0, [0.21, 0.05, 0], 0.004),
+        ...Array.from({ length: 9 }, (_, i) => B(0.46, 0.03, 0.06, [0, 0.02, -10 + i * 2.5], 0.003)),
+      ),
+      material: "cv_steel_dark",
+      mate: A([side * 8.95, 9.42, -34]),
+    });
+  }
+
+  // 燃机两侧安全栏杆（立柱落在花钢板上）
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}power.er_rail_${side === -1 ? "l" : "r"}`,
+      name_cn: `燃机安全栏杆 ${side === -1 ? "左" : "右"}`,
+      name_en: `engine safety rail ${side === -1 ? "l" : "r"}`,
+      assembly: "propulsion",
+      build_layer: 3,
+      geometry: M(
+        { type: "weld", from: [0, 1.08, -4.1], to: [0, 1.08, 4.1], radius: 0.032 },
+        { type: "weld", from: [0, 0.58, -4.1], to: [0, 0.58, 4.1], radius: 0.026 },
+        ...[-4, -2, 0, 2, 4].flatMap((z) => [
+          B(0.05, 1.08, 0.05, [0, 0.54, z], 0.004),
+          B(0.18, 0.04, 0.18, [0, 0.02, z], 0.004),
+        ]),
+      ),
+      material: "cv_warning",
+      mate: A([side * 5.7, 4.26, -29]),
+    });
+  }
+
+  // 消防瓶组（机舱固定灭火系统）
+  add({
+    id: `${P}power.er_fire_bottles`,
+    name_cn: "机舱消防瓶组 ×5",
+    name_en: "engine room fire suppression bottles ×5",
+    assembly: "propulsion",
+    build_layer: 2,
+    geometry: M(
+      B(1.5, 0.06, 0.6, [0, 0.03, 0], 0.004),
+      B(0.05, 1.5, 0.05, [-0.7, 0.78, -0.25], 0.004),
+      B(0.05, 1.5, 0.05, [0.7, 0.78, -0.25], 0.004),
+      B(1.5, 0.05, 0.05, [0, 1.5, -0.25], 0.004),
+      ...[-0.56, -0.28, 0, 0.28, 0.56].map((x) =>
+        C(0.13, 1.42, [x, 0.74, 0.06], 14),
+      ),
+      ...[-0.56, -0.28, 0, 0.28, 0.56].map((x) =>
+        C(0.045, 0.16, [x, 1.56, 0.06], 10),
+      ),
+    ),
+    material: "cv_deck_red",
+    mate: A([-8.0, 4.26, -33.9]),
+  });
+
+  // 滑油日用柜
+  add({
+    id: `${P}power.er_lube_tank`,
+    name_cn: "滑油日用柜",
+    name_en: "lube oil service tank",
+    assembly: "propulsion",
+    build_layer: 2,
+    geometry: M(
+      B(1.4, 1.5, 2.6, [0, 0, 0], 0.02),
+      B(0.5, 0.06, 0.5, [0, 0.79, 0.7], 0.008),
+      B(0.08, 0.5, 0.08, [0.5, 0.5, -1.0], 0.006),
+    ),
+    material: "cv_hull_dark",
+    mate: A([-8.0, 5.01, -46.0]),
+  });
+
+  // 就地仪表盘与屏
+  add({
+    id: `${P}power.er_local_panel`,
+    name_cn: "机舱就地仪表盘",
+    name_en: "engine room local gauge panel",
+    assembly: "propulsion",
+    build_layer: 2,
+    geometry: M(
+      B(2.6, 1.3, 0.12, [0, 0, 0], 0.01),
+      B(2.5, 0.06, 0.16, [0, 0.68, 0], 0.006),
+    ),
+    material: "cv_hull_dark",
+    mate: A([-4.0, 6.4, -35.24]),
+  });
+  add({
+    id: `${P}power.er_local_gauges`,
+    name_cn: "机舱就地仪表显示屏 ×6",
+    name_en: "engine room local gauges ×6",
+    assembly: "propulsion",
+    build_layer: 3,
+    geometry: M(
+      ...Array.from({ length: 6 }, (_, i) =>
+        B(0.32, 0.24, 0.02, [-0.95 + (i % 3) * 0.95, 0.28 - Math.floor(i / 3) * 0.5, 0], 0.002),
+      ),
+    ),
+    material: "cv_screen",
+    mate: A([-4.0, 6.4, -35.17]),
+  });
+
   add({
     id: `${P}power.engine_console`,
     name_cn: "机舱集控台",

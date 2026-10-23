@@ -193,13 +193,13 @@ function InteriorFillLight() {
   // 机舱里还有大量金属转子，单靠环境光会发黑，再补一盏舱顶点光。
   return (
     <>
-      <ambientLight intensity={cameraMode === "engine_room" ? 1.8 : 1.05} color="#eaf5ff" />
+      <ambientLight intensity={cameraMode === "engine_room" ? 0.85 : 1.05} color="#eaf5ff" />
       {cameraMode === "engine_room" ? (
         <>
-          <pointLight position={[0, 12.5, -34]} intensity={4.0} distance={26} decay={1.3} color="#dff1ff" />
-          <pointLight position={[-5.5, 7.6, -27]} intensity={4.0} distance={13} decay={1.2} color="#eef7ff" />
-          <pointLight position={[-3.5, 7.6, -33]} intensity={3.5} distance={13} decay={1.2} color="#eef7ff" />
-          <pointLight position={[5.5, 7.6, -39]} intensity={3.5} distance={13} decay={1.2} color="#eef7ff" />
+          <pointLight position={[0, 9.2, -34]} intensity={2.3} distance={24} decay={1.35} color="#dbe9f5" />
+          <pointLight position={[-6.2, 8.1, -27]} intensity={1.6} distance={12} decay={1.3} color="#e6f1fa" />
+          <pointLight position={[-4.2, 8.1, -35]} intensity={1.4} distance={12} decay={1.3} color="#e6f1fa" />
+          <pointLight position={[5.2, 8.1, -40]} intensity={1.4} distance={12} decay={1.3} color="#e6f1fa" />
         </>
       ) : null}
     </>

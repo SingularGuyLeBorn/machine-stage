@@ -29,7 +29,7 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_055_fitting: { base: "#343b3e", metalness: 0.2, roughness: 0.88, pbr: "plates", repeat: [2, 2], envMapIntensity: 0.1, doubleSided: true },
   cv_055_aesa_tile: { base: "#6e7a80", metalness: 0.06, roughness: 0.92, preset: "none", envMapIntensity: 0.18 },
   cv_055_shell: { base: "#a98a52", metalness: 0.55, roughness: 0.62, preset: "primer", envMapIntensity: 0.45 },
-  cv_055_engine: { base: "#c5ccd0", metalness: 0.06, roughness: 0.7, preset: "primer", emissive: "#344046", emissiveIntensity: 0.7, envMapIntensity: 0.6 },
+  cv_055_engine: { base: "#99a3a8", metalness: 0.22, roughness: 0.66, preset: "primer", emissive: "#232c31", emissiveIntensity: 0.12, envMapIntensity: 0.45 },
   // 定制翼型桨叶 + 各向异性 physical 材质会让 N8AO 后处理整屏发黑；桨叶用标准青铜。
   cv_055_prop: { base: "#b08c4a", metalness: 0.72, roughness: 0.38, preset: "primer", envMapIntensity: 0.9 },
   cv_steam: { base: "#e3ebec", metalness: 0.0, roughness: 0.96, preset: "none", opacity: 0.32, depthWrite: false, doubleSided: true, envMapIntensity: 0.1 },
@@ -56,6 +56,7 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_brass: { base: "#d2b47a", metalness: 1, roughness: 0.32, pbr: "brushed", repeat: [1, 1], anisotropy: 0.7, envMapIntensity: 1.35 },
   cv_copper: { base: "#c99a76", metalness: 1, roughness: 0.36, pbr: "brushed", repeat: [1, 1], anisotropy: 0.6, envMapIntensity: 1.25 },
   cv_glow: { base: "#7fd8ff", metalness: 0.0, roughness: 0.3, emissive: "#3fb9ff", envMapIntensity: 0.6 },
+  cv_055_lamp: { base: "#eef4f6", metalness: 0.0, roughness: 0.45, preset: "primer", emissive: "#d8e6ee", emissiveIntensity: 0.55, envMapIntensity: 0.3 },
   cv_flame: { base: "#ffc27a", metalness: 0.0, roughness: 0.42, preset: "none", emissive: "#ff6a1f", emissiveIntensity: 2.6, opacity: 0.62, depthWrite: false, doubleSided: true, envMapIntensity: 0.2 },
   cv_warning: { base: "#d9a62f", metalness: 0.05, roughness: 0.7, emissive: "#4a2c00", envMapIntensity: 0.6 },
   cv_water: { base: "#41636e", metalness: 0.1, roughness: 0.25, preset: "none", envMapIntensity: 1.0 },

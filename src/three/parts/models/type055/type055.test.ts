@@ -17,7 +17,7 @@ afterAll(() => built.dispose());
 
 describe("055 型驱逐舰", () => {
   it("舰体/112 VLS/主炮/相控阵/动力/机库都装出来了", () => {
-    expect(built.parts.length).toBeGreaterThanOrEqual(719);
+    expect(built.parts.length).toBeGreaterThanOrEqual(753);
     const hatchInstances = built.parts
       .filter((part) => part.partId === "type055.vls.hatch" || part.partId.startsWith("type055.vls.hatch_hero"))
       .reduce((sum, part) => sum + part.instances.length, 0);
@@ -46,6 +46,9 @@ describe("055 型驱逐舰", () => {
     expect(built.getNode("CV_055_VlsGas_fwd_4")).toBeDefined();
     expect(built.getPart("type055.vls.module_dividers_fwd")).toBeDefined();
     expect(built.getPart("type055.power.er_exhaust_trunk_l")).toBeDefined();
+    expect(built.getPart("type055.power.er_ceiling")).toBeDefined();
+    expect(built.getPart("type055.power.er_rail_l")).toBeDefined();
+    expect(built.getPart("type055.power.er_fire_bottles")).toBeDefined();
     expect(built.getPart("type055.hull.stabilizer_l")).toBeDefined();
     expect(built.getPart("type055.vls.glider_fwd_4")).toBeDefined();
     expect(built.getNode("CV_055_VlsGlider_fwd_4")).toBeDefined();

@@ -25,7 +25,7 @@ function hullRing(z: number, ys: number[]): THREE.Vector3[] {
   return [...port, ...starboard];
 }
 
-function loft(ringYsAt: (z: number) => number[], cap: boolean): THREE.BufferGeometry {
+function loft(ringYsAt: (z: number) => number[], cap: boolean, openSeams: number[] = []): THREE.BufferGeometry {
   const rings: THREE.Vector3[][] = [];
   for (let i = 0; i < STATIONS; i++) rings.push(hullRing(stationZ(i), ringYsAt(stationZ(i))));
   const n = rings[0]!.length;
@@ -34,6 +34,8 @@ function loft(ringYsAt: (z: number) => number[], cap: boolean): THREE.BufferGeom
   for (const ring of rings) for (const p of ring) positions.push(p.x, p.y, p.z);
   for (let i = 0; i < rings.length - 1; i++) {
     for (let j = 0; j < n - 1; j++) {
+      // 左右舷环在顶部/水线处的接缝不能封成横贯全舰的甲板，否则会切穿机舱。
+      if (openSeams.includes(j)) continue;
       const a = i * n + j;
       const b = i * n + j + 1;
       const c = (i + 1) * n + j + 1;
@@ -70,11 +72,11 @@ export const type055HullShell: GeometryBuilder = () =>
   loft((z) => {
     const top = t55DeckY(z);
     return [T55.WATERLINE, T55.WATERLINE + (top - T55.WATERLINE) * 0.36, T55.WATERLINE + (top - T55.WATERLINE) * 0.7, top];
-  }, true);
+  }, true, [3]);
 
 /** 水线以下防污漆壳体（龙骨→水线以上 0.03 重叠）。 */
 export const type055HullUnderwater: GeometryBuilder = () =>
-  loft(() => [0.4, 1.6, 3.0, 4.6, 6.0, T55.WATERLINE + 0.03], true);
+  loft(() => [0.4, 1.6, 3.0, 4.6, 6.0, T55.WATERLINE + 0.03], true, [5]);
 
 /**
  * 甲板网格：沿脊弧逐站抬升，横向留 55mm 拱度（中间高、舷边低），
@@ -176,6 +178,7 @@ export const type055BootTop: GeometryBuilder = () => {
   const n = ys.length * 2;
   for (let i = 0; i < stations - 1; i++) {
     for (let j = 0; j < n - 1; j++) {
+      if (j === 2) continue; // 舷侧色带顶部不封口，避免横板切穿机舱
       const a = i * n + j;
       const b = a + 1;
       const c = (i + 1) * n + j + 1;
@@ -753,7 +756,7 @@ function merge(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry {
 export const type055GasTurbineStatic: GeometryBuilder = () => {
   const parts: THREE.BufferGeometry[] = [];
   // 公共底座
-  parts.push(new THREE.BoxGeometry(8.4, 0.4, 2.7).translate(0, 0.2, 0));
+  parts.push(new THREE.BoxGeometry(2.7, 0.4, 8.4).translate(0, 0.2, 0));
   // 检修状态：外侧板拆下，保留内舷板/顶部两条盖板/端部门框，转子从外侧敞开可见。
   parts.push(new THREE.BoxGeometry(0.08, 2.9, 7.8).translate(1.24, 1.55, 0));
   for (const z of [-4.05, 4.05]) {
