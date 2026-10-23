@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>福建舰外形对照</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; background: #f4f6f8; color: #1d2930; font: 14px/1.6 "Microsoft YaHei", sans-serif; }
+      .page { width: 1600px; height: 1460px; padding: 26px 36px; }
+      h1 { margin: 0 0 3px; font-size: 24px; letter-spacing: 0.04em; }
+      h2 { margin: 20px 0 10px; font-size: 16px; color: #24404e; }
+      .sub { margin: 0 0 12px; color: #55636b; font-size: 13px; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+      figure { margin: 0; background: #fff; border: 1px solid #d8dfe4; border-radius: 8px; overflow: hidden; box-shadow: 0 3px 10px rgba(20, 40, 55, 0.06); }
+      .imgbox { background: #dfe6ea; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+      .imgbox.top { height: 560px; }
+      .imgbox.aerial { height: 400px; }
+      .imgbox img { max-width: 100%; max-height: 100%; display: block; }
+      .flip { transform: scaleY(-1); }
+      figcaption { padding: 9px 14px; font-size: 14px; font-weight: 600; border-top: 1px solid #e3e9ed; }
+      figcaption span { font-weight: 400; color: #63737b; font-size: 12px; margin-left: 8px; }
+      .notes { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; color: #3a4a52; font-size: 13px; }
+      .notes ul { margin: 0; padding-left: 18px; }
+      .notes li { margin: 3px 0; }
+      b { color: #13313f; }
+      .src { margin-top: 10px; color: #6c7a82; font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>福建舰 · 外形对照（照真图重做）</h1>
+      <p class="sub">上：飞行甲板俯视轮廓（左：本模型，隐藏海面/尾流并垂直翻成舰艏朝上；右：真实甲板俯视图）。下：3/4 航拍对照（左：本模型；右：福建舰真实航拍）。</p>
+
+      <div class="grid">
+        <figure>
+          <div class="imgbox top"><img class="flip" src="carrier-top-crop-final.jpeg" alt="本模型俯视" /></div>
+          <figcaption>本模型 · 飞行甲板俯视 <span>5,396 件 / 2,750,978 三角面</span></figcaption>
+        </figure>
+        <figure>
+          <div class="imgbox top"><img src="carrier-real-top-crop.png" alt="福建舰真实甲板俯视" /></div>
+          <figcaption>福建舰 · 真实甲板俯视参考 <span>9° 斜角甲板 / 三弹射器 / 右舷舰岛</span></figcaption>
+        </figure>
+      </div>
+
+      <h2>3/4 航拍对照</h2>
+      <div class="grid">
+        <figure>
+          <div class="imgbox aerial"><img src="carrier-aerial-final5.jpeg" alt="本模型航拍" /></div>
+          <figcaption>本模型 · 右舷后方 3/4 俯视 <span>尖艏外飘甲板 / 右舷舰岛 / 双跑道</span></figcaption>
+        </figure>
+        <figure>
+          <div class="imgbox aerial"><img src="../../refs/carrier/fujian-flight-deck.jpg" alt="福建舰真实航拍" /></div>
+          <figcaption>福建舰 · 真实航拍 <span>J-15 / J-35 / 空警-600 甲板模型</span></figcaption>
+        </figure>
+      </div>
+
+      <div class="notes">
+        <ul>
+          <li><b>斜角着舰跑道</b>：左舷 9.3° 斜置，浅灰跑道底 + 白色边线 + 虚线中线 + 4 道拦阻索；真实福建舰约 9°、230m × 35m。</li>
+          <li><b>舰艏直通起飞区</b>：连续浅灰跑道 + 两条电磁弹射轨 + 中线 + 舰艏舷号 18；位于舰艏两舷外飘甲板之间。</li>
+          <li><b>舰艏</b>：从全宽分 8 段收成约 14m 宽的圆钝艏端（不是针尖/方头），外飘甲板前伸到 z≈20.65，压在前倾艏柱上。</li>
+        </ul>
+        <ul>
+          <li><b>右舷舰岛</b>：位于舰体中部偏后，双舷侧升降机开口在右舷甲板边缘。</li>
+          <li><b>外飘甲板</b>：舰体半宽收至 3.6（世界约 57m），飞行甲板半宽 4.8（约 76m），左舷斜角区外飘；旧版 18 块矩形甲板盖板已删除，改为连续甲板 + 细拼缝。</li>
+          <li><b>甲板面</b>：修正旋转挤出后顶面可见性（材质双面）+ 连续甲板；升降机开口保留真实缺口，不再是一整块方盒。</li>
+        </ul>
+      </div>
+      <p class="src">References: Tencent News reprint of Fujian flight-deck aerial photo; Zhihu deck-layout analysis (9° / 230m×35m / three cats / starboard island); Xinhua & People's Daily Fujian EM launch reports. Local copies and URLs: refs/carrier/ (see SOURCES.md).</p>
+    </div>
+  </body>
+</html>

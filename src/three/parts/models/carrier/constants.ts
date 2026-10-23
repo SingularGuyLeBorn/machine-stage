@@ -15,7 +15,7 @@ export const CV = {
   DECK_Z_STERN: -20,
 
   HULL_LEN: 37,
-  HULL_BEAM: 8.0,
+  HULL_BEAM: 7.2,
   HULL_BOTTOM: 0.42,
   HULL_TOP: 3.9,
   HULL_Z_BOW: 18.5,

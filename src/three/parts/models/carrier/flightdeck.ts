@@ -40,30 +40,30 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     mate: A([0, 0, 0]),
     source: "1:8 展示尺度；平直甲板 + 斜角艏 + 左舷外飘，甲板面 y=4.58m。",
   });
-  for (let p = 0; p < 18; p++) {
-    const z = -18.5 + p * 2.15;
+  // 甲板面不再铺 18 块横向矩形装甲板——那样俯视像货船甲板，还会把斜角轮廓盖成方盒。
+  // 只保留细的纵向/横向拼板缝，甲板面本身由 carrierFlightDeck 的连续外飘轮廓承担。
+  for (let s = 0; s < 9; s++) {
     add({
-      id: `${P}deck_plate_${pad(p + 1)}`,
-      name_cn: `甲板装甲板 ${p + 1}`,
-      name_en: `deck plate ${p + 1}`,
+      id: `${P}deck_seam_cross_${pad(s + 1)}`,
+      name_cn: `甲板横向拼缝 ${s + 1}`,
+      name_en: `deck transverse seam ${s + 1}`,
       assembly: ASSEMBLY,
       build_layer: 3,
-      geometry: M(B(8.8, 0.035, 1.9, [0, 0, 0], 0.005)),
+      geometry: M(B(7.9, 0.004, 0.035, [0, 0, 0], 0.001)),
       material: "cv_deck_plate",
-      mate: A([0, deckTop + 0.018, z]),
+      mate: A([0, deckTop + 0.002, -17.5 + s * 3.4]),
     });
   }
-  // 防滑砂条：沿甲板横向排布，和装甲板贴合。
-  for (let p = 0; p < 24; p++) {
+  for (let s = 0; s < 3; s++) {
     add({
-      id: `${P}antislip_${pad(p + 1)}`,
-      name_cn: `防滑涂层条 ${p + 1}`,
-      name_en: `antislip strip ${p + 1}`,
+      id: `${P}deck_seam_long_${pad(s + 1)}`,
+      name_cn: `甲板纵向拼缝 ${s + 1}`,
+      name_en: `deck longitudinal seam ${s + 1}`,
       assembly: ASSEMBLY,
       build_layer: 3,
-      geometry: M(B(8.4, 0.008, 0.11, [0, 0, 0], 0.002)),
-      material: "cv_deck",
-      mate: A([0, deckTop + 0.04, -19 + p * 1.65]),
+      geometry: M(B(0.035, 0.004, 29.5, [0, 0, 0], 0.001)),
+      material: "cv_deck_plate",
+      mate: A([-2.6 + s * 2.6, deckTop + 0.002, -3.0]),
     });
   }
 
@@ -688,7 +688,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   });
 
   // ---- 甲板标记与系留点 ----
-  const markY = deckTop + 0.052;
+  const markY = deckTop + 0.014;
   // 斜角着舰跑道：右舷艉部向舰艏左舷斜置 9.3°（福建舰实测 ~9.5°，落在 6°~14° 区间）。
   // 所有标线都按跑道坐标系（沿跑道 s / 横跨跑道 d）生成并随跑道同角度旋转，保证平行、前后对齐。
   const RUNWAY_DEG = 9.3;
@@ -704,7 +704,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     const [x, z] = runwayAt(s);
     return [x + side * distance * RUNWAY_COS, z + side * distance * RUNWAY_SIN];
   };
-  // 斜角跑道底层深灰漆带：给所有白色标线提供连续附着面，同时形成真实跑道底色。
+  // 斜角跑道底层浅灰漆带：给所有白色标线提供连续附着面，同时形成真实跑道底色。
+  // 用 cv_runway（比甲板浅一档）而不是甲板板材质——俯视时能一眼认出是斜跑道。
   const underlay = runwayAt(RUNWAY_LEN / 2);
   add({
     id: `${P}runway_underlay`,
@@ -712,9 +713,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     name_en: "angled runway underlay",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(B(3.5, 0.004, RUNWAY_LEN + 0.5, [0, 0, 0], 0.0015)),
-    material: "cv_deck_plate",
-    mate: A([underlay[0], deckTop + 0.041, underlay[1]], [0, RUNWAY_YAW, 0]),
+    geometry: M(B(4.0, 0.004, RUNWAY_LEN + 0.5, [0, 0, 0], 0.0015)),
+    material: "cv_runway",
+    mate: A([underlay[0], deckTop + 0.006, underlay[1]], [0, RUNWAY_YAW, 0]),
   });
   // 中线虚线：沿跑道纵向等距 1.22，25 段从头到尾严格一条直线。
   for (let d = 0; d < 25; d++) {
@@ -789,6 +790,74 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       mate: A([cx, markY + 0.006, cz], [0, RUNWAY_YAW, 0]),
     });
   }
+  // 舰艏直通起飞区：一整条浅灰跑道底色 + 两条弹射轨 + 中线 + 起飞位横线，
+  // 俯视时与左侧 9.3° 斜角着舰跑道形成清晰的“直通 + 斜角”双跑道。
+  add({
+    id: `${P}launch_runway`,
+    name_cn: "舰艏直通起飞跑道",
+    name_en: "bow launch runway",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(4.6, 0.004, 14.2, [0, 0, 0], 0.0015)),
+    material: "cv_runway",
+    mate: A([0, deckTop + 0.005, 9.6]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}launch_edge_${side === -1 ? "p" : "s"}`,
+      name_cn: `直通起飞跑道${side === -1 ? "左" : "右"}边线`,
+      name_en: `bow launch edge ${side === -1 ? "p" : "s"}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.12, 0.004, 13.2, [0, 0, 0], 0.0015)),
+      material: "cv_deck_line",
+      mate: A([side * 2.22, markY, 9.6]),
+    });
+  }
+  for (let d = 0; d < 13; d++) {
+    add({
+      id: `${P}launch_center_${pad(d + 1)}`,
+      name_cn: `舰艏起飞区中线 ${d + 1}`,
+      name_en: `bow launch centerline ${d + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.11, 0.004, 0.55, [0, 0, 0], 0.0015)),
+      material: "cv_deck_line",
+      mate: A([0, markY, 2.9 + d * 0.92]),
+    });
+  }
+  add({
+    id: `${P}launch_threshold`,
+    name_cn: "舰艏起飞位横线",
+    name_en: "bow launch threshold",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(5.0, 0.004, 0.12, [0, 0, 0], 0.0015)),
+    material: "cv_deck_line",
+    mate: A([0, markY + 0.001, 2.45]),
+  });
+  // 舰艏甲板舷号“18”：真实福建舰舰艏刷有 18，俯视一眼可辨。
+  const bowNumberY = markY + 0.002;
+  const deckBar = (id: string, x: number, z: number, w: number, l: number) =>
+    add({
+      id: `${P}bow_number_${id}`,
+      name_cn: `舰艏舷号笔画 ${id}`,
+      name_en: `bow hull number stroke ${id}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(w, 0.004, l, [0, 0, 0], 0.0015)),
+      material: "cv_deck_line",
+      mate: A([x, bowNumberY, z]),
+    });
+  deckBar("1_stem", -0.82, 18.1, 0.28, 2.45);
+  deckBar("1_base", -0.78, 16.95, 0.92, 0.22);
+  deckBar("8_top", 0.68, 19.12, 1.12, 0.22);
+  deckBar("8_mid", 0.68, 18.1, 1.12, 0.22);
+  deckBar("8_bot", 0.68, 17.08, 1.12, 0.22);
+  deckBar("8_left_up", 0.23, 18.62, 0.22, 0.86);
+  deckBar("8_left_lo", 0.23, 17.58, 0.22, 0.86);
+  deckBar("8_right_up", 1.13, 18.62, 0.22, 0.86);
+  deckBar("8_right_lo", 1.13, 17.58, 0.22, 0.86);
   // 甲板使用痕迹：着舰轮胎擦痕（两列）、停机位油污、挡焰板烧蚀。
   for (const side of [-1, 1] as const) {
     for (let t = 0; t < 11; t++) {

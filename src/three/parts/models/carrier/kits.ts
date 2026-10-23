@@ -69,9 +69,11 @@ function deckPlan(): Array<[number, number]> {
     points.push([notchX, ez + halfL]);
     points.push([b, ez + halfL]);
   }
-  // 右舷直边 + 方艏斜切；左舷为斜角甲板外飘（艉部收、舯部最宽、艏部收）。
-  points.push([b, 12.5], [b - 0.35, 17.6], [b - 1.3, 19.4], [b - 2.2, 20.5]);
-  points.push([-b + 2.4, 20.9], [-b + 1.3, 19.6], [-b + 0.1, 16.0], [-b - 0.7, 10.0], [-b - 1.05, 4.0], [-b - 1.05, -4.0], [-b - 0.9, -12.0], [-b - 0.4, CV.DECK_Z_STERN]);
+  // 右舷直边 + 圆钝尖艏斜切；左舷为斜角甲板外飘（艉部收、舯部最宽、艏部收）。
+  // 艏部从 z=12.5 起分 8 段收窄，但保留约 14m 宽的圆钝艏端（真实福建舰不是针尖），
+  // 外飘甲板前伸到 z≈20.65，压住下面前倾艏柱；左舷在 z≈10 保留斜角降落区外飘宽度。
+  points.push([b, 12.5], [b - 0.02, 14.6], [b - 0.3, 16.3], [b - 0.8, 17.8], [b - 1.5, 19.0], [b - 2.5, 19.9], [b - 3.5, 20.4], [0.9, 20.6], [0, 20.65]);
+  points.push([-0.9, 20.6], [-1.8, 20.4], [-2.7, 19.8], [-3.4, 18.8], [-3.9, 17.2], [-4.4, 15.0], [-4.9, 11.5], [-5.4, 8.0], [-b - 1.05, 4.0], [-b - 1.05, -4.0], [-b - 0.9, -12.0], [-b - 0.4, CV.DECK_Z_STERN]);
   return points;
 }
 
@@ -572,7 +574,7 @@ export const carrierSeaFoam: GeometryBuilder = () => {
       const x = -width / 2 + ix * cellX + (rand() - 0.5) * cellX * 0.5;
       const z = zStern + iz * cellZ + (rand() - 0.5) * cellZ * 0.5;
       const y = SEA_LEVEL + h + 0.012;
-      const half = 0.8 + rand() * 1.8;
+      const half = 0.32 + rand() * 0.88;
       const skew = 0.4 + rand() * 0.5;
       const base = positions.length / 3;
       positions.push(x - half, y, z - half * skew, x + half, y, z - half * 0.2, x + half * 0.7, y, z + half, x - half * 0.6, y, z + half * skew);

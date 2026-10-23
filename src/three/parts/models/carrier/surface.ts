@@ -146,6 +146,8 @@ export function addSurface(ctx: CarrierCtx): void {
   const railPostSpots: Array<[number, number]> = [];
   for (let row = 0; row < 18; row++) {
     const z = -18 + row * 2.1;
+    // 艏部 z>11.4 进入甲板收尖段且是弹射作业区，不再布栏杆（真实航母艏部也无边缘栏杆）。
+    if (z > 11.4) continue;
     for (const side of [-1, 1] as const) {
       const inElevator = CV.ELEVATOR_Z.some((ez) => Math.abs(z - ez) < CV.ELEVATOR_L / 2 + 0.3);
       if (side === 1 && inElevator) continue;
@@ -175,9 +177,9 @@ export function addSurface(ctx: CarrierCtx): void {
     name_en: "port deck rail",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(C(0.018, 36.5, [0, 0, 0], 8)),
+    geometry: M(C(0.018, 29.5, [0, 0, 0], 8)),
     material: "cv_steel",
-    mate: A([-4.66, deckTop + 0.2, 0], [90, 0, 0]),
+    mate: A([-4.66, deckTop + 0.2, -3.5], [90, 0, 0]),
   });
   add({
     id: `${P}deck_rail_l_mid_1`,
@@ -185,9 +187,9 @@ export function addSurface(ctx: CarrierCtx): void {
     name_en: "port deck mid rail",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(C(0.014, 36.5, [0, 0, 0], 8)),
+    geometry: M(C(0.014, 29.5, [0, 0, 0], 8)),
     material: "cv_steel",
-    mate: A([-4.66, deckTop + 0.1, 0], [90, 0, 0]),
+    mate: A([-4.66, deckTop + 0.1, -3.5], [90, 0, 0]),
   });
   // 右舷栏杆在升降机开口处断开（三段），不横跨升降机平台。
   const starboardRailSegments: Array<[number, number]> = [
@@ -253,7 +255,7 @@ export function addSurface(ctx: CarrierCtx): void {
   ctx.layout("carrier.surface.raft", ({ index }) => new THREE.Matrix4().makeTranslation((index % 2) * 0.55 - 0.25, 0, -index * 0.75));
 
   // 左舷艉部救生艇 + 吊艇架（艇体放样、充气舷管、挂机、操控台、吊臂/绞车）。
-  const boatX = -4.2;
+  const boatX = -3.55;
   const boatY = 3.0;
   const boatZ = -15.5;
   add({

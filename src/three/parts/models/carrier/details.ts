@@ -583,7 +583,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
       build_layer: 4,
       geometry: M(B(0.6, 0.005, 0.08, [0, 0, 0], 0.002)),
       material: m % 4 === 0 ? "cv_deck_red" : "cv_deck_yellow",
-      mate: A([-3.6 + (m % 6) * 1.44, DECK_TOP + 0.05, 1.0 + Math.floor(m / 6) * 2.3]),
+      mate: A([-3.6 + (m % 6) * 1.44, DECK_TOP + 0.008, 1.0 + Math.floor(m / 6) * 2.3]),
     });
   }
   for (let c = 0; c < 20; c++) {
