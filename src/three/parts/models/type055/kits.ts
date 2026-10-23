@@ -380,15 +380,28 @@ function missileFins(count: number, root: number, span: number, chord: number, t
 }
 
 /** 海红旗-9B：6.5m × 0.5m，冷发射，细长弹体 + 尾部助推 + 4 片大尾翼。 */
-export const type055Hhq9bMissile: GeometryBuilder = () =>
-  merge([
+export const type055Hhq9bMissile: GeometryBuilder = () => {
+  const bands = [-2.0, -0.8, 0.9, 2.0].map((y) =>
+    new THREE.TorusGeometry(0.253, 0.012, 6, 26).rotateX(Math.PI / 2).translate(0, y, 0),
+  );
+  const ducts = [0, 1, 2, 3].map((i) => {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    return new THREE.BoxGeometry(0.055, 2.7, 0.03)
+      .rotateY(-a)
+      .translate(Math.cos(a) * 0.255, 0.1, Math.sin(a) * 0.255);
+  });
+  return merge([
     new THREE.CylinderGeometry(0.25, 0.25, 4.25, 22).translate(0, 0.075, 0),
     new THREE.CylinderGeometry(0.02, 0.25, 1.05, 22).translate(0, 2.725, 0),
     new THREE.CylinderGeometry(0.28, 0.28, 1.25, 22).translate(0, -2.675, 0),
     new THREE.CylinderGeometry(0.22, 0.28, 0.18, 22).translate(0, -3.35, 0),
     new THREE.SphereGeometry(0.055, 10, 8).translate(0, 3.27, 0),
+    ...bands,
+    ...ducts,
+    new THREE.BoxGeometry(0.16, 0.22, 0.1).translate(0.26, 1.35, 0),
     ...foldedFins(4, 0.255, 0.82, 0.16, -2.62),
   ]);
+};
 
 /** 海红旗-9B 展开尾翼（出筒后展开；静止时由动画缩到 0 藏在筒内）。 */
 export const type055Hhq9bFins: GeometryBuilder = () =>
@@ -398,15 +411,23 @@ export const type055Hhq9bFins: GeometryBuilder = () =>
   ]);
 
 /** 鹰击-18：8.0m × 0.5m，热发射，亚超结合，尾部助推 + 折叠翼 + 腹部进气道。 */
-export const type055Yj18Missile: GeometryBuilder = () =>
-  merge([
+export const type055Yj18Missile: GeometryBuilder = () => {
+  const bands = [-2.6, -1.3, 0.2, 1.6, 2.7].map((y) =>
+    new THREE.TorusGeometry(0.253, 0.012, 6, 26).rotateX(Math.PI / 2).translate(0, y, 0),
+  );
+  return merge([
     new THREE.CylinderGeometry(0.25, 0.25, 5.8, 22).translate(0, 0.1, 0),
     new THREE.CylinderGeometry(0.02, 0.25, 1.0, 22).translate(0, 3.5, 0),
     new THREE.CylinderGeometry(0.3, 0.3, 1.2, 22).translate(0, -3.4, 0),
     new THREE.CylinderGeometry(0.23, 0.3, 0.2, 22).translate(0, -4.08, 0),
+    new THREE.TorusGeometry(0.302, 0.018, 6, 26).rotateX(Math.PI / 2).translate(0, -2.78, 0),
+    ...bands,
+    new THREE.BoxGeometry(0.06, 2.2, 0.06).translate(0.25, 0.9, 0),
+    new THREE.BoxGeometry(0.18, 0.16, 0.12).translate(-0.25, 1.8, 0),
     ...foldedFins(4, 0.305, 1.0, 0.18, -3.45),
     new THREE.BoxGeometry(0.24, 0.22, 0.9).translate(0, -0.31, 0.8),
   ]);
+};
 
 /** 鹰击-18 展开尾翼/折叠翼。 */
 export const type055Yj18Fins: GeometryBuilder = () =>
@@ -416,21 +437,35 @@ export const type055Yj18Fins: GeometryBuilder = () =>
   ]);
 
 /** 鹰击-21 助推级（下段）：大直径助推 + 尾翼。 */
-export const type055Yj21Missile: GeometryBuilder = () =>
-  merge([
+export const type055Yj21Missile: GeometryBuilder = () => {
+  const bands = [-3.9, -2.6, -1.5].map((y) =>
+    new THREE.TorusGeometry(0.413, 0.014, 6, 28).rotateX(Math.PI / 2).translate(0, y, 0),
+  );
+  return merge([
     new THREE.CylinderGeometry(0.41, 0.41, 3.2, 24).translate(0, -2.8, 0),
     new THREE.CylinderGeometry(0.3, 0.41, 0.26, 24).translate(0, -4.35, 0),
+    new THREE.TorusGeometry(0.415, 0.02, 6, 28).rotateX(Math.PI / 2).translate(0, -1.2, 0),
+    ...bands,
+    new THREE.BoxGeometry(0.08, 2.0, 0.05).translate(0.41, -2.7, 0),
     ...foldedFins(4, 0.405, 1.2, 0.2, -3.45),
   ]);
+};
 
 /** 鹰击-21 双锥体滑翔体（上段，可分离）。 */
-export const type055Yj21Glider: GeometryBuilder = () =>
-  merge([
+export const type055Yj21Glider: GeometryBuilder = () => {
+  const bands = [-0.8, 0.4, 1.7].map((y) =>
+    new THREE.TorusGeometry(0.303, 0.011, 6, 26).rotateX(Math.PI / 2).translate(0, y, 0),
+  );
+  return merge([
     new THREE.CylinderGeometry(0.3, 0.3, 3.6, 24).translate(0, 0.6, 0),
     new THREE.CylinderGeometry(0.18, 0.3, 1.0, 24).translate(0, 3.4, 0),
     new THREE.CylinderGeometry(0.02, 0.18, 1.0, 24).translate(0, 4.4, 0),
+    ...bands,
+    new THREE.BoxGeometry(0.05, 2.6, 0.04).translate(0.3, 0.7, 0),
+    new THREE.BoxGeometry(0.12, 0.1, 0.06).translate(-0.3, 1.2, 0),
     ...foldedFins(4, 0.305, 0.9, 0.16, 0.4),
   ]);
+};
 
 export const type055Yj21BoosterFins: GeometryBuilder = () =>
   merge([...missileFins(4, 0.41, 0.72, 1.0, 0.045, -3.5)]);
