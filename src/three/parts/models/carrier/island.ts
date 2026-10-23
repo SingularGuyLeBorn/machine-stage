@@ -265,7 +265,7 @@ export function addIsland(ctx: CarrierCtx): void {
     assembly: ASSEMBLY,
     build_layer: 4,
     geometry: M(B(1.36, 0.06, 4.5, [0, 0, 0], 0.006)),
-    material: "cv_deck_plate",
+    material: "cv_hull",
     mate: A([x, roofY, z]),
   });
   for (const side of [-1, 1] as const) {
@@ -366,6 +366,98 @@ export function addIsland(ctx: CarrierCtx): void {
       geometry: M({ type: "weld", from: [x + side * 0.62, roofY + 0.02, z - 0.4], to: [x + side * 0.16, roofY + 0.24, z - 0.4], radius: 0.035 }),
       material: "cv_steel_dark",
       mate: A([0, 0, 0]),
+    });
+  }
+  // 舰岛外部细节：平台角航行灯 + 旗杆 + 后壁直梯 + 两个小型卫通/导航罩。
+  for (const side of [-1, 1] as const) {
+    for (const pz of [-2.18, 2.18] as const) {
+      const tag = `${side === -1 ? "p" : "s"}${pz < 0 ? "m" : "p"}`;
+      add({
+        id: `${P}nav_light_post_${tag}`,
+        name_cn: `航行灯柱 ${tag}`,
+        name_en: `navigation light post ${tag}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(C(0.012, 0.35, [0, 0, 0], 8)),
+        material: "cv_steel",
+        mate: A([x + side * 0.6, roofY + 0.18, z + pz]),
+      });
+      add({
+        id: `${P}nav_light_${tag}`,
+        name_cn: `航行灯 ${tag}`,
+        name_en: `navigation light ${tag}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(S(0.045, [0, 0, 0], 10)),
+        material: "cv_glow",
+        mate: A([x + side * 0.6, roofY + 0.4, z + pz]),
+      });
+    }
+  }
+  add({
+    id: `${P}flag_staff_base`,
+    name_cn: "旗杆底座",
+    name_en: "flagstaff base",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.14, 0.04, 0.14, [0, 0, 0], 0.004)),
+    material: "cv_steel_dark",
+    mate: A([x + 0.5, roofY + 0.03, z + 2.12]),
+  });
+  add({
+    id: `${P}flag_staff`,
+    name_cn: "旗杆",
+    name_en: "flagstaff",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(C(0.012, 1.05, [0, 0, 0], 8), S(0.025, [0, 0.54, 0], 8)),
+    material: "cv_steel",
+    mate: A([x + 0.5, roofY + 0.56, z + 2.12]),
+  });
+  add({
+    id: `${P}flag`,
+    name_cn: "舰岛旗",
+    name_en: "island flag",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.02, 0.28, 0.42, [0.02, 0, 0], 0.002)),
+    material: "cv_deck_red",
+    mate: A([x + 0.5, roofY + 0.95, z + 2.12]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}access_ladder_rail_${side === -1 ? "p" : "s"}`,
+      name_cn: `后壁直梯边梁 ${side === -1 ? "左" : "右"}`,
+      name_en: `island access ladder rail ${side === -1 ? "p" : "s"}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(C(0.014, 1.9, [0, 0, 0], 8)),
+      material: "cv_steel",
+      mate: A([x + 0.2 + side * 0.13, baseY + 1.5, z + 2.03]),
+    });
+  }
+  for (let rung = 0; rung < 8; rung++) {
+    add({
+      id: `${P}access_ladder_rung_${pad(rung + 1)}`,
+      name_cn: `后壁直梯踏棍 ${rung + 1}`,
+      name_en: `island ladder rung ${rung + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.26, 0.018, 0.02, [0, 0, 0], 0.002)),
+      material: "cv_steel",
+      mate: A([x + 0.2, baseY + 0.7 + rung * 0.21, z + 2.04]),
+    });
+  }
+  for (const [tag, dx, dz] of [["a", -0.35, 0.6], ["b", 0.35, -0.9]] as const) {
+    add({
+      id: `${P}roof_dome_${tag}`,
+      name_cn: `平台卫通/导航罩 ${tag.toUpperCase()}`,
+      name_en: `roof satcom/nav dome ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(C(0.03, 0.2, [0, 0, 0], 10), S(0.075, [0, 0.12, 0], 12)),
+      material: "cv_radar",
+      mate: A([x + dx, roofY + 0.1, z + dz]),
     });
   }
 

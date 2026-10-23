@@ -17,15 +17,17 @@ export const AIRCRAFT_SCALE_Z = 22 / 24.06;
 
 // 甲板斜列停机位：避开舰岛、升降机与拦阻索；机翼展开，贴近真实甲板停机照。
 export const PARKED_SPOTS = [
-  { x: 3.95, z: 10.0, yaw: 30 },
-  { x: 3.95, z: 14.2, yaw: 30 },
+  { x: -2.4, z: -11.5, yaw: -20 },
+  { x: 2.2, z: -15.8, yaw: -10 },
   { x: -2.4, z: -14.4, yaw: -30 },
-  { x: -2.4, z: -18.0, yaw: -30 },
+  { x: -2.0, z: -16.8, yaw: -30 },
 ] as const;
 
 export const HANGAR_SPOTS = [
   { x: -1.0, z: 2.4, yaw: 0 },
   { x: 1.0, z: 6.1, yaw: 180 },
+  { x: -1.0, z: 9.0, yaw: 0 },
+  { x: 1.0, z: 12.7, yaw: 180 },
 ] as const;
 
 /** 把已建好的 J-15 零件复制成静态停放机（含完整外翼/尾翼/起落架，不是简化盒）。 */
@@ -50,8 +52,8 @@ export function addParkedAircraft(
       scale: [1, 1, AIRCRAFT_SCALE_Z],
       note: `${key === "hangar" ? "机库" : "甲板"}停放舰载机 ${tag}`,
     });
-    ctx.node({ name: wingL, parent: rootName, pivot: [-0.48, 0.28, 0.02], note: `停放机 ${tag} 左翼` });
-    ctx.node({ name: wingR, parent: rootName, pivot: [0.48, 0.28, 0.02], note: `停放机 ${tag} 右翼` });
+    ctx.node({ name: wingL, parent: rootName, pivot: [-0.48, 0.28, 0.02], rest_rotation: [0, 0, -1.45], note: `停放机 ${tag} 左翼折叠` });
+    ctx.node({ name: wingR, parent: rootName, pivot: [0.48, 0.28, 0.02], rest_rotation: [0, 0, 1.45], note: `停放机 ${tag} 右翼折叠` });
     ctx.node({ name: hook, parent: rootName, pivot: [0, 0.27, -1.12], note: `停放机 ${tag} 尾钩` });
 
     const nodeMap = new Map<string, string>([
