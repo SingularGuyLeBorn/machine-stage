@@ -7,10 +7,11 @@ import type { ModelRegistry } from "../../registry/types";
 
 export const CV_MATERIALS: ModelRegistry["materials"] = {
   // 舰体是涂装钢板：漆膜为介电层，保留钢板法线/粗糙度，金属度低于裸钢，避免背光面死黑。
-  cv_hull: { base: "#7c858a", metalness: 0.35, roughness: 0.7, pbr: "plates", repeat: [4, 4], clearcoat: 0.12, clearcoatRoughness: 0.5, envMapIntensity: 0.7 },
-  cv_hull_dark: { base: "#5c666b", metalness: 0.4, roughness: 0.72, pbr: "plates", repeat: [4, 4], envMapIntensity: 0.6 },
-  cv_hull_boot: { base: "#454b4e", metalness: 0.8, roughness: 0.8, pbr: "rust", repeat: [4, 3], envMapIntensity: 0.95 },
-  cv_antifouling: { base: "#7a332b", metalness: 0.04, roughness: 0.82, preset: "primer", envMapIntensity: 0.45 },
+  // 船壳是闭合壳体，双面渲染避免艉/艏封口与水下壳在仰视时被背面剔除成“透明空洞”。
+  cv_hull: { base: "#7c858a", metalness: 0.35, roughness: 0.7, pbr: "plates", repeat: [4, 4], clearcoat: 0.12, clearcoatRoughness: 0.5, envMapIntensity: 0.7, doubleSided: true },
+  cv_hull_dark: { base: "#5c666b", metalness: 0.4, roughness: 0.72, pbr: "plates", repeat: [4, 4], envMapIntensity: 0.6, doubleSided: true },
+  cv_hull_boot: { base: "#454b4e", metalness: 0.8, roughness: 0.8, pbr: "rust", repeat: [4, 3], envMapIntensity: 0.95, doubleSided: true },
+  cv_antifouling: { base: "#7a332b", metalness: 0.04, roughness: 0.82, preset: "primer", envMapIntensity: 0.45, doubleSided: true },
   cv_deck: { base: "#676c68", metalness: 0.1, roughness: 0.93, preset: "cast", envMapIntensity: 0.35, doubleSided: true },
   cv_deck_panel: { base: "#646965", metalness: 0.1, roughness: 0.93, preset: "cast", envMapIntensity: 0.35 },
   cv_deck_plate: { base: "#565d5c", metalness: 0.14, roughness: 0.9, pbr: "scratched", repeat: [4, 4], envMapIntensity: 0.35, doubleSided: true },

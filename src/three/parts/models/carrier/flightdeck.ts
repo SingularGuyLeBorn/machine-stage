@@ -41,6 +41,17 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     mate: A([0, 0, 0]),
     source: "1:8 展示尺度；连续水密基层顶面 y=4.57，上面分块铺装甲板，板缝露出深色基层。",
   });
+  add({
+    id: `${P}deck_underside`,
+    name_cn: "飞行甲板基层底面",
+    name_en: "flight deck underside",
+    assembly: ASSEMBLY,
+    build_layer: 3,
+    geometry: { type: "kit", kit: "carrierDeckUnderside" },
+    material: "cv_hull_dark",
+    mate: A([0, 0, 0]),
+    source: "整片封住甲板底面，仰视时不再透出船体内部。",
+  });
   // ---- 飞行甲板装甲板：沿真实甲板折线按 z 带 + 横向列切块 ----
   // 不是一整块板：每块装甲板独立成件，板缝（约 0.012 编辑单位）露出下面的深色水密基层。
   const armorJoint = 0.022;
@@ -1236,9 +1247,10 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       name_en: label,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(0.08, 0.006, Math.hypot(dx, dz), [0, 0, 0], 0.0015)),
+      geometry: M(B(0.1, 0.006, Math.hypot(dx, dz), [0, 0, 0], 0.0015)),
       material: "cv_deck_line",
-      mate: A([(x0 + x1) / 2, markY + 0.006, (z0 + z1) / 2], [0, (Math.atan2(dx, dz) * 180) / Math.PI, 0]),
+      // 线压在甲板真实外缘上：线内外不再出现“装甲板超出外缘线”的视觉。
+      mate: A([(x0 + x1) / 2, deckTop + 0.004, (z0 + z1) / 2], [0, (Math.atan2(dx, dz) * 180) / Math.PI, 0]),
     });
   };
   let stbdEdgeIndex = 0;
@@ -1251,8 +1263,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     const dz = bz - az;
     const len = Math.hypot(dx, dz);
     if (len < 1e-6) continue;
-    const inX = (dz / len) * 0.05;
-    const inZ = (-dx / len) * 0.05;
+    // 不向内偏：外缘线直接压在甲板折线上，装甲板不会再“超出外缘线”。
     const midX = (ax + bx) / 2;
     let id: string;
     let label: string;
@@ -1269,7 +1280,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       id = `deck_edge_end_${endEdgeIndex}`;
       label = az + bz < 0 ? `艉甲板外缘线 ${endEdgeIndex}` : `艏甲板外缘线 ${endEdgeIndex}`;
     }
-    edgeLine(ax + inX, az + inZ, bx + inX, bz + inZ, id, label);
+    edgeLine(ax, az, bx, bz, id, label);
   }
 
   // 直升机停靠点（圆圈 + H）。
@@ -1371,19 +1382,44 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     return new THREE.Matrix4().makeTranslation(side * 4.2, deckTop + 0.02, z);
   });
 
-  // ---- 舷侧外飘封边：整圈连续封边 + 整圈连续底封板 + 外露斜撑 ----
-  // 不再逐站放 3.6m 长的盒子——硬角处盒子必然伸出甲板或留缝。
-  add({
-    id: `${P}sponson_skirt`,
-    name_cn: "舷侧外飘封边板（整圈连续）",
-    name_en: "continuous sponson sealing skirt",
-    assembly: ASSEMBLY,
-    build_layer: 3,
-    geometry: { type: "kit", kit: "carrierSponsonSkirt" },
-    material: "cv_hull",
-    mate: A([0, 0, 0]),
-    source: "沿飞行甲板折线整圈放样，上缘埋入甲板、下缘与外飘底封板共边。",
-  });
+  // ---- 舷侧外飘封边：沿甲板折线逐段独立成板（不再是一个整圈大件） ----
+  // 每段仍严格沿甲板真实折线放样，不是旧版那种 3.6m 长的直盒子，所以不会伸出去也不会留缝。
+  const skirtOutline = deckPlan();
+  let skirtStbd = 0;
+  let skirtPort = 0;
+  let skirtEnd = 0;
+  for (let i = 0; i < skirtOutline.length; i++) {
+    const a = skirtOutline[i]!;
+    const b = skirtOutline[(i + 1) % skirtOutline.length]!;
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 1e-6) continue;
+    const midX = (a[0] + b[0]) / 2;
+    let sideLabel: string;
+    let tag: string;
+    if (midX > 0.15) {
+      skirtStbd++;
+      sideLabel = "右舷";
+      tag = `s_${pad(skirtStbd)}`;
+    } else if (midX < -0.15) {
+      skirtPort++;
+      sideLabel = "左舷";
+      tag = `p_${pad(skirtPort)}`;
+    } else {
+      skirtEnd++;
+      sideLabel = a[1] + b[1] < 0 ? "艉端" : "艏端";
+      tag = `e_${pad(skirtEnd)}`;
+    }
+    add({
+      id: `${P}sponson_skirt_${tag}`,
+      name_cn: `舷侧外飘封边板 ${sideLabel} ${tag.startsWith("s") ? skirtStbd : tag.startsWith("p") ? skirtPort : skirtEnd}`,
+      name_en: `sponson sealing plate ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: { type: "kit", kit: "carrierSponsonSkirt", params: { points: [a, b] } },
+      material: "cv_hull",
+      mate: A([0, 0, 0]),
+      source: "逐段沿飞行甲板真实折线放样；上缘埋入甲板、下缘与外飘底封板共边。",
+    });
+  }
   add({
     id: `${P}sponson_bottom`,
     name_cn: "外飘底封板（整圈连续）",

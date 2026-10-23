@@ -292,9 +292,11 @@ export const carrierHullShell: GeometryBuilder = () =>
 /** 水线以下舰体外板：防污红漆，圆舭过渡，含球鼻艏安装面。 */
 export const carrierHullUnderwater: GeometryBuilder = () =>
   loftHull((st) => {
+    const top = HULL_WL + 0.03;
     const ys = [st.bottom];
-    for (const f of [0.12, 0.3, 0.52, 0.76, 0.93]) ys.push(st.bottom + (HULL_WL - st.bottom) * f);
-    ys.push(HULL_WL);
+    for (const f of [0.12, 0.3, 0.52, 0.76, 0.93]) ys.push(st.bottom + (top - st.bottom) * f);
+    // 水下壳顶边略压过水线，与水上壳重叠，避免水线处出现锯齿状接缝；boot stripe 盖住重叠带。
+    ys.push(top);
     return ys;
   }, true, true);
 
@@ -376,13 +378,44 @@ export const carrierBowRake: GeometryBuilder = () => {
   return geometry;
 };
 
-/** 舰体底板（双层底的上层，随舭部收窄）。 */
+/** 双层底：沿 0.62m 高度的真实外板轮廓整片封到舷侧，不再是一条窄板悬在中间。 */
 export const carrierBottom: GeometryBuilder = () =>
-  extrudedPlan(hullPlan(0.08).map(([x, z]) => [x * 0.42, z] as [number, number]), 0.14, CV.HULL_BOTTOM + 0.14);
+  extrudedPlan(hullPlanAtHeight(0.62, 56), 0.1, CV.HULL_BOTTOM + 0.3);
+
+/** 艉封板：按艉部真实横剖面从船底封到甲板底，封死水上/水下壳与艉部之间的开口。 */
+export const carrierSternTransom: GeometryBuilder = () => {
+  const st = hullStationAt(CV.HULL_Z_STERN);
+  const topY = HULL_DECK_BOTTOM;
+  const samples = 24;
+  const points: Array<[number, number]> = [[0, st.bottom]];
+  for (let i = 1; i <= samples; i++) {
+    const y = st.bottom + ((topY - st.bottom) * i) / samples;
+    points.push([-hullHalfAt(st, y), y]);
+  }
+  for (let i = samples - 1; i >= 0; i--) {
+    const y = st.bottom + ((topY - st.bottom) * i) / samples;
+    points.push([hullHalfAt(st, y), y]);
+  }
+  const shape = new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x, y)));
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.06,
+    bevelEnabled: false,
+    curveSegments: 1,
+    steps: 1,
+  });
+  // 艏向面压在壳板艉封口上，艉向面略微外露；门框/扶强材再贴在艉向面。
+  geometry.translate(0, 0, CV.HULL_Z_STERN - 0.06);
+  geometry.computeVertexNormals();
+  return geometry;
+};
 
 /** 飞行甲板水密基层：顶面比装甲板低 0.018，装甲板之间的板缝会露出深色基层。 */
 export const carrierFlightDeck: GeometryBuilder = () =>
   extrudedPlan(deckPlan(), CV.DECK_T - 0.018, CV.DECK_Y + CV.DECK_T - 0.018);
+
+/** 飞行甲板基层底面：从下往上看也必须是实心封板，不能透出船体内部。 */
+export const carrierDeckUnderside: GeometryBuilder = () =>
+  extrudedPlan(deckPlan(), 0.025, CV.DECK_Y + 0.005);
 
 /** 单块飞行甲板装甲板：points 为该板在 x-z 平面的封闭折线。 */
 export const carrierDeckArmorPlate: GeometryBuilder = (spec) => {
@@ -402,9 +435,11 @@ export const carrierDeckArmorPlate: GeometryBuilder = (spec) => {
   return geometry;
 };
 
-/** 外飘封边板：沿甲板折线一整圈连续的舷墙，从甲板底包到外飘底。 */
-export const carrierSponsonSkirt: GeometryBuilder = () => {
-  const outline = deckPlan();
+/** 外飘封边板：沿甲板折线的舷墙板。传入 points 时只做一个/一组折线段（逐块零件）。 */
+export const carrierSponsonSkirt: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: { points?: Array<[number, number]> } }).params ?? {};
+  const outline = params.points && params.points.length >= 2 ? params.points : deckPlan();
+  const closed = !params.points;
   const yTop = CV.DECK_Y + 0.02;
   const yBot = CV.DECK_Y - 0.32;
   const thickness = 0.07;
@@ -438,7 +473,8 @@ export const carrierSponsonSkirt: GeometryBuilder = () => {
     pushTri(a, b, c, out);
     pushTri(a, c, d, out);
   };
-  for (let i = 0; i < outline.length; i++) {
+  const edgeCount = closed ? outline.length : outline.length - 1;
+  for (let i = 0; i < edgeCount; i++) {
     const [x0, z0] = outline[i]!;
     const [x1, z1] = outline[(i + 1) % outline.length]!;
     const dx = x1 - x0;

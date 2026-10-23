@@ -82,13 +82,14 @@ export function addHull(ctx: CarrierCtx): void {
   // 避免从舰艉看过去是一整块空白板。
   add({
     id: "carrier.hull.stern_transom",
-    name_cn: "艉封板",
-    name_en: "stern transom",
+    name_cn: "艉封板（随艉部横剖面）",
+    name_en: "stern transom (hull section)",
     assembly: HULL_ASSEMBLY,
     build_layer: 1,
-    geometry: M(B(4.2, 2.3, 0.06, [0, 0, 0], 0.01)),
+    geometry: { type: "kit", kit: "carrierSternTransom" },
     material: "cv_hull_dark",
-    mate: A([0, 3.1, -18.53]),
+    mate: A([0, 0, 0]),
+    source: "按艉部站位的真实横剖面从船底封到甲板底，覆盖水上/水下壳艉端。",
   });
   add({
     id: "carrier.hull.stern_transom_detail",
@@ -107,11 +108,27 @@ export function addHull(ctx: CarrierCtx): void {
       B(3.6, 0.07, 0.06, [0, -1.08, -0.03], 0.005),
       C(0.06, 0.16, [-0.5, -0.35, -0.07], 12),
       C(0.06, 0.16, [0.5, -0.35, -0.07], 12),
+      // 两根竖向扶强材把门框与上下横向扶强材连成整体，避免合并件内部断成孤块。
+      B(0.08, 2.2, 0.06, [-0.85, 0, -0.04], 0.004),
+      B(0.08, 2.2, 0.06, [0.85, 0, -0.04], 0.004),
     ),
     material: "cv_steel",
-    mate: A([0, 3.1, -18.57]),
+    mate: A([0, 3.1, -18.58]),
   });
 
+  // 艏部楔形整流：船壳放样的艏端封口是斜切面，从正前方仰视会看到两舷之间的暗缝；
+  // 用实心楔形艏柱把两舷/艏柱/球鼻艏之间填实，形成可看见的艏部外形。
+  add({
+    id: "carrier.hull.bow_rake_fairing",
+    name_cn: "舰艏楔形整流/艏柱",
+    name_en: "bow rake fairing",
+    assembly: HULL_ASSEMBLY,
+    build_layer: 1,
+    geometry: { type: "kit", kit: "carrierBowRake" },
+    material: "cv_hull",
+    mate: A([0, 0, -0.18]),
+    source: "填实两舷艏端之间的楔形空间，避免正前方仰视出现中空暗缝。",
+  });
   // 前倾舰艏已并入外板型线放样，这里只保留艏柱包板焊缝。
   add({
     id: "carrier.hull.bow_stem_strip",
