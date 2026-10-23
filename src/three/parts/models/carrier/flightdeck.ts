@@ -1047,12 +1047,12 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   const portEdge: Array<[number, number]> = [
     [-2.5, -20], [-2.5, -18], [-3.2, -16.5], [-4.2, -15.9],
     [-4.4, -9], [-4.5, -6], [-4.3, -2.7], [-4.8, 4.7], [-4.8, 9],
-    [-2.04, 10.7], [-1.48, 20],
+    [-2.04, 10.7], [-1.55, 20.7],
   ];
   const starboardEdgeSegments: Array<Array<[number, number]>> = [
     [[2.9, -19.4], [3.5, -17.5], [4.68, -15.8], [4.68, -14.52]],
     [[4.68, -11.08], [4.68, 0.28], [4.68, 3.72], [4.68, 6.0]],
-    [[4.18, 9.53], [2.4, 11.4], [1.75, 20]],
+    [[4.18, 9.53], [2.4, 11.4], [1.85, 20.7]],
   ];
   const edgeLine = (x0: number, z0: number, x1: number, z1: number, id: string, label: string) => {
     const dx = x1 - x0;
@@ -1180,21 +1180,43 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     return new THREE.Matrix4().makeTranslation(side * 4.2, deckTop + 0.02, z);
   });
 
-  // ---- 舷侧外飘支撑 / 甲板下纵桁与斜撑（把飞行甲板接回舰体，消除悬空感） ----
+  // ---- 舷侧外飘封边板：沿新甲板轮廓逐段立在甲板缘下方，把甲板缘与舰体顶部封死 ----
+  const deckStarOutline: Array<[number, number]> = [
+    [2.9, -19.4], [3.5, -17.5], [4.68, -15.8], [4.68, 6.0], [4.18, 9.53], [2.4, 11.4], [1.85, 20.7],
+  ];
+  const deckPortOutline: Array<[number, number]> = [
+    [-2.5, -20], [-2.5, -18], [-3.2, -16.5], [-4.2, -15.9], [-4.4, -9], [-4.5, -6], [-4.3, -2.7],
+    [-4.8, 4.7], [-4.8, 9], [-2.04, 10.7], [-1.55, 20.7],
+  ];
+  const edgeInfoAt = (outline: Array<[number, number]>, z: number): { x: number; yawDeg: number } => {
+    for (let i = 0; i < outline.length - 1; i++) {
+      const [x0, z0] = outline[i]!;
+      const [x1, z1] = outline[i + 1]!;
+      const lo = Math.min(z0, z1);
+      const hi = Math.max(z0, z1);
+      if (z >= lo && z <= hi) {
+        const t = Math.abs(z1 - z0) < 1e-6 ? 0 : (z - z0) / (z1 - z0);
+        return { x: x0 + (x1 - x0) * t, yawDeg: (Math.atan2(x1 - x0, z1 - z0) * 180) / Math.PI };
+      }
+    }
+    return { x: outline[outline.length - 1]![0], yawDeg: 0 };
+  };
   for (const side of [-1, 1] as const) {
     const tag = side === -1 ? "p" : "s";
+    const outline = side === -1 ? deckPortOutline : deckStarOutline;
     for (let i = 0; i < 13; i++) {
-      const z = -17.5 + i * 2.92;
-      const half = hullHalfBeamAt(z);
+      const z = -18.5 + i * 3.166;
+      const info = edgeInfoAt(outline, z);
+      const hullX = hullHalfBeamAt(z);
       add({
         id: `${P}sponson_shell_${tag}_${pad(i + 1)}`,
-        name_cn: `舷侧外飘支撑板 ${tag.toUpperCase()}-${i + 1}`,
-        name_en: `sponson shell ${tag} ${i + 1}`,
+        name_cn: `舷侧外飘封边板 ${tag.toUpperCase()}-${i + 1}`,
+        name_en: `sponson sealing plate ${tag} ${i + 1}`,
         assembly: ASSEMBLY,
         build_layer: 3,
-        geometry: M(B(0.08, 0.5, 2.92, [0, 0, 0], 0.006)),
+        geometry: M(B(0.08, 0.5, 3.6, [0, 0, 0], 0.006)),
         material: "cv_hull",
-        mate: A([side * (half + 0.02), CV.HULL_TOP + 0.25, z]),
+        mate: A([info.x, CV.HULL_TOP + 0.27, z], [0, info.yawDeg, 0]),
       });
       add({
         id: `${P}sponson_brace_${tag}_${pad(i + 1)}`,
@@ -1202,12 +1224,52 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         name_en: `deck brace ${tag} ${i + 1}`,
         assembly: ASSEMBLY,
         build_layer: 3,
-        geometry: M({ type: "weld", from: [0, 0, 0], to: [side * 0.76, 0.42, 0], radius: 0.035 }),
+        geometry: M({ type: "weld", from: [side * (hullX - 0.05), 3.5, z], to: [info.x - side * 0.04, CV.DECK_Y + 0.02, z], radius: 0.035, seed: 900 + i + side }),
         material: "cv_steel_dark",
-        mate: A([side * (half + 0.02), CV.HULL_TOP + 0.02, z]),
+        mate: A([0, 0, 0]),
+      });
+      // 外飘底封板：把甲板缘封边板与舰体侧壁之间封死（不敞口进浪）。
+      const bottomWidth = Math.max(0.4, Math.abs(info.x - side * hullX) + 0.12);
+      add({
+        id: `${P}sponson_bottom_${tag}_${pad(i + 1)}`,
+        name_cn: `外飘底封板 ${tag.toUpperCase()}-${i + 1}`,
+        name_en: `sponson bottom plate ${tag} ${i + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 3,
+        geometry: M(B(bottomWidth, 0.06, 3.6, [0, 0, 0], 0.004)),
+        material: "cv_hull_dark",
+        mate: A([(info.x + side * hullX) / 2, CV.HULL_TOP + 0.03, z]),
       });
     }
   }
+  const skirtSegment = (x0: number, z0: number, x1: number, z1: number, id: string, label: string) => {
+    const dx = x1 - x0;
+    const dz = z1 - z0;
+    const yaw = (Math.atan2(dx, dz) * 180) / Math.PI;
+    add({
+      id,
+      name_cn: label,
+      name_en: label,
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M(B(0.08, 0.5, Math.hypot(dx, dz) + 0.08, [0, 0, 0], 0.006)),
+      material: "cv_hull",
+      mate: A([(x0 + x1) / 2, CV.HULL_TOP + 0.27, (z0 + z1) / 2], [0, yaw, 0]),
+    });
+  };
+  skirtSegment(1.85, 20.7, -1.55, 20.7, `${P}sponson_shell_tip`, "舷侧外飘封边板 艏端");
+  add({
+    id: `${P}sponson_bottom_tip`,
+    name_cn: "外飘底封板 艏端",
+    name_en: "sponson bottom plate bow",
+    assembly: ASSEMBLY,
+    build_layer: 3,
+    geometry: M(B(3.4, 0.06, 0.9, [0, 0, 0], 0.004)),
+    material: "cv_hull_dark",
+    mate: A([0.15, CV.HULL_TOP + 0.03, 20.3]),
+  });
+  skirtSegment(2.9, -19.4, -0.8, -20.0, `${P}sponson_shell_stern_s`, "舷侧外飘封边板 艉右");
+  skirtSegment(-0.8, -20.0, -2.5, -20.0, `${P}sponson_shell_stern_p`, "舷侧外飘封边板 艉左");
 
   // ---- 左舷斜角甲板外飘支撑 + 舷边栏杆 ----
   for (let i = 0; i < 7; i++) {
@@ -1334,8 +1396,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   }
   // 舰艏舷墙：沿最后 3 段甲板边缘抬起，侧视能看到舰艏上翘而不是平切方盒。
   const bowEdges: Array<{ tag: string; points: Array<[number, number]> }> = [
-    { tag: "p", points: [[-1.7, 18.0], [-1.48, 20.0]] },
-    { tag: "s", points: [[1.9, 18.0], [1.75, 20.0]] },
+    { tag: "p", points: [[-1.7, 18.0], [-1.55, 20.7]] },
+    { tag: "s", points: [[1.9, 18.0], [1.85, 20.7]] },
   ];
   for (const edge of bowEdges) {
     for (let i = 0; i < edge.points.length - 1; i++) {
@@ -1361,8 +1423,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     name_en: "bow front bulwark",
     assembly: ASSEMBLY,
     build_layer: 3,
-    geometry: M(B(3.2, 0.38, 0.07, [0, 0, 0], 0.006)),
+    geometry: M(B(3.4, 0.38, 0.07, [0, 0, 0], 0.006)),
     material: "cv_hull",
-    mate: A([0.135, deckTop + 0.22, 20.0], [0, 0, 0]),
+    mate: A([0.15, deckTop + 0.22, 20.65], [0, 0, 0]),
   });
 }
