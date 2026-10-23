@@ -90,7 +90,7 @@ export function addSurface(ctx: CarrierCtx): void {
     const zc = -13 + cw * 2;
     const hullTop = hullSurfaceHalfAt(zc, catwalkY + 0.02);
     const hullBracket = hullSurfaceHalfAt(zc, catwalkY - 0.04);
-    const px = -(hullTop + 0.3);
+    const px = -(hullTop + 0.72);
     add({
       id: `${P}catwalk_${pad(cw + 1)}`,
       name_cn: `左舷外走道格栅 ${cw + 1}`,
@@ -108,9 +108,9 @@ export function addSurface(ctx: CarrierCtx): void {
         name_en: `port catwalk bracket ${cw + 1}-${dz < 0 ? "f" : "a"}`,
         assembly: ASSEMBLY,
         build_layer: 4,
-        geometry: M(B(0.46, 0.08, 0.12, [0, 0, 0], 0.004), B(0.1, 0.28, 0.1, [0.2, -0.15, 0], 0.003)),
+        geometry: M(B(0.8, 0.08, 0.12, [0, 0, 0], 0.004), B(0.1, 0.28, 0.1, [0.35, -0.15, 0], 0.003)),
         material: "cv_steel_dark",
-        mate: A([-(hullBracket + 0.2), catwalkY - 0.06, zc + dz]),
+        mate: A([-(hullBracket + 0.4), catwalkY - 0.06, zc + dz]),
       });
     }
     add({

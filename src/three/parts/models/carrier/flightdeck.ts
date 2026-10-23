@@ -573,7 +573,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     // 网中心必须落在斜角跑道中线上：用跑道艉端 x=1.05 反算，旧版用 0.5 让整张网向
     // 左舷偏 0.55，左支柱悬出甲板外。
     const netCenterX = 1.05 - ((netZ + 18.5) / netCos) * netSin;
-    const netHalf = 1.5;
+    const netHalf = 2.0;
     const netYaw = -9.3;
     const postAt = (side: -1 | 1): [number, number] => [
       netCenterX + side * netHalf * netCos,
@@ -980,14 +980,14 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   };
   // 斜角跑道底层浅灰漆带：给所有白色标线提供连续附着面，同时形成真实跑道底色。
   // 用 cv_runway（比甲板浅一档）而不是甲板板材质——俯视时能一眼认出是斜跑道。
-  const underlay = runwayAt(RUNWAY_LEN / 2);
+  const underlay = runwayAt(12.55);
   add({
     id: `${P}runway_underlay`,
     name_cn: "斜角着舰跑道底色",
     name_en: "angled runway underlay",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(B(3.0, 0.004, RUNWAY_LEN + 0.5, [0, 0, 0], 0.0015)),
+    geometry: M(B(4.0, 0.004, 24.6, [0, 0, 0], 0.0015)),
     material: "cv_runway",
     mate: A([underlay[0], deckTop + 0.006, underlay[1]], [0, RUNWAY_YAW, 0]),
   });
@@ -1008,7 +1008,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // 跑道两侧边线：9 段实线沿跑道横向 ±1.35，与中线同角度。
   for (const side of [-1, 1] as const) {
     for (let s = 0; s < 8; s++) {
-      const [x, z] = runwayAcross(2.25 + s * 3.0, side, 1.3);
+      const [x, z] = runwayAcross(2.25 + s * 3.0, side, 1.8);
       add({
         id: `${P}runway_edge_${side === -1 ? "p" : "s"}_${pad(s + 1)}`,
         name_cn: `斜角跑道${side === -1 ? "左" : "右"}边线 ${s + 1}`,
@@ -1023,7 +1023,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   }
   // 着舰区“钢琴键”：8 根纵向条带横跨跑道，全部按跑道角度排齐。
   for (let bar = 0; bar < 8; bar++) {
-    const [x, z] = runwayAcross(2.4, 1, -1.36 + bar * 0.3886);
+    const [x, z] = runwayAcross(2.4, 1, -1.84 + bar * 0.526);
     add({
       id: `${P}runway_threshold_${pad(bar + 1)}`,
       name_cn: `着舰区钢琴键 ${bar + 1}`,
@@ -1059,7 +1059,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       name_en: `angled runway end ${tag}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(2.8, 0.006, 0.12, [0, 0, 0], 0.0015)),
+      geometry: M(B(3.8, 0.006, 0.12, [0, 0, 0], 0.0015)),
       material: "cv_deck_line",
       mate: A([cx, markY + 0.006, cz], [0, RUNWAY_YAW, 0]),
     });

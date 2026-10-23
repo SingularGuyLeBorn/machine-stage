@@ -15,7 +15,8 @@ export const CV = {
   DECK_Z_STERN: -20,
 
   HULL_LEN: 37,
-  HULL_BEAM: 7.2,
+  // 水线型宽 40m：5.06 编辑单位 / 0.88（舭部椭圆系数）≈ 5.76 总宽。
+  HULL_BEAM: 5.76,
   HULL_BOTTOM: 0.42,
   HULL_TOP: 3.9,
   HULL_Z_BOW: 18.5,
@@ -43,9 +44,9 @@ export const CV = {
   WIRE_HALF: 3.0,
   WIRE_Y: 4.62,
 
-  ELEVATOR_X: 3.76,
+  ELEVATOR_X: 3.42,
   ELEVATOR_Z: [2.0, -12.8] as const,
-  ELEVATOR_W: 2.0,
+  ELEVATOR_W: 2.53,
   ELEVATOR_L: 3.4,
 
   // 演示机停在艏部右舷停机位（弹射跑道外侧、拦阻网前方），滑行到 2 号弹射位时不穿网。
@@ -70,9 +71,9 @@ export type CatTrack = {
 };
 
 export const CAT_TRACKS: readonly CatTrack[] = [
-  // 舰艏两条：整体内收 1.5°，合计 3° 夹角（与真实福建舰一致），起点前移到拦阻网/着舰区前方。
-  { id: 1, x0: -1.55, z0: 10.0, yawDeg: 1.5, length: 8.4 },
-  { id: 2, x0: 1.55, z0: 10.0, yawDeg: -1.5, length: 8.4 },
+  // 舰艏两条：2 号与甲板中线平行，1 号向右偏 3°（公开资料描述），起点前移到拦阻网/着舰区前方。
+  { id: 1, x0: -1.55, z0: 10.0, yawDeg: 3.0, length: 8.4 },
+  { id: 2, x0: 1.55, z0: 10.0, yawDeg: 0.0, length: 8.4 },
   // 腰部三号：与斜角着舰跑道平行，放在跑道右侧（靠舰岛一侧），不再横跨跑道。
   { id: 3, x0: 2.62, z0: -8.6, yawDeg: -9.3, length: 8.4 },
 ];

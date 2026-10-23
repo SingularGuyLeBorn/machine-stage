@@ -292,13 +292,15 @@ export function addHull(ctx: CarrierCtx): void {
   });
   for (let p = 0; p < 16; p++) {
     const z = -15 + p * 1.9;
+    // 甲板加强板必须收在真实船壳内：艏部船壳收窄后固定 6.6 宽会伸出舷外。
+    const plateHalf = Math.max(0.4, Math.min(3.3, hullSurfaceHalfAt(z, CV.HANGAR_Y + 0.13) - 0.1));
     add({
       id: `carrier.hull.hangar_plate_${pad(p + 1)}`,
       name_cn: `机库甲板加强板 ${p + 1}`,
       name_en: `hangar deck plate ${p + 1}`,
       assembly: HULL_ASSEMBLY,
       build_layer: 2,
-      geometry: M(B(6.6, 0.04, 1.7, [0, 0, 0], 0.004)),
+      geometry: M(B(plateHalf * 2, 0.04, 1.7, [0, 0, 0], 0.004)),
       material: "cv_deck_plate",
       mate: A([0, CV.HANGAR_Y + 0.13, z]),
     });
@@ -431,11 +433,11 @@ export function addHull(ctx: CarrierCtx): void {
 
   // 舱室隔板（住舱/损管/配电）：作为内部体量，后续可剖视。
   const rooms = [
-    ["dc", "损管站", 2.35, -7.2],
-    ["berth_a", "住舱 A", -2.25, 7.5],
-    ["berth_b", "住舱 B", 2.25, 8.5],
-    ["galley", "厨房", -2.25, 2.5],
-    ["medical", "医疗舱", 2.25, 3.5],
+    ["dc", "损管站", 1.2, -7.2],
+    ["berth_a", "住舱 A", -1.2, 7.5],
+    ["berth_b", "住舱 B", 1.2, 8.5],
+    ["galley", "厨房", -1.2, 2.5],
+    ["medical", "医疗舱", 1.2, 3.5],
     ["switch", "配电舱", 1.2, -13.5],
   ] as const;
   for (const [key, name, x, z] of rooms) {

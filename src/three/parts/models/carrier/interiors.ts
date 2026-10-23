@@ -114,10 +114,10 @@ export function addCarrierInteriors(ctx: CarrierCtx): void {
     valve(ctx, POWER, 1, "carrier.power.engine_aux", 0.66, 1.66, -17.4);
 
     // 主配电板移到左舷围壁：避开汽轮机，同时第一人称转头就能看到断路器排。
-    add("carrier.power.engine_switchboard", "机舱主配电板", M(B(0.1, 1.4, 3.4, [0, 0, 0], 0.008), B(0.14, 0.06, 3.2, [0, -0.62, 0], 0.004), B(0.14, 0.06, 3.2, [0, 0.62, 0], 0.004)), "cv_steel_dark", [-2.59, 1.78, -15.8]);
+    add("carrier.power.engine_switchboard", "机舱主配电板", M(B(0.1, 1.4, 3.4, [0, 0, 0], 0.008), B(0.14, 0.06, 3.2, [0, -0.62, 0], 0.004), B(0.14, 0.06, 3.2, [0, 0.62, 0], 0.004)), "cv_steel_dark", [-0.65, 1.78, -15.8]);
     for (let r = 0; r < 3; r++) {
       for (let c = 0; c < 8; c++) {
-        add(`carrier.power.engine_breaker_${r * 8 + c + 1}`, `主配电板断路器 ${r * 8 + c + 1}`, M(B(0.035, 0.17, 0.055, [0, 0, 0], 0.002), B(0.04, 0.03, 0.11, [-0.01, 0.06, 0], 0.002)), "cv_warning", [-2.53, 1.42 + r * 0.34, -17.2 + c * 0.37]);
+        add(`carrier.power.engine_breaker_${r * 8 + c + 1}`, `主配电板断路器 ${r * 8 + c + 1}`, M(B(0.035, 0.17, 0.055, [0, 0, 0], 0.002), B(0.04, 0.03, 0.11, [-0.01, 0.06, 0], 0.002)), "cv_warning", [-0.6, 1.42 + r * 0.34, -17.2 + c * 0.37]);
       }
     }
     for (let g = 0; g < 3; g++) {
@@ -180,9 +180,9 @@ export function addCarrierInteriors(ctx: CarrierCtx): void {
     const add = localAdd(ctx, HANGAR, 2);
     const deckY = CV.HANGAR_Y + 0.14;
     add("carrier.hangar.hangar_control_podium", "机库控制台", M(B(0.94, 0.16, 0.34, [0, 0, 0], 0.008), B(0.94, 0.04, 0.36, [0, 0.1, 0.02], 0.004)), "cv_steel_dark", [2.3, deckY + 0.03, 10.0]);
-    add("carrier.hangar.hangar_control_board", "机库状态板", M(B(1.0, 0.36, 0.035, [0, 0, 0], 0.006)), "cv_steel_dark", [3.05, deckY + 0.3, 9.9]);
-    add("carrier.hangar.hangar_control_screen", "机库调度屏", M(B(0.5, 0.22, 0.008, [0, 0, 0], 0.002)), "cv_screen", [3.05, deckY + 0.3, 9.92]);
+    add("carrier.hangar.hangar_control_board", "机库状态板", M(B(1.0, 0.36, 0.035, [0, 0, 0], 0.006)), "cv_steel_dark", [2.35, deckY + 0.3, 9.9]);
+    add("carrier.hangar.hangar_control_screen", "机库调度屏", M(B(0.5, 0.22, 0.008, [0, 0, 0], 0.002)), "cv_screen", [2.35, deckY + 0.3, 9.92]);
     seat(ctx, HANGAR, 2, "carrier.hangar.hangar_control", "carrier.hangar.hangar_control_seat_back", 2.3, deckY - 0.04, 10.35, -1);
-    add("carrier.hangar.hangar_control_phone", "机库调度电话", M(B(0.04, 0.1, 0.03, [0, 0, 0], 0.004), C(0.012, 0.05, [0.03, 0.04, 0], 10)), "cv_steel", [3.4, deckY + 0.24, 10.0]);
+    add("carrier.hangar.hangar_control_phone", "机库调度电话", M(B(0.04, 0.1, 0.03, [0, 0, 0], 0.004), C(0.012, 0.05, [0.03, 0.04, 0], 10)), "cv_steel", [2.5, deckY + 0.24, 10.0]);
   }
 }

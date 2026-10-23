@@ -348,9 +348,8 @@ export function animateCarrier(assembled: AssembledModel, seconds: number, state
   if (state === "hangar") {
     // 机库作业时防火门保持全开，第一人称才能看见纵深停机位与停放机。
     setDoors(assembled, 1);
-    const cycle = t % 8;
-    const drop = -1.1 * (0.5 - 0.5 * Math.cos((Math.min(cycle, 6) / 6) * Math.PI * 2));
-    setAmmoElevator(assembled, drop);
+    // 船壳收窄后弹药升降机井与下层弹架/肋骨净空不足，平台停在机库层（行程不再下探）。
+    setAmmoElevator(assembled, 0);
     setRadar(assembled, t * 0.5);
     return;
   }

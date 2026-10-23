@@ -381,7 +381,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
       build_layer: 1,
       geometry: M(B(0.35, 0.75, 0.25, [0, 0, 0], 0.006), B(0.28, 0.12, 0.02, [0, 0.18, 0.14], 0.003)),
       material: "cv_steel_dark",
-      mate: A([-3.15 + (c % 5) * 0.28, CV.LOWER_DECK_Y + 0.38, -15.4 + Math.floor(c / 5) * 0.35]),
+      mate: A([-0.6 + (c % 5) * 0.28, CV.LOWER_DECK_Y + 0.38, -15.4 + Math.floor(c / 5) * 0.35]),
     });
   }
   for (let b = 0; b < 8; b++) {
@@ -436,7 +436,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
       build_layer: 2,
       geometry: M(B(0.7, 0.9, 0.06, [0, 0, 0], 0.006)),
       material: "cv_steel_dark",
-      mate: A([-2.85 + (e % 2) * 1.3, CV.HANGAR_Y + 0.55, -6.7 + Math.floor(e / 2) * 0.3]),
+      mate: A([-2.4 + (e % 2) * 1.3, CV.HANGAR_Y + 0.55, -6.7 + Math.floor(e / 2) * 0.3]),
     });
   }
   // 机库停放机的蒙皮板随真实机身一起取消程序化贴片；保留实体机身/翼/起落架。

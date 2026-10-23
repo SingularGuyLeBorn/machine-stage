@@ -236,7 +236,8 @@ describe("福建舰 · 整机", () => {
     built.root.updateMatrixWorld(true);
     expect(built.getNode("CV_HangarDoor_1")!.scale.x).toBeLessThan(0.5);
     expect(built.getNode("CV_HangarDoor_1_R")!.scale.x).toBeLessThan(0.5);
-    expect(built.getNode(AMMO_ELEVATOR_NODE)!.position.y).toBeLessThan(CV.HANGAR_Y - 0.4);
+    // 船壳收窄后弹药升降机井与下层弹架/肋骨净空不足，平台停在机库层（门仍开合）。
+    expect(built.getNode(AMMO_ELEVATOR_NODE)!.position.y).toBeGreaterThan(2.25);
 
     built.resetNodes();
     animateCarrier(built, 1.4, "ciws");

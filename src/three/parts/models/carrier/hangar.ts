@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { CV } from "./constants";
 import { A, B, C, M, T, pad, type CarrierCtx } from "./common";
+import { hullSurfaceHalfAt } from "./kits";
 
 // ============================================================================
 // L2 机库 / 弹药库 / 弹药升降机 / 防火分段门 / 维护区
@@ -19,15 +20,18 @@ export function addHangar(ctx: CarrierCtx): void {
   const DOOR_Z = [-2.5, 0.5, 4.5, 7.5, 10.5];
   HANGAR_DOOR_NODES.forEach((node, index) => {
     const z = DOOR_Z[index]!;
-    ctx.node({ name: node, parent: "root", pivot: [-2.6, deckY, z], motion: "rotate", axis: "y", note: `机库防火门 ${index + 1} 左扇（折叠收拢）` });
-    ctx.node({ name: `${node}_R`, parent: "root", pivot: [2.6, deckY, z], motion: "rotate", axis: "y", note: `机库防火门 ${index + 1} 右扇（折叠收拢）` });
+    // 机库宽度随船壳收窄：门框/门扇按该 z 的船壳半宽收，不能固定 5.3 宽戳出舷外。
+    const half = Math.max(1.45, Math.min(2.6, hullSurfaceHalfAt(z, deckY + 0.45) - 0.12));
+    const leafW = half - 0.03;
+    ctx.node({ name: node, parent: "root", pivot: [-half, deckY, z], motion: "rotate", axis: "y", note: `机库防火门 ${index + 1} 左扇（折叠收拢）` });
+    ctx.node({ name: `${node}_R`, parent: "root", pivot: [half, deckY, z], motion: "rotate", axis: "y", note: `机库防火门 ${index + 1} 右扇（折叠收拢）` });
     add({
       id: `${P}fire_door_${pad(index + 1)}_frame`,
       name_cn: `机库防火门 ${index + 1} 门框`,
       name_en: `hangar fire door frame ${index + 1}`,
       assembly: ASSEMBLY,
       build_layer: 2,
-      geometry: M(B(5.3, 0.08, 0.18, [0, 0.96, 0], 0.008), B(5.3, 0.08, 0.18, [0, -0.04, 0], 0.008), B(0.12, 1.05, 0.18, [-2.6, 0.46, 0], 0.006), B(0.12, 1.05, 0.18, [2.6, 0.46, 0], 0.006)),
+      geometry: M(B(half * 2, 0.08, 0.18, [0, 0.96, 0], 0.008), B(half * 2, 0.08, 0.18, [0, -0.04, 0], 0.008), B(0.12, 1.05, 0.18, [-half, 0.46, 0], 0.006), B(0.12, 1.05, 0.18, [half, 0.46, 0], 0.006)),
       material: "cv_steel_dark",
       mate: A([0, deckY, z]),
     });
@@ -37,7 +41,7 @@ export function addHangar(ctx: CarrierCtx): void {
       name_en: `hangar fire door ${index + 1} left leaf`,
       assembly: ASSEMBLY,
       build_layer: 2,
-      geometry: M(B(2.55, 0.9, 0.07, [1.28, 0.5, 0], 0.008), B(2.3, 0.08, 0.03, [1.28, 0.26, 0.045], 0.003)),
+      geometry: M(B(leafW, 0.9, 0.07, [leafW / 2, 0.5, 0], 0.008), B(leafW * 0.9, 0.08, 0.03, [leafW / 2, 0.26, 0.045], 0.003)),
       material: "cv_hull",
       node,
       mate: A([0, 0, 0]),
@@ -48,7 +52,7 @@ export function addHangar(ctx: CarrierCtx): void {
       name_en: `hangar fire door ${index + 1} right leaf`,
       assembly: ASSEMBLY,
       build_layer: 2,
-      geometry: M(B(2.55, 0.9, 0.07, [1.28, 0.5, 0], 0.008)),
+      geometry: M(B(leafW, 0.9, 0.07, [leafW / 2, 0.5, 0], 0.008)),
       material: "cv_hull",
       node: `${node}_R`,
       mate: A([0, 0, 0], [0, 180, 0]),
@@ -62,12 +66,12 @@ export function addHangar(ctx: CarrierCtx): void {
       geometry: M(C(0.05, 0.32, [0, 0, 0], 12), C(0.025, 0.22, [0, 0.2, 0], 10)),
       material: "cv_steel",
       node,
-      mate: A([0.5, 0.6, -0.1], [0, 0, 20]),
+      mate: A([Math.min(0.5, leafW * 0.35), 0.6, -0.1], [0, 0, 20]),
     });
   });
 
   // 停机位/系留点/轮挡/维护工位。
-  for (let p = 0; p < 8; p++) {
+  for (let p = 0; p < 4; p++) {
     add({
       id: `${P}parking_${pad(p + 1)}`,
       name_cn: `机库停机位 ${p + 1}`,
@@ -76,7 +80,7 @@ export function addHangar(ctx: CarrierCtx): void {
       build_layer: 2,
       geometry: M(B(1.5, 0.006, 1.6, [0, 0, 0], 0.002), B(0.06, 0.008, 1.2, [0, 0.005, 0], 0.002)),
       material: "cv_deck_line",
-      mate: A([-2.2 + (p % 4) * 1.4, deckY + 0.01, 0.0 + Math.floor(p / 4) * 12.0]),
+      mate: A([-1.3 + (p % 4) * 0.86, deckY + 0.01, 0.0 + Math.floor(p / 4) * 9.0]),
     });
     add({
       id: `${P}chock_${pad(p + 1)}_l`,
@@ -86,7 +90,7 @@ export function addHangar(ctx: CarrierCtx): void {
       build_layer: 2,
       geometry: M(B(0.25, 0.14, 0.18, [0, 0, 0], 0.006)),
       material: "cv_warning",
-      mate: A([-2.2 + (p % 4) * 1.4 - 0.35, deckY + 0.08, 0.0 + Math.floor(p / 4) * 12.0]),
+      mate: A([-1.3 + (p % 4) * 0.86 - 0.3, deckY + 0.08, 0.0 + Math.floor(p / 4) * 9.0]),
     });
     add({
       id: `${P}chock_${pad(p + 1)}_r`,
@@ -96,7 +100,7 @@ export function addHangar(ctx: CarrierCtx): void {
       build_layer: 2,
       geometry: M(B(0.25, 0.14, 0.18, [0, 0, 0], 0.006)),
       material: "cv_warning",
-      mate: A([-2.2 + (p % 4) * 1.4 + 0.35, deckY + 0.08, 0.0 + Math.floor(p / 4) * 12.0]),
+      mate: A([-1.3 + (p % 4) * 0.86 + 0.3, deckY + 0.08, 0.0 + Math.floor(p / 4) * 9.0]),
     });
   }
   add({
@@ -115,7 +119,7 @@ export function addHangar(ctx: CarrierCtx): void {
   ctx.layout("carrier.hangar.tiedown", ({ index }) => {
     const col = index % 8;
     const row = Math.floor(index / 8);
-    return new THREE.Matrix4().makeTranslation(-3.0 + col * 0.85, deckY + 0.02, -13 + row * 4.3);
+    return new THREE.Matrix4().makeTranslation(-2.4 + col * 0.686, deckY + 0.02, -13 + row * 4.3);
   });
   for (let m = 0; m < 3; m++) {
     add({
@@ -126,7 +130,7 @@ export function addHangar(ctx: CarrierCtx): void {
       build_layer: 2,
       geometry: M(B(0.9, 0.1, 0.5, [0, 0, 0], 0.006), B(0.08, 0.45, 0.4, [-0.35, -0.27, 0], 0.004), B(0.08, 0.45, 0.4, [0.35, -0.27, 0], 0.004)),
       material: "cv_steel_dark",
-      mate: A([-2.9, deckY + 0.5, -10 + m * 2.4]),
+      mate: A([-2.1, deckY + 0.5, -10 + m * 2.4]),
     });
     add({
       id: `${P}tool_rack_${m + 1}`,
@@ -136,12 +140,12 @@ export function addHangar(ctx: CarrierCtx): void {
       build_layer: 2,
       geometry: M(B(0.8, 1.0, 0.12, [0, 0, 0], 0.006), B(0.7, 0.04, 0.25, [0, -0.2, 0.16], 0.004)),
       material: "cv_steel",
-      mate: A([-3.1, deckY + 0.55, -9.6 + m * 2.4]),
+      mate: A([-2.2, deckY + 0.55, -9.6 + m * 2.4]),
     });
   }
   // 弹药升降机（弹药库 → 机库层），平台带护栏/液压杆。
-  const ammoX = -2.2;
-  const ammoZ = -5.8;
+  const ammoX = -1.0;
+  const ammoZ = -5.0;
   ctx.node({ name: AMMO_ELEVATOR_NODE, parent: "root", pivot: [ammoX, deckY - 0.1, ammoZ], motion: "translate", axis: "y", note: "弹药升降机平台" });
   add({
     id: `${P}ammo_platform`,
@@ -225,7 +229,7 @@ export function addHangar(ctx: CarrierCtx): void {
       build_layer: 2,
       geometry: M(B(2.4, 0.08, 0.7, [0, 0, 0], 0.006), B(2.3, 0.7, 0.06, [0, 0.35, -0.32], 0.006), B(2.3, 0.06, 0.7, [0, 0.7, 0], 0.006)),
       material: "cv_steel_dark",
-      mate: A([0, CV.LOWER_DECK_Y + 0.4, rz]),
+      mate: A([1.2, CV.LOWER_DECK_Y + 0.4, rz]),
     });
     add({
       id: `${P}magazine_round_ext_${r + 1}`,
@@ -235,7 +239,7 @@ export function addHangar(ctx: CarrierCtx): void {
       build_layer: 2,
       geometry: M(C(0.06, 0.5, [0, 0, 0], 12), C(0.02, 0.16, [0, 0.32, 0], 10)),
       material: "cv_steel",
-      mate: A([0, CV.LOWER_DECK_Y + 0.55, rz], [90, 0, 0]),
+      mate: A([1.2, CV.LOWER_DECK_Y + 0.55, rz], [90, 0, 0]),
       instances: 12,
       indexed: true,
       instance_layout: `carrier.hangar.magazineExt${r + 1}`,

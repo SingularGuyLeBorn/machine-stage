@@ -216,7 +216,7 @@ export function addPower(ctx: CarrierCtx): void {
       build_layer: 1,
       geometry: M(T(0.56, 0.46, 1.9, [0, 0, 0], 28), C(0.62, 0.3, [0, 0.85, 0], 28)),
       material: "cv_steel_dark",
-      mate: A([side * 2.15, 1.55, REACTOR_Z + 0.6]),
+      mate: A([side * 1.8, 1.55, REACTOR_Z + 0.6]),
     });
     add({
       id: `${P}sg_tube_bundle_${tag}`,
@@ -226,7 +226,7 @@ export function addPower(ctx: CarrierCtx): void {
       build_layer: 1,
       geometry: M(C(0.03, 1.2, [0, 0, 0], 8)),
       material: "cv_copper",
-      mate: A([side * 2.15, 1.5, REACTOR_Z + 0.6]),
+      mate: A([side * 1.8, 1.5, REACTOR_Z + 0.6]),
       instances: 20,
       indexed: true,
       instance_layout: "carrier.power.sgTube",
@@ -239,7 +239,7 @@ export function addPower(ctx: CarrierCtx): void {
       build_layer: 1,
       geometry: M(C(0.3, 0.62, [0, 0, 0], 22), C(0.16, 0.2, [0, 0.4, 0], 16)),
       material: "cv_steel",
-      mate: A([side * 1.9, 1.05, REACTOR_Z - 2.0]),
+      mate: A([side * 1.6, 1.05, REACTOR_Z - 2.0]),
     });
     add({
       id: `${P}primary_loop_${tag}`,
@@ -335,7 +335,7 @@ export function addPower(ctx: CarrierCtx): void {
       build_layer: 1,
       geometry: M(B(1.2, 1.0, 1.2, [0, 0, 0], 0.02), T(0.42, 0.32, 0.18, [0, 0, 0], 28), C(0.16, 0.4, [0, 0, 0], 16)),
       material: "cv_steel_dark",
-      mate: A([side * 1.5, 1.45, -17.0]),
+      mate: A([side * 1.2, 1.45, -17.0]),
     });
     add({
       id: `${P}condenser_${tag}`,
@@ -432,10 +432,10 @@ export function addPower(ctx: CarrierCtx): void {
     assembly: ASSEMBLY,
     build_layer: 1,
     geometry: M(
-      B(5.4, 2.0, 0.1, [0, 0, -2.4], 0.006),
-      B(5.4, 2.0, 0.1, [0, 0, 2.4], 0.006),
-      B(0.1, 2.0, 4.9, [-2.7, 0, 0], 0.006),
-      B(0.1, 2.0, 4.9, [2.7, 0, 0], 0.006),
+      B(4.4, 2.0, 0.1, [0, 0, -2.4], 0.006),
+      B(4.4, 2.0, 0.1, [0, 0, 2.4], 0.006),
+      B(0.1, 2.0, 4.9, [-2.2, 0, 0], 0.006),
+      B(0.1, 2.0, 4.9, [2.2, 0, 0], 0.006),
     ),
     material: "cv_hull_dark",
     mate: A([0, 1.6, -16.0]),
@@ -449,7 +449,7 @@ export function addPower(ctx: CarrierCtx): void {
       build_layer: 1,
       geometry: M(B(0.45, 0.9, 0.3, [0, 0, 0], 0.006), B(0.3, 0.2, 0.02, [0, 0.2, 0.16], 0.003)),
       material: "cv_steel_dark",
-      mate: A([-3.45 + (i % 4) * 0.3, 1.7, -14.0 - Math.floor(i / 4) * 0.45]),
+      mate: A([-0.5 + (i % 4) * 0.3, 1.7, -14.0 - Math.floor(i / 4) * 0.45]),
     });
   }
 }
