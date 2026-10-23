@@ -75,7 +75,7 @@ import {
 // planned 卡片是路线图占位（M-B…M-F），没有注册表时不可选中。
 // ============================================================================
 
-export type ViewKey = "explode" | "xray" | "labels" | "grid" | "shadow" | "rain" | "thermal";
+export type ViewKey = "explode" | "xray" | "labels" | "grid" | "shadow" | "rain" | "thermal" | "sea";
 
 export type StageAction =
   | { id: string; group: string; label: string; kind: "machine-state"; state: string }
@@ -928,6 +928,7 @@ export const CATALOG: StageModel[] = [
       { id: "cv-cam-cockpit", group: "内部视角", label: "舰载机座舱", kind: "camera", mode: "cockpit" },
       { id: "cv-cam-flight", group: "内部视角", label: "跟拍舰载机", kind: "camera", mode: "flight" },
       { id: "cv-aircraft-closeup", group: "航空", label: "舰载机特写", kind: "focus-node", node: "CV_Aircraft", offset: [0, 4, 0], radius: 14 },
+      { id: "cv-catapult-closeup", group: "航空", label: "电磁弹射器", kind: "focus-node", node: "CV_Shuttle", offset: [0, 5, -3], radius: 22 },
       { id: "cv-explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
       { id: "cv-xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
       { id: "cv-labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
@@ -941,6 +942,8 @@ export const CATALOG: StageModel[] = [
       "动力：压水堆 8 组燃料组件（16 根棒/组件）/控制棒驱动/蒸汽发生器/一回路主泵 → 高低压蒸汽轮机 → 减速齿轮 → 双轴双桨；红区剖面可看堆芯。",
       "舰岛：三层舰桥 + 四面固定相控阵（8×8 T/R 单元/面）+ 旋转搜索雷达 + 1130 近防炮（11 管/11 枪机）。",
       "甲板：3 条电磁弹射器（定子/线圈/水冷/飞轮储能）、4 道拦阻索（左右半索+滑轮+液压拦阻机）、2 部舷侧升降机、系留点/边灯/标线。",
+      "电磁弹射可视化：甲板三车道带白边线/铜中心轨/起止线/待发滑梭/挡焰板；甲板下有直线电机隧道、反应轨、水冷主管、变流柜、飞轮储能、脉冲电容和母线铜排。点「电磁弹射器」聚焦，再开「透视」即可看甲板下机构。",
+      "斜角着舰区与弹射器共享同一片飞行甲板：着舰跑道斜穿甲板中后部，腰部 3 号弹射器与着舰区在平面上交叉，这是真实航母的布置；起降按作业阶段错开，并非模型错误。舰艏直通起飞区已前移到着舰区前方，俯视不再出现两条浅灰跑道叠在一起。",
     ],
   },
   {

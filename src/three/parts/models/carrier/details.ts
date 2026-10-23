@@ -1,4 +1,5 @@
-import { CV, hullHalfBeamAt } from "./constants";
+import { CV } from "./constants";
+import { hullSurfaceHalfAt } from "./kits";
 import { A, B, C, M, pad, T, type CarrierCtx } from "./common";
 
 // ============================================================================
@@ -15,7 +16,6 @@ const HANGAR = "hangar";
 const DECK = "flightdeck";
 const ISLAND = "island";
 const AIRCRAFT = "aircraft";
-const SURFACE = "surface";
 
 export function addCarrierDetails(ctx: CarrierCtx): void {
   const add = (part: Parameters<CarrierCtx["add"]>[0]) => ctx.add(part);
@@ -33,9 +33,12 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
   // ---------------- L1 舰体：肋骨肘板 / 舷侧纵骨 / 甲板梁 / 舱壁扶强材 ----------------
   for (let i = 0; i < 32; i++) {
     const z = CV.HULL_Z_STERN + 0.9 + (i * (CV.HULL_LEN - 1.8)) / 31;
-    const half = Math.max(0.55, hullHalfBeamAt(z) - 0.1);
     for (const side of [-1, 1] as const) {
       for (const level of [0.7, 1.35, 2.05]) {
+        // 左舷弹药升降机（x≈-2.2, z≈-5.8）的垂直行程内不放肘板，避免扫掠时切到平台。
+        if (side === -1 && z > -7.0 && z < -4.35 && (Math.abs(level - 1.35) < 1e-6 || Math.abs(level - 2.05) < 1e-6)) continue;
+        // 肘板随型线所在高度的真实外板内收；旧版按船底最大半宽放，低处会整块伸出舷外。
+        const half = Math.max(0.55, hullSurfaceHalfAt(z, level) - 0.02);
         add({
           id: `carrier.hull.detail_gusset_${pad(i + 1)}_${side === -1 ? "l" : "r"}_${Math.round(level * 100)}`,
           name_cn: `肋骨肘板 ${i + 1}-${level}`,
@@ -44,7 +47,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
           build_layer: 1,
           geometry: M(B(0.36, 0.1, 0.22, [0, 0, 0], 0.005), B(0.1, 0.32, 0.22, [side * 0.15, -0.1, 0], 0.004)),
           material: "cv_steel_dark",
-          mate: A([side * (half - 0.18), level, z]),
+          mate: A([side * (half - 0.2), level, z]),
         });
         add({
           id: `carrier.hull.detail_gusset_x_${pad(i + 1)}_${side === -1 ? "l" : "r"}_${Math.round(level * 100)}`,
@@ -54,34 +57,20 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
           build_layer: 1,
           geometry: M(B(0.1, 0.28, 0.18, [0, 0, 0], 0.004)),
           material: "cv_steel",
-          mate: A([side * (half - 0.12), level + 0.12, z + 0.1]),
+          mate: A([side * (half - 0.16), level + 0.12, z + 0.1]),
         });
       }
-    }
-  }
-  // 舷侧分段合拢焊缝（垂直对接缝，实体焊道——不是贴图）。
-  for (let i = 0; i < 24; i++) {
-    const z = -16.8 + i * 1.45;
-    const half = Math.max(0.6, hullHalfBeamAt(z) + 0.004);
-    for (const side of [-1, 1] as const) {
-      add({
-        id: `carrier.hull.detail_weld_${pad(i + 1)}_${side === -1 ? "l" : "r"}`,
-        name_cn: `舷侧合拢焊缝 ${i + 1}-${side === -1 ? "左" : "右"}`,
-        name_en: `shell butt weld ${i + 1}-${side === -1 ? "l" : "r"}`,
-        assembly: HULL,
-        build_layer: 1,
-        geometry: M({ type: "weld", from: [side * half, 0.55, z], to: [side * half, 2.98, z], radius: 0.009, seed: i + 11 }),
-        material: "cv_steel_dark",
-        mate: A([0, 0, 0]),
-      });
     }
   }
   for (const side of [-1, 1] as const) {
     for (let zi = 0; zi < 16; zi++) {
       const z = -16.8 + zi * 2.2;
-      // 纵骨直段跨 2.2m，取分段内最小半宽，避免艏艉收窄处穿出外板。
-      const half = Math.max(0.55, Math.min(hullHalfBeamAt(z - 1.1), hullHalfBeamAt(z + 1.1)) - 0.06);
       for (let level = 0; level < 7; level++) {
+        const y = 0.68 + level * 0.46;
+        // 同样的弹药升降机净空：跳过与平台行程重叠的那段纵骨。
+        if (side === -1 && z > -7.0 && z < -4.4 && level === 2) continue;
+        // 纵骨直段跨 2.2m，取分段两端真实外板的较小半宽，整段埋在壳板内侧。
+        const half = Math.max(0.55, Math.min(hullSurfaceHalfAt(z - 1.1, y), hullSurfaceHalfAt(z + 1.1, y)) - 0.06);
         add({
           id: `carrier.hull.detail_stringer_${side === -1 ? "l" : "r"}_${pad(zi + 1)}_${level + 1}`,
           name_cn: `舷侧纵骨 ${zi + 1}-${level + 1}`,
@@ -90,16 +79,17 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
           build_layer: 1,
           geometry: M(B(0.1, 0.075, 2.2, [0, 0, 0], 0.004)),
           material: "cv_steel_dark",
-          mate: A([side * (half - 0.18), 0.68 + level * 0.46, z]),
+          mate: A([side * (half - 0.18), y, z]),
         });
       }
     }
   }
   for (let level = 0; level < 4; level++) {
-    const y = [CV.LOWER_DECK_Y - 0.12, CV.HANGAR_Y - 0.12, 3.55, CV.DECK_Y - 0.05][level]!;
+    // 第三层纵梁抬到机库停放机垂尾之上（原 3.55 会切到 J-15 垂尾）。
+    const y = [CV.LOWER_DECK_Y - 0.12, CV.HANGAR_Y - 0.12, 3.75, CV.DECK_Y - 0.05][level]!;
     for (let zi = 0; zi < 12; zi++) {
       const z = -15 + zi * 2.55;
-      const half = Math.max(0.7, hullHalfBeamAt(z) - 0.3);
+      const half = Math.max(0.7, hullSurfaceHalfAt(z, y) - 0.3);
       add({
         id: `carrier.hull.detail_deck_beam_${level + 1}_${pad(zi + 1)}`,
         name_cn: `甲板纵梁 ${level + 1}-${zi + 1}`,
@@ -114,8 +104,10 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
   }
   for (let bi = 0; bi < BULKHEADS.length; bi++) {
     const z = BULKHEADS[bi]!;
-    const half = Math.max(0.8, hullHalfBeamAt(z) - 0.3);
     const throughHangar = z > -17 && z < 11;
+    const yStiff = CV.HULL_BOTTOM + (throughHangar ? 0.3 : 1.5);
+    const stiffTop = yStiff + (throughHangar ? 0.6 : 2.6);
+    const half = Math.max(0.8, hullSurfaceHalfAt(z, stiffTop) - 0.2);
     for (let s = 0; s < 4; s++) {
       add({
         id: `carrier.hull.detail_bulkhead_stiff_${pad(bi + 1)}_${s + 1}`,
@@ -125,7 +117,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
         build_layer: 1,
         geometry: M(B(0.08, throughHangar ? 0.6 : 2.6, 0.1, [0, 0, 0], 0.004)),
         material: "cv_steel_dark",
-        mate: A([(s - 1.5) * half * 0.38, CV.HULL_BOTTOM + (throughHangar ? 0.3 : 1.5), z - 0.08]),
+        mate: A([(s - 1.5) * half * 0.38, yStiff, z - 0.08]),
       });
     }
     for (let p = 0; p < 2; p++) {
@@ -180,7 +172,14 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
       ["console", "舱室显控台", M(B(0.8, 0.3, 0.25, [0, 0, 0], 0.006), B(0.6, 0.18, 0.02, [0, 0.18, 0.1], 0.003)), x - 0.3, y + 0.55, z + 0.65],
       ["fan", "通风机", M(C(0.18, 0.2, [0, 0, 0], 14), B(0.3, 0.05, 0.3, [0, -0.12, 0], 0.004)), x + 0.8, y + 1.4, z + 0.8],
     ];
+    const pieceHalfX: Record<string, number> = { bunk: 0.76, locker: 0.26, table: 0.46, chair: 0.18, console: 0.4, fan: 0.16 };
+    const pieceBottom: Record<string, number> = { bunk: 0.18, locker: 0.6, table: 0.31, chair: 0.04, console: 0.15, fan: 0.23 };
     for (const [piece, name, geometry, px, py, pz] of pieces) {
+      // 舱室家具也不能顶出船壳：按家具上下沿中最窄处的真实半宽把 x 往中线收。
+      const yLow = py - (pieceBottom[piece] ?? 0.3);
+      const minHalf = Math.min(hullSurfaceHalfAt(pz, py), hullSurfaceHalfAt(pz, Math.max(0.2, yLow)));
+      const limit = Math.max(0.2, minHalf - (pieceHalfX[piece] ?? 0.3) - 0.08);
+      const safeX = Math.sign(px || 1) * Math.min(Math.abs(px), limit);
       add({
         id: `carrier.hull.detail_${key}_${piece}`,
         name_cn: `${key} ${name}`,
@@ -189,27 +188,11 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
         build_layer: 2,
         geometry,
         material: "cv_steel_dark",
-        mate: A([px, py, pz]),
+        mate: A([safeX, py, pz]),
       });
     }
   }
-  // 舷侧外板接缝带。
-  for (const side of [-1, 1] as const) {
-    for (let s = 0; s < 12; s++) {
-      const z = -16 + s * 2.9;
-      const half = hullHalfBeamAt(z);
-      add({
-        id: `carrier.hull.detail_plate_seam_${side === -1 ? "l" : "r"}_${pad(s + 1)}`,
-        name_cn: `舷侧板缝 ${s + 1}`,
-        name_en: `shell seam ${s + 1}`,
-        assembly: HULL,
-        build_layer: 1,
-        geometry: M(B(0.035, 2.5, 0.08, [0, 0, 0], 0.003)),
-        material: "cv_hull_dark",
-        mate: A([side * (half + 0.01), 1.85, z]),
-      });
-    }
-  }
+  // 分段/合拢焊缝统一由 hull.ts 的贴合曲面焊道生成，这里不再叠固定 z 的竖板。
   // 外板列板（水平板缝）：沿船壳曲线放样，外缘露出舷外，内缘搭在舷侧纵骨上。
   const strakeLevels = [1.14, 1.6, 2.06, 2.52, 2.98];
   for (const side of [-1, 1] as const) {
@@ -245,7 +228,8 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
   for (const side of [-1, 1] as const) {
     for (let ci = 0; ci < chestZ.length; ci++) {
       const z = chestZ[ci]!;
-      const half = hullHalfBeamAt(z);
+      // 水线附近船壳是椭圆舭部，半宽远小于船底最大半宽——按真实表面贴装。
+      const surface = hullSurfaceHalfAt(z, 1.3);
       add({
         id: `carrier.hull.detail_sea_chest_${side === -1 ? "l" : "r"}_${ci + 1}`,
         name_cn: `海水门 ${z}`,
@@ -254,7 +238,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
         build_layer: 1,
         geometry: M(B(0.3, 0.24, 0.4, [0, 0, 0], 0.006)),
         material: "cv_steel_dark",
-        mate: A([side * (half - 0.04), 1.3, z]),
+        mate: A([side * (surface + 0.11), 1.3, z]),
       });
       for (let g = 0; g < 4; g++) {
         add({
@@ -265,7 +249,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
           build_layer: 1,
           geometry: M(B(0.02, 0.18, 0.045, [0, 0, 0], 0.002)),
           material: "cv_steel",
-          mate: A([side * (half + 0.12), 1.3, z - 0.15 + g * 0.1]),
+          mate: A([side * (surface + 0.27), 1.3, z - 0.15 + g * 0.1]),
         });
       }
     }
@@ -279,7 +263,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
         build_layer: 1,
         geometry: M(C(0.05, 0.26, [0, 0, 0], 14)),
         material: "cv_steel",
-        mate: A([side * (hullHalfBeamAt(z) - 0.11), 0.62, z], [0, 0, 90]),
+        mate: A([side * (hullSurfaceHalfAt(z, 0.62) - 0.11), 0.62, z], [0, 0, 90]),
       });
     }
   }
@@ -474,7 +458,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
     const data = [
       { x: -1.7, z0: CV.CAT_Z0, z1: CV.CAT_Z1 },
       { x: 1.7, z0: CV.CAT_Z0, z1: CV.CAT_Z1 },
-      { x: -3.15, z0: -1.0, z1: 11.0 },
+      { x: -3.15, z0: -1.0, z1: 9.0 },
     ][track]!;
     const seg = (data.z1 - data.z0) / CV.CAT_SEGMENTS;
     for (let s = 0; s < CV.CAT_SEGMENTS; s++) {
@@ -487,7 +471,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
         build_layer: 3,
         geometry: M(C(0.05, seg * 0.72, [0, 0, 0], 10)),
         material: "cv_steel_dark",
-        mate: A([data.x + 0.42, DECK_TOP + 0.02, z], [90, 0, 0]),
+        mate: A([data.x + 0.42, DECK_TOP + 0.05, z], [90, 0, 0]),
       });
       add({
         id: `carrier.deck.detail_cat_${track + 1}_mount_${pad(s + 1)}`,
@@ -498,18 +482,6 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
         geometry: M(B(0.56, 0.07, 0.18, [0, 0, 0], 0.004)),
         material: "cv_steel",
         mate: A([data.x, DECK_TOP - 0.03, z]),
-      });
-    }
-    for (let h = 0; h < 8; h++) {
-      add({
-        id: `carrier.deck.detail_cat_${track + 1}_hatch_${h + 1}`,
-        name_cn: `弹射器 ${track + 1} 检修盖 ${h + 1}`,
-        name_en: `catapult ${track + 1} access hatch ${h + 1}`,
-        assembly: DECK,
-        build_layer: 3,
-        geometry: M(B(0.45, 0.03, 0.5, [0, 0, 0], 0.004)),
-        material: "cv_deck_plate",
-        mate: A([data.x + 0.55, DECK_TOP + 0.035, data.z0 + 1.2 + h * 1.45]),
       });
     }
   }
@@ -538,18 +510,6 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
       mate: A([(b % 2 === 0 ? -1 : 1) * (CV.WIRE_HALF + 0.35), DECK_TOP + 0.1, CV.WIRE_Z[Math.floor(b / 4)]!]),
     });
   }
-  for (let e = 0; e < 16; e++) {
-    add({
-      id: `carrier.deck.detail_elevator_roller_${pad(e + 1)}`,
-      name_cn: `升降机导向轮组 ${e + 1}`,
-      name_en: `elevator roller ${e + 1}`,
-      assembly: DECK,
-      build_layer: 3,
-      geometry: M(C(0.09, 0.06, [0, 0, 0], 12)),
-      material: "cv_steel",
-      mate: A([CV.ELEVATOR_X + (e % 2 === 0 ? -1 : 1) * 1.08, DECK_TOP - 0.1, CV.ELEVATOR_Z[Math.floor(e / 8)]! - 1.2 + (e % 8) * 0.34], [0, 0, 90]),
-    });
-  }
   for (let p = 0; p < 30; p++) {
     add({
       id: `carrier.deck.detail_padeye_${pad(p + 1)}`,
@@ -560,18 +520,6 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
       geometry: M(T(0.07, 0.04, 0.02, [0, 0, 0], 12)),
       material: "cv_steel",
       mate: A([-3.8 + (p % 10) * 0.84, DECK_TOP + 0.02, -14.5 + Math.floor(p / 10) * 4.5]),
-    });
-  }
-  for (let l = 0; l < 20; l++) {
-    add({
-      id: `carrier.deck.detail_light_${pad(l + 1)}`,
-      name_cn: `甲板边灯座 ${l + 1}`,
-      name_en: `deck light base ${l + 1}`,
-      assembly: DECK,
-      build_layer: 4,
-      geometry: M(C(0.06, 0.04, [0, 0, 0], 10)),
-      material: "cv_steel_dark",
-      mate: A([(l % 2 === 0 ? -1 : 1) * 4.55, DECK_TOP + 0.02, -16 + Math.floor(l / 2) * 2.2]),
     });
   }
   for (let m = 0; m < 20; m++) {
@@ -586,19 +534,6 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
       mate: A([-3.6 + (m % 6) * 1.44, DECK_TOP + 0.008, 1.0 + Math.floor(m / 6) * 2.3]),
     });
   }
-  for (let c = 0; c < 20; c++) {
-    add({
-      id: `carrier.deck.detail_capacitor_cell_${pad(c + 1)}`,
-      name_cn: `弹射储能电容单体 ${c + 1}`,
-      name_en: `catapult capacitor cell ${c + 1}`,
-      assembly: DECK,
-      build_layer: 3,
-      geometry: M(C(0.08, 0.3, [0, 0, 0], 12)),
-      material: "cv_steel",
-      mate: A([3.0 + (c % 2) * 0.3, CV.HANGAR_Y + 0.29, -3.0 + Math.floor(c / 2) * 0.45]),
-    });
-  }
-
   // ---------------- L4 舰岛：雷达柜 / 近防附件 / 桅杆 ----------------
   // 一层 CIC 与二层航海舰桥均由 cic.ts / bridge.ts 建真实舱室，不再放占位方盒。
   for (let t = 0; t < 2; t++) {
@@ -742,47 +677,9 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
     });
   }
 
-  // ---------------- L5 表面：栏杆座/车辆附件/甲板箱 ----------------
-  for (let b = 0; b < 20; b++) {
-    add({
-      id: `carrier.surface.detail_rail_base_${pad(b + 1)}`,
-      name_cn: `栏杆底座 ${b + 1}`,
-      name_en: `rail base ${b + 1}`,
-      assembly: SURFACE,
-      build_layer: 4,
-      geometry: M(B(0.16, 0.06, 0.16, [0, 0, 0], 0.004)),
-      material: "cv_steel",
-      mate: A([(b % 2 === 0 ? -1 : 1) * 4.66, DECK_TOP + 0.03, -17 + Math.floor(b / 2) * 2.1]),
-    });
-  }
-  // 甲板车辆附件：原车辆为程序化积木件，已移除；附件不再单独悬空放置。
-  // 救生筏架：筏罐坐在低鞍座上，鞍座落在甲板并托住罐体，不再是竖立钢板。
-  add({
-    id: "carrier.surface.detail_raft_rack_beam",
-    name_cn: "救生筏纵向托梁",
-    name_en: "life raft rack beam",
-    assembly: SURFACE,
-    build_layer: 4,
-    geometry: M(B(0.1, 0.06, 4.3, [0, 0, 0], 0.004)),
-    material: "cv_steel",
-    mate: A([3.9, DECK_TOP + 0.03, 6.15]),
-  });
-  for (let r = 0; r < 6; r++) {
-    const rx = 3.9 + (r % 2) * 0.55 - 0.25;
-    const rz = 8.0 - r * 0.75;
-    for (const dz of [-0.28, 0.28] as const) {
-      add({
-        id: `carrier.surface.detail_raft_cradle_${pad(r + 1)}_${dz < 0 ? "a" : "f"}`,
-        name_cn: `救生筏鞍座 ${r + 1}-${dz < 0 ? "后" : "前"}`,
-        name_en: `life raft cradle ${r + 1}-${dz < 0 ? "aft" : "fore"}`,
-        assembly: SURFACE,
-        build_layer: 4,
-        geometry: M(B(0.5, 0.12, 0.1, [0, 0, 0], 0.004), B(0.34, 0.05, 0.08, [0, 0.08, 0], 0.003)),
-        material: "cv_steel_dark",
-        mate: A([rx, DECK_TOP + 0.06, rz + dz]),
-      });
-    }
-  }
+  // ---------------- L5 表面：甲板附件 ----------------
+  // 栏杆底座由 surface.ts 的整段栏杆立柱承担；旧固定 x=±4.66 的散座在艏艉会悬出甲板，整组移除。
+  // 救生筏架原在右舷、筏罐却在左舷，属悬空占位件；整组移除，保留左舷真实筏罐。
   // 甲板工具箱组会与后移的 3 号弹射器挡焰板干涉，按“宁缺毋滥”整组移除。
 }
 

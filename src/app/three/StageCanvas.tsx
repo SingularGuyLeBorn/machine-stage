@@ -598,6 +598,21 @@ function StageRuntime() {
     return () => applyXray(assembled, false);
   }, [assembled, views.xray, modelId, selectedPart]);
 
+  // ---- 海面开关：海面/白浪/艏浪/尾流统一显隐；关掉后可绕到舰体下方检查 ----
+  useEffect(() => {
+    if (!assembled) return;
+    for (const handle of assembled.parts) {
+      if (!handle.partId.startsWith("carrier.sea.")) continue;
+      handle.object.visible = views.sea;
+      setPickable(handle.object, views.sea);
+      for (const variant of Object.values(handle.damageObjects)) {
+        if (!variant) continue;
+        variant.visible = views.sea;
+        setPickable(variant, views.sea);
+      }
+    }
+  }, [assembled, views.sea, rebuildToken]);
+
   const damage = useStageStore((state) => state.damage);
   useEffect(() => {
     if (!assembled) return;
@@ -831,19 +846,21 @@ function CarrierCameraFloor() {
   const modelId = useStageStore((state) => state.modelId);
   const cameraMode = useStageStore((state) => state.cameraMode);
   const camera = useThree((state) => state.camera);
+  const seaOn = useStageStore((state) => state.views.sea);
   const controls = useThree((state) => state.controls) as
     | { target: THREE.Vector3; update: () => void }
     | null;
   useFrame(() => {
     if (modelId !== "carrier" || cameraMode !== "orbit" || !controls) return;
     let changed = false;
-    // 海面世界高度约 14m；留 10m 余量，避免相机进到水面/船底以下。
-    if (camera.position.y < 24) {
-      camera.position.y = 24;
+    // 海面可见时把相机压在水面以上；关掉海面后允许降到舰底以下做完整 360° 检查。
+    const floorY = seaOn ? 24 : 2;
+    if (camera.position.y < floorY) {
+      camera.position.y = floorY;
       changed = true;
     }
-    if (controls.target.y < 24) {
-      controls.target.y = 24;
+    if (controls.target.y < floorY) {
+      controls.target.y = floorY;
       changed = true;
     }
     if (controls.target.y > 120) {
@@ -1118,6 +1135,7 @@ function CameraRig() {
   });
 
   const target = useMemo(() => new THREE.Vector3(0, 0.8, 0), []);
+  const seaOn = useStageStore((state) => state.views.sea);
   return (
     <OrbitControls
       makeDefault
@@ -1126,8 +1144,8 @@ function CameraRig() {
       dampingFactor={0.12}
       minDistance={0.1}
       maxDistance={2000}
-      minPolarAngle={modelId === "carrier" ? 0.2 : 0.04}
-      maxPolarAngle={modelId === "carrier" ? 1.38 : Math.PI / 2 - 0.015}
+      minPolarAngle={modelId === "carrier" ? 0.02 : 0.04}
+      maxPolarAngle={modelId === "carrier" ? (seaOn ? 1.55 : Math.PI - 0.06) : Math.PI / 2 - 0.015}
     />
   );
 }

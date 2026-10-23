@@ -1,4 +1,4 @@
-import { Boxes, CloudRain, Crosshair, DoorOpen, Eye, Grid3x3, Layers, MousePointerClick, Tag } from "lucide-react";
+import { Boxes, CloudRain, Crosshair, DoorOpen, Eye, Grid3x3, Layers, MousePointerClick, Tag, Waves } from "lucide-react";
 import { useEffect, useReducer } from "react";
 import { instanceKey, type AssembledModel } from "@/three/parts";
 import { effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
@@ -270,6 +270,18 @@ export function Viewport() {
             <CloudRain size={13} aria-hidden />
             雨天
           </button>
+          {model.id === "carrier" ? (
+            <button
+              type="button"
+              className="btn btn--sm"
+              aria-pressed={views.sea}
+              title="海面/艏浪/尾流开关；关闭后可把视角降到舰体下方做 360° 检查"
+              onClick={() => toggleView("sea")}
+            >
+              <Waves size={13} aria-hidden />
+              海面
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn--sm"

@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { CV, hullHalfBeamAt } from "./constants";
-import { hullSurfaceHalfAt } from "./kits";
+import { CV } from "./constants";
+import { deckEdgeAt, hullSurfaceHalfAt } from "./kits";
 import { A, B, C, M, T, pad, type CarrierCtx } from "./common";
 
 // ============================================================================
@@ -67,7 +67,7 @@ export function addSurface(ctx: CarrierCtx): void {
       build_layer: 5,
       geometry: M(B(0.12, 0.55, 0.08, [0, 0, 0], 0.01), B(0.46, 0.1, 0.08, [0, -0.3, 0], 0.01), B(0.28, 0.1, 0.08, [0, 0.28, 0], 0.01)),
       material: "cv_steel_dark",
-      mate: A([side * (hullHalfBeamAt(17.9) + 0.07), 1.25, 17.9], [0, 0, side * 10]),
+      mate: A([side * (hullSurfaceHalfAt(17.9, 1.25) + 0.07), 1.25, 17.9], [0, 0, side * 10]),
     });
     add({
       id: `${P}anchor_chain_${tag}`,
@@ -77,26 +77,28 @@ export function addSurface(ctx: CarrierCtx): void {
       build_layer: 5,
       geometry: M(C(0.035, 1.0, [0, 0, 0], 8), C(0.05, 0.1, [0, 0.45, 0], 10)),
       material: "cv_steel",
-      mate: A([side * (hullHalfBeamAt(17.3) + 0.05), 1.9, 17.3], [20, 0, 0]),
+      mate: A([side * (hullSurfaceHalfAt(17.3, 1.9) + 0.05), 1.9, 17.3], [20, 0, 0]),
     });
   }
 
-  // 左舷外走道：沿船壳曲线分段，格栅板 + 双托架 + 立柱 + 扶手（补齐甲板下空档）。
-  for (let cw = 0; cw < 18; cw++) {
-    const z0 = CV.DECK_Z_STERN + 1.0 + cw * 2.0;
-    const zc = z0 + 1.0;
-    const half = hullHalfBeamAt(zc);
-    const px = -(half + 0.32);
-    const deckY = CV.DECK_Y - 0.34;
+  // 左舷外走道：沿真实船壳曲线分段，格栅板 + 双托架 + 立柱 + 扶手。
+  // 位置全部由 hullSurfaceHalfAt 推得——旧版用船底最大半宽，托架整段插进舷侧。
+  const catwalkY = CV.DECK_Y - 0.78;
+  const catwalkPosts: Array<[number, number, number]> = [];
+  for (let cw = 0; cw < 11; cw++) {
+    const zc = -13 + cw * 2;
+    const hullTop = hullSurfaceHalfAt(zc, catwalkY + 0.02);
+    const hullBracket = hullSurfaceHalfAt(zc, catwalkY - 0.04);
+    const px = -(hullTop + 0.3);
     add({
       id: `${P}catwalk_${pad(cw + 1)}`,
       name_cn: `左舷外走道格栅 ${cw + 1}`,
       name_en: `port catwalk grating ${cw + 1}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(0.56, 0.04, 1.94, [0, 0, 0], 0.003)),
+      geometry: M(B(0.56, 0.04, 1.98, [0, 0, 0], 0.003)),
       material: "cv_grate",
-      mate: A([px, deckY, zc]),
+      mate: A([px, catwalkY, zc]),
     });
     for (const dz of [-0.65, 0.65] as const) {
       add({
@@ -105,9 +107,9 @@ export function addSurface(ctx: CarrierCtx): void {
         name_en: `port catwalk bracket ${cw + 1}-${dz < 0 ? "f" : "a"}`,
         assembly: ASSEMBLY,
         build_layer: 4,
-        geometry: M(B(0.9, 0.08, 0.12, [0, 0, 0], 0.004), B(0.12, 0.34, 0.1, [0.38, -0.18, 0], 0.003)),
+        geometry: M(B(0.46, 0.08, 0.12, [0, 0, 0], 0.004), B(0.1, 0.28, 0.1, [0.2, -0.15, 0], 0.003)),
         material: "cv_steel_dark",
-        mate: A([-(half + 0.14), deckY - 0.06, zc + dz]),
+        mate: A([-(hullBracket + 0.2), catwalkY - 0.06, zc + dz]),
       });
     }
     add({
@@ -116,10 +118,25 @@ export function addSurface(ctx: CarrierCtx): void {
       name_en: `port catwalk post ${cw + 1}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(C(0.022, 0.2, [0, 0, 0], 8)),
+      geometry: M(C(0.022, 0.24, [0, 0, 0], 8)),
       material: "cv_steel",
-      mate: A([px - 0.24, deckY + 0.12, zc]),
+      mate: A([px - 0.24, catwalkY + 0.12, zc]),
     });
+    catwalkPosts.push([px - 0.24, catwalkY + 0.24, zc]);
+  }
+  const catwalkRailParts: Parameters<typeof M>[0][] = [];
+  for (const level of [0, -0.1] as const) {
+    for (let i = 0; i < catwalkPosts.length - 1; i++) {
+      const [x0, y0, z0] = catwalkPosts[i]!;
+      const [x1, , z1] = catwalkPosts[i + 1]!;
+      catwalkRailParts.push({
+        type: "weld",
+        from: [x0, y0 + level, z0],
+        to: [x1, y0 + level, z1],
+        radius: level === 0 ? 0.014 : 0.011,
+        seed: 520 + i,
+      });
+    }
   }
   add({
     id: `${P}catwalk_rail`,
@@ -127,89 +144,48 @@ export function addSurface(ctx: CarrierCtx): void {
     name_en: "port catwalk handrail",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(C(0.02, 35.5, [0, 0, 0], 8)),
-    material: "cv_steel",
-    mate: A([-(hullHalfBeamAt(0) + 0.56), CV.DECK_Y - 0.12, 1.0], [90, 0, 0]),
-  });
-  add({
-    id: `${P}catwalk_rail_mid`,
-    name_cn: "左舷外走道中扶手",
-    name_en: "port catwalk mid rail",
-    assembly: ASSEMBLY,
-    build_layer: 4,
-    geometry: M(C(0.016, 35.5, [0, 0, 0], 8)),
-    material: "cv_steel",
-    mate: A([-(hullHalfBeamAt(0) + 0.56), CV.DECK_Y - 0.22, 1.0], [90, 0, 0]),
-  });
-
-  // 甲板边缘栏杆只在全宽中段布置；艏部窄甲板/弹射区与艉部收窄段不设长直栏杆。
-  const railPostSpots: Array<[number, number]> = [];
-  for (const side of [-1, 1] as const) {
-    const z0 = side === -1 ? -4 : -10;
-    const z1 = side === -1 ? 8 : 0;
-    for (let z = z0; z <= z1; z += 2) railPostSpots.push([side, z]);
-  }
-  add({
-    id: `${P}deck_rail_post`,
-    name_cn: "甲板栏杆立柱",
-    name_en: "deck rail posts",
-    assembly: ASSEMBLY,
-    build_layer: 4,
-    geometry: M(B(0.04, 0.2, 0.04, [0, 0, 0], 0.004), C(0.045, 0.04, [0, 0.11, 0], 10)),
+    geometry: M(...catwalkRailParts),
     material: "cv_steel",
     mate: A([0, 0, 0]),
-    instances: railPostSpots.length,
-    indexed: true,
-    instance_layout: "carrier.surface.railPost",
-  });
-  ctx.layout("carrier.surface.railPost", ({ index }) => {
-    const [side, z] = railPostSpots[index]!;
-    return new THREE.Matrix4().makeTranslation(side === -1 ? -4.5 : 4.35, deckTop + 0.1, z);
-  });
-  add({
-    id: `${P}deck_rail_l_1`,
-    name_cn: "左舷甲板栏杆",
-    name_en: "port deck rail",
-    assembly: ASSEMBLY,
-    build_layer: 4,
-    geometry: M(C(0.018, 12.0, [0, 0, 0], 8)),
-    material: "cv_steel",
-    mate: A([-4.5, deckTop + 0.2, 2.0], [90, 0, 0]),
-  });
-  add({
-    id: `${P}deck_rail_l_mid_1`,
-    name_cn: "左舷甲板中栏杆",
-    name_en: "port deck mid rail",
-    assembly: ASSEMBLY,
-    build_layer: 4,
-    geometry: M(C(0.014, 12.0, [0, 0, 0], 8)),
-    material: "cv_steel",
-    mate: A([-4.5, deckTop + 0.1, 2.0], [90, 0, 0]),
-  });
-  // 右舷栏杆只保留后升降机与前升降机之间的一段，不横跨升降机平台。
-  add({
-    id: `${P}deck_rail_r_1`,
-    name_cn: "右舷甲板栏杆",
-    name_en: "starboard deck rail",
-    assembly: ASSEMBLY,
-    build_layer: 4,
-    geometry: M(C(0.018, 10.2, [0, 0, 0], 8)),
-    material: "cv_steel",
-    mate: A([4.35, deckTop + 0.2, -4.9], [90, 0, 0]),
-  });
-  add({
-    id: `${P}deck_rail_r_mid_1`,
-    name_cn: "右舷甲板中栏杆",
-    name_en: "starboard deck mid rail",
-    assembly: ASSEMBLY,
-    build_layer: 4,
-    geometry: M(C(0.014, 10.2, [0, 0, 0], 8)),
-    material: "cv_steel",
-    mate: A([4.35, deckTop + 0.1, -4.9], [90, 0, 0]),
   });
 
+  // 甲板边缘栏杆只在全宽中段布置；立柱与扶手逐段取真实甲板缘，避免直线栏杆切出甲板。
+  const buildDeckRail = (side: -1 | 1, z0: number, z1: number) => {
+    const posts: Array<[number, number]> = [];
+    for (let z = z0; z <= z1 + 1e-6; z += 2) {
+      const edge = deckEdgeAt(z, side);
+      posts.push([edge.x - side * 0.08, z]);
+    }
+    const geos: Parameters<typeof M>[0][] = [];
+    for (const [x, z] of posts) {
+      geos.push(B(0.04, 0.2, 0.04, [x, deckTop + 0.1, z], 0.003));
+      geos.push(C(0.045, 0.04, [x, deckTop + 0.21, z], 10));
+    }
+    for (let i = 0; i < posts.length - 1; i++) {
+      const [x0, zz0] = posts[i]!;
+      const [x1, zz1] = posts[i + 1]!;
+      const yTop = deckTop + 0.21;
+      const yMid = deckTop + 0.1;
+      geos.push({ type: "weld", from: [x0, yTop, zz0], to: [x1, yTop, zz1], radius: 0.016, seed: 610 + i + side });
+      geos.push({ type: "weld", from: [x0, yMid, zz0], to: [x1, yMid, zz1], radius: 0.012, seed: 640 + i + side });
+    }
+    add({
+      id: `${P}deck_rail_${side === -1 ? "l" : "r"}`,
+      name_cn: `${side === -1 ? "左" : "右"}舷甲板栏杆`,
+      name_en: `${side === -1 ? "port" : "starboard"} deck rail`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(...geos),
+      material: "cv_steel",
+      mate: A([0, 0, 0]),
+    });
+  };
+  buildDeckRail(-1, 0.5, 8);
+  // 右舷栏杆只保留后升降机与前升降机之间的一段，不横跨升降机平台。
+  buildDeckRail(1, -10, 0);
+
   // 救生圈/救生筏/消防栓（避开升降机开口）。
-  const ringZPort = [-12, -8.8, -5.6, -2.4];
+  const ringZPort = [-12, -8.8, -5.6, -4.4];
   const ringZStarboard = [-10.2, -6.9, -3.6, -0.3];
   for (let l = 0; l < 8; l++) {
     const side = l % 2 === 0 ? -1 : 1;
@@ -222,7 +198,7 @@ export function addSurface(ctx: CarrierCtx): void {
       build_layer: 4,
       geometry: M({ type: "torus", radius: 0.06, tube: 0.014, radialSegments: 10, tubularSegments: 24 }),
       material: "cv_warning",
-      mate: A([side * 4.0, deckTop + 0.02, side === -1 ? ringZPort[index]! : ringZStarboard[index]!], [0, 90, 0]),
+      mate: A([side * (side === -1 ? 3.85 : 4.0), deckTop + 0.085, side === -1 ? ringZPort[index]! : ringZStarboard[index]!], [0, 90, 0]),
     });
   }
   add({
@@ -233,27 +209,63 @@ export function addSurface(ctx: CarrierCtx): void {
     build_layer: 4,
     geometry: M(C(0.3, 0.55, [0, 0, 0], 16), T(0.32, 0.26, 0.05, [0, 0.28, 0], 16)),
     material: "cv_canvas",
-    mate: A([-4.15, deckTop + 0.3, -6.0]),
+    mate: A([-4.35, deckTop + 0.335, -6.0]),
     instances: 6,
     indexed: true,
     instance_layout: "carrier.surface.raft",
   });
   ctx.layout("carrier.surface.raft", ({ index }) => new THREE.Matrix4().makeTranslation((index % 2) * 0.55 - 0.25, 0, -index * 0.75));
+  add({
+    id: `${P}life_raft_rack`,
+    name_cn: "左舷救生筏鞍座",
+    name_en: "port life raft rack",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.7, 0.06, 4.6, [0, 0, 0], 0.004)),
+    material: "cv_steel_dark",
+    mate: A([-4.35, deckTop + 0.03, -7.85]),
+  });
 
   // 左舷艉部救生艇 + 吊艇架（艇体放样、充气舷管、挂机、操控台、吊臂/绞车）。
-  const boatX = -3.55;
-  const boatY = 3.0;
+  // 救生艇必须收在外飘底封板（y≈4.03）以下，否则吊艇架/绞车会顶穿封板。
+  const boatY = 2.6;
   const boatZ = -15.5;
+  // 平台跨 z=-16.5..-14.5，艉部壳板前宽后窄；按平台覆盖范围内的最大半宽外移，
+  // 否则平台前角仍会插进壳板。
+  let boatHullHalf = 0;
+  for (let bz = boatZ - 1.05; bz <= boatZ + 1.05; bz += 0.35) {
+    boatHullHalf = Math.max(boatHullHalf, hullSurfaceHalfAt(bz, boatY));
+  }
+  const boatX = -(boatHullHalf + 0.6);
   add({
     id: `${P}boat_sponson`,
     name_cn: "救生艇平台",
     name_en: "boat sponson",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(B(0.82, 0.07, 2.0, [0, 0, 0], 0.006), B(0.5, 0.1, 0.12, [0.34, -0.08, -0.8], 0.004), B(0.5, 0.1, 0.12, [0.34, -0.08, 0.8], 0.004)),
+    // 只保留平台板；内侧原有两个伸向壳板的短臂已由 boat_sponson_bracket 托架取代，
+    // 否则移出后的平台短臂会继续插进艉部壳板。
+    geometry: M(B(0.82, 0.07, 2.0, [0, 0, 0], 0.006)),
     material: "cv_grate",
     mate: A([boatX, boatY, boatZ]),
   });
+  for (const dz of [-0.7, 0.7] as const) {
+    add({
+      id: `${P}boat_sponson_bracket_${dz < 0 ? "f" : "a"}`,
+      name_cn: `救生艇平台托架 ${dz < 0 ? "前" : "后"}`,
+      name_en: `boat platform bracket ${dz < 0 ? "f" : "a"}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M({
+        type: "weld",
+        from: [-(hullSurfaceHalfAt(boatZ + dz, 2.85) - 0.04), 2.85, boatZ + dz],
+        to: [boatX + 0.36, boatY, boatZ + dz],
+        radius: 0.05,
+      }),
+      material: "cv_steel_dark",
+      mate: A([0, 0, 0]),
+    });
+  }
   add({
     id: `${P}boat_hull`,
     name_cn: "救生艇艇体",

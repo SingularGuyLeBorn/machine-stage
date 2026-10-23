@@ -1,5 +1,5 @@
 import { CV, hullHalfBeamAt } from "./constants";
-import { hullSurfaceHalfAt } from "./kits";
+import { hullSurfaceAtStation, hullSurfaceHalfAt } from "./kits";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
 
 // ============================================================================
@@ -78,6 +78,40 @@ export function addHull(ctx: CarrierCtx): void {
     });
   }
 
+  // 艉封板：放样壳体的艉端封口是一块平板，补上真实的艉门/横向扶强材/门框，
+  // 避免从舰艉看过去是一整块空白板。
+  add({
+    id: "carrier.hull.stern_transom",
+    name_cn: "艉封板",
+    name_en: "stern transom",
+    assembly: HULL_ASSEMBLY,
+    build_layer: 1,
+    geometry: M(B(4.2, 2.3, 0.06, [0, 0, 0], 0.01)),
+    material: "cv_hull_dark",
+    mate: A([0, 3.1, -18.53]),
+  });
+  add({
+    id: "carrier.hull.stern_transom_detail",
+    name_cn: "艉门与横向扶强材",
+    name_en: "stern door and transom stiffeners",
+    assembly: HULL_ASSEMBLY,
+    build_layer: 1,
+    geometry: M(
+      B(1.5, 1.15, 0.06, [0, -0.35, -0.02], 0.008),
+      B(1.7, 0.08, 0.08, [0, 0.28, -0.04], 0.006),
+      B(1.7, 0.08, 0.08, [0, -0.98, -0.04], 0.006),
+      B(0.08, 1.3, 0.08, [-0.8, -0.35, -0.04], 0.006),
+      B(0.08, 1.3, 0.08, [0.8, -0.35, -0.04], 0.006),
+      B(3.9, 0.06, 0.06, [0, 0.62, -0.03], 0.005),
+      B(3.9, 0.06, 0.06, [0, 0.98, -0.03], 0.005),
+      B(3.6, 0.07, 0.06, [0, -1.08, -0.03], 0.005),
+      C(0.06, 0.16, [-0.5, -0.35, -0.07], 12),
+      C(0.06, 0.16, [0.5, -0.35, -0.07], 12),
+    ),
+    material: "cv_steel",
+    mate: A([0, 3.1, -18.57]),
+  });
+
   // 前倾舰艏已并入外板型线放样，这里只保留艏柱包板焊缝。
   add({
     id: "carrier.hull.bow_stem_strip",
@@ -85,7 +119,7 @@ export function addHull(ctx: CarrierCtx): void {
     name_en: "bow stem strip",
     assembly: HULL_ASSEMBLY,
     build_layer: 1,
-    geometry: M({ type: "weld", from: [0, 0.45, 18.55], to: [0, 4.42, 20.6], radius: 0.045 }),
+    geometry: M({ type: "weld", from: [0, 0.45, 18.55], to: [0, 3.98, 20.42], radius: 0.045 }),
     material: "cv_steel_dark",
     mate: A([0, 0, 0]),
   });
@@ -142,7 +176,19 @@ export function addHull(ctx: CarrierCtx): void {
       material: "cv_steel_dark",
       mate: A([0, CV.HULL_BOTTOM + 0.25, z]),
     });
-    // 肋骨分三段随型线内收：下段贴舭部、中段过水线、上段到甲板梁，避免方盒式直壁。
+    // 肋骨分三段随型线内收：每段取该高度区间内最窄的真实外板半宽，
+    // 保证整段肋骨都在壳板以内（旧版按船底最大半宽放，肋骨会从舷侧露出一排竖条）。
+    const frameInset = (y0: number, y1: number) => {
+      let minHalf = Infinity;
+      for (let k = 0; k <= 4; k++) minHalf = Math.min(minHalf, hullSurfaceHalfAt(z, y0 + ((y1 - y0) * k) / 4));
+      return Math.max(0.35, minHalf - 0.08);
+    };
+    const frameLoY = CV.HULL_BOTTOM + 0.82;
+    const frameMidY = CV.HULL_BOTTOM + 1.85;
+    const frameHiY = CV.HULL_BOTTOM + 2.85;
+    const xLo = frameInset(frameLoY - 0.675, frameLoY + 0.675);
+    const xMid = frameInset(frameMidY - 0.425, frameMidY + 0.425);
+    const xHi = frameInset(frameHiY - 0.675, frameHiY + 0.675);
     for (const side of [-1, 1] as const) {
       add({
         id: `carrier.hull.frame_${station}_side_${side === -1 ? "l" : "r"}_lo`,
@@ -152,7 +198,7 @@ export function addHull(ctx: CarrierCtx): void {
         build_layer: 1,
         geometry: M(B(0.13, 1.35, 0.14, [0, 0, 0], 0.008)),
         material: "cv_steel_dark",
-        mate: A([side * (half * 0.56), CV.HULL_BOTTOM + 0.82, z]),
+        mate: A([side * xLo, frameLoY, z]),
       });
       add({
         id: `carrier.hull.frame_${station}_side_${side === -1 ? "l" : "r"}_mid`,
@@ -162,7 +208,7 @@ export function addHull(ctx: CarrierCtx): void {
         build_layer: 1,
         geometry: M(B(0.13, 0.85, 0.14, [0, 0, 0], 0.008)),
         material: "cv_steel_dark",
-        mate: A([side * (half * 0.88), CV.HULL_BOTTOM + 1.85, z]),
+        mate: A([side * xMid, frameMidY, z]),
       });
       add({
         id: `carrier.hull.frame_${station}_side_${side === -1 ? "l" : "r"}_hi`,
@@ -172,16 +218,17 @@ export function addHull(ctx: CarrierCtx): void {
         build_layer: 1,
         geometry: M(B(0.13, 1.35, 0.14, [0, 0, 0], 0.008)),
         material: "cv_steel_dark",
-        mate: A([side * half, CV.HULL_BOTTOM + 2.85, z]),
+        mate: A([side * xHi, frameHiY, z]),
       });
     }
+    const beamHalf = Math.max(0.5, hullSurfaceHalfAt(z, CV.HANGAR_Y - 0.02) - 0.1);
     add({
       id: `carrier.hull.frame_${station}_beam`,
       name_cn: `甲板横梁 ${station}`,
       name_en: `deck beam ${station}`,
       assembly: HULL_ASSEMBLY,
       build_layer: 1,
-      geometry: M(B(half * 2, 0.12, 0.16, [0, 0, 0], 0.008)),
+      geometry: M(B(beamHalf * 2, 0.12, 0.16, [0, 0, 0], 0.008)),
       material: "cv_steel",
       mate: A([0, CV.HANGAR_Y - 0.02, z]),
     });
@@ -240,19 +287,25 @@ export function addHull(ctx: CarrierCtx): void {
 
   // 横向水密舱壁 + 扶强材。
   BULKHEAD_Z.forEach((z, index) => {
-    const half = Math.max(0.8, hullHalfBeamAt(z) - 0.28);
     const station = pad(index + 1);
     // 机库/机舱/弹药库段：舱壁只保留在底层甲板以下，避免横穿可进入舱室。
     const throughHangar = z > -17 && z < 11;
+    const bulkH = throughHangar ? 0.7 : 2.0;
+    const bulkY = throughHangar ? 0.9 : 2.35;
+    let minHalf = Infinity;
+    for (let k = 0; k <= 4; k++) {
+      minHalf = Math.min(minHalf, hullSurfaceHalfAt(z, bulkY - bulkH / 2 + (bulkH * k) / 4));
+    }
+    const half = Math.max(0.5, minHalf - 0.08);
     add({
       id: `carrier.hull.bulkhead_${station}`,
       name_cn: `水密舱壁 ${station}`,
       name_en: `watertight bulkhead ${station}`,
       assembly: HULL_ASSEMBLY,
       build_layer: 1,
-      geometry: M(B(half * (throughHangar ? 1.36 : 1.7), throughHangar ? 0.7 : 2.0, 0.1, [0, 0, 0], 0.008)),
+      geometry: M(B(half * 2, bulkH, 0.1, [0, 0, 0], 0.008)),
       material: "cv_steel_dark",
-      mate: A([0, throughHangar ? 0.9 : 2.35, z]),
+      mate: A([0, bulkY, z]),
     });
     for (let s = -1; s <= 1; s++) {
       add({
@@ -324,16 +377,25 @@ export function addHull(ctx: CarrierCtx): void {
     });
   }
 
-  // 舰体分段接缝：不再叠浮板，直接在船壳表面上焊出分段缝（沿曲面逐段取点）。
+  // 舰体分段接缝：沿固定肋骨站位的真实外板点焊出焊缝（艏部随前倾一起前移，
+  // 不能钉死在固定 z 上，否则焊缝会斜切进壳板或浮在壳板外）。
   for (let s = 0; s < 8; s++) {
-    const z = -16.1 + s * 4.6;
-    const ys = [1.3, 1.9, 2.5, 3.1, 3.5];
+    const stationZ = -16.1 + s * 4.6;
+    const ys = [1.3, 1.9, 2.5, 3.1, 3.5, 3.9];
     for (const side of [-1, 1] as const) {
       const seams = [];
       for (let i = 0; i < ys.length - 1; i++) {
         const y0 = ys[i]!;
         const y1 = ys[i + 1]!;
-        seams.push({ type: "weld" as const, from: [side * (hullSurfaceHalfAt(z, y0) + 0.008), y0, z] as [number, number, number], to: [side * (hullSurfaceHalfAt(z, y1) + 0.008), y1, z] as [number, number, number], radius: 0.012, seed: 900 + s + side });
+        const p0 = hullSurfaceAtStation(stationZ, y0);
+        const p1 = hullSurfaceAtStation(stationZ, y1);
+        seams.push({
+          type: "weld" as const,
+          from: [side * (p0.half + 0.006), y0, p0.z] as [number, number, number],
+          to: [side * (p1.half + 0.006), y1, p1.z] as [number, number, number],
+          radius: 0.011,
+          seed: 900 + s + side,
+        });
       }
       add({
         id: `carrier.hull.segment_${pad(s + 1)}_${side === -1 ? "l" : "r"}`,

@@ -129,6 +129,7 @@ const VIEWS_DEFAULT: Record<ViewKey, boolean> = {
   shadow: true,
   rain: false,
   thermal: false,
+  sea: true,
 };
 
 interface StageState {

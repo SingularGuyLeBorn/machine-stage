@@ -12,6 +12,7 @@ import type { PartHandle } from "@/three/parts";
 const CARRIER_HULL_INTERIOR =
   /^carrier\.hull\.(frame_|detail_gusset|detail_stringer|girder|detail_weld|detail_deck_beam|bulkhead|detail_bulkhead_stiff|detail_penetration|door_|detail_door_hinge|detail_door_dog|hangar_plate|hangar_deck|lower_deck|compartment_|detail_(dc|berth|galley|medical|switch)_)/;
 const CARRIER_POWER_EXTERIOR = /^carrier\.power\.(propeller_|shaft_|rudder_)/;
+const CARRIER_EMALS_UNDERDECK = /^carrier\.deck\.emals_/;
 const CARRIER_ISLAND_INTERIOR =
   /^carrier\.island\.(cic_|bridge_(helm_|telegraph_|binnacle_|chart_|radar_|comms_|captain_|navigator_|floor_walk|ceiling_light_|fire_bottle|clock_|binoculars|rear_alarm_|rear_chart_|rear_handrail|rear_life_ring|side_console_|side_screen_|side_switch_|gauge_))/;
 
@@ -23,6 +24,7 @@ export function isInternalPart(modelId: string, handle: PartHandle): boolean {
     if (handle.assembly === "power") return !CARRIER_POWER_EXTERIOR.test(handle.partId);
     if (handle.assembly === "hull") return CARRIER_HULL_INTERIOR.test(handle.partId);
     if (handle.assembly === "island") return CARRIER_ISLAND_INTERIOR.test(handle.partId);
+    if (handle.assembly === "flightdeck") return CARRIER_EMALS_UNDERDECK.test(handle.partId);
     return false;
   }
   if (modelId !== "mbt90" && modelId !== "ed90") return false;

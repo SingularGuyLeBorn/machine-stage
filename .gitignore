@@ -25,3 +25,6 @@ Thumbs.db
 
 # qa artifacts (screenshots kept only under docs/screenshots)
 qa-out/
+
+# carrier QA generated dump
+docs/qa/carrier-static-report.json

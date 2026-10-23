@@ -1,5 +1,38 @@
 # 福建舰 · 验收记录（carrier worktree）
 
+## 本轮交付（2026-10-23 · 外形返修 2：封边 / 穿模 / EMALS / 海面）
+
+> 本节为**最新状态**。下方历史段落里的 S-01..S-13 逐站封边、5810 件、旧相机角度限制等均已被本节取代。
+
+### 规模与门禁
+- 零件定义 **5510** / 展开 **5510** / 实例 **6810**；分层 L1=1812、L2=317、L3=424、L4=997、L5=1960；三角面 **2,838,038**。
+- 注册表校验 0 错；悬空 0；悬空孤岛 0；合并件内部悬空 0（最大连通分量 6806/6806）。
+- 静态穿模：**12121 报告 / 未豁免 0**（白名单 96 条）。
+- 动画扫掠：**flight_ops 745/0、engine 550/0、hangar 35/0、ciws 158/0**。
+- **门禁不再有整船豁免**：删除原 `carrier.* ↔ carrier.*` 2000mm 兜底规则；改为按装配层的窄规则，并把外露件深度上限收紧（deck↔deck 80mm、deck↔hull 100mm、surface↔hull/deck 100mm 等）。`diag-carrier-exterior --active` 在绕开白名单后实测 **0 条未豁免**。
+- `npx tsc --noEmit` 通过；`npm test` 通过（313 passed / 1 skipped）；`npm run build` 通过。
+
+### 穿模/封边修复
+- [x] **舷侧外飘封边彻底重做**：删除左右舷各 13 块 3.6m 长的分段封边板/底封板/斜撑盒子（它们在甲板硬角处必然伸出或留缝，正是 S-9/S-10/S-11 穿模的来源）；改为 `carrier.deck.sponson_skirt` + `carrier.deck.sponson_bottom` 两个**整圈连续**件：外圈严格沿甲板折线，下缘 y=4.08；底封板从甲板折线连续封到 y=4.03 的**真实外板型线**，艏端/艉端整圈闭合。证据：`carrier-qa-bow-seal.jpeg`、`carrier-qa-stern-sponson.jpeg`。
+- [x] **艏部严丝合缝**：甲板前伸到 z=20.7 与连续封边/底封板共同盖住前倾艏柱；艏端不再出现仰视可见的暗洞。艉端补 `stern_transom` + 艉门/门框/横向扶强材，空白艉封板变成结构面。证据：`carrier-qa-bow-seal.jpeg`、`carrier-qa-transom.jpeg`。
+- [x] **舰体型线与甲板匹配**：艏部型线按新窄艏重新收窄（不再是宽艏顶出窄甲板）；肋骨/甲板横梁/舱壁宽度按各自高度区间的**真实外板半宽**内收，修掉舷侧露出一排竖肋的穿模；分段焊缝改为固定肋骨站位、随艏部前倾逐点贴壳，不再固定 z 斜切船壳。
+- [x] **舷侧列板 2.98 / 舭龙骨**：列板沿真实外板世界 z/y 取点；舭龙骨按舭部截面法向外伸，内外缘都贴壳，不再是大平板横插船体。
+- [x] **左舷外走道格栅**：11 段格栅按 `hullSurfaceHalfAt` 放到壳板外侧；托架内端埋入壳板、顶面与格栅底面接触；立柱/扶手按走道折线逐段生成；格栅/托架不再插进舷侧。
+- [x] **周边类似问题**：FLOLS 平台内移离甲板缘；左舷栏杆在 FLOLS 处断开；甲板栏杆立柱/扶手逐段贴甲板缘；救生圈抬高到甲板面上方；救生筏移到左舷甲板缘并加连续鞍座；删除悬在舷外的固定栏杆底座、无对应筏罐的右舷筏架、电梯导向轮占位件等一批“固定 x 坐标”外露件。
+- [x] **严格审计发现的内部碰撞一并修掉**：删除与 3 号机库停放机完全重叠的简化“备用机”（原 `hangar.spare_aircraft_*`，是数百条穿模的来源，且与“不用简化件”的红线冲突）；把 4 号机库停放机改为与 3 号并排、避开 z=13 全高舱壁；抬高三层甲板纵梁避开 J-15 垂尾；把救生艇/平台按覆盖区最大壳板半宽外移并补托架；把 2 号甲板停放机移开航空吊车基座；修正 EMALS 飞轮与母线槽/母排的相互位置。
+
+### 观察/交互
+- [x] **海面可选**：新增 `ViewKey = "sea"` 与工具条「海面」开关（默认开）；关闭时海面/白浪/艏浪/艉流一起隐藏，可把相机降到舰底以下检查。证据：`carrier-qa-sea-on.jpeg`、`carrier-qa-sea-off.jpeg`。
+- [x] **360° 环视**：水平方向无方位限制；垂直范围放宽到 0.02..1.55 rad（关海面时到 π-0.06），相机地面护栏在开海面时保持 y≥24，关海面时降到 y≥2；东南西北四个方位均有出图，无黑屏/裁切。证据：`carrier-qa-360-e/s/w/n.jpeg`。
+- [x] **电磁弹射器可见**：三条车道加白色边线/起止横线/中心铜轨/黄色大号 1/2/3 编号；新增 1、3 号待发滑梭；挡焰板/滑梭/轨道分层清晰。新增右侧动作「电磁弹射器」直接聚焦 2 号滑梭。
+- [x] **甲板下 EMALS 传动/电力**：每条弹射器新增 10 件甲板下设备：直线电机隧道、电枢、反应轨、水冷主管、隧道吊架、变流器机柜、飞轮储能、脉冲电容组、母线槽、母线铜排（共 30 件，`carrier.deck.emals_*`）。这些件在外部视角被遮挡、在「透视」或选中内部件时显示；证据：`carrier-qa-emals-isolated.jpeg`、`carrier-qa-emals-xray.jpeg`。
+- [x] **双跑道重叠说明**：斜角着舰区与 3 号腰部弹射器在甲板平面交叉是真实航母布置（着舰区斜穿中后部甲板），起降按作业阶段错开；本轮已把舰艏直通起飞区的浅灰底色前移到 z≈7.8..17，俯视不再与斜角跑道底色叠成两片。
+
+### 本轮证据
+`carrier-qa-bow-seal.jpeg`、`carrier-qa-hull-side.jpeg`、`carrier-qa-stern-sponson.jpeg`、`carrier-qa-transom.jpeg`、`carrier-qa-catapults.jpeg`、`carrier-qa-emals-isolated.jpeg`、`carrier-qa-emals-xray.jpeg`、`carrier-qa-sea-on.jpeg`、`carrier-qa-sea-off.jpeg`、`carrier-qa-360-e/s/w/n.jpeg`、`carrier-qa-final-home.jpeg`。
+
+---
+
 ## 零件与结构
 - 零件定义 **5810** / 展开 **5810** / 实例 **7139**
 - 分层：L1=1891、L2=317、L3=553、L4=1080、L5=1969
@@ -169,6 +202,8 @@
 ```bash
 npx tsc --noEmit
 npx tsx scripts/diag-carrier.ts
+npx tsx scripts/diag-carrier-exterior.ts --active   # 严格口径：绕开整船豁免的未豁免清单（应为 0）
+node scripts/capture-carrier-fixes.mjs              # 生成本轮 14 张证据
 npx tsx scripts/diag-carrier-sweep.ts --state flight_ops --duration 30 --fps 2
 npx tsx scripts/diag-carrier-sweep.ts --state engine --duration 12 --fps 2
 npx tsx scripts/diag-carrier-sweep.ts --state hangar --duration 12 --fps 2

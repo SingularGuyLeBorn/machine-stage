@@ -54,26 +54,16 @@ export function hullPlan(inset = 0): Array<[number, number]> {
 }
 
 /** 飞行甲板轮廓：右舷直边 + 尖艏斜切；左舷为斜角甲板外飘（艉部收、舯部最宽、艏部收）。
- *  宽度剖面按福建舰真实俯视轮廓重取：艏部 z>12 只有约 4 个编辑单位（32m）宽的长艏段，
- *  z≈9 起左舷斜角甲板大型外飘展开到全宽，艉部再收到约 4.2（33m）。 */
-function deckPlan(): Array<[number, number]> {
-  // 按真图俯视折线取硬角：艏部两条直线收到 3.2 宽平艏端，艏后左舷以一条短斜边
-  // 折到斜角甲板外飘，再直下到艉部；不再用多点拟合弧线。
+ *  艏部宽度沿两条长直线收窄；升降机平台不再在甲板平面挖 U 形缺口——缺口会让舰体
+ *  上部露出甲板轮廓之外，平台改在甲板面上方安装。 */
+export function deckPlan(): Array<[number, number]> {
   return [
-    // 艏端平边（真实福建舰约 26m 宽）
+    // 艏端平边（真实福建舰约 27m 宽）
     [1.85, 20.7],
-    // 右舷：平艏 → 窄艏段 → 外飘拐角 → 全宽 → 后升降机 → 前升降机 → 艉
-    [2.4, 11.4],
-    [4.18, 9.53],
+    // 右舷：长艏段 → 外飘展开 → 全宽 → 艉部收窄
+    [2.7, 12.8],
+    [4.5, 9.2],
     [4.68, 6.0],
-    [4.68, 3.72],
-    [2.76, 3.72],
-    [2.76, 0.28],
-    [4.68, 0.28],
-    [4.68, -11.08],
-    [2.76, -11.08],
-    [2.76, -14.52],
-    [4.68, -14.52],
     [4.68, -15.8],
     [3.5, -17.5],
     [2.9, -19.4],
@@ -88,10 +78,35 @@ function deckPlan(): Array<[number, number]> {
     [-4.3, -2.7],
     [-4.8, 4.7],
     [-4.8, 9.0],
-    // 斜角甲板前缘：一条短斜边折到窄艏（硬角在 -2.04,10.7）
-    [-2.04, 10.7],
+    // 斜角甲板前缘：两条长直线折到窄艏
+    [-3.35, 12.6],
     [-1.55, 20.7],
   ];
+}
+
+/** 甲板舷缘：给定世界 z 与舷别，返回该处甲板边缘 x 与切线偏航角。 */
+export function deckEdgeAt(z: number, side: -1 | 1): { x: number; yawDeg: number } {
+  const outline = deckPlan();
+  for (let i = 0; i < outline.length; i++) {
+    const [x0, z0] = outline[i]!;
+    const [x1, z1] = outline[(i + 1) % outline.length]!;
+    const lo = Math.min(z0, z1);
+    const hi = Math.max(z0, z1);
+    if (z < lo - 1e-6 || z > hi + 1e-6) continue;
+    // 只取对应舷侧的边；艉/艏封边跨中线，按斜率仍可确定归属。
+    if (Math.abs(z1 - z0) < 1e-6) continue;
+    const t = (z - z0) / (z1 - z0);
+    const x = x0 + (x1 - x0) * t;
+    if (side > 0 ? x < -0.02 : x > 0.02) continue;
+    return { x, yawDeg: (Math.atan2(x1 - x0, z1 - z0) * 180) / Math.PI };
+  }
+  return { x: side > 0 ? 4.68 : -4.8, yawDeg: 0 };
+}
+
+function deckMinHalfAt(z: number): number {
+  const star = deckEdgeAt(z, 1).x;
+  const port = deckEdgeAt(z, -1).x;
+  return Math.max(0.25, Math.min(star, -port));
 }
 
 // ---- 舰体型线放样 ----------------------------------------------------------
@@ -111,25 +126,6 @@ function hullStationAt(z: number): HullStation {
   return { z, base, bottom, bow };
 }
 
-/** 飞行甲板右舷外轮廓（不含升降机开口），用于舰体上部宽度封顶。 */
-const DECK_STAR_SILHOUETTE: Array<[number, number]> = [
-  [2.9, -19.4], [3.5, -17.5], [4.68, -15.8], [4.68, 6.0], [4.18, 9.53], [2.4, 11.4], [1.85, 20.7],
-];
-
-function deckStarHalfAt(z: number): number {
-  for (let i = 0; i < DECK_STAR_SILHOUETTE.length - 1; i++) {
-    const [x0, z0] = DECK_STAR_SILHOUETTE[i]!;
-    const [x1, z1] = DECK_STAR_SILHOUETTE[i + 1]!;
-    const lo = Math.min(z0, z1);
-    const hi = Math.max(z0, z1);
-    if (z >= lo && z <= hi) {
-      const t = Math.abs(z1 - z0) < 1e-6 ? 0 : (z - z0) / (z1 - z0);
-      return x0 + (x1 - x0) * t;
-    }
-  }
-  return DECK_STAR_SILHOUETTE[DECK_STAR_SILHOUETTE.length - 1]![0];
-}
-
 /** 给定高度处的半宽（水线以下为椭圆舭部，以上为外飘直线）。 */
 function hullHalfAt(st: HullStation, y: number): number {
   if (y <= HULL_WL) {
@@ -139,8 +135,9 @@ function hullHalfAt(st: HullStation, y: number): number {
   const t = Math.min(1, (y - HULL_WL) / (HULL_DECK_BOTTOM - HULL_WL));
   const flare = 0.1 + 0.07 * t;
   const upper = st.base * (0.88 + (1.0 - 0.88) * Math.min(1, t / 0.42)) * (1 + flare * Math.max(0, t - 0.42)) + (t > 0.55 ? (0.22 + 0.42 * st.bow * st.bow) * ((t - 0.55) / 0.45) : 0);
-  // 上部船壳必须收在飞行甲板边缘以内（甲板始终外飘），否则底封板/外飘板会插进船壳。
-  const deckCap = Math.max(0.25, deckStarHalfAt(st.z + hullRakeShift(st, y)) - 0.12);
+  // 上部船壳必须收在飞行甲板边缘以内（甲板始终外飘），否则外飘封边会插进船壳。
+  // 两侧甲板不对称，取较窄的一侧作为封顶宽度。
+  const deckCap = Math.max(0.25, deckMinHalfAt(st.z + hullRakeShift(st, y)) - 0.12);
   return Math.min(upper, deckCap);
 }
 
@@ -160,7 +157,7 @@ function hullRing(st: HullStation, ys: number[]): THREE.Vector3[] {
 }
 
 /** 由站点环线生成舰体曲面，法线按“离开舰体中线”朝外修正。 */
-function loftHull(ys: (st: HullStation) => number[], cap: boolean): THREE.BufferGeometry {
+function loftHull(ys: (st: HullStation) => number[], cap: boolean, skipWaterlineFace = false): THREE.BufferGeometry {
   const stations = Array.from({ length: HULL_STATIONS }, (_, i) => {
     const z = CV.HULL_Z_STERN + (i * (CV.HULL_Z_BOW - CV.HULL_Z_STERN)) / (HULL_STATIONS - 1);
     return hullStationAt(z);
@@ -178,6 +175,10 @@ function loftHull(ys: (st: HullStation) => number[], cap: boolean): THREE.Buffer
   }
   for (let i = 0; i < rings.length - 1; i++) {
     for (let j = 0; j < n - 1; j++) {
+      // 舷侧环线从“左舷上缘→左舷水线→右舷水线→右舷上缘”闭合，
+      // j=n/2-1 这一格会在水线处生成一张横跨全宽的平面——水上/水下壳各来一张，
+      // 仰视/俯视时会像一块白色大平板。上下壳在水线共边，不需要这张面。
+      if (skipWaterlineFace && j === n / 2 - 1) continue;
       const a = i * n + j;
       const b = i * n + j + 1;
       const c = (i + 1) * n + j + 1;
@@ -247,14 +248,46 @@ function loftHull(ys: (st: HullStation) => number[], cap: boolean): THREE.Buffer
   return geometry;
 }
 
-/** 供表面件定位：某站位/高度的外板半宽。 */
+/** 供表面件定位：世界 z / 高度 y 处的外板半宽（考虑艏部前倾）。 */
 export function hullSurfaceHalfAt(z: number, y: number): number {
-  return hullHalfAt(hullStationAt(z), y);
+  // 外板点世界 z = 站位 z + 前倾量；反解站位，避免把焊缝/列板贴到斜艏的错误位置。
+  let stationZ = z;
+  for (let i = 0; i < 6; i++) {
+    const st = hullStationAt(stationZ);
+    const next = z - hullRakeShift(st, y);
+    if (Math.abs(next - stationZ) < 1e-4) {
+      stationZ = next;
+      break;
+    }
+    stationZ = next;
+  }
+  return hullHalfAt(hullStationAt(stationZ), y);
+}
+
+/** 固定肋骨站位上的外板点（横向焊缝必须沿该站位的真实外板走，不能钉在固定 z）。 */
+export function hullSurfaceAtStation(stationZ: number, y: number): { half: number; z: number } {
+  const st = hullStationAt(stationZ);
+  return { half: hullHalfAt(st, y), z: st.z + hullRakeShift(st, y) };
+}
+
+/** 给定高度处的外板平面轮廓（用于外飘底封板的连续内边界）。 */
+export function hullPlanAtHeight(y: number, samples = 44): Array<[number, number]> {
+  const points: Array<[number, number]> = [];
+  const stationAt = (i: number) => CV.HULL_Z_STERN + (i * (CV.HULL_Z_BOW - CV.HULL_Z_STERN)) / (samples - 1);
+  for (let i = 0; i < samples; i++) {
+    const z = stationAt(i);
+    points.push([hullSurfaceAtStation(z, y).half, hullSurfaceAtStation(z, y).z]);
+  }
+  for (let i = samples - 1; i >= 0; i--) {
+    const z = stationAt(i);
+    points.push([-hullSurfaceAtStation(z, y).half, hullSurfaceAtStation(z, y).z]);
+  }
+  return points;
 }
 
 /** 水线以上舰体外板：舭部以上到甲板底，含舷侧外飘与艏部前倾。 */
 export const carrierHullShell: GeometryBuilder = () =>
-  loftHull((st) => [HULL_WL, 2.12, 2.6, 3.45, HULL_DECK_BOTTOM].filter((y) => y >= st.bottom), true);
+  loftHull((st) => [HULL_WL, 2.12, 2.6, 3.45, HULL_DECK_BOTTOM].filter((y) => y >= st.bottom), true, true);
 
 /** 水线以下舰体外板：防污红漆，圆舭过渡，含球鼻艏安装面。 */
 export const carrierHullUnderwater: GeometryBuilder = () =>
@@ -263,11 +296,11 @@ export const carrierHullUnderwater: GeometryBuilder = () =>
     for (const f of [0.12, 0.3, 0.52, 0.76, 0.93]) ys.push(st.bottom + (HULL_WL - st.bottom) * f);
     ys.push(HULL_WL);
     return ys;
-  }, true);
+  }, true, true);
 
 /** 水线漆带：水线处外贴 0.012 的黑色 boot topping。 */
 export const carrierBootStripe: GeometryBuilder = () => {
-  const geometry = loftHull((st) => [HULL_WL - 0.16, HULL_WL + 0.2].filter((y) => y >= st.bottom), false);
+  const geometry = loftHull((st) => [HULL_WL - 0.16, HULL_WL + 0.2].filter((y) => y >= st.bottom), false, true);
   geometry.scale(1.003, 1, 1);
   return geometry;
 };
@@ -343,50 +376,101 @@ export const carrierBowRake: GeometryBuilder = () => {
   return geometry;
 };
 
-/** 保留 UV 的合并（外壳贴图依赖 UV，不能走只保留位置/法线的 merge）。 */
-function mergeWithUv(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  const positions: number[] = [];
-  const normals: number[] = [];
-  const uvs: number[] = [];
-  for (const part of parts) {
-    const g = part.getIndex() ? part.toNonIndexed() : part;
-    const pos = g.getAttribute("position");
-    const nor = g.getAttribute("normal");
-    const uv = g.getAttribute("uv");
-    for (let i = 0; i < pos.count; i++) {
-      positions.push(pos.getX(i), pos.getY(i), pos.getZ(i));
-      if (nor) normals.push(nor.getX(i), nor.getY(i), nor.getZ(i));
-      if (uv) uvs.push(uv.getX(i), uv.getY(i));
-      else uvs.push(pos.getX(i) * 0.1, pos.getZ(i) * 0.1);
-    }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  if (normals.length) geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
-  else geometry.computeVertexNormals();
-  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-  return geometry;
-}
-
 /** 舰体底板（双层底的上层，随舭部收窄）。 */
 export const carrierBottom: GeometryBuilder = () =>
   extrudedPlan(hullPlan(0.08).map(([x, z]) => [x * 0.42, z] as [number, number]), 0.14, CV.HULL_BOTTOM + 0.14);
 
-/** 飞行甲板（装甲板 + 外飘轮廓 + 外飘段底面封板）。 */
-export const carrierFlightDeck: GeometryBuilder = () => {
-  const deck = extrudedPlan(deckPlan(), CV.DECK_T, CV.DECK_Y + CV.DECK_T);
+/** 飞行甲板（装甲板）。外飘段的侧面/底面由连续外飘封边件封闭，不再叠薄片。 */
+export const carrierFlightDeck: GeometryBuilder = () => extrudedPlan(deckPlan(), CV.DECK_T, CV.DECK_Y + CV.DECK_T);
+
+/** 外飘封边板：沿甲板折线一整圈连续的舷墙，从甲板底包到外飘底。 */
+export const carrierSponsonSkirt: GeometryBuilder = () => {
+  const outline = deckPlan();
+  const yTop = CV.DECK_Y + 0.02;
+  const yBot = CV.DECK_Y - 0.32;
+  const thickness = 0.07;
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const pushTri = (
+    a: [number, number, number],
+    b: [number, number, number],
+    c: [number, number, number],
+    out: [number, number, number],
+  ) => {
+    const ab = new THREE.Vector3(...b).sub(new THREE.Vector3(...a));
+    const ac = new THREE.Vector3(...c).sub(new THREE.Vector3(...a));
+    const n = ab.cross(ac).normalize();
+    const oriented = n.x * out[0] + n.y * out[1] + n.z * out[2] < 0;
+    const p = oriented ? [a, c, b] : [a, b, c];
+    for (const v of p) {
+      positions.push(v[0], v[1], v[2]);
+      normals.push(oriented ? -n.x : n.x, oriented ? -n.y : n.y, oriented ? -n.z : n.z);
+      uvs.push(v[0] * 0.2 + v[2] * 0.2, v[1] * 0.5);
+    }
+  };
+  const quad = (
+    a: [number, number, number],
+    b: [number, number, number],
+    c: [number, number, number],
+    d: [number, number, number],
+    out: [number, number, number],
+  ) => {
+    pushTri(a, b, c, out);
+    pushTri(a, c, d, out);
+  };
+  for (let i = 0; i < outline.length; i++) {
+    const [x0, z0] = outline[i]!;
+    const [x1, z1] = outline[(i + 1) % outline.length]!;
+    const dx = x1 - x0;
+    const dz = z1 - z0;
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-6) continue;
+    // 轮廓从艏右舷顺时针走到艉再回艏左舷；外法线 = (-dz, dx)。
+    const out: [number, number, number] = [-dz / len, 0, dx / len];
+    const inX = -out[0] * thickness;
+    const inZ = -out[2] * thickness;
+    const o0: [number, number, number] = [x0, 0, z0];
+    const o1: [number, number, number] = [x1, 0, z1];
+    const i0: [number, number, number] = [x0 + inX, 0, z0 + inZ];
+    const i1: [number, number, number] = [x1 + inX, 0, z1 + inZ];
+    const ot0: [number, number, number] = [o0[0], yTop, o0[2]];
+    const ot1: [number, number, number] = [o1[0], yTop, o1[2]];
+    const ob0: [number, number, number] = [o0[0], yBot, o0[2]];
+    const ob1: [number, number, number] = [o1[0], yBot, o1[2]];
+    const it0: [number, number, number] = [i0[0], yTop, i0[2]];
+    const it1: [number, number, number] = [i1[0], yTop, i1[2]];
+    const ib0: [number, number, number] = [i0[0], yBot, i0[2]];
+    const ib1: [number, number, number] = [i1[0], yBot, i1[2]];
+    quad(ob0, ob1, ot1, ot0, out);
+    quad(it0, it1, ib1, ib0, [-out[0], 0, -out[2]]);
+    quad(ot0, ot1, it1, it0, [0, 1, 0]);
+    quad(ib0, ib1, ob1, ob0, [0, -1, 0]);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  return geometry;
+};
+
+/** 外飘底封板：甲板缘到真实舰体表面的一整圈连续水平封板。 */
+export const carrierSponsonBottom: GeometryBuilder = () => {
+  const yTop = CV.DECK_Y - 0.32;
+  const thickness = 0.05;
   const shape = planShape(deckPlan());
-  shape.holes.push(new THREE.Path(planShape(hullPlan(0.03)).getPoints(200)));
-  const overhang = new THREE.ExtrudeGeometry(shape, {
-    depth: 0.025,
+  // 取封板底面高度的船壳轮廓：内边界略埋入壳板，封死缝隙。
+  shape.holes.push(new THREE.Path(hullPlanAtHeight(yTop - thickness, 64).map(([x, z]) => new THREE.Vector2(x, z))));
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: thickness,
     bevelEnabled: false,
     curveSegments: 1,
     steps: 1,
   });
-  overhang.rotateX(Math.PI / 2);
-  overhang.translate(0, CV.DECK_Y + 0.005, 0);
-  overhang.computeVertexNormals();
-  return mergeWithUv([deck, overhang]);
+  geometry.rotateX(Math.PI / 2);
+  geometry.translate(0, yTop, 0);
+  geometry.computeVertexNormals();
+  return geometry;
 };
 
 /** 机库甲板（舰体内轮廓缩进）。 */
@@ -755,37 +839,76 @@ export const carrierPropeller: GeometryBuilder = (spec) => {
   return merge(parts);
 };
 
-/** 舷侧列板：沿船壳曲线放样的水平板条，外缘压在舷外，内缘搭在纵骨上。 */
+/** 舷侧列板：沿真实外板型线放样的水平板条，外缘压在舷外，内缘搭在纵骨上。 */
 export const carrierHullStrake: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Record<string, number> }).params ?? {};
   const level = Number(p.level ?? 1.6);
   const side = Number(p.side ?? 1) >= 0 ? 1 : -1;
-  return curvedHullRibbon(
-    -16.8,
-    16.8,
-    72,
-    side,
-    (z) => side * (hullHalfBeamAt(z) + 0.022),
-    (z) => side * (hullHalfBeamAt(z) - 0.16),
-    level + 0.025,
-    level - 0.025,
-  );
+  const outer = (z: number) => side * (hullSurfaceHalfAt(z, level) + 0.022);
+  return curvedHullRibbon(-16.8, 16.8, 84, side, outer, (z) => outer(z) - side * 0.16, level + 0.025, level - 0.025);
 };
 
-/** 舭龙骨：沿舭部曲面的外伸连续板，内缘与纵骨/肋板搭接。 */
+/** 舭龙骨：沿舭部曲面的外伸连续板，内外缘都按该高度真实外板取点。 */
 export const carrierHullBilgeKeel: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Record<string, number> }).params ?? {};
   const side = Number(p.side ?? 1) >= 0 ? 1 : -1;
-  return curvedHullRibbon(
-    -13,
-    11,
-    56,
-    side,
-    (z) => side * (hullHalfBeamAt(z) + 0.08),
-    (z) => side * (hullHalfBeamAt(z) - 0.24),
-    0.87,
-    0.57,
-  );
+  const z0 = -13;
+  const z1 = 11;
+  const samples = 60;
+  const yTop = 0.87;
+  const yBot = 0.57;
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+  const face = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, out: THREE.Vector3) => {
+    let bb = b;
+    let cc = c;
+    const n = new THREE.Vector3().subVectors(bb, a).cross(new THREE.Vector3().subVectors(cc, a));
+    if (n.dot(out) < 0) {
+      const swap = bb;
+      bb = cc;
+      cc = swap;
+      n.negate();
+    }
+    n.normalize();
+    for (const pt of [a, bb, cc]) {
+      positions.push(pt.x, pt.y, pt.z);
+      normals.push(n.x, n.y, n.z);
+      uvs.push(pt.z * 0.2, pt.y);
+    }
+  };
+  const quad = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3, out: THREE.Vector3) => {
+    face(a, b, c, out);
+    face(a, c, d, out);
+  };
+  for (let i = 0; i < samples; i++) {
+    const za = z0 + ((z1 - z0) * i) / samples;
+    const zb = z0 + ((z1 - z0) * (i + 1)) / samples;
+    const xTa = side * hullSurfaceHalfAt(za, yTop);
+    const xBa = side * hullSurfaceHalfAt(za, yBot);
+    const xTb = side * hullSurfaceHalfAt(zb, yTop);
+    const xBb = side * hullSurfaceHalfAt(zb, yBot);
+    const dx = (xTa - xBa) * side;
+    const dy = yTop - yBot;
+    const nLen = Math.hypot(dx, dy) || 1;
+    // 舭部外法线：沿截面向外下方伸出。
+    const nx = (dy / nLen) * side;
+    const ny = -dx / nLen;
+    const ext = 0.11;
+    const oTa = v(xTa + nx * ext, yTop + ny * ext, za);
+    const oBa = v(xBa + nx * ext, yBot + ny * ext, za);
+    const oTb = v(xTb + nx * ext, yTop + ny * ext, zb);
+    const oBb = v(xBb + nx * ext, yBot + ny * ext, zb);
+    quad(v(xBa, yBot, za), v(xBb, yBot, zb), oBb, oBa, v(ny, -nx, 0));
+    quad(v(xTa, yTop, za), oTa, oTb, v(xTb, yTop, zb), v(-ny, nx, 0));
+    quad(oBa, oBb, oTb, oTa, v(nx, ny, 0));
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  return geometry;
 };
 
 function curvedHullRibbon(

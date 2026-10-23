@@ -65,5 +65,6 @@ export function hullHalfBeamAt(z: number): number {
   if (t < 0.12) return half * (0.62 + 0.38 * (t / 0.12));
   if (t < 0.72) return half;
   const bow = (t - 0.72) / 0.28;
-  return half * Math.max(0.03, 1 - bow * bow * 0.98);
+  // 艏部型线按真实舰体收窄：先慢后快，最后一段收成尖艏；宽艏会顶出窄甲板轮廓。
+  return half * Math.max(0.03, 1 - Math.pow(bow, 1.5) * 0.9 - Math.pow(bow, 10) * 0.07);
 }
