@@ -370,36 +370,64 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       mate: A([side * 2.0, CV.DECK_Y - 0.1, -10.2]),
     });
   }
-  add({
-    id: `${P}arrestor_net_post_l`,
-    name_cn: "拦阻网左支柱",
-    name_en: "barrier net post left",
-    assembly: ASSEMBLY,
-    build_layer: 3,
-    geometry: M(C(0.08, 1.1, [0, 0, 0], 12), B(0.25, 0.1, 0.25, [0, -0.55, 0], 0.008)),
-    material: "cv_steel_dark",
-    mate: A([-3.8, deckTop + 0.55, -19.2]),
-  });
-  add({
-    id: `${P}arrestor_net_post_r`,
-    name_cn: "拦阻网右支柱",
-    name_en: "barrier net post right",
-    assembly: ASSEMBLY,
-    build_layer: 3,
-    geometry: M(C(0.08, 1.1, [0, 0, 0], 12), B(0.25, 0.1, 0.25, [0, -0.55, 0], 0.008)),
-    material: "cv_steel_dark",
-    mate: A([3.8, deckTop + 0.55, -19.2]),
-  });
-  add({
-    id: `${P}arrestor_net`,
-    name_cn: "拦阻网",
-    name_en: "barrier net",
-    assembly: ASSEMBLY,
-    build_layer: 3,
-    geometry: M(B(7.5, 1.0, 0.05, [0, 0, 0], 0.006)),
-    material: "cv_canvas",
-    mate: A([0, deckTop + 0.55, -19.2]),
-  });
+  // ---- 应急拦阻网：布置在斜角着舰区前端（不是舰艉），由左右支柱 + 交叉网带组成 ----
+  {
+    const netZ = 7.6;
+    const netRad = (9.3 * Math.PI) / 180;
+    const netSin = Math.sin(netRad);
+    const netCos = Math.cos(netRad);
+    const netCenterX = 0.5 - ((netZ + 18.5) / netCos) * netSin;
+    const netHalf = 1.7;
+    const netYaw = -9.3;
+    const postAt = (side: -1 | 1): [number, number] => [
+      netCenterX + side * netHalf * netCos,
+      netZ + side * netHalf * netSin,
+    ];
+    for (const side of [-1, 1] as const) {
+      const [px, pz] = postAt(side);
+      const tag = side === -1 ? "l" : "r";
+      add({
+        id: `${P}arrestor_net_post_${tag}`,
+        name_cn: `拦阻网支柱 ${side === -1 ? "左" : "右"}`,
+        name_en: `barrier net post ${tag}`,
+        assembly: ASSEMBLY,
+        build_layer: 3,
+        geometry: M(C(0.07, 1.2, [0, 0, 0], 12), B(0.32, 0.08, 0.32, [0, -0.58, 0], 0.008)),
+        material: "cv_steel_dark",
+        mate: A([px, deckTop + 0.6, pz]),
+      });
+      add({
+        id: `${P}arrestor_net_brace_${tag}`,
+        name_cn: `拦阻网支柱斜撑 ${side === -1 ? "左" : "右"}`,
+        name_en: `barrier net post brace ${tag}`,
+        assembly: ASSEMBLY,
+        build_layer: 3,
+        geometry: M({ type: "weld", from: [px, deckTop + 1.08, pz], to: [px - side * 0.7, deckTop + 0.06, pz], radius: 0.032 }),
+        material: "cv_steel_dark",
+        mate: A([0, 0, 0]),
+      });
+    }
+    // 网带：7 道横带 + 11 道竖带 + 顶部张紧杆，合并成一个零件，避免网带互相穿模报告。
+    const netBands: Array<ReturnType<typeof B>> = [];
+    for (let h = 0; h < 9; h++) {
+      netBands.push(B(netHalf * 2, 0.012, 0.012, [0, 0.14 + h * 0.12, 0], 0.0006));
+    }
+    for (let v = 0; v < 15; v++) {
+      netBands.push(B(0.012, 0.96, 0.012, [-netHalf + v * (netHalf * 2) / 14, 0.62, 0], 0.0006));
+    }
+    netBands.push(B(netHalf * 2 + 0.14, 0.06, 0.06, [0, 1.2, 0], 0.002));
+    netBands.push(B(netHalf * 2, 0.05, 0.05, [0, 0.05, 0], 0.002));
+    add({
+      id: `${P}arrestor_net`,
+      name_cn: "拦阻网（网带式，可升起）",
+      name_en: "barrier net mesh",
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M(...netBands),
+      material: "cv_canvas",
+      mate: A([netCenterX, deckTop, netZ], [0, netYaw, 0]),
+    });
+  }
 
   // ---- 右舷艉部航空吊车：基座/回转齿圈/桅柱/司机室/桁架吊臂/绞车/吊钩 ----
   {
@@ -963,15 +991,14 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       name_en: `takeoff edge ${side === -1 ? "p" : "s"}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(0.06, 0.006, 10.8, [0, 0, 0], 0.0015)),
+      geometry: M(B(0.06, 0.006, 6.0, [0, 0, 0], 0.0015)),
       material: "cv_deck_yellow",
-      mate: A([side * 3.35, markY + 0.004, 9.6]),
+      mate: A([side * 1.95, markY + 0.004, 6.0]),
     });
   }
   // 停机位框线 + 编号（七段数字），全部贴在甲板上；避开斜角着舰跑道。
   const parkingSpots: Array<[number, number, number]> = [
-    [3.95, 10.0, 1], [3.95, 14.2, 2], [-2.4, -14.4, 3], [-2.4, -18.0, 4],
-    [3.95, 5.6, 5], [3.95, 8.0, 6], [-4.4, -10.5, 7], [-4.2, -8.7, 8],
+    [2.2, -15.8, 1], [-2.4, -11.5, 2], [-2.4, -14.4, 3], [-2.0, -16.8, 4],
   ];
   const digitSegments: Record<string, string[]> = {
     "1": ["b", "c"], "2": ["a", "b", "g", "e", "d"], "3": ["a", "b", "g", "c", "d"],
@@ -1064,7 +1091,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     build_layer: 4,
     geometry: M({ type: "torus", radius: 0.58, tube: 0.032, radialSegments: 8, tubularSegments: 32 }),
     material: "cv_deck_line",
-    mate: A([-3.95, markY + 0.006, 13.2], [90, 0, 0]),
+    mate: A([-3.2, markY + 0.006, 1.0], [90, 0, 0]),
   });
   add({
     id: `${P}helipad_h`,
@@ -1074,7 +1101,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     build_layer: 4,
     geometry: M(B(0.1, 0.006, 0.66, [0, 0, 0], 0.0015), B(0.1, 0.006, 0.66, [-0.38, 0, 0], 0.0015), B(0.48, 0.006, 0.1, [-0.19, 0, 0], 0.0015)),
     material: "cv_deck_line",
-    mate: A([-3.95, markY + 0.007, 13.2]),
+    mate: A([-3.2, markY + 0.007, 1.0]),
   });
   // 舷号 18（舰艏甲板）。
   drawDigit("1", "hull_number_1", -0.95, 17.0, 1.5);
@@ -1104,9 +1131,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       name_en: `stern danger stripe ${st + 1}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(5.0 - st * 0.4, 0.006, 0.18, [0, 0, 0], 0.0015)),
+      geometry: M(B(3.2 - st * 0.22, 0.006, 0.18, [0, 0, 0], 0.0015)),
       material: st % 2 === 0 ? "cv_deck_red" : "cv_deck_yellow",
-      mate: A([0, markY + 0.005, -19.4 + st * 0.23]),
+      mate: A([0, markY + 0.005, -18.7 + st * 0.18]),
     });
   }
   add({
@@ -1294,7 +1321,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // ---- 舰艏上翘甲板（真实甲板有轻微上翘/外飘，不是一块平板） ----
   for (let i = 0; i < 4; i++) {
     const z = 16.6 + i * 1.05;
-    const width = 8.3 - i * 0.7;
+    const width = 3.8 - i * 0.2;
     add({
       id: `${P}bow_ramp_${pad(i + 1)}`,
       name_cn: `舰艏上翘甲板 ${i + 1}`,
@@ -1303,13 +1330,13 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       build_layer: 3,
       geometry: M(B(width, 0.06, 1.2, [0, 0, 0], 0.006)),
       material: "cv_deck_plate",
-      mate: A([0, deckTop + 0.035 + i * 0.055, z], [-2 - i * 1.8, 0, 0]),
+      mate: A([0.1, deckTop + 0.035 + i * 0.04, z], [-2 - i * 1.4, 0, 0]),
     });
   }
   // 舰艏舷墙：沿最后 3 段甲板边缘抬起，侧视能看到舰艏上翘而不是平切方盒。
   const bowEdges: Array<{ tag: string; points: Array<[number, number]> }> = [
-    { tag: "p", points: [[-4.2, 17.5], [-3.3, 19.6], [-2.4, 20.9]] },
-    { tag: "s", points: [[4.45, 17.6], [3.5, 19.4], [2.6, 20.5]] },
+    { tag: "p", points: [[-1.85, 17.5], [-1.6, 19.3], [-1.2, 20.5]] },
+    { tag: "s", points: [[2.05, 17.6], [1.8, 19.3], [1.4, 20.5]] },
   ];
   for (const edge of bowEdges) {
     for (let i = 0; i < edge.points.length - 1; i++) {
@@ -1335,9 +1362,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     name_en: "bow front bulwark",
     assembly: ASSEMBLY,
     build_layer: 3,
-    geometry: M(B(5.1, 0.38, 0.07, [0, 0, 0], 0.006)),
+    geometry: M(B(2.8, 0.38, 0.07, [0, 0, 0], 0.006)),
     material: "cv_hull",
-    mate: A([0.1, deckTop + 0.22, 20.95], [0, 0, 0]),
+    mate: A([0.1, deckTop + 0.22, 20.55], [0, 0, 0]),
   });
   add({
     id: `${P}bow_bulwark`,
@@ -1345,8 +1372,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     name_en: "bow bulwark",
     assembly: ASSEMBLY,
     build_layer: 3,
-    geometry: M(B(4.8, 0.34, 0.08, [0, 0, 0], 0.006)),
+    geometry: M(B(3.4, 0.34, 0.08, [0, 0, 0], 0.006)),
     material: "cv_hull",
-    mate: A([0, deckTop + 0.25, 20.1], [12, 0, 0]),
+    mate: A([0.1, deckTop + 0.25, 19.9], [12, 0, 0]),
   });
 }

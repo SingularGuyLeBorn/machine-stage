@@ -89,6 +89,7 @@ export function StageCanvas() {
         <TigerVfx />
         <MbtVfx />
         <CameraRig />
+        <CarrierCameraFloor />
         <StageEffects />
       </Canvas>
       <WarmupOverlay />
@@ -825,10 +826,49 @@ function ContactShadow({ y, scale }: { y: number; scale: number }) {
   );
 }
 
+/** 航母外部视角护栏：防止拖动/平移把相机压到海面下或舰体内部造成黑屏。 */
+function CarrierCameraFloor() {
+  const modelId = useStageStore((state) => state.modelId);
+  const cameraMode = useStageStore((state) => state.cameraMode);
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls) as
+    | { target: THREE.Vector3; update: () => void }
+    | null;
+  useFrame(() => {
+    if (modelId !== "carrier" || cameraMode !== "orbit" || !controls) return;
+    let changed = false;
+    // 海面世界高度约 14m；留 10m 余量，避免相机进到水面/船底以下。
+    if (camera.position.y < 24) {
+      camera.position.y = 24;
+      changed = true;
+    }
+    if (controls.target.y < 24) {
+      controls.target.y = 24;
+      changed = true;
+    }
+    if (controls.target.y > 120) {
+      controls.target.y = 120;
+      changed = true;
+    }
+    const maxTargetXZ = 220;
+    if (Math.abs(controls.target.x) > maxTargetXZ) {
+      controls.target.x = Math.sign(controls.target.x) * maxTargetXZ;
+      changed = true;
+    }
+    if (Math.abs(controls.target.z) > maxTargetXZ) {
+      controls.target.z = Math.sign(controls.target.z) * maxTargetXZ;
+      changed = true;
+    }
+    if (changed) controls.update();
+  });
+  return null;
+}
+
 /** 相机聚焦：零件树 / 穿模报告点击 → 平滑飞行；重置视角 → 回到初始方位。
  *  第一人称（潜望镜）时接管相机：关掉 OrbitControls，眼点由 viewpoints 从零件包围盒派生；
  *  退出时先记住的自由视角原路飞回，不把人甩到别的方位。 */
 function CameraRig() {
+  const modelId = useStageStore((state) => state.modelId);
   const camera = useThree((state) => state.camera);
   const gl = useThree((state) => state.gl);
   const controls = useThree((state) => state.controls) as
@@ -1086,8 +1126,8 @@ function CameraRig() {
       dampingFactor={0.12}
       minDistance={0.1}
       maxDistance={2000}
-      minPolarAngle={0.04}
-      maxPolarAngle={Math.PI / 2 - 0.015}
+      minPolarAngle={modelId === "carrier" ? 0.2 : 0.04}
+      maxPolarAngle={modelId === "carrier" ? 1.38 : Math.PI / 2 - 0.015}
     />
   );
 }

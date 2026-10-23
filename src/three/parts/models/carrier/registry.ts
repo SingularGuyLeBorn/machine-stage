@@ -94,6 +94,7 @@ function buildCarrierOnce(): { registry: ModelRegistry; layouts: Record<string, 
     staticOnly("cv-surface-island", "carrier.surface.*", "carrier.island.*", "舰岛表面附件安装"),
     staticOnly("cv-aircraft-self", "carrier.aircraft.*", "carrier.aircraft.*", "舰载机机体/蒙皮/发动机/挂架静态装配"),
     staticOnly("cv-aircraft-hangar", "carrier.hangar.spare_aircraft*", "carrier.hull.hangar_deck", "机库停放舰载机轮胎/机体与机库甲板接触"),
+    staticOnly("cv-barrier-net", "carrier.deck.arrestor_net*", "carrier.deck.*", "应急拦阻网网带/支柱/斜撑在甲板上的安装与网带挂接"),
     // 运动件配合面：只允许真实的转动/滑动/轮胎接触。
     {
       family: "cv-gear-deck",

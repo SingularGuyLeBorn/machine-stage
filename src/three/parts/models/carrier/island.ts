@@ -264,7 +264,7 @@ export function addIsland(ctx: CarrierCtx): void {
     name_en: "sensor house roof radar platform",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(B(1.36, 0.06, 4.5, [0, 0, 0], 0.006)),
+    geometry: M(B(2.3, 0.06, 6.4, [0, 0, 0], 0.006)),
     material: "cv_hull",
     mate: A([x, roofY, z]),
   });
@@ -759,18 +759,28 @@ export function addIsland(ctx: CarrierCtx): void {
       material: "cv_grate",
       mate: A([spot[0], platformY, spot[2]]),
     });
-    // 独立支撑柱 + 法兰 + 四根斜撑：炮位到传感器舱顶是可见的实体连接。
+    // 大面积底座 + 宽支撑座 + 四面斜撑：炮位平台到传感器舱顶是连续实体。
     add({
-      id: `${P}ciws_${tag}_pedestal`,
-      name_cn: `1130 近防炮 ${index + 1} 支撑柱`,
-      name_en: `CIWS ${index + 1} support pedestal`,
+      id: `${P}ciws_${tag}_foundation`,
+      name_cn: `1130 近防炮 ${index + 1} 底座平台`,
+      name_en: `CIWS ${index + 1} foundation plate`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(C(0.24, 0.56, [0, 0, 0], 12, 0.18), C(0.34, 0.06, [0, -0.27, 0], 12), C(0.4, 0.06, [0, 0.27, 0], 12)),
+      geometry: M(B(1.1, 0.05, 1.0, [0, 0, 0], 0.012), B(0.95, 0.04, 0.85, [0, 0.04, 0], 0.008)),
       material: "cv_hull",
-      mate: A([spot[0], platformY - 0.33, spot[2]]),
+      mate: A([spot[0], roofY + 0.055, spot[2]]),
     });
-    for (const dx of [-0.62, 0.62] as const) {
+    add({
+      id: `${P}ciws_${tag}_pedestal`,
+      name_cn: `1130 近防炮 ${index + 1} 宽支撑座`,
+      name_en: `CIWS ${index + 1} wide support pedestal`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.7, 0.48, 0.7, [0, 0, 0], 0.02), B(0.92, 0.07, 0.92, [0, -0.22, 0], 0.015)),
+      material: "cv_hull",
+      mate: A([spot[0], platformY - 0.25, spot[2]]),
+    });
+    for (const dx of [-0.52, 0.52] as const) {
       for (const dz of [-0.42, 0.42] as const) {
         add({
           id: `${P}ciws_${tag}_gusset_${dx < 0 ? "p" : "s"}${dz < 0 ? "a" : "f"}`,
