@@ -5,18 +5,70 @@ import { buildModel } from "../../assembler/assembler";
 import { makeKingJoeModuleRegistry, kingjoeModuleBuilders } from "./registry";
 import { planCavityDevices } from "./cavity-devices";
 import { animateKingJoeModules } from "./motion";
+import { planHandCouplings, updateHandCouplings } from "./hand-couplings";
 
 describe("空腔设备、肩肘驱动与流体连接", () => {
   let model: ReturnType<typeof buildModel>;
   let library: ReturnType<typeof createMaterialLibrary>;
   beforeAll(() => {
     const registry = makeKingJoeModuleRegistry();
-    library = createMaterialLibrary({ pedan_gel: registry.materials.pedan_gel });
+    library = createMaterialLibrary({
+      pedan_gel: registry.materials.pedan_gel,
+      pedan_hand_field: registry.materials.pedan_hand_field,
+    });
     model = buildModel(registry, { builders: kingjoeModuleBuilders, materials: library.materials });
   }, 20000);
   afterAll(() => {
     model.dispose();
     library.dispose();
+  });
+  it("手部设备全连通，胶膜端点跟随指节，能量环定向流动且两端同步呼吸", () => {
+    const plan = planCavityDevices(new Map()),
+      links = planHandCouplings(plan);
+    for (const owner of ["fore_l", "fore_r"]) {
+      const own = plan.filter((p) => p.owner === owner),
+        edges = links.filter((p) => p.owner === owner);
+      expect(edges.length).toBe(own.length - 1);
+      const reached = new Set([edges[0].from]);
+      for (const edge of edges) {
+        expect(reached.has(edge.from)).toBe(true);
+        reached.add(edge.to);
+      }
+      expect(reached.size).toBe(own.length);
+    }
+    for (const time of [0, 1.7, 3.4]) {
+      animateKingJoeModules(model, time, "beam");
+      for (const [i, edge] of links.entries()) {
+        const node = model.getNode(`HandField_${i}`)!;
+        const from = model
+          .getNode(`Cavity_base_${plan.indexOf(edge.from)}`)!
+          .getWorldPosition(new THREE.Vector3());
+        const to = model
+          .getNode(`Cavity_base_${plan.indexOf(edge.to)}`)!
+          .getWorldPosition(new THREE.Vector3());
+        const length = new THREE.Vector3(...edge.from.center).distanceTo(
+          new THREE.Vector3(...edge.to.center),
+        );
+        expect(node.localToWorld(new THREE.Vector3()).distanceTo(from)).toBeLessThan(1e-6);
+        expect(node.localToWorld(new THREE.Vector3(0, length, 0)).distanceTo(to)).toBeLessThan(1e-6);
+        const a = model.getNode(`HandField_${i}_end_0`)!,
+          b = model.getNode(`HandField_${i}_end_1`)!;
+        expect(a.scale.equals(b.scale)).toBe(true);
+      }
+    }
+    updateHandCouplings(model, 0.2, 0);
+    const pulse = model.getNode("HandField_0_packet_0")!,
+      before = pulse.position.y;
+    updateHandCouplings(model, 0.3, 0);
+    expect(pulse.position.y).toBeGreaterThan(before);
+    const material = model.getPart("kingjoemodules.head_arms.hand_field_0_terminals")!.object
+      .material as THREE.MeshStandardMaterial;
+    expect(material.emissiveIntensity).toBeLessThanOrEqual(0.3);
+    const arc = model.getNode("HandField_0_arc")!;
+    updateHandCouplings(model, 0.16, 0);
+    expect(arc.scale.x).toBeGreaterThan(0.9);
+    updateHandCouplings(model, 1, 0);
+    expect(arc.scale.x).toBeLessThan(0.001);
   });
   it("头侧、脚掌和手掌双侧都有新增实体，填隙包络不挤进已有设备", () => {
     const plan = planCavityDevices(new Map());
@@ -37,7 +89,7 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
             p.partId.endsWith("gel_capsule") &&
             model.getNode(p.def.node!)!.parent?.name === `Joint_fore_${side}`,
         ).length,
-      ).toBeGreaterThan(10);
+      ).toBe(0);
   });
   it("八片壳体都有体积设备，空腔设备动作采样仍在内壁约束的安装球内", () => {
     const plan = planCavityDevices(new Map());

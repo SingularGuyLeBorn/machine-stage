@@ -4,6 +4,7 @@ import { getModuleEffects, hideModuleEffects } from "./effects";
 import { updateModuleIllumination } from "./illumination";
 import { updatePedanRays } from "./rays";
 import { updateCavityDevices } from "./cavity-devices";
+import { updateHandCouplings } from "./hand-couplings";
 import { updateJointDrives } from "./joint-drives";
 import { updatePedanMachinery, type PedanActivity } from "./machinery";
 import { updateJointCovers } from "./joint-covers";
@@ -308,6 +309,7 @@ export function animateKingJoeModules(model: AssembledModel, seconds: number, st
   };
   updatePedanMachinery(model, seconds, activity);
   updateCavityDevices(model, seconds, activity);
+  updateHandCouplings(model, seconds, activity.charge);
   updateModuleIllumination(model, seconds, activity);
   model.root.updateMatrixWorld(true);
   updatePedanRays(model, seconds, activity.redModule, activity.yellow);

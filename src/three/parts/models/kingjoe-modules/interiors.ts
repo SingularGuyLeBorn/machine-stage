@@ -4,13 +4,39 @@ import type { GeometryBuilder } from "../../assembler/geometry";
 import type { ModelRegistry, PartDefinition, GeometrySpec } from "../../registry/types";
 import data from "./pedan.generated.json";
 import { addPedanDetailAssemblies, addPedanMachinery, powerMaterial } from "./machinery";
-import { addCavityDevices } from "./cavity-devices";
+import { addCavityDevices, planCavityDevices } from "./cavity-devices";
+import { addHandCouplings } from "./hand-couplings";
 import { addJointDrives } from "./joint-drives";
 import { CUFF } from "./joint-covers";
 
 // 用户已批准的原创佩丹技术：磁约束能源、计算晶核、场调制器与悬浮线圈。
 // [OM-FREEPLAY] 尺寸由实际壳内设备舱派生；配色、线圈匝数及支架布局为原创机械解释。
 export const INTERIOR_MATERIALS: ModelRegistry["materials"] = {
+  pedan_hand_gel: {
+    base: "#659d95",
+    metalness: 0.1,
+    roughness: 0.38,
+    opacity: 0.5,
+    depthWrite: false,
+    clearcoat: 0.35,
+    clearcoatRoughness: 0.35,
+  },
+  pedan_hand_field: {
+    base: "#508f85",
+    metalness: 0.35,
+    roughness: 0.4,
+    emissive: "#73a992",
+    emissiveIntensity: 0.2,
+  },
+  pedan_hand_flow: {
+    base: "#79b7ae",
+    metalness: 0.15,
+    roughness: 0.45,
+    emissive: "#76b5a2",
+    emissiveIntensity: 0.25,
+    opacity: 0.46,
+    depthWrite: false,
+  },
   pedan_chrome: { base: "#b9cedb", metalness: 0.88, roughness: 0.24 },
   pedan_gel: {
     base: "#8ccac5",
@@ -106,6 +132,31 @@ function spring(radius: number, height: number, wire: number, turns: number): TH
   return g;
 }
 export const interiorBuilders: Record<string, GeometryBuilder> = {
+  pedanMembrane: () => {
+    const geometry = new THREE.SphereGeometry(1, 20, 24).scale(1, 0.5, 1);
+    const p = geometry.getAttribute("position");
+    for (let i = 0; i < p.count; i++) {
+      const waist = 0.64 + 0.3 * Math.abs(p.getY(i) * 2);
+      p.setX(i, p.getX(i) * waist);
+      p.setZ(i, p.getZ(i) * waist);
+    }
+    geometry.computeVertexNormals();
+    return geometry;
+  },
+  pedanMicroArc: (spec) => {
+    const { length, width } = (spec as { params: Record<string, number> }).params;
+    // 用封端细管弯成短折电流，仍满足项目的实际渲染几何闭合检查。
+    const geometry = new THREE.CylinderGeometry(0.0014, 0.0014, length, 6, 18).translate(0, length / 2, 0);
+    const p = geometry.getAttribute("position");
+    for (let i = 0; i < p.count; i++) {
+      const t = p.getY(i) / length,
+        seal = Math.sin(Math.PI * t);
+      p.setX(i, p.getX(i) + Math.sin(t * 31) * width * 0.18 * seal);
+      p.setZ(i, p.getZ(i) + Math.sin(t * 49) * width * 0.12 * seal);
+    }
+    geometry.computeVertexNormals();
+    return geometry;
+  },
   pedanCuff: (spec) => {
     const p = (spec as { params: Record<string, number> }).params;
     // 关节叠层护套沿两端连接面连续弯折；保留肩肘的原护甲，不挖球座。
@@ -438,6 +489,7 @@ export function makeInteriors(): Pick<ModelRegistry, "parts" | "nodes" | "consta
   }
   addPedanDetailAssemblies(parts, nodes);
   addCavityDevices(wallTrees, parts, nodes);
+  addHandCouplings(planCavityDevices(wallTrees), parts, nodes);
   addJointDrives(parts, nodes);
   for (const joint of data.joints) {
     const shoulder = joint.key.startsWith("upper");

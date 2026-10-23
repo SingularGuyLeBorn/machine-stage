@@ -167,8 +167,8 @@ export function addCavityDevices(
       });
     };
     const family = i % 3;
-    // 手掌用胶囊填充器件之间的空白；脚底和头侧新增设备也带低亮度柔性场包覆。
-    if (device.infill || device.owner.startsWith("fore")) {
+    // 手部交由连续指节网络连接，不再用一个个独立胶囊；其余新设备保留柔性场包覆。
+    if (device.infill && !device.owner.startsWith("fore")) {
       add(
         "gel_capsule",
         device.owner.startsWith("fore") ? "手掌虹彩凝胶肌束" : "设备柔性场囊",
@@ -256,6 +256,7 @@ export function addCavityDevices(
   }
   // 每个设备最多接向两个近邻；连接从器件表面到表面，不在中心叠满透明膜。
   for (const [i, a] of plan.entries()) {
+    if (a.owner.startsWith("fore")) continue;
     const peers = plan
       .map((b, j) => ({ b, j, d: new THREE.Vector3(...a.center).distanceTo(new THREE.Vector3(...b.center)) }))
       .filter((p) => p.j > i && p.b.owner === a.owner && p.d < a.radius + p.b.radius + 0.42)
@@ -319,7 +320,7 @@ export function updateCavityDevices(model: AssembledModel, seconds: number, acti
   if (!entry) {
     const seen = new Set<THREE.Material>();
     const gels: NonNullable<ReturnType<typeof cache.get>>["gels"] = [];
-    for (const p of model.parts.filter((p) => p.def.material === "pedan_gel")) {
+    for (const p of model.parts.filter((p) => ["pedan_gel", "pedan_hand_gel"].includes(p.def.material))) {
       const material = p.object.material as THREE.MeshStandardMaterial;
       if (seen.has(material)) continue;
       seen.add(material);
