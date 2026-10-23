@@ -35,8 +35,11 @@ function animateLaunch(assembled: AssembledModel, t: number, active: boolean): v
     const spec = MISSILES[hero.type];
     const lid = assembled.getNode(`CV_055_VlsLid_${tag}`);
     const missile = assembled.getNode(`CV_055_VlsMissile_${tag}`);
-    const fins = assembled.getPart(`type055.vls.fins_${tag}`);
+    const isYj21 = hero.type === "yj21";
+    const fins = assembled.getPart(isYj21 ? `type055.vls.fins_booster_${tag}` : `type055.vls.fins_${tag}`);
+    const gliderFins = isYj21 ? assembled.getPart(`type055.vls.fins_glider_${tag}`) : undefined;
     const flame = assembled.getPart(`type055.vls.flame_${tag}`);
+    const gliderFlame = isYj21 ? assembled.getPart(`type055.vls.glider_flame_${tag}`) : undefined;
     if (!lid || !missile) continue;
 
     const local = active
@@ -55,13 +58,20 @@ function animateLaunch(assembled: AssembledModel, t: number, active: boolean): v
     const shrink = active ? 1 - smooth(clamp01((local - 6.0) / 0.6)) : 0;
     missile.position.y = missileRestY(hero.type) + rise;
     missile.scale.setScalar(visible ? Math.max(0, shrink) : 0);
-    if (fins) {
-      const deployed = visible && local > start + (spec.launch === "hot" ? 0.6 : 1.1);
-      fins.object.scale.setScalar(deployed ? 1 : 0.001);
-    }
+    const deployed = visible && local > start + (spec.launch === "hot" ? 0.6 : 1.1);
+    if (fins) fins.object.scale.setScalar(deployed ? 1 : 0.001);
+    if (gliderFins) gliderFins.object.scale.setScalar(deployed ? 1 : 0.001);
     if (flame) {
       const ignite = spec.launch === "hot" ? start + 0.1 : start + 2.0;
       flame.object.visible = visible && local > ignite;
+    }
+    const glider = isYj21 ? assembled.getNode(`CV_055_VlsGlider_${tag}`) : undefined;
+    if (glider) {
+      const sep = visible ? 6.0 * smooth(clamp01((local - (start + 1.8)) / 1.4)) : 0;
+      glider.position.y = sep;
+    }
+    if (gliderFlame) {
+      gliderFlame.object.visible = visible && local > start + 2.2;
     }
     const gas = assembled.getNode(`CV_055_VlsGas_${tag}`);
     if (gas) {

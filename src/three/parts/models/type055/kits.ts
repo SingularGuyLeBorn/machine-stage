@@ -412,23 +412,45 @@ export const type055Yj18Fins: GeometryBuilder = () =>
     ...missileFins(4, 0.25, 0.44, 1.35, 0.028, 0.5, Math.PI / 4),
   ]);
 
-/** 鹰击-21：9m 级 × 0.85m，冷发射，两级：大助推 + 高超滑翔体。 */
+/** 鹰击-21 助推级（下段）：大直径助推 + 尾翼。 */
 export const type055Yj21Missile: GeometryBuilder = () =>
   merge([
     new THREE.CylinderGeometry(0.41, 0.41, 3.2, 24).translate(0, -2.8, 0),
-    new THREE.CylinderGeometry(0.3, 0.3, 3.6, 24).translate(0, 0.6, 0),
-    new THREE.CylinderGeometry(0.18, 0.3, 1.0, 24).translate(0, 3.4, 0),
-    new THREE.CylinderGeometry(0.02, 0.18, 1.0, 24).translate(0, 4.4, 0),
     new THREE.CylinderGeometry(0.3, 0.41, 0.26, 24).translate(0, -4.35, 0),
     ...foldedFins(4, 0.405, 1.2, 0.2, -3.45),
   ]);
 
-/** 鹰击-21 展开助推尾翼/滑翔体控制翼。 */
-export const type055Yj21Fins: GeometryBuilder = () =>
+/** 鹰击-21 双锥体滑翔体（上段，可分离）。 */
+export const type055Yj21Glider: GeometryBuilder = () =>
   merge([
-    ...missileFins(4, 0.41, 0.72, 1.0, 0.045, -3.5),
-    ...missileFins(4, 0.34, 0.54, 0.8, 0.035, 0.4, Math.PI / 4),
+    new THREE.CylinderGeometry(0.3, 0.3, 3.6, 24).translate(0, 0.6, 0),
+    new THREE.CylinderGeometry(0.18, 0.3, 1.0, 24).translate(0, 3.4, 0),
+    new THREE.CylinderGeometry(0.02, 0.18, 1.0, 24).translate(0, 4.4, 0),
+    ...foldedFins(4, 0.305, 0.9, 0.16, 0.4),
   ]);
+
+export const type055Yj21BoosterFins: GeometryBuilder = () =>
+  merge([...missileFins(4, 0.41, 0.72, 1.0, 0.045, -3.5)]);
+
+export const type055Yj21GliderFins: GeometryBuilder = () =>
+  merge([...missileFins(4, 0.34, 0.54, 0.8, 0.035, 0.4, Math.PI / 4)]);
+
+/** 三型弹的深色雷达罩（覆盖原灰色头锥，略大 4mm 防 z-fighting）。 */
+export const type055Hhq9bNose: GeometryBuilder = () =>
+  merge([new THREE.CylinderGeometry(0.02, 0.255, 1.06, 22).translate(0, 2.72, 0), new THREE.SphereGeometry(0.055, 10, 8).translate(0, 3.27, 0)]);
+
+export const type055Yj18Nose: GeometryBuilder = () =>
+  merge([new THREE.CylinderGeometry(0.02, 0.255, 1.02, 22).translate(0, 3.5, 0)]);
+
+export const type055Yj21Nose: GeometryBuilder = () =>
+  merge([
+    new THREE.CylinderGeometry(0.185, 0.305, 1.0, 24).translate(0, 3.4, 0),
+    new THREE.CylinderGeometry(0.02, 0.185, 1.0, 24).translate(0, 4.4, 0),
+  ]);
+
+/** 导弹尾喷口（深色，位置由调用方按弹长放置）。 */
+export const type055MissileNozzle: GeometryBuilder = () =>
+  merge([new THREE.CylinderGeometry(0.16, 0.24, 0.28, 18), new THREE.TorusGeometry(0.23, 0.035, 5, 16).translate(0, -0.12, 0)]);
 
 /** 导弹尾焰（挂在弹体节点上，静止时藏在发射筒内）。 */
 export const type055VlsFlame: GeometryBuilder = () =>

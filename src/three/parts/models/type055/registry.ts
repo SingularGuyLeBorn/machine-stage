@@ -36,6 +36,8 @@ import {
   type055Stabilizer,
   type055Hhq9bFins,
   type055Hhq9bMissile,
+  type055Hhq9bNose,
+  type055MissileNozzle,
   type055VlsCanister,
   type055VlsFlame,
   type055VlsGasCloud,
@@ -44,8 +46,12 @@ import {
   type055VlsTube,
   type055Yj18Fins,
   type055Yj18Missile,
-  type055Yj21Fins,
+  type055Yj18Nose,
+  type055Yj21BoosterFins,
+  type055Yj21Glider,
+  type055Yj21GliderFins,
   type055Yj21Missile,
+  type055Yj21Nose,
 } from "./kits";
 import { MISSILES, VLS, VLS_HEROES, missileRestY, vlsCells } from "./vls";
 
@@ -358,14 +364,54 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     source: "双机库壳体（左右壁 + 顶盖 + 前壁，艉端敞开装卷帘门）；内部可见。",
   });
   add({
-    id: `${P}super.mast`,
-    name_cn: "一体化隐身桅杆",
-    name_en: "integrated mast",
+    id: `${P}super.mast_base`,
+    name_cn: "综合桅杆下段",
+    name_en: "integrated mast lower tier",
     assembly: "radar",
     build_layer: 4,
-    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 6.0, d0: 8.6, w1: 2.4, d1: 4.4, h: 13 } },
+    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 6.0, d0: 8.6, w1: 5.0, d1: 7.2, h: 4.0 } },
     material: "cv_055_hull",
     mate: A([0, DECK + 12.9, 20]),
+  });
+  add({
+    id: `${P}super.mast_mid`,
+    name_cn: "综合桅杆中段",
+    name_en: "integrated mast middle tier",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 5.0, d0: 7.2, w1: 3.6, d1: 5.4, h: 4.5 } },
+    material: "cv_055_hull",
+    mate: A([0, DECK + 16.9, 20]),
+  });
+  add({
+    id: `${P}super.mast_top`,
+    name_cn: "综合桅杆上段",
+    name_en: "integrated mast upper tier",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 3.6, d0: 5.4, w1: 2.2, d1: 3.8, h: 4.5 } },
+    material: "cv_055_hull",
+    mate: A([0, DECK + 21.4, 20]),
+  });
+  add({
+    id: `${P}super.mast_platform_1`,
+    name_cn: "综合桅杆中层平台",
+    name_en: "mast middle platform",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(B(5.4, 0.16, 7.6, [0, 0, 0], 0.02)),
+    material: "cv_steel_dark",
+    mate: A([0, DECK + 16.85, 20]),
+  });
+  add({
+    id: `${P}super.mast_platform_2`,
+    name_cn: "综合桅杆上层平台",
+    name_en: "mast upper platform",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(B(4.0, 0.16, 5.8, [0, 0, 0], 0.02)),
+    material: "cv_steel_dark",
+    mate: A([0, DECK + 21.35, 20]),
   });
   // 舰桥前窗（透明，第一人称可看出去）+ 两侧暗玻璃带
   add({
@@ -793,12 +839,12 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 4,
       geometry: M(B(0.5, 1.6, 0.18, [0, 0, 0], 0.01)),
       material: "cv_aesa",
-      mate: A([side * 2.05, 34.6, 20], [0, side * 90, 0]),
+      mate: A([side * 1.9, 34.6, 20], [0, side * 90, 0]),
     });
   }
   for (const [tag, z, yaw] of [
-    ["fwd", 23.1, 0],
-    ["aft", 16.9, 180],
+    ["fwd", 22.9, 0],
+    ["aft", 17.1, 180],
   ] as const) {
     add({
       id: `${P}radar.xband_${tag}`,
@@ -808,7 +854,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 4,
       geometry: M(B(1.2, 1.0, 0.14, [0, 0, 0], 0.01)),
       material: "cv_aesa",
-      mate: A([0, 35.4, z], [0, yaw, 0]),
+      mate: A([0, 34.8, z], [0, yaw, 0]),
     });
   }
   for (const side of [-1, 1] as const) {
@@ -820,7 +866,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 4,
       geometry: M(B(1.2, 1.0, 0.14, [0, 0, 0], 0.01)),
       material: "cv_aesa",
-      mate: A([side * 2.03, 35.4, 20], [0, side * 90, 0]),
+      mate: A([side * 1.95, 34.6, 20], [0, side * 90, 0]),
     });
   }
   // 桅身四面平板阵（综合射频桅杆的相控阵/电子战面板）
@@ -1297,34 +1343,116 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       motion: "translate",
       note: `${spec.label} ${spec.launch === "cold" ? "冷发射" : "热发射"}`,
     });
+    const isYj21 = hero.type === "yj21";
+    const gliderNode = `CV_055_VlsGlider_${tag}`;
+    if (isYj21) {
+      ctx.node({ name: gliderNode, parent: missileNode, pivot: [0, 0, 0], motion: "translate", note: `鹰击-21 滑翔体分离 ${tag}` });
+    }
     add({
       id: `${P}vls.missile_${tag}`,
       name_cn: `${spec.label} ${tag}（${spec.length}m × ${spec.diameter}m）`,
       name_en: `${spec.label} ${tag}`,
       assembly: "vls",
       build_layer: 3,
-      geometry: {
-        type: "kit",
-        kit: hero.type === "hhq9b" ? "type055Hhq9bMissile" : hero.type === "yj18" ? "type055Yj18Missile" : "type055Yj21Missile",
-      },
+      geometry: { type: "kit", kit: hero.type === "hhq9b" ? "type055Hhq9bMissile" : hero.type === "yj18" ? "type055Yj18Missile" : "type055Yj21Missile" },
       material: "cv_aircraft",
       node: missileNode,
       mate: A([0, 0, 0]),
     });
+    if (isYj21) {
+      add({
+        id: `${P}vls.glider_${tag}`,
+        name_cn: `鹰击-21 双锥滑翔体 ${tag}`,
+        name_en: `YJ-21 glider ${tag}`,
+        assembly: "vls",
+        build_layer: 3,
+        geometry: { type: "kit", kit: "type055Yj21Glider" },
+        material: "cv_aircraft",
+        node: gliderNode,
+        mate: A([0, 0, 0]),
+      });
+      add({
+        id: `${P}vls.glider_nose_${tag}`,
+        name_cn: `鹰击-21 深色头罩 ${tag}`,
+        name_en: `YJ-21 radome ${tag}`,
+        assembly: "vls",
+        build_layer: 3,
+        geometry: { type: "kit", kit: "type055Yj21Nose" },
+        material: "cv_radar_dark",
+        node: gliderNode,
+        mate: A([0, 0, 0]),
+      });
+      add({
+        id: `${P}vls.fins_booster_${tag}`,
+        name_cn: `鹰击-21 助推尾翼 ${tag}`,
+        name_en: `YJ-21 booster fins ${tag}`,
+        assembly: "vls",
+        build_layer: 3,
+        geometry: { type: "kit", kit: "type055Yj21BoosterFins" },
+        material: "cv_steel_dark",
+        node: missileNode,
+        mate: A([0, 0, 0]),
+        scale: [0.001, 0.001, 0.001],
+      });
+      add({
+        id: `${P}vls.fins_glider_${tag}`,
+        name_cn: `鹰击-21 滑翔体控制翼 ${tag}`,
+        name_en: `YJ-21 glider fins ${tag}`,
+        assembly: "vls",
+        build_layer: 3,
+        geometry: { type: "kit", kit: "type055Yj21GliderFins" },
+        material: "cv_steel_dark",
+        node: gliderNode,
+        mate: A([0, 0, 0]),
+        scale: [0.001, 0.001, 0.001],
+      });
+      add({
+        id: `${P}vls.glider_flame_${tag}`,
+        name_cn: `鹰击-21 滑翔体尾焰 ${tag}`,
+        name_en: `YJ-21 glider plume ${tag}`,
+        assembly: "vls",
+        build_layer: 5,
+        geometry: { type: "kit", kit: "type055VlsFlame" },
+        material: "cv_flame",
+        node: gliderNode,
+        mate: A([0, -1.2, 0]),
+        tags: ["fx"],
+      });
+    } else {
+      add({
+        id: `${P}vls.fins_${tag}`,
+        name_cn: `${spec.label} 展开尾翼 ${tag}`,
+        name_en: `${spec.label} deployed fins ${tag}`,
+        assembly: "vls",
+        build_layer: 3,
+        geometry: { type: "kit", kit: hero.type === "hhq9b" ? "type055Hhq9bFins" : "type055Yj18Fins" },
+        material: "cv_steel_dark",
+        node: missileNode,
+        mate: A([0, 0, 0]),
+        scale: [0.001, 0.001, 0.001],
+      });
+      add({
+        id: `${P}vls.nose_${tag}`,
+        name_cn: `${spec.label} 深色头罩 ${tag}`,
+        name_en: `${spec.label} radome ${tag}`,
+        assembly: "vls",
+        build_layer: 3,
+        geometry: { type: "kit", kit: hero.type === "hhq9b" ? "type055Hhq9bNose" : "type055Yj18Nose" },
+        material: "cv_radar_dark",
+        node: missileNode,
+        mate: A([0, 0, 0]),
+      });
+    }
     add({
-      id: `${P}vls.fins_${tag}`,
-      name_cn: `${spec.label} 展开尾翼 ${tag}`,
-      name_en: `${spec.label} deployed fins ${tag}`,
+      id: `${P}vls.nozzle_${tag}`,
+      name_cn: `${spec.label} 尾喷口 ${tag}`,
+      name_en: `${spec.label} nozzle ${tag}`,
       assembly: "vls",
       build_layer: 3,
-      geometry: {
-        type: "kit",
-        kit: hero.type === "hhq9b" ? "type055Hhq9bFins" : hero.type === "yj18" ? "type055Yj18Fins" : "type055Yj21Fins",
-      },
+      geometry: { type: "kit", kit: "type055MissileNozzle" },
       material: "cv_steel_dark",
       node: missileNode,
-      mate: A([0, 0, 0]),
-      scale: [0.001, 0.001, 0.001],
+      mate: A([0, -half, 0]),
     });
     add({
       id: `${P}vls.flame_${tag}`,
@@ -1963,6 +2091,20 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       mate: A([side * 7.0, 13.2, -32.5]),
     });
   }
+  for (const side of [-1, 1] as const) {
+    for (const [tag, z] of [["fwd", -8], ["aft", -20]] as const) {
+      add({
+        id: `${P}power.er_exhaust_riser_${side === -1 ? "l" : "r"}_${tag}`,
+        name_cn: `机舱排气上升井 ${side === -1 ? "左" : "右"} ${tag}`,
+        name_en: `engine exhaust riser ${side === -1 ? "l" : "r"} ${tag}`,
+        assembly: "propulsion",
+        build_layer: 1,
+        geometry: M(B(0.9, 5.7, 0.9, [0, 0, 0], 0.03), B(3.2, 0.9, 0.9, [side * 1.5, -3.9, 0], 0.03)),
+        material: "cv_steel_dark",
+        mate: A([side * 4.0, 17.15, z]),
+      });
+    }
+  }
   add({
     id: `${P}power.steering_gear`,
     name_cn: "舵机液压动力单元",
@@ -2357,7 +2499,8 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     staticOnly("t55-super-self", "type055.super.*", "type055.super.*", "上层建筑/烟囱/舰桥安装"),
     staticOnly("t55-radar-super", "type055.radar.*", "type055.super.*", "相控阵/桅杆与上建安装", 150),
     staticOnly("t55-radar-self", "type055.radar.*", "type055.radar.*", "阵面/天线/安装框装配"),
-    staticOnly("t55-radar-mast-panel", "type055.radar.mast_panel_*", "type055.super.mast", "桅身相控阵/电子战面板嵌入综合桅杆表面", 2200),
+    staticOnly("t55-radar-mast-panel", "type055.radar.mast_panel_*", "type055.super.mast*", "桅身相控阵/电子战面板嵌入综合桅杆表面", 2200),
+    staticOnly("t55-radar-mast-ecm", "type055.radar.ecm_*", "type055.super.mast*", "电子战阵面贴装桅杆侧面", 400),
     staticOnly("t55-vls-deck", "type055.vls.*", "type055.deck.*", "VLS 井口/框架与甲板安装", 150),
     staticOnly("t55-vls-self", "type055.vls.*", "type055.vls.*", "井筒/井盖/框架/燃气排导安装"),
     staticOnly("t55-weapons-deck", "type055.weapons.*", "type055.deck.*", "主炮/近防/导弹/鱼雷与甲板安装", 150),
@@ -2481,10 +2624,16 @@ export const TYPE055_BUILDERS = {
   type055VlsHatch,
   type055Hhq9bMissile,
   type055Hhq9bFins,
+  type055Hhq9bNose,
   type055Yj18Missile,
   type055Yj18Fins,
+  type055Yj18Nose,
   type055Yj21Missile,
-  type055Yj21Fins,
+  type055Yj21Glider,
+  type055Yj21BoosterFins,
+  type055Yj21GliderFins,
+  type055Yj21Nose,
+  type055MissileNozzle,
   type055VlsFlame,
   type055VlsGasCloud,
   type055VlsLiner,
