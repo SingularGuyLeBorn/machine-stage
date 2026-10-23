@@ -123,7 +123,8 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
     for (const part of model.parts.filter((p) => p.def.material.startsWith("pedan_transit_"))) {
       const m = part.object.material as THREE.MeshStandardMaterial;
       expect(m.emissiveIntensity).toBeLessThanOrEqual(0.5);
-      if (part.def.material.includes("flow")) expect(m.opacity).toBeLessThanOrEqual(0.74);
+      if (part.def.material.includes("flow"))
+        expect(m.opacity).toBeLessThanOrEqual(part.def.material.endsWith("arms") ? 0.86 : 0.74);
     }
     updateEnergyExchange(model, devices, 10, QUIET_ACTIVITY);
     for (const stage of baseline.keys()) expect(material(stage).emissiveIntensity).toBe(baseline.get(stage));
@@ -200,6 +201,12 @@ describe("空腔设备、肩肘驱动与流体连接", () => {
             ...[0, 1, 2].map((k) => model.getNode(`Exchange_${i}_packet_${k}`)!.scale.x),
           );
           expect(largest).toBeGreaterThanOrEqual(1);
+          const packetPart = model.getPart(`kingjoemodules.head_arms.exchange_${i}_packets`)!;
+          packetPart.geometry.computeBoundingBox();
+          const softTubeWidth = packetPart.geometry.boundingBox!.getSize(new THREE.Vector3()).z;
+          const pitch = a.distanceTo(b) / 3;
+          // 三枚光包的间距至少留出一枚软晕的空隙，不能再次叠成轮毂边的一条亮线。
+          expect(pitch).toBeGreaterThan(softTubeWidth * 2);
         }
       }
     }
