@@ -170,6 +170,8 @@ interface StageState {
   scanMs: number | null;
   /** 大型模型首帧着色器编译中（DOM 层显示加载提示）。 */
   shaderWarming: boolean;
+  /** 切换到新模型、主线程同步装配中（DOM 层先于重活绘制，避免看起来卡死）。 */
+  assembling: boolean;
 
   views: Record<ViewKey, boolean>;
   layout: PanelLayout;
@@ -229,6 +231,7 @@ interface StageState {
   requestViewReset(instant?: boolean): void;
   runScan(kind: "static" | "sweep"): void;
   setShaderWarming(warming: boolean): void;
+  setAssembling(assembling: boolean): void;
   setNotice(notice: string | null): void;
   /** 记录运行故障（错误面板数据源）。 */
   reportFault(input: { scope: string; message: string; stack?: string }): void;
@@ -313,6 +316,7 @@ export const useStageStore = create<StageState>((set, get) => ({
   scanKind: null,
   scanMs: null,
   shaderWarming: false,
+  assembling: false,
 
   views: { ...VIEWS_DEFAULT },
   layout: {
@@ -733,6 +737,7 @@ export const useStageStore = create<StageState>((set, get) => ({
   },
 
   setShaderWarming: (warming) => set({ shaderWarming: warming }),
+  setAssembling: (assembling) => set({ assembling }),
   setNotice: (notice) => set({ notice }),
 
   reportFault: ({ scope, message, stack }) => set({ fault: { scope, message, stack, at: Date.now() } }),

@@ -5,10 +5,26 @@ import type { PartHandle } from "@/three/parts";
 //
 // 逐件模型默认把电池/电机/发动机/内饰都真实建出来；普通外观视角不需要
 // 渲染它们（会被装甲遮住），但透视/爆炸/构建回放/选中内部件时必须显示。
-// 这里只对自内向外分层的 MBT / ED 生效，其它模型一律不隐藏。
+// MBT / ED 按层判定；航母按总成 + 舱内部件 id 判定（动力舱/机库/舰桥与 CIC
+// 内部设备在外部视角被舰体挡住，却仍要逐件绘制——5 千多个网格会拖到 20fps）。
 // ============================================================================
 
+const CARRIER_HULL_INTERIOR =
+  /^carrier\.hull\.(frame_|detail_gusset|detail_stringer|girder|detail_weld|detail_deck_beam|bulkhead|detail_bulkhead_stiff|detail_penetration|door_|detail_door_hinge|detail_door_dog|hangar_plate|hangar_deck|lower_deck|compartment_|detail_(dc|berth|galley|medical|switch)_)/;
+const CARRIER_POWER_EXTERIOR = /^carrier\.power\.(propeller_|shaft_|rudder_)/;
+const CARRIER_ISLAND_INTERIOR =
+  /^carrier\.island\.(cic_|bridge_(helm_|telegraph_|binnacle_|chart_|radar_|comms_|captain_|navigator_|floor_walk|ceiling_light_|fire_bottle|clock_|binoculars|rear_alarm_|rear_chart_|rear_handrail|rear_life_ring|side_console_|side_screen_|side_switch_|gauge_))/;
+
 export function isInternalPart(modelId: string, handle: PartHandle): boolean {
+  if (modelId === "carrier") {
+    if (handle.def.tags?.includes("fx")) return false;
+    if (handle.assembly === "hangar") return true;
+    if (handle.partId.startsWith("carrier.aircraft.hangarparked")) return true;
+    if (handle.assembly === "power") return !CARRIER_POWER_EXTERIOR.test(handle.partId);
+    if (handle.assembly === "hull") return CARRIER_HULL_INTERIOR.test(handle.partId);
+    if (handle.assembly === "island") return CARRIER_ISLAND_INTERIOR.test(handle.partId);
+    return false;
+  }
   if (modelId !== "mbt90" && modelId !== "ed90") return false;
   // FX / 泄压板在装甲外，不能随内部件隐藏。
   if (handle.def.tags?.includes("fx")) return false;

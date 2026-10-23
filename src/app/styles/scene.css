@@ -58,3 +58,17 @@
 .param__input:focus {
   border-color: var(--accent);
 }
+
+/* 装配/着色器提示：快速淡入；装配前已留出一帧绘制时间 */
+.stage-loading {
+  animation: stage-loading-in 120ms ease-out both;
+}
+
+@keyframes stage-loading-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

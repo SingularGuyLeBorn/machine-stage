@@ -96,12 +96,21 @@ export function StageCanvas() {
   );
 }
 
-/** 重模型首帧着色器编译提示：编译期间用 DOM 层盖住画面，避免低端 GPU 看起来像卡死/黑屏。 */
+/** 重模型加载提示：装配与着色器编译期间用 DOM 层盖住画面，避免低端 GPU 看起来像卡死/黑屏。 */
 function WarmupOverlay() {
-  const active = useStageStore((state) => state.shaderWarming);
-  if (!active) return null;
+  const assembling = useStageStore((state) => state.assembling);
+  const warming = useStageStore((state) => state.shaderWarming);
+  const heavy = useStageStore((state) => state.modelId === "carrier");
+  if (!assembling && !warming) return null;
+  const title = assembling ? "正在装配模型…" : "舰体着色器编译中…";
+  const hint = assembling
+    ? heavy
+      ? "福建舰 5 千余件 / 300 万三角面 · 首次切换要数秒，完成后自动进入"
+      : "正在构建零件几何，请稍候"
+    : "首次加载 300 万三角面，低端 GPU 需要数秒";
   return (
     <div
+      className="stage-loading"
       style={{
         position: "absolute",
         inset: 0,
@@ -126,8 +135,8 @@ function WarmupOverlay() {
           textAlign: "center",
         }}
       >
-        <div style={{ fontSize: 15, marginBottom: 4 }}>舰体着色器编译中…</div>
-        <div style={{ opacity: 0.7, fontSize: 12 }}>首次加载 2.6M 三角面，低端 GPU 需要数秒</div>
+        <div style={{ fontSize: 15, marginBottom: 4 }}>{title}</div>
+        <div style={{ opacity: 0.7, fontSize: 12 }}>{hint}</div>
       </div>
     </div>
   );
@@ -269,6 +278,7 @@ function StageRuntime() {
   const buildIndex = useStageStore((state) => state.buildIndex);
   const selectedPart = useStageStore((state) => state.selectedPart);
   const damageSeed = useStageStore((state) => state.damageSeed);
+  const cameraMode = useStageStore((state) => state.cameraMode);
   const camera = useThree((state) => state.camera);
   const gl = useThree((state) => state.gl);
   const rootScene = useThree((state) => state.scene);
@@ -295,7 +305,10 @@ function StageRuntime() {
     // 变体优先：有 variants 时用选中的那个（原型 / 机械拆解版）
     const variant = model.variants?.find((item) => item.id === variantId) ?? model.variants?.[0];
     const source = variant?.registry ?? model.registry;
-    if (!source) return;
+    if (!source) {
+      useStageStore.getState().setAssembling(false);
+      return;
+    }
     const store = useStageStore.getState();
     const key = `${modelId}|${variantId}|${damageSeed}|${JSON.stringify(overrides)}`;
     const previousKey = currentKeyRef.current;
@@ -338,6 +351,7 @@ function StageRuntime() {
       seqRef.current += 1;
       setScene({ assembled: target, seq: seqRef.current });
       store.setStats(stats);
+      store.setAssembling(false);
       // 重建/复用都保留当前构建进度（改参数不该把玩家从 L2 拉回整车）
       store.setBuildIndex(store.buildIndex);
       store.attach(target);
@@ -386,97 +400,117 @@ function StageRuntime() {
     const errors = validateRegistry(registry).filter((issue) => issue.level === "error");
     if (errors.length > 0) {
       setBuildError(formatIssues(errors));
+      useStageStore.getState().setAssembling(false);
       useStageStore.getState().setNotice(`注册表校验未通过：${errors.length} 个错误`);
       return;
     }
     // 装配可能抛（常量拼写、kit 参数、几何自检……）。这里必须捕获：
     // effect 里抛出的异常会冒泡到 React，没有边界就是整页白屏。
-    let library: ReturnType<typeof createMaterialLibrary>;
-    let next: AssembledModel;
-    const tMat = performance.now();
-    try {
-      library = createMaterialLibrary(registry.materials);
-      const tBuild = performance.now();
-      next = buildModel(registry, {
-        builders: model.builders,
-        materials: library.materials,
-        instanceLayouts: variant?.layouts ?? model.layouts,
-        warnMissingLayout: false,
+    const runBuild = (): AssembledModel | null => {
+      let library: ReturnType<typeof createMaterialLibrary>;
+      let next: AssembledModel;
+      const tMat = performance.now();
+      try {
+        library = createMaterialLibrary(registry.materials);
+        const tBuild = performance.now();
+        next = buildModel(registry, {
+          builders: model.builders,
+          materials: library.materials,
+          instanceLayouts: variant?.layouts ?? model.layouts,
+          warnMissingLayout: false,
+        });
+        console.log(
+          `[perf] 材质库 ${Math.round(tBuild - tMat)}ms · 装配 ${Math.round(performance.now() - tBuild)}ms`,
+        );
+      } catch (error) {
+        useStageStore.getState().setAssembling(false);
+        useStageStore.getState().reportFault(faultFromError(`装配 ${model.title}`, error));
+        return null;
+      }
+      if (model.presentationScale) next.root.scale.set(...model.presentationScale);
+      next.root.traverse((object) => {
+        if ((object as THREE.Mesh).isMesh) {
+          object.castShadow = true;
+          object.receiveShadow = true;
+        }
       });
-      console.log(
-        `[perf] 材质库 ${Math.round(tBuild - tMat)}ms · 装配 ${Math.round(performance.now() - tBuild)}ms`,
-      );
-    } catch (error) {
-      useStageStore.getState().reportFault(faultFromError(`装配 ${model.title}`, error));
-      return;
-    }
-    if (model.presentationScale) next.root.scale.set(...model.presentationScale);
-    next.root.traverse((object) => {
-      if ((object as THREE.Mesh).isMesh) {
-        object.castShadow = true;
-        object.receiveShadow = true;
-      }
-    });
-    // 特效件（tags: fx）默认不可见，由动画在需要时切 visible；否则首帧会先闪一下。
-    // 海面/尾流同用 fx 标签（不参与结构检测、不撑大取景），但需要常显。
-    for (const handle of next.parts) {
-      if (handle.def.tags?.includes("fx") && !handle.def.id.startsWith("carrier.sea.")) {
-        handle.object.visible = false;
-      }
-    }
-    let triangles = 0;
-    for (const handle of next.parts) {
-      const geometry = handle.geometry;
-      const count = geometry.index ? geometry.index.count / 3 : geometry.getAttribute("position").count / 3;
-      triangles += count * (handle.instanced ? handle.instances.length : 1);
-    }
-    // 全车体包围盒 → 复位视角基准 + 地面锚点（排除 fx 特效件，避免炮口焰把取景拉远）
-    const bounds = new THREE.Box3();
-    for (const handle of next.parts) {
-      if (handle.def.tags?.includes("fx")) continue;
-      bounds.union(next.partBounds(handle, new THREE.Box3()));
-    }
-    let home: CachedBuild["home"] = null;
-    let floor: CachedBuild["floor"] = null;
-    if (!bounds.isEmpty()) {
-      // 取景/地面/阴影都在世界空间计算：presentationScale 把编辑尺度换算成米。
-      const presentation = model.presentationScale ?? [1, 1, 1];
-      const scaleMatrix = new THREE.Matrix4().makeScale(presentation[0], presentation[1], presentation[2]);
-      const frame = (model.framingBounds?.(next) ?? bounds).clone().applyMatrix4(scaleMatrix);
-      const worldBounds = bounds.clone().applyMatrix4(scaleMatrix);
-      const center = frame.getCenter(new THREE.Vector3());
-      const frameSize = frame.getSize(new THREE.Vector3());
-      const size = worldBounds.getSize(new THREE.Vector3());
-      home = {
-        center: [center.x, center.y, center.z],
-        radius: Math.max(frameSize.length() * 0.5, 0.5),
-      };
-      floor = { y: worldBounds.min.y, footprint: Math.max(size.x, size.z) };
-    }
-    const stats = { parts: next.parts.length, triangles: Math.round(triangles) };
-    cache.set(key, { assembled: next, library, stats, home, floor, lastUsed: performance.now(), warmed: false });
-    // 只淘汰既不是正在显示、也不是刚装配的缓存项。
-    while (cache.size > MODEL_CACHE_LIMIT) {
-      let victimKey: string | null = null;
-      let oldest = Infinity;
-      for (const [candidateKey, entry] of cache) {
-        if (candidateKey === key || candidateKey === previousKey) continue;
-        if (entry.lastUsed < oldest) {
-          oldest = entry.lastUsed;
-          victimKey = candidateKey;
+      // 特效件（tags: fx）默认不可见，由动画在需要时切 visible；否则首帧会先闪一下。
+      // 海面/尾流同用 fx 标签（不参与结构检测、不撑大取景），但需要常显。
+      for (const handle of next.parts) {
+        if (handle.def.tags?.includes("fx") && !handle.def.id.startsWith("carrier.sea.")) {
+          handle.object.visible = false;
         }
       }
-      if (!victimKey) break;
-      const victim = cache.get(victimKey)!;
-      cache.delete(victimKey);
-      applyXray(victim.assembled, false);
-      clearPose(victim.assembled);
-      victim.assembled.dispose();
-      victim.library.dispose();
-      console.log(`[perf] 缓存淘汰 ${victimKey}`);
+      let triangles = 0;
+      for (const handle of next.parts) {
+        const geometry = handle.geometry;
+        const count = geometry.index ? geometry.index.count / 3 : geometry.getAttribute("position").count / 3;
+        triangles += count * (handle.instanced ? handle.instances.length : 1);
+      }
+      // 全车体包围盒 → 复位视角基准 + 地面锚点（排除 fx 特效件，避免炮口焰把取景拉远）
+      const bounds = new THREE.Box3();
+      for (const handle of next.parts) {
+        if (handle.def.tags?.includes("fx")) continue;
+        bounds.union(next.partBounds(handle, new THREE.Box3()));
+      }
+      let home: CachedBuild["home"] = null;
+      let floor: CachedBuild["floor"] = null;
+      if (!bounds.isEmpty()) {
+        // 取景/地面/阴影都在世界空间计算：presentationScale 把编辑尺度换算成米。
+        const presentation = model.presentationScale ?? [1, 1, 1];
+        const scaleMatrix = new THREE.Matrix4().makeScale(presentation[0], presentation[1], presentation[2]);
+        const frame = (model.framingBounds?.(next) ?? bounds).clone().applyMatrix4(scaleMatrix);
+        const worldBounds = bounds.clone().applyMatrix4(scaleMatrix);
+        const center = frame.getCenter(new THREE.Vector3());
+        const frameSize = frame.getSize(new THREE.Vector3());
+        const size = worldBounds.getSize(new THREE.Vector3());
+        home = {
+          center: [center.x, center.y, center.z],
+          radius: Math.max(frameSize.length() * 0.5, 0.5),
+        };
+        floor = { y: worldBounds.min.y, footprint: Math.max(size.x, size.z) };
+      }
+      const stats = { parts: next.parts.length, triangles: Math.round(triangles) };
+      cache.set(key, { assembled: next, library, stats, home, floor, lastUsed: performance.now(), warmed: false });
+      // 只淘汰既不是正在显示、也不是刚装配的缓存项。
+      while (cache.size > MODEL_CACHE_LIMIT) {
+        let victimKey: string | null = null;
+        let oldest = Infinity;
+        for (const [candidateKey, entry] of cache) {
+          if (candidateKey === key || candidateKey === previousKey) continue;
+          if (entry.lastUsed < oldest) {
+            oldest = entry.lastUsed;
+            victimKey = candidateKey;
+          }
+        }
+        if (!victimKey) break;
+        const victim = cache.get(victimKey)!;
+        cache.delete(victimKey);
+        applyXray(victim.assembled, false);
+        clearPose(victim.assembled);
+        victim.assembled.dispose();
+        victim.library.dispose();
+        console.log(`[perf] 缓存淘汰 ${victimKey}`);
+      }
+      mount(next, stats, home, floor);
+      return next;
+    };
+
+    // 大型模型先让加载提示绘制一帧、再开始同步装配，避免切换时整页无响应。
+    // 5000+ 件的装配约 1-2s，提示层提前出现比装配完再提示更有意义。
+    if (source.parts.length >= 1000) {
+      store.setAssembling(true);
+      let built: AssembledModel | null = null;
+      const timer = window.setTimeout(() => {
+        built = runBuild();
+      }, 140);
+      return () => {
+        window.clearTimeout(timer);
+        if (built) cleanupFor(built)();
+      };
     }
-    mount(next, stats, home, floor);
-    return cleanupFor(next);
+    const built = runBuild();
+    return built ? cleanupFor(built) : undefined;
   }, [modelId, variantId, rebuildToken, overrides, damageSeed, gl, rootScene, camera]);
 
   // 组件卸载时释放所有缓存模型；模型切换时只是缓存/复用，不立即销毁。
@@ -623,7 +657,9 @@ function StageRuntime() {
       views.xray ||
       views.explode ||
       buildIndex < buildOrdersOf(modelId).length ||
-      selectedInternal;
+      selectedInternal ||
+      // 舰内第一人称（舰桥/情报中心/机舱/反应堆/弹药库/机库）必须看到舱内部件。
+      (modelId === "carrier" && isCarrierInteriorMode(cameraMode));
     camera.layers.enable(0);
     if (showInternals) camera.layers.enable(2);
     else camera.layers.disable(2);
@@ -637,7 +673,7 @@ function StageRuntime() {
         setPickable(variant, showInternals);
       }
     }
-  }, [assembled, modelId, camera, views.xray, views.explode, buildIndex, selectedPart]);
+  }, [assembled, modelId, camera, views.xray, views.explode, buildIndex, selectedPart, cameraMode]);
 
   // QA 钩子：开发模式或 ?qa=1 时暴露只读场景引用，用于自动化截图/录屏/相机机位。
   const three = useThree();
