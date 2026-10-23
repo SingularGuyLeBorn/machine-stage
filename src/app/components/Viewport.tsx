@@ -1,4 +1,14 @@
-import { Boxes, CloudRain, Crosshair, DoorOpen, Eye, Grid3x3, Layers, MousePointerClick, Tag } from "lucide-react";
+import {
+  Boxes,
+  CloudRain,
+  Crosshair,
+  DoorOpen,
+  Eye,
+  Grid3x3,
+  Layers,
+  MousePointerClick,
+  Tag,
+} from "lucide-react";
 import { useEffect, useReducer } from "react";
 import { instanceKey, type AssembledModel } from "@/three/parts";
 import { effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
@@ -20,13 +30,7 @@ import { CAMERA_MODE_LABELS } from "../three/viewpoints";
  * 实时读数：机构动画时关节角 / 活塞行程每帧都在变，必须跟着刷新。
  * 单独一个 rAF 节流循环（约 12fps），不牵动整块视口重渲染。
  */
-function LiveReadouts({
-  model,
-  assembled,
-}: {
-  model: StageModel;
-  assembled: AssembledModel | null;
-}) {
+function LiveReadouts({ model, assembled }: { model: StageModel; assembled: AssembledModel | null }) {
   const [, bump] = useReducer((n: number) => n + 1, 0);
   useEffect(() => {
     if (!model.readouts) return;
@@ -97,8 +101,7 @@ export function Viewport() {
 
   const crewLids = model.lids?.filter((lid) => lid.kind !== "fuel") ?? [];
   const crewOpen =
-    crewLids.length > 0 &&
-    crewLids.every((lid) => effectiveLidOpen(lid, lidOverrides, machineState));
+    crewLids.length > 0 && crewLids.every((lid) => effectiveLidOpen(lid, lidOverrides, machineState));
   const hoverLid = lidAt(hoveredPart, hoveredInstance);
   const hoverLidOpen = hoverLid ? effectiveLidOpen(hoverLid, lidOverrides, machineState) : false;
 
@@ -207,13 +210,42 @@ export function Viewport() {
             <Eye size={13} aria-hidden />
             透视
           </button>
+          {model.id === "kingjoemodules" ? (
+            <>
+              <button
+                type="button"
+                className="btn btn--sm"
+                aria-pressed={views.localXray}
+                title="鼠标移到模型上，局部穿透外壳查看内部；拖动时暂时收起"
+                onClick={() => toggleView("localXray")}
+              >
+                <Crosshair size={13} aria-hidden />
+                局部 X 光
+              </button>
+              <button
+                type="button"
+                className="btn btn--sm"
+                aria-pressed={views.internalsOnly}
+                title="隐藏外壳和外部护套，只显示可点选的内部机构；再次点击恢复外观"
+                onClick={() => toggleView("internalsOnly")}
+              >
+                <Boxes size={13} aria-hidden />
+                仅内部零件
+              </button>
+            </>
+          ) : null}
           {crewLids.length > 0 ? (
             <button
               type="button"
               className="btn btn--sm"
               aria-pressed={crewOpen}
               title="一键开/合全部乘员舱盖；也可以直接点单个盖板开合"
-              onClick={() => setLidsOpen(crewLids.map((lid) => lid.key), !crewOpen)}
+              onClick={() =>
+                setLidsOpen(
+                  crewLids.map((lid) => lid.key),
+                  !crewOpen,
+                )
+              }
             >
               <DoorOpen size={13} aria-hidden />
               舱盖

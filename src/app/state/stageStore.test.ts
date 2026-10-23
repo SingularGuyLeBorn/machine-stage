@@ -57,7 +57,17 @@ const resetStore = () => {
     scanPhase: "idle",
     scanKind: null,
     scanMs: null,
-    views: { explode: false, xray: false, labels: false, grid: false, shadow: true, rain: false, thermal: false },
+    views: {
+      explode: false,
+      xray: false,
+      internalsOnly: false,
+      localXray: false,
+      labels: false,
+      grid: false,
+      shadow: true,
+      rain: false,
+      thermal: false,
+    },
     layout: {
       left: { width: 272, open: true },
       right: { width: 324, open: true },
@@ -279,13 +289,33 @@ describe("stageStore 模型切换", () => {
       overrides: { GAP: 0.01 },
       buildIndex: 0,
       selectedPart: "test.frame.box",
-      views: { explode: true, xray: true, labels: true, grid: true, shadow: false, rain: true, thermal: true },
+      views: {
+        explode: true,
+        xray: true,
+        internalsOnly: true,
+        localXray: true,
+        labels: true,
+        grid: true,
+        shadow: false,
+        rain: true,
+        thermal: true,
+      },
     });
     useStageStore.getState().setModel("test");
     const state = useStageStore.getState();
     expect(state.modelId).toBe("test");
     expect(state.overrides).toEqual({});
-    expect(state.views).toEqual({ explode: false, xray: false, labels: false, grid: false, shadow: true, rain: false, thermal: false });
+    expect(state.views).toEqual({
+      explode: false,
+      xray: false,
+      internalsOnly: false,
+      localXray: false,
+      labels: false,
+      grid: false,
+      shadow: true,
+      rain: false,
+      thermal: false,
+    });
     expect(state.selectedPart).toBeNull();
     expect(state.buildIndex).toBe(buildOrdersOf("test").length);
     expect(state.reports).toEqual([]);
@@ -515,5 +545,51 @@ describe("stageStore 实例检查器（负重轮单拆）", () => {
     useStageStore.getState().toggleDetach("tiger.suspension.wheel", 20);
     expect(useStageStore.getState().detached).toHaveLength(0);
     assembled.dispose();
+  });
+});
+
+describe("内部观察模式互斥", () => {
+  beforeEach(resetStore);
+  it("任何入口启用一种模式都关闭另两种，关闭自身不改变其他视图", () => {
+    const modes = ["localXray", "xray", "internalsOnly"] as const;
+    useStageStore.getState().toggleView("grid");
+    for (const from of modes) {
+      for (const to of modes) {
+        resetStore();
+        useStageStore.getState().toggleView("grid");
+        useStageStore.getState().toggleView(from);
+        useStageStore.getState().toggleView(to);
+        const views = useStageStore.getState().views;
+        for (const mode of modes) expect(views[mode]).toBe(from !== to && mode === to);
+        expect(views.grid).toBe(true);
+      }
+    }
+  });
+});
+
+describe("光线加力开关", () => {
+  it("加力保持当前发射状态与模型实例，换模型清零且不支持的模型不能开启", () => {
+    const store = useStageStore.getState();
+    store.setModel("kingjoemodules");
+    store.setMachineState("ray_chest");
+    const before = useStageStore.getState().assembled;
+    store.setEnergyWidth(1.8);
+    expect(useStageStore.getState().energyWidth).toBe(1.8);
+    store.setEnergyWidth(Number.NaN);
+    expect(useStageStore.getState().energyWidth).toBe(1.8);
+    store.setEnergyWidth(9);
+    expect(useStageStore.getState().energyWidth).toBe(3);
+    store.toggleEnergyBoost();
+    expect(useStageStore.getState().energyBoost).toBe(true);
+    expect(useStageStore.getState().machineState).toBe("ray_chest");
+    expect(useStageStore.getState().assembled).toBe(before);
+    store.toggleEnergyBoost();
+    expect(useStageStore.getState().energyBoost).toBe(false);
+    store.toggleEnergyBoost();
+    store.setModel("test");
+    expect(useStageStore.getState().energyWidth).toBe(1);
+    expect(useStageStore.getState().energyBoost).toBe(false);
+    store.toggleEnergyBoost();
+    expect(useStageStore.getState().energyBoost).toBe(false);
   });
 });

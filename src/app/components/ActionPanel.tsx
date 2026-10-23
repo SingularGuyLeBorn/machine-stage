@@ -12,6 +12,8 @@ import { useStageStore } from "../state/stageStore";
 export function ActionPanel() {
   const modelId = useStageStore((state) => state.modelId);
   const machineState = useStageStore((state) => state.machineState);
+  const energyWidth = useStageStore((state) => state.energyWidth);
+  const energyBoost = useStageStore((state) => state.energyBoost);
   const damage = useStageStore((state) => state.damage);
   const variantId = useStageStore((state) => state.variantId);
   const views = useStageStore((state) => state.views);
@@ -33,6 +35,9 @@ export function ActionPanel() {
   const dispatch = (action: StageAction) => {
     const store = useStageStore.getState();
     switch (action.kind) {
+      case "energy-boost":
+        store.toggleEnergyBoost();
+        break;
       case "machine-state":
         store.setMachineState(
           store.machineState === action.state ? (model.states?.[0]?.id ?? "idle") : action.state,
@@ -71,6 +76,7 @@ export function ActionPanel() {
   };
 
   const pressedOf = (action: StageAction): boolean => {
+    if (action.kind === "energy-boost") return energyBoost;
     if (action.kind === "machine-state") return machineState === action.state;
     if (action.kind === "damage") return damage === action.level;
     if (action.kind === "view-toggle") return views[action.view];
@@ -113,6 +119,25 @@ export function ActionPanel() {
             </div>
           </div>
         ))}
+        {model.actions?.some((action) => action.kind === "energy-boost") ? (
+          <div className="action-group">
+            <label className="action-group__label" htmlFor="energy-width">
+              光线粗细 · {energyWidth.toFixed(2)}×
+            </label>
+            <input
+              id="energy-width"
+              type="range"
+              min={0.25}
+              max={3}
+              step={0.05}
+              value={energyWidth}
+              aria-label="光线粗细"
+              style={{ width: "100%" }}
+              onChange={(event) => useStageStore.getState().setEnergyWidth(Number(event.target.value))}
+            />
+            <div className="notes">红色、黄色光束实时调整；加力在此基础上增强。</div>
+          </div>
+        ) : null}
         {model.actions && model.actions.length > 0 ? (
           <div className="notes">
             动作按钮只改状态：机构状态驱动节点动画，展示状态改视口姿态层，自检动作改参数并触发穿模检测。

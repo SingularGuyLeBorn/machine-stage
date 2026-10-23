@@ -122,7 +122,7 @@ class ModuleEffects {
       const faces = contactTriangles(low, high),
         lowTree = new MeshBVH(low),
         highTree = new MeshBVH(high);
-      // [OM-FREEPLAY] 每个接口最多六束短寿命电弧，白芯蓝晕；不添加悬浮光圈。
+      // [OM-FREEPLAY] 每个接口六束白芯蓝晕电弧，近场光圈取实际接触面的包围范围。
       const chains = Array.from({ length: 6 }, () => {
         const core = new THREE.Mesh(
           tube(),
@@ -149,7 +149,27 @@ class ModuleEffects {
       });
       const light = new THREE.PointLight(0x69cbff, 0, 2.8);
       this.group.add(light);
-      return { lower, upper, faces, low, high, lowTree, highTree, chains, light };
+      const contactBox = new THREE.Box3().setFromPoints(faces.flatMap((f) => [f.a, f.b, f.c]));
+      const center = contactBox.getCenter(new THREE.Vector3());
+      const size = contactBox.getSize(new THREE.Vector3());
+      const rings = [0, 1].map(() => {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(1, 0.012, 8, 96),
+          new THREE.MeshBasicMaterial({
+            color: 0x80dcff,
+            transparent: true,
+            opacity: 0,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          }),
+        );
+        ring.rotation.x = Math.PI / 2;
+        ring.scale.set(Math.max(0.2, size.x * 0.53), Math.max(0.2, size.z * 0.53), 1);
+        ring.visible = false;
+        this.group.add(ring);
+        return ring;
+      });
+      return { lower, upper, faces, low, high, lowTree, highTree, chains, light, rings, center };
     });
     model.root.add(this.group);
     const dispose = model.dispose.bind(model);
@@ -171,6 +191,13 @@ class ModuleEffects {
       const charge = Math.min(1, Math.max(0, (0.24 - openings[rig.upper]) / 0.2));
       const strength = charge * Math.min(1, distance / 0.025);
       const ready = openings[rig.lower] < 0.025 && distance < 1.5 && distance > 0.001;
+      // 光圈浮在两个接触面之间，各离本侧面一小段距离，吸合时缩回并熄灭。
+      rig.rings.forEach((ring, side) => {
+        ring.visible = ready && strength > 0.01;
+        ring.position.copy(rig.center).add(side === 0 ? low : high);
+        ring.position.y += (side === 0 ? 1 : -1) * Math.min(0.09, distance * 0.22);
+        ring.material.opacity = strength * (0.45 + 0.15 * Math.sin(time * 5 + side));
+      });
       let lit = 0;
       rig.chains.forEach(({ core, glow }, chain) => {
         let seed = (Math.floor(time * 17 + chain * 0.37) * 104729 + dock * 7919 + chain * 997 + 1) >>> 0;
@@ -232,6 +259,10 @@ class ModuleEffects {
     this.rigs.forEach((r) => {
       r.low.dispose();
       r.high.dispose();
+      r.rings.forEach((ring) => {
+        ring.geometry.dispose();
+        ring.material.dispose();
+      });
       r.chains.forEach((c) => {
         c.core.geometry.dispose();
         c.glow.geometry.dispose();

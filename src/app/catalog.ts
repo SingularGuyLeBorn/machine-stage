@@ -97,9 +97,11 @@ import { T38_MOTION_PARTS, animateType38 } from "@/three/parts/models/guns7/type
 // planned 卡片是路线图占位（M-B…M-F），没有注册表时不可选中。
 // ============================================================================
 
-export type ViewKey = "explode" | "xray" | "labels" | "grid" | "shadow" | "rain" | "thermal";
+export type ViewKey =
+  "explode" | "xray" | "localXray" | "internalsOnly" | "labels" | "grid" | "shadow" | "rain" | "thermal";
 
 export type StageAction =
+  | { id: string; group: string; label: string; kind: "energy-boost" }
   | { id: string; group: string; label: string; kind: "machine-state"; state: string }
   | { id: string; group: string; label: string; kind: "damage"; level: DamageState }
   | { id: string; group: string; label: string; kind: "view-toggle"; view: ViewKey }
@@ -134,12 +136,16 @@ export interface StageVariant {
 }
 
 export interface StageModel {
+  /** [OM-FREEPLAY] 连续灯效与可反向合体使用场景时钟，状态内时序由模型管理。 */
+  animationClock?: "continuous";
   id: string;
   title: string;
   subtitle: string;
   /** 里程碑标记（左栏卡片角标）。 */
   milestone: string;
   status: "ready" | "planned";
+  /** 用户指定隐藏的历史研究卡仍保留源码和注册表，避免与当前四分体展示混淆。 */
+  hidden?: boolean;
   registry?: ModelRegistry;
   layouts?: Record<string, InstanceLayout>;
   /** 变体清单（有它时，UI 用「变体」动作切换，registry 取第一个变体）。 */
@@ -147,7 +153,13 @@ export interface StageModel {
   /** 模型自定义几何 kit 构造器（如发动机 borePlate/siameseBlock 等）。 */
   builders?: Record<string, GeometryBuilder>;
   /** 动画：只驱动节点，每帧调用前框架已 resetNodes。t 为秒；state 为当前机器状态。 */
-  animate?: (assembled: AssembledModel, seconds: number, state?: string) => void;
+  animate?: (
+    assembled: AssembledModel,
+    seconds: number,
+    state?: string,
+    energyBoost?: boolean,
+    energyWidth?: number,
+  ) => void;
   /** 纯展示比例（只缩放置换根节点，不改节点/动画/对接）；在包围盒与相机基准之前应用。 */
   presentationScale?: [number, number, number];
   /** 可动总成的完整行程范围，用于初始取景。 */
@@ -183,16 +195,11 @@ const testKit = makeTestRegistry();
 const makeT800MechRegistry = () => makeT800({ decompose: true }).registry;
 
 /** 当前生效的注册表（有变体时取选中变体的）。 */
-export function activeRegistryOf(
-  modelId: string,
-  variantId?: string,
-): ModelRegistry | undefined {
+export function activeRegistryOf(modelId: string, variantId?: string): ModelRegistry | undefined {
   const model = findModel(modelId);
   if (!model) return undefined;
   if (!model.variants?.length) return model.registry;
-  return (
-    model.variants.find((item) => item.id === variantId)?.registry ?? model.variants[0].registry
-  );
+  return model.variants.find((item) => item.id === variantId)?.registry ?? model.variants[0].registry;
 }
 
 /** 当前生效的实例布局（有变体时取选中变体的）。 */
@@ -266,16 +273,27 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoemodules",
     title: "金古桥 · 参考图分体",
-    subtitle: "头肩与完整双臂 / 胸甲 / 腹盆 / 腿部 · 原 GLB 细节",
+    subtitle: "四分体 / 佩丹设备舱 / 可动肩肘 / 双天线折线光束",
     milestone: "四模块",
     status: "ready",
     registry: makeKingJoeModuleRegistry(),
     builders: kingjoeModuleBuilders,
     animate: poseKingJoeModules,
+    animationClock: "continuous",
     framingBounds: moduleMotionBounds,
-    animatedStates: ["combining", "separation"],
+    animatedStates: [
+      "idle",
+      "closed",
+      "combining",
+      "separation",
+      "beam",
+      "ray_legs",
+      "ray_pelvis",
+      "ray_chest",
+      "ray_head_arms",
+    ],
     states: [
-      { id: "idle", label: "分体检查", hint: "双臂整体跟随头肩；四模块静态展开" },
+      { id: "idle", label: "分体检查", hint: "双臂整体跟随头肩；四模块缓慢悬浮，头灯和胸窗持续发光" },
       { id: "closed", label: "整机检查", hint: "回到原模型装配位置，不播放合体动画" },
       {
         id: "combining",
@@ -283,6 +301,12 @@ export const CATALOG: StageModel[] = [
         hint: "腿部就位后，腹盆、胸甲、头肩依次沿曲线吸合；电花由小到大，最后轻微回弹",
       },
       { id: "separation", label: "展开分体", hint: "四体从起步沿空间曲线展开，天线伸出、髋鼓护片打开" },
+      { id: "beam", label: "佩丹黄色光线", hint: "双手抬至头前下方，向前送出并发射黄色折线光束" },
+      ...(["legs", "pelvis", "chest", "head_arms"] as const).map((key, i) => ({
+        id: `ray_${key}`,
+        label: ["腿部双天线", "腹盆双天线", "胸甲双天线", "头肩双天线"][i],
+        hint: "分体就位后，两根天线同步发射红色 Z 字电束",
+      })),
     ],
     actions: [
       { id: "modules-open", group: "分体", label: "分体检查", kind: "machine-state", state: "idle" },
@@ -296,18 +320,36 @@ export const CATALOG: StageModel[] = [
         state: "separation",
       },
       { id: "modules-reset", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "modules-boost", group: "佩丹光线", label: "光线加力", kind: "energy-boost" },
+      { id: "modules-beam", group: "佩丹光线", label: "整机黄色光线", kind: "machine-state", state: "beam" },
+      ...(["legs", "pelvis", "chest", "head_arms"] as const).map((key, i) => ({
+        id: `modules-ray-${key}`,
+        group: "佩丹光线",
+        label: ["腿部红色双束", "腹盆红色双束", "胸甲红色双束", "头肩红色双束"][i],
+        kind: "machine-state" as const,
+        state: `ray_${key}`,
+      })),
     ],
-    readouts: () => [
-      { label: "主体", value: "4 个连通实体" },
+    readouts: (assembled) => [
+      { label: "主体", value: "4 分体 · 12 设备舱" },
+      {
+        label: "内部零件",
+        value: assembled.parts
+          .filter((p) => p.def.tags?.includes("internal"))
+          .reduce((sum, p) => sum + p.instances.length, 0)
+          .toLocaleString(),
+      },
       { label: "开放边", value: "0" },
-      { label: "双臂", value: "完整保留" },
+      { label: "双臂", value: "肩肘联动" },
       { label: "接口", value: "阶梯嵌合" },
     ],
     notes: [
-      "按参考图分为头肩与双臂、胸甲、腹盆、腿部；手臂按原骨骼归组，不经过躯干切平面。",
+      "分为头肩与双臂、胸甲、腹盆、腿部；肩肘采用前缘转轴和柔性叠层护套，手掌随前臂运动。",
       "保留原 GLB 的头部、四肢与腹盆细节。胸甲按参考图重塑为上窄下展的圆润双瓣，彩窗改为厚黑边与虹彩云斑玻璃；肩根保留大臂外露空间。",
       "腹盆上下凸起嵌入对应凹槽，原髋鼓完整归腿部。胸甲中央为圆 U 口，两侧双榫嵌入头肩凹槽；双臂根部带圆润护甲。",
       "四体沿连续曲线飞出，天线从本体套筒伸出；合体按腿部、腹盆、胸甲、头肩依次完成，电花由小到大，近距减速后吸合回弹。",
+      "佩丹计算晶核、磁约束能源、悬浮场线圈与电磁执行器为经用户批准的原创结构；承力轨、安装柱、螺旋弹簧和散热件可在零件树逐件查看。「仅内部零件」隐藏表皮；大块空腔补入反应堆、储能罐和相位设备；肩肘齿圈与双活塞随抬臂联动，器件之间以半透明虹彩流体耦合。",
+      "分体可用双天线发射红色 Z 字电束；整机抬手、前送后由屏幕发射黄色电束。头屏保留固定四排等宽灯块，未点亮的格子融入暗底，上下两组三连亮点带柔和散射并逐格循环，胸窗在呼吸亮起与近暗之间交替。",
     ],
   },
   {
@@ -451,7 +493,13 @@ export const CATALOG: StageModel[] = [
     actions: [
       { id: "suspension-run", group: "机构", label: "悬挂演示", kind: "machine-state", state: "running" },
       { id: "drive-run", group: "机构", label: "行进演示", kind: "machine-state", state: "driving" },
-      { id: "engine-start", group: "机构", label: "发动机启动", kind: "machine-state", state: "engine_start" },
+      {
+        id: "engine-start",
+        group: "机构",
+        label: "发动机启动",
+        kind: "machine-state",
+        state: "engine_start",
+      },
       { id: "refuel", group: "勤务", label: "加油（开盖）", kind: "machine-state", state: "refuel" },
       { id: "cannon-fire", group: "火力", label: "主炮击发", kind: "machine-state", state: "firing" },
       { id: "loading-run", group: "火力", label: "装填演示", kind: "machine-state", state: "loading" },
@@ -460,7 +508,13 @@ export const CATALOG: StageModel[] = [
       { id: "hit-light", group: "受击", label: "轻击（小口径）", kind: "machine-state", state: "hit_light" },
       { id: "hit-heavy", group: "受击", label: "重击（大口径）", kind: "machine-state", state: "hit_heavy" },
       { id: "hit-oblique", group: "受击", label: "斜角命中", kind: "machine-state", state: "hit_oblique" },
-      { id: "hit-ricochet", group: "受击", label: "跳弹（未穿）", kind: "machine-state", state: "hit_ricochet" },
+      {
+        id: "hit-ricochet",
+        group: "受击",
+        label: "跳弹（未穿）",
+        kind: "machine-state",
+        state: "hit_ricochet",
+      },
       { id: "damage-intact", group: "战损", label: "完好", kind: "damage", level: "intact" },
       { id: "damage-dented", group: "战损", label: "破损（凹陷/裂痕）", kind: "damage", level: "damaged" },
       { id: "damage-broken", group: "战损", label: "破碎（断面露内构）", kind: "damage", level: "broken" },
@@ -503,12 +557,24 @@ export const CATALOG: StageModel[] = [
     animate: animateMbt,
     motionParts: MBT_MOTION_PARTS,
     states: [
-      { id: "idle", label: "停机", hint: "全车静止；可拖构建滑杆自内向外看 V12 动力 → 悬挂 → 战斗室 → 复合装甲" },
-      { id: "engine_start", label: "发动机启动", hint: "起动机拖动曲轴 → 逐缸点火 → 转速爬升到 620r/min 怠速" },
+      {
+        id: "idle",
+        label: "停机",
+        hint: "全车静止；可拖构建滑杆自内向外看 V12 动力 → 悬挂 → 战斗室 → 复合装甲",
+      },
+      {
+        id: "engine_start",
+        label: "发动机启动",
+        hint: "起动机拖动曲轴 → 逐缸点火 → 转速爬升到 620r/min 怠速",
+      },
       { id: "running", label: "怠速运转", hint: "曲轴/12 活塞/12 连杆/48 气门/双凸轮轴/双涡轮/风扇全部在动" },
       { id: "drive", label: "行进演示", hint: "履带滚动 + 14 轮独立起伏 + 传动齿轮转动；车体前后来回" },
       { id: "suspension", label: "液气悬挂", hint: "14 站液压缸/活塞杆/蓄能器独立随地形伸缩" },
-      { id: "aim", label: "炮塔瞄准", hint: "炮塔 +31°/−20° 回转 + 火炮 ±5.7° 俯仰；炮塔回正时驾驶员舱盖弹起并掀开再闭合" },
+      {
+        id: "aim",
+        label: "炮塔瞄准",
+        hint: "炮塔 +31°/−20° 回转 + 火炮 ±5.7° 俯仰；炮塔回正时驾驶员舱盖弹起并掀开再闭合",
+      },
       { id: "loading", label: "自动装弹机", hint: "转盘选弹 → 提弹机抬升 → 推弹杆推入炮膛 → 炮闩关闭" },
       { id: "fire", label: "主炮击发", hint: "后坐 340mm → 炮口焰 → 抽烟装置排烟 → 开闩抛壳" },
       { id: "era_hit", label: "ERA 被击中", hint: "首上反应装甲单块爆炸，来袭弹被推开" },
@@ -518,7 +584,13 @@ export const CATALOG: StageModel[] = [
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
     ],
     actions: [
-      { id: "mbt-engine-start", group: "动力", label: "发动机启动", kind: "machine-state", state: "engine_start" },
+      {
+        id: "mbt-engine-start",
+        group: "动力",
+        label: "发动机启动",
+        kind: "machine-state",
+        state: "engine_start",
+      },
       { id: "mbt-run", group: "动力", label: "怠速运转", kind: "machine-state", state: "running" },
       { id: "mbt-drive", group: "机動", label: "行进演示", kind: "machine-state", state: "drive" },
       { id: "mbt-suspension", group: "机動", label: "液气悬挂", kind: "machine-state", state: "suspension" },
@@ -561,13 +633,25 @@ export const CATALOG: StageModel[] = [
     readouts: edriveReadouts,
     states: [
       { id: "idle", label: "静音待机", hint: "纯电静音：无发动机、无排气；仪表显示电量/母线电压/电机温度" },
-      { id: "silent_drive", label: "静音行驶", hint: "双电机低噪驱动履带，车体低频起伏，静音滑行（噪声约 42dB）" },
+      {
+        id: "silent_drive",
+        label: "静音行驶",
+        hint: "双电机低噪驱动履带，车体低频起伏，静音滑行（噪声约 42dB）",
+      },
       { id: "boost", label: "瞬时加速", hint: "电机瞬时扭矩，0→加速无换挡顿挫；功率表打到 1200kW" },
       { id: "e_steer_left", label: "差速左转", hint: "左电机 900rpm / 右电机 3200rpm，左右履带差速转向" },
       { id: "e_steer_right", label: "差速右转", hint: "右电机 900rpm / 左电机 3200rpm，电动差速右转" },
       { id: "regen", label: "能量回收", hint: "制动/下坡：电机反拖发电，电量表上升，回收功率约 −420kW" },
-      { id: "charging", label: "快充", hint: "充电桩接快充口：装甲盖打开、充电枪锁止、800V 快充（电量爬升）" },
-      { id: "battery_hit", label: "电池被击中", hint: "电池包中弹：短路火星 → 热失控火球/浓烟，Pack 5 顶部泄压" },
+      {
+        id: "charging",
+        label: "快充",
+        hint: "充电桩接快充口：装甲盖打开、充电枪锁止、800V 快充（电量爬升）",
+      },
+      {
+        id: "battery_hit",
+        label: "电池被击中",
+        hint: "电池包中弹：短路火星 → 热失控火球/浓烟，Pack 5 顶部泄压",
+      },
       { id: "thermal_runaway", label: "热失控", hint: "热失控持续蔓延：高温/火焰/烟，电量骤降" },
       { id: "aim", label: "炮塔瞄准", hint: "炮塔回转 + 火炮俯仰（复用 MBT 火力系统）" },
       { id: "loading", label: "自动装弹机", hint: "转盘选弹 → 提弹臂 → 推弹杆 → 炮闩关闭" },
@@ -582,7 +666,13 @@ export const CATALOG: StageModel[] = [
       { id: "ed-stop", group: "电驱", label: "停机", kind: "machine-state", state: "idle" },
       { id: "ed-regen", group: "能量", label: "能量回收", kind: "machine-state", state: "regen" },
       { id: "ed-charge", group: "能量", label: "快充", kind: "machine-state", state: "charging" },
-      { id: "ed-battery-hit", group: "防护", label: "电池被击中", kind: "machine-state", state: "battery_hit" },
+      {
+        id: "ed-battery-hit",
+        group: "防护",
+        label: "电池被击中",
+        kind: "machine-state",
+        state: "battery_hit",
+      },
       { id: "ed-runaway", group: "防护", label: "热失控", kind: "machine-state", state: "thermal_runaway" },
       { id: "ed-aim", group: "火力", label: "炮塔瞄准", kind: "machine-state", state: "aim" },
       { id: "ed-loading", group: "火力", label: "自动装弹", kind: "machine-state", state: "loading" },
@@ -797,6 +887,8 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoeskin",
     title: "金古桥 King Joe · 真实网格分件",
+    // 用户要求隐藏：这是早期 578 源件检查卡，当前展示使用“参考图分体”。
+    hidden: true,
     subtitle: "578 源件 · 四段飞船 · 四体分件查看 · 哑光银灰 + 彩虹胸 · 个人参考",
     milestone: "M-G·R3",
     status: "ready",
@@ -840,6 +932,8 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoewhole",
     title: "金古桥 King Joe · 整体实心（单件）",
+    // 用户要求隐藏：这是早期实心对照模型，保留用于几何回归，不再展示入口。
+    hidden: true,
     subtitle: "原皮表面 + 内部闭合实心核 + 缝隙补面 · 1 个 partId · 不是中空壳",
     milestone: "M-G·R3.1",
     status: "ready",

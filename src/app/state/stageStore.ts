@@ -122,6 +122,8 @@ const LAYOUT_DEFAULT: PanelLayout = {
 const VIEWS_DEFAULT: Record<ViewKey, boolean> = {
   explode: false,
   xray: false,
+  internalsOnly: false,
+  localXray: false,
   labels: false,
   grid: false,
   shadow: true,
@@ -172,6 +174,10 @@ interface StageState {
   views: Record<ViewKey, boolean>;
   layout: PanelLayout;
   machineState: string;
+  energyBoost: boolean;
+  energyWidth: number;
+  setEnergyWidth(value: number): void;
+  toggleEnergyBoost(): void;
   /** 相机模式：自由视角 / 第一人称（驾驶员潜望镜 / 车长指挥塔）。 */
   cameraMode: CameraMode;
   /** 战损形态（完好/破损/破碎）：只切预制变体，不影响碰撞与支撑检测。 */
@@ -319,6 +325,8 @@ export const useStageStore = create<StageState>((set, get) => ({
     drawer: { ...LAYOUT_DEFAULT.drawer },
   },
   machineState: "idle",
+  energyBoost: false,
+  energyWidth: 1,
   cameraMode: "orbit",
   damage: "intact",
   damageSeed: 0,
@@ -354,6 +362,8 @@ export const useStageStore = create<StageState>((set, get) => ({
       scanKind: null,
       scanMs: null,
       machineState: model.states?.[0]?.id ?? "idle",
+      energyBoost: false,
+      energyWidth: 1,
       cameraMode: "orbit",
       damage: "intact",
       damageSeed: 0,
@@ -455,7 +465,18 @@ export const useStageStore = create<StageState>((set, get) => ({
       };
     }),
 
-  toggleView: (key) => set((state) => ({ views: { ...state.views, [key]: !state.views[key] } })),
+  toggleView: (key) =>
+    set((state) => {
+      const enabled = !state.views[key];
+      const views = { ...state.views, [key]: enabled };
+      // [OM-FREEPLAY] 三种内部观察方式互斥，避免外壳已隐藏时局部观察窗失去意义。
+      if (enabled && ["xray", "localXray", "internalsOnly"].includes(key)) {
+        views.xray = key === "xray";
+        views.localXray = key === "localXray";
+        views.internalsOnly = key === "internalsOnly";
+      }
+      return { views };
+    }),
   setView: (key, value) => set((state) => ({ views: { ...state.views, [key]: value } })),
 
   setColumnWidth: (side, width) =>
@@ -510,6 +531,19 @@ export const useStageStore = create<StageState>((set, get) => ({
     set({ variantId, selectedPart: null, selectedInstance: null, detached: [] });
   },
 
+  setEnergyWidth: (value) => {
+    if (
+      !Number.isFinite(value) ||
+      !findModel(get().modelId).actions?.some((action) => action.kind === "energy-boost")
+    )
+      return;
+    // [OM-FREEPLAY] 0.25～3 倍可调；只修改展示截面，不重建模型或重启技能。
+    set({ energyWidth: Math.max(0.25, Math.min(3, value)) });
+  },
+  toggleEnergyBoost: () => {
+    if (!findModel(get().modelId).actions?.some((action) => action.kind === "energy-boost")) return;
+    set({ energyBoost: !get().energyBoost });
+  },
   setMachineState: (state) => {
     const allowed = findModel(get().modelId).states;
     if (allowed && !allowed.some((item) => item.id === state)) return;
@@ -624,7 +658,8 @@ export const useStageStore = create<StageState>((set, get) => ({
     // 有 Worker：检测在后台重建 + 跑 BVH；MBT/ED 级模型再按候选对拆给多个 Worker。
     if (typeof Worker !== "undefined" && import.meta.env.MODE !== "test") {
       const cores = typeof navigator !== "undefined" ? (navigator.hardwareConcurrency ?? 4) : 4;
-      const activeRegistry = model.variants?.find((item) => item.id === variantId)?.registry ?? model.registry;
+      const activeRegistry =
+        model.variants?.find((item) => item.id === variantId)?.registry ?? model.registry;
       const definitionCount = activeRegistry?.parts.length ?? 0;
       // 大模型按候选对拆片；每片重建一次模型 + 独立 BVH，8 片在 16 核上摊得开。
       const shardCount =

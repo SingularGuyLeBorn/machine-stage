@@ -117,7 +117,10 @@ for (const side of [-1, 1])
       build_layer: glass ? 5 : 4,
       build_order: 21 + chestWindowParts.length,
       geometry: { type: "kit", kit },
-      material: glass ? "kjm_glass" : "kjm_window_rim",
+      material: glass ? `kjm_glass_${side < 0 ? "l" : "r"}` : "kjm_window_rim",
       mate: { type: "absolute", position: [0, 0, 0] },
     });
   }
+
+// 内层光学总成复用外窗边界与曲率，避免两份轮廓逐渐漂移。
+export const chestWindowProfile = { center, edge, front };

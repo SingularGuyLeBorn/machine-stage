@@ -14,7 +14,8 @@ import {
 import { findModel, type StageModel } from "../catalog";
 import { buildOrdersOf, faultFromError, useStageStore } from "../state/stageStore";
 import { applyDamage, applyDetach, applyExplode, applyHighlight, applyXray, clearPose } from "./pose";
-import { isInternalPart, isXrayShellPart } from "./internal";
+import { applyInternalVisibility, isInternalPart, isXrayShellPart } from "./internal";
+import { createLocalXray } from "./localXray";
 import { Weather } from "./Weather";
 import { setArmourWet } from "@/three/parts/kernel/armourSurface";
 import { TigerVfx } from "./vfx/TigerVfx";
@@ -48,17 +49,6 @@ function motionPartsOf(model: StageModel): ReadonlySet<string> | undefined {
     motionPartSets.set(model, set);
   }
   return set;
-}
-
-const originalRaycasts = new WeakMap<THREE.Object3D, THREE.Object3D["raycast"]>();
-function setPickable(object: THREE.Object3D, pickable: boolean): void {
-  if (pickable) {
-    const original = originalRaycasts.get(object);
-    if (original) object.raycast = original;
-  } else if (!originalRaycasts.has(object)) {
-    originalRaycasts.set(object, object.raycast);
-    object.raycast = () => {};
-  }
 }
 
 const MODEL_CACHE_LIMIT = 3;
@@ -172,7 +162,8 @@ function SceneEnvIntensity({ value }: { value: number }) {
 function StageEffects() {
   const xray = useStageStore((state) => state.views.xray);
   // 透视时物体大量重叠，AO/Bloom 意义不大且会放大混合开销；直接走默认帧缓冲。
-  if (xray) return null;
+  const localXray = useStageStore((state) => state.views.localXray);
+  if (xray || localXray) return null;
   return (
     <EffectComposer multisampling={4}>
       <Bloom luminanceThreshold={0.95} luminanceSmoothing={0.25} intensity={0.3} mipmapBlur />
@@ -209,6 +200,7 @@ function StageRuntime() {
   // 模型「地面」：包围盒底 + 水平footprint（接触阴影与网格都锚在这里，避免
   // 阴影板切在机体中间、网格从模型腰部穿出）。
   const [stageFloor, setStageFloor] = useState<{ y: number; footprint: number } | null>(null);
+  const localXrayRef = useRef<ReturnType<typeof createLocalXray> | null>(null);
   const clockRef = useRef(0);
   const realTimeRef = useRef(0);
   const lastStateRef = useRef<string | null>(null);
@@ -233,7 +225,7 @@ function StageRuntime() {
     const warmShaders = (target: AssembledModel) => {
       const warm = () => {
         if (useStageStore.getState().assembled !== target) return;
-        void gl.compileAsync(rootScene, camera).catch(() => {});
+        gl.compileAsync(rootScene, camera).catch(() => {});
         const cached = cache.get(key);
         if (cached) cached.warmed = true;
       };
@@ -369,7 +361,15 @@ function StageRuntime() {
       floor = { y: bounds.min.y, footprint: Math.max(size.x, size.z) };
     }
     const stats = { parts: next.parts.length, triangles: Math.round(triangles) };
-    cache.set(key, { assembled: next, library, stats, home, floor, lastUsed: performance.now(), warmed: false });
+    cache.set(key, {
+      assembled: next,
+      library,
+      stats,
+      home,
+      floor,
+      lastUsed: performance.now(),
+      warmed: false,
+    });
     // 只淘汰既不是正在显示、也不是刚装配的缓存项。
     while (cache.size > MODEL_CACHE_LIMIT) {
       let victimKey: string | null = null;
@@ -424,7 +424,7 @@ function StageRuntime() {
     realTimeRef.current += Math.min(delta, 0.05);
     if (!assembled) return;
     const store = useStageStore.getState();
-    const model = findModel(store.modelId);
+    const model = findModel(assembled.registry.model);
     const state = store.machineState;
     // King Joe 等多形态模型用 animatedStates 显式声明时钟推进状态；
     // 其余模型沿用主线的规则：除 idle/scanning 外都推进（悬挂/击发/受损等）。
@@ -441,7 +441,13 @@ function StageRuntime() {
     }
     assembled.resetNodes();
     // 停机时传 0：悬挂回到装配态（否则会停在上一帧的抬起位）
-    model.animate?.(assembled, running ? clockRef.current : 0, state);
+    model.animate?.(
+      assembled,
+      model.animationClock === "continuous" ? realTimeRef.current : running ? clockRef.current : 0,
+      state,
+      store.energyBoost,
+      store.energyWidth,
+    );
     // 舱盖/加油口盖是交互件：用真实帧时间平滑开合，不跟机器状态时钟走
     setArmourWet(store.views.rain);
     if (store.modelId === "tiger") {
@@ -460,21 +466,38 @@ function StageRuntime() {
       });
     }
     assembled.root.updateMatrixWorld(true);
+    localXrayRef.current?.update(camera, gl);
   });
+  const selectedXray = useMemo(() => {
+    const part = selectedPart ? assembled?.getPart(selectedPart) : undefined;
+    return !views.localXray && !!part && isInternalPart(modelId, part);
+  }, [assembled, selectedPart, modelId, views.localXray]);
   // ---- 透视 / 战损 / 高亮 ----
   useEffect(() => {
     if (!assembled) return;
+    applyHighlight(assembled, null, null);
     // 外壳才做幽灵壳；内部件保持不透明，避免近千层透明混合。
     // 选中内部件时自动幽灵化外壳，保证从零件树聚焦内部件时能看见。
-    const selectedHandle = selectedPart ? assembled.getPart(selectedPart) : undefined;
-    const selectedInternal = selectedHandle ? isInternalPart(modelId, selectedHandle) : false;
     applyXray(
       assembled,
-      views.xray || selectedInternal,
+      !views.internalsOnly && !views.localXray && (views.xray || selectedXray),
       (handle) => !isInternalPart(modelId, handle) || isXrayShellPart(modelId, handle),
     );
-    return () => applyXray(assembled, false);
-  }, [assembled, views.xray, modelId, selectedPart]);
+    const lens =
+      views.localXray && modelId === "kingjoemodules"
+        ? createLocalXray(
+            assembled.parts.filter((part) => !isInternalPart(modelId, part)).map((part) => part.object),
+            gl.domElement,
+          )
+        : null;
+    localXrayRef.current = lens;
+    return () => {
+      applyHighlight(assembled, null, null);
+      lens?.dispose();
+      if (localXrayRef.current === lens) localXrayRef.current = null;
+      applyXray(assembled, false);
+    };
+  }, [assembled, views.xray, views.localXray, views.internalsOnly, modelId, selectedXray, gl]);
 
   const damage = useStageStore((state) => state.damage);
   useEffect(() => {
@@ -487,8 +510,23 @@ function StageRuntime() {
   const hoveredInstance = useStageStore((state) => state.hoveredInstance);
   useEffect(() => {
     if (!assembled) return;
-    applyHighlight(assembled, selectedPart, hoveredPart, selectedInstance, hoveredInstance);
-  }, [assembled, selectedPart, selectedInstance, hoveredPart, hoveredInstance]);
+    applyHighlight(
+      assembled,
+      selectedPart,
+      views.localXray ? null : hoveredPart,
+      selectedInstance,
+      hoveredInstance,
+    );
+  }, [
+    assembled,
+    selectedPart,
+    selectedInstance,
+    hoveredPart,
+    hoveredInstance,
+    views.localXray,
+    views.xray,
+    views.internalsOnly,
+  ]);
 
   // ---- 总成标签 ----
   useEffect(() => {
@@ -536,23 +574,24 @@ function StageRuntime() {
     const selectedInternal = selectedHandle ? isInternalPart(modelId, selectedHandle) : false;
     const showInternals =
       views.xray ||
+      views.localXray ||
       views.explode ||
       buildIndex < buildOrdersOf(modelId).length ||
       selectedInternal;
     camera.layers.enable(0);
-    if (showInternals) camera.layers.enable(2);
-    else camera.layers.disable(2);
-    for (const handle of assembled.parts) {
-      if (!isInternalPart(modelId, handle)) continue;
-      handle.object.layers.set(2);
-      setPickable(handle.object, showInternals);
-      for (const variant of Object.values(handle.damageObjects)) {
-        if (!variant) continue;
-        variant.layers.set(2);
-        setPickable(variant, showInternals);
-      }
-    }
-  }, [assembled, modelId, camera, views.xray, views.explode, buildIndex, selectedPart]);
+    camera.layers.disable(2);
+    applyInternalVisibility(modelId, assembled, showInternals, views.internalsOnly);
+  }, [
+    assembled,
+    modelId,
+    camera,
+    views.xray,
+    views.localXray,
+    views.internalsOnly,
+    views.explode,
+    buildIndex,
+    selectedPart,
+  ]);
 
   // QA 钩子：开发模式或 ?qa=1 时暴露只读场景引用，用于自动化截图/录屏/相机机位。
   const three = useThree();

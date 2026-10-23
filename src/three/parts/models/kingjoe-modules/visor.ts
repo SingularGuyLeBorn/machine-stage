@@ -3,8 +3,8 @@ import { MeshBVH } from "three-mesh-bvh";
 import type { GeometryBuilder } from "../../assembler/geometry";
 import type { PartDefinition } from "../../registry/types";
 
-// 剧照：玻璃随头壳后倾，上窄下宽、圆角，浅绿磨砂透光，内部为纵向亮纹。
-// [OM-FREEPLAY] 剧照分辨率不足以量取尺寸；以下轮廓按现有头壳比例拟合，亮纹仅作光学近似。
+// 剧照：玻璃随头壳后倾，上窄下宽、圆角，浅绿磨砂透光，内部为固定四排灯块。
+// [OM-FREEPLAY] 剧照分辨率不足以量取尺寸；以下轮廓按现有头壳比例拟合，玻璃底色仅作光学近似，固定灯阵由 illumination 驱动。
 const center = new THREE.Vector3(0, 6.195, 0);
 const boundary = new THREE.CatmullRomCurve3(
   [
@@ -33,24 +33,7 @@ function opticalColor(x: number, y: number, radius: number) {
     new THREE.Color("#a2cbb3"),
     0.58 * Math.exp(-((x / 0.23) ** 2)) + 0.12 * Math.sin(v * Math.PI),
   );
-  let light = 0;
-  // 半透磨砂下的纵向光带；有宽窄和亮暗变化，不做黑色百叶或高亮霓虹栅栏。
-  for (const [cx, width, intensity] of [
-    [-0.245, 0.009, 0.22],
-    [-0.171, 0.014, 0.35],
-    [-0.092, 0.012, 0.47],
-    [-0.015, 0.019, 0.37],
-    [0.075, 0.011, 0.42],
-    [0.156, 0.014, 0.27],
-    [0.232, 0.008, 0.22],
-  ]) {
-    const bend = 0.009 * Math.sin(v * Math.PI * 1.3 + cx * 8);
-    light +=
-      intensity *
-      Math.exp(-(((x - cx - bend) / width) ** 2)) *
-      Math.sin(Math.PI * THREE.MathUtils.clamp(v, 0, 1)) ** 0.55;
-  }
-  color.lerp(new THREE.Color("#e0ead3"), Math.min(0.72, light));
+  // 玻璃只保留磨砂底色；旧纵向亮纹会穿过固定灯阵的行间，必须去掉。
   const grain = Math.sin(Math.floor(x * 1500) * 127.1 + Math.floor(y * 1500) * 311.7) * 43758.5453;
   return color.multiplyScalar((0.97 + 0.06 * (grain - Math.floor(grain))) * (1 - 0.24 * radius ** 8));
 }
@@ -147,3 +130,5 @@ export const visorParts: PartDefinition[] = ["housing", "seal", "glass"].map((ki
   material: ["kjr_silver", "kjm_visor_seal", "kjm_visor_glass"][i],
   mate: { type: "absolute", position: [0, 0, 0] },
 }));
+
+export const visorProfile = { center, boundary, surface: smoothSurface };
