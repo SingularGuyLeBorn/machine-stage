@@ -3137,6 +3137,90 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     material: "cv_steel",
     mate: A([0, t55DeckTop(-63) + 5.7, -62]),
   });
+  // 机库吊车小车附件：滑轮组/吊索/吊钩/电机/限位/夹轨器
+  for (const [i, x] of [-0.28, 0.28].entries()) {
+    add({
+      id: `${P}hangar.crane_sheave_${i + 1}`,
+      name_cn: `机库吊车滑轮组 ${i + 1}`,
+      name_en: `hangar crane sheave ${i + 1}`,
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(T(0.12, 0.07, 0.06, [0, 0, 0], 12)),
+      material: "cv_steel",
+      mate: A([x, t55DeckTop(-63) + 5.2, -62]),
+    });
+    add({
+      id: `${P}hangar.crane_rail_clamp_${i + 1}`,
+      name_cn: `机库吊车夹轨器 ${i + 1}`,
+      name_en: `hangar crane rail clamp ${i + 1}`,
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(B(0.16, 0.12, 0.2, [0, 0, 0], 0.004)),
+      material: "cv_steel_dark",
+      mate: A([x, t55DeckTop(-63) + 5.85, -62]),
+    });
+  }
+  add({
+    id: `${P}hangar.crane_cable`,
+    name_cn: "机库吊车吊索",
+    name_en: "hangar crane hoist cable",
+    assembly: "hangar",
+    build_layer: 4,
+    geometry: M({ type: "weld", from: [0, t55DeckTop(-63) + 5.7, -62], to: [0, t55DeckTop(-63) + 3.9, -62], radius: 0.02 }),
+    material: "cv_steel",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}hangar.crane_hook`,
+    name_cn: "机库吊车吊钩",
+    name_en: "hangar crane hook",
+    assembly: "hangar",
+    build_layer: 4,
+    geometry: M(T(0.12, 0.07, 0.04, [0, 0, 0], 10)),
+    material: "cv_steel",
+    mate: A([0, t55DeckTop(-63) + 3.82, -62]),
+  });
+  add({
+    id: `${P}hangar.crane_motor`,
+    name_cn: "机库吊车卷扬电机",
+    name_en: "hangar crane winch motor",
+    assembly: "hangar",
+    build_layer: 4,
+    geometry: M(C(0.16, 0.32, [0, 0, 0], 12), C(0.08, 0.1, [0, 0.2, 0], 8)),
+    material: "cv_steel_dark",
+    mate: A([0.42, t55DeckTop(-63) + 5.78, -62]),
+  });
+  add({
+    id: `${P}hangar.crane_gearbox`,
+    name_cn: "机库吊车卷扬减速箱",
+    name_en: "hangar crane winch gearbox",
+    assembly: "hangar",
+    build_layer: 4,
+    geometry: M(B(0.32, 0.28, 0.3, [0, 0, 0], 0.008)),
+    material: "cv_steel",
+    mate: A([-0.4, t55DeckTop(-63) + 5.7, -62]),
+  });
+  add({
+    id: `${P}hangar.crane_limit`,
+    name_cn: "机库吊车高度限位",
+    name_en: "hangar crane limit switch",
+    assembly: "hangar",
+    build_layer: 4,
+    geometry: M(B(0.12, 0.12, 0.08, [0, 0, 0], 0.004)),
+    material: "cv_warning",
+    mate: A([0.2, t55DeckTop(-63) + 5.35, -61.7]),
+  });
+  add({
+    id: `${P}hangar.crane_pendant`,
+    name_cn: "机库吊车操作手柄",
+    name_en: "hangar crane pendant",
+    assembly: "hangar",
+    build_layer: 4,
+    geometry: M({ type: "weld", from: [0.4, t55DeckTop(-63) + 5.6, -61.8], to: [0.4, t55DeckTop(-63) + 4.8, -61.5], radius: 0.012 }, B(0.16, 0.1, 0.12, [0.4, t55DeckTop(-63) + 4.75, -61.5], 0.004)),
+    material: "cv_055_console",
+    mate: A([0, 0, 0]),
+  });
+
   const hangarTieDowns: Array<[number, number]> = [];
   for (const side of [-1, 1] as const) {
     for (let i = 0; i < 4; i++) hangarTieDowns.push([side * 3.6, -68 + i * 3.3]);
@@ -3899,6 +3983,137 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     });
   }
 
+  // 燃气轮机/齿轮箱/轴系附件：油滤、燃油集管、检查盖、吊环、冷却管、轴承阳极
+  for (const e of engines) {
+    add({
+      id: `${P}power.engine_oilfilter_${e.tag}`,
+      name_cn: `GT ${e.tag} 滑油滤`,
+      name_en: `GT ${e.tag} oil filter`,
+      assembly: "propulsion",
+      build_layer: 1,
+      geometry: M(C(0.12, 0.3, [0, 0, 0], 12), C(0.06, 0.1, [0, 0.2, 0], 8)),
+      material: "cv_steel",
+      mate: A([e.x + 0.34, 6.55, e.z + 0.4]),
+    });
+    add({
+      id: `${P}power.engine_fuelmanifold_${e.tag}`,
+      name_cn: `GT ${e.tag} 燃油集管`,
+      name_en: `GT ${e.tag} fuel manifold`,
+      assembly: "propulsion",
+      build_layer: 1,
+      geometry: M({ type: "weld", from: [-0.6, 0, 0], to: [0.6, 0, 0], radius: 0.04 }),
+      material: "cv_copper",
+      mate: A([e.x, 6.1, e.z - 0.45]),
+    });
+    add({
+      id: `${P}power.engine_inspection_${e.tag}`,
+      name_cn: `GT ${e.tag} 检查盖`,
+      name_en: `GT ${e.tag} inspection cover`,
+      assembly: "propulsion",
+      build_layer: 1,
+      geometry: M(B(0.32, 0.02, 0.24, [0, 0, 0], 0.003), C(0.03, 0.04, [0.1, 0.02, 0], 6)),
+      material: "cv_steel_dark",
+      mate: A([e.x - 0.3, 6.6, e.z + 0.1]),
+    });
+    add({
+      id: `${P}power.engine_lifting_${e.tag}`,
+      name_cn: `GT ${e.tag} 吊装环`,
+      name_en: `GT ${e.tag} lifting eye`,
+      assembly: "propulsion",
+      build_layer: 1,
+      geometry: M(T(0.08, 0.045, 0.03, [0, 0, 0], 10), C(0.025, 0.1, [0, -0.05, 0], 6)),
+      material: "cv_steel",
+      mate: A([e.x, 6.95, e.z + 0.2]),
+    });
+    add({
+      id: `${P}power.engine_coolant_${e.tag}`,
+      name_cn: `GT ${e.tag} 冷却水管`,
+      name_en: `GT ${e.tag} coolant line`,
+      assembly: "propulsion",
+      build_layer: 1,
+      geometry: M({ type: "weld", from: [0, 0, -0.6], to: [0, 0, 0.6], radius: 0.035 }),
+      material: "cv_steel",
+      mate: A([e.x + 0.42, 6.3, e.z]),
+    });
+  }
+  for (const side of [-1, 1] as const) {
+    const gx = side * 3.0;
+    for (let i = 0; i < 5; i++) {
+      add({
+        id: `${P}power.gearbox_detail_${side === -1 ? "l" : "r"}_${i + 1}`,
+        name_cn: `并车齿轮箱附件 ${side === -1 ? "左" : "右"} ${i + 1}`,
+        name_en: `gearbox accessory ${side === -1 ? "l" : "r"} ${i + 1}`,
+        assembly: "propulsion",
+        build_layer: 1,
+        geometry: i === 0 ? M(B(0.4, 0.5, 0.03, [0, 0, 0], 0.004), T(0.07, 0.045, 0.04, [0.12, 0.12, 0.03], 10)) : i === 1 ? M(C(0.08, 0.04, [0, 0, 0], 10)) : i === 2 ? M({ type: "weld", from: [0, 0, 0], to: [0, 0, 0.5], radius: 0.04 }) : i === 3 ? M(B(0.55, 0.3, 0.35, [0, 0, 0], 0.006)) : M(T(0.09, 0.05, 0.03, [0, 0, 0], 10)),
+        material: i === 2 ? "cv_copper" : "cv_steel_dark",
+        mate: A([gx - 1.5 + i * 0.7, 5.7 + (i % 2) * 0.6, -45.65 + 1.72]),
+      });
+    }
+    for (const bz of [-52, -62, -72, -82, -89]) {
+      add({
+        id: `${P}power.bearing_detail_${side === -1 ? "l" : "r"}_${Math.abs(bz)}`,
+        name_cn: `轴系轴承附件 ${side === -1 ? "左" : "右"} z${bz}`,
+        name_en: `shaft bearing accessory ${side === -1 ? "l" : "r"} z${bz}`,
+        assembly: "propulsion",
+        build_layer: 1,
+        geometry: M(C(0.06, 0.08, [0, 0, 0], 8), T(0.14, 0.09, 0.03, [0, 0.06, 0], 10)),
+        material: "cv_brass",
+        mate: A([side * T55.SHAFT_X, 4.45, bz]),
+      });
+    }
+    // 可调距桨桨根/桨毂/阳极
+    for (let b = 0; b < 5; b++) {
+      const a = (Math.PI * 2 * b) / 5;
+      add({
+        id: `${P}power.prop_root_${side === -1 ? "l" : "r"}_${b + 1}`,
+        name_cn: `可调距桨桨根 ${side === -1 ? "左" : "右"} ${b + 1}`,
+        name_en: `CPP blade root ${side === -1 ? "l" : "r"} ${b + 1}`,
+        assembly: "propulsion",
+        build_layer: 1,
+        geometry: M(C(0.09, 0.18, [0, 0, 0], 10), T(0.14, 0.1, 0.04, [0, 0.1, 0], 10)),
+        material: "cv_steel",
+        node: side === -1 ? "CV_055_PropL" : "CV_055_PropR",
+        mate: A([Math.cos(a) * 0.68, Math.sin(a) * 0.68, 0]),
+      });
+      add({
+        id: `${P}power.prop_anode_${side === -1 ? "l" : "r"}_${b + 1}`,
+        name_cn: `桨叶牺牲阳极 ${side === -1 ? "左" : "右"} ${b + 1}`,
+        name_en: `propeller anode ${side === -1 ? "l" : "r"} ${b + 1}`,
+        assembly: "propulsion",
+        build_layer: 1,
+        geometry: M(C(0.05, 0.03, [0, 0, 0], 8)),
+        material: "cv_brass",
+        node: side === -1 ? "CV_055_PropL" : "CV_055_PropR",
+        mate: A([Math.cos(a) * 1.2, Math.sin(a) * 1.2, 0]),
+      });
+    }
+    add({
+      id: `${P}power.prop_hubcap_${side === -1 ? "l" : "r"}`,
+      name_cn: `桨毂整流帽 ${side === -1 ? "左" : "右"}`,
+      name_en: `propeller hub cap ${side === -1 ? "l" : "r"}`,
+      assembly: "propulsion",
+      build_layer: 1,
+      geometry: M(S(0.26, [0, 0, 0], 14), C(0.1, 0.1, [0, 0, -0.16], 10)),
+      material: "cv_steel",
+      node: side === -1 ? "CV_055_PropL" : "CV_055_PropR",
+      mate: A([0, 0, -0.05]),
+    });
+    for (let b = 0; b < 4; b++) {
+      const a = (Math.PI * 2 * b) / 4;
+      add({
+        id: `${P}power.shaft_bolt_${side === -1 ? "l" : "r"}_${b + 1}`,
+        name_cn: `轴系法兰螺栓 ${side === -1 ? "左" : "右"} ${b + 1}`,
+        name_en: `shaft flange bolt ${side === -1 ? "l" : "r"} ${b + 1}`,
+        assembly: "propulsion",
+        build_layer: 1,
+        geometry: M(C(0.03, 0.08, [0, 0, 0], 6)),
+        material: "cv_steel",
+        mate: A([side * T55.SHAFT_X + Math.cos(a) * 0.28, 4.0 + Math.sin(a) * 0.28, -80.5]),
+      });
+    }
+  }
+
   // ---------------- 舰桥/CIC/机舱内部 ----------------
   type StationScreen = { x: number; y: number; w: number; h: number; z: number; mat: string };
   interface Station {
@@ -4034,6 +4249,42 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     } else {
       item(st.tag, "便签/笔", "notepad", M(B(0.18, 0.02, 0.24, [0, 0.01, 0], 0.004), B(0.01, 0.01, 0.14, [0.04, 0.03, 0], 0.002)), "cv_deck_line");
     }
+  }
+  // 每个战位的桌面随身物件：电话/水杯/便签，避免 20 个席位完全同一套摆件。
+  for (const [index, st] of stations.entries()) {
+    const ix = st.x + (st.x <= 0 ? 0.56 : -0.56);
+    const iy = st.floorY + 0.78;
+    const iz = st.z + 0.06;
+    add({
+      id: `${P}interior.deskphone_${index + 1}`,
+      name_cn: `${st.role}桌面电话`,
+      name_en: `${st.role} desk phone`,
+      assembly: "interior",
+      build_layer: 3,
+      geometry: M(B(0.14, 0.03, 0.18, [0, 0, 0], 0.002), B(0.08, 0.02, 0.08, [0, 0.02, -0.05], 0.001)),
+      material: "cv_055_console",
+      mate: A([ix - 0.18, iy + 0.02, iz + 0.12]),
+    });
+    add({
+      id: `${P}interior.deskmug_${index + 1}`,
+      name_cn: `${st.role}水杯`,
+      name_en: `${st.role} mug`,
+      assembly: "interior",
+      build_layer: 3,
+      geometry: M(C(0.04, 0.09, [0, 0, 0], 10), C(0.032, 0.01, [0, 0.05, 0], 10)),
+      material: "cv_055_seat",
+      mate: A([ix + 0.12, iy + 0.045, iz + 0.16]),
+    });
+    add({
+      id: `${P}interior.desknote_${index + 1}`,
+      name_cn: `${st.role}便签`,
+      name_en: `${st.role} desk note`,
+      assembly: "interior",
+      build_layer: 3,
+      geometry: M(B(0.18, 0.006, 0.12, [0, 0, 0], 0.001), B(0.01, 0.01, 0.08, [0.05, 0.008, 0], 0.001)),
+      material: "cv_deck_line",
+      mate: A([ix + 0.18, iy + 0.006, iz - 0.12]),
+    });
   }
   add({
     id: `${P}interior.bridge_dashboard`,
@@ -5850,6 +6101,42 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       geometry: M(C(0.5, 0.8, [0, 0, 0], 16), B(1.2, 0.1, 0.16, [0, 0.45, 0], 0.01)),
       material: "cv_canvas",
       mate: A([(i % 2 === 0 ? -1 : 1) * (t55DeckHalf(z) - 0.45), t55DeckTop(z) + 0.4, z]),
+    });
+  }
+  // 救生筏绑扎带/静水压力释放器/释放手柄
+  for (let i = 0; i < 20; i++) {
+    const z = -70 + Math.floor(i / 2) * 2.2;
+    const x = (i % 2 === 0 ? -1 : 1) * (t55DeckHalf(z) - 0.45);
+    const y = t55DeckTop(z) + 0.4;
+    add({
+      id: `${P}surface.raft_strap_${pad(i + 1)}`,
+      name_cn: `救生筏绑扎带 ${i + 1}`,
+      name_en: `life raft strap ${i + 1}`,
+      assembly: "surface",
+      build_layer: 5,
+      geometry: M(T(0.555, 0.505, 0.06, [0, 0, 0], 20)),
+      material: "cv_rubber",
+      mate: A([x, y + 0.7, z]),
+    });
+    add({
+      id: `${P}surface.raft_release_${pad(i + 1)}`,
+      name_cn: `救生筏静水释放器 ${i + 1}`,
+      name_en: `life raft hydrostatic release ${i + 1}`,
+      assembly: "surface",
+      build_layer: 5,
+      geometry: M(B(0.18, 0.14, 0.14, [0, 0, 0], 0.006), C(0.04, 0.08, [0, -0.1, 0], 8)),
+      material: "cv_warning",
+      mate: A([x, y - 0.3, z]),
+    });
+    add({
+      id: `${P}surface.raft_handle_${pad(i + 1)}`,
+      name_cn: `救生筏释放手柄 ${i + 1}`,
+      name_en: `life raft release handle ${i + 1}`,
+      assembly: "surface",
+      build_layer: 5,
+      geometry: M(C(0.025, 0.18, [0, 0, 0], 6), T(0.06, 0.035, 0.02, [0, 0.1, 0], 8)),
+      material: "cv_steel",
+      mate: A([x + 0.3, y - 0.1, z + 0.2]),
     });
   }
   // 舷号/舰名标牌后续按真实字体补充（不用方块拼数字）。
