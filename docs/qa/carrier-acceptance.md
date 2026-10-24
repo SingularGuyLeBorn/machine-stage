@@ -636,3 +636,57 @@ npm run build
 - 福建舰三层铺、满编 2500–3000：https://baijiahao.baidu.com/s?id=1848998255603089078
 - 福建舰医务中心手术室/无影灯/麻醉机/远程会诊、全电厨房：https://www.sohu.com/a/969033867_121347613
 - 福建舰生活区约 1.5 万㎡、全电厨房、分时段供餐：https://www.bilibili.com/video/BV1ABiPB6Ety
+
+---
+
+## 2026-10-25 舰艏甲板本体上翘 + 第一人称全舰漫游（福建舰 / 055 / 坦克）
+
+### 用户指出的问题与对应修复
+- **舰艏上翘不是贴板**：不再用两段薄坡板，甲板本体从 `z=19.4` 起按二次弧线连续抬到艏端 `z=20.669`，抬升 `0.3`（约 2.4m）；上翘段是实体甲板 + 分块装甲板，操舵/舷墙/回收角/拦阻网等艏部设备全部跟随弧面。
+- **回收角左舷穿模 / 封闭楔过大 / 舷号 1_stem 被挡**：回收角改为从当前 36 点甲板边缘派生；艏部封闭楔顶环抬到上翘甲板底、宽度收敛到艏端真实轮廓；删掉压在起翘段上的重复大号 18，只保留平甲板区一组可读的舰艏 18。
+- **降落跑道两端贴合左舷外缘线 13/1**：`LANDING_RUNWAY_POLYGON` 改为由外缘线 13/1 精确截取，跑道偏航 2.46°；甲板标线/中线/接地点全部按同一多边形派生（上一轮 `1935b74` 已提交，本轮继续沿用）。
+- **悬空**：燃油补给站、加油车、停车位框线/5 号字、甲板停放机 1 重新落到甲板面，静态门禁未豁免归零。
+- **新增**：第一人称自由行走/F 交互，覆盖福建舰全部舱室，再扩展到 055 与坦克。
+
+### 舰艏甲板本体上翘（结构）
+- `constants.ts` 新增 `BOW_RAMP_Z0=19.4`、`BOW_RAMP_Z1=20.669`、`BOW_RAMP_RISE=0.3` 与 `deckTopAt / deckSlopeAt / deckPitchDegAt`。
+- 新 kit：`carrierBowRamp`（弧面实体甲板）、`carrierBowRampPlate`（沿弧面分块装甲板 ×5）、`carrierBowRampEdge`（左右舷红/白弧面边带）。
+- 平甲板装甲、舷缘线、起飞跑道底色/边线在 `z=19.4` 截断；两条弹射轨道、滑梭、挡焰板止于起翘段之前；艏舷墙、回收角、网杆、前唇、封闭楔全部随 `deckTopAt(z)` 抬升；原 `bow_ramp_01/02/front/cheek` 已删除。
+- 证据：`carrier-curve-bow-side.jpeg`、`carrier-curve-bow-port.jpeg`、`carrier-curve-bow-top.jpeg`、`carrier-walk-bow-ramp.jpeg`。
+
+### 应急拦阻网对齐 lnj 着舰跑道
+- 旧网按移跑道之前的 -3.59°/中心 0.88 布置，整体偏到右舷；新网按当前 `LANDING_RUNWAY` 在 z=3.3 的跑道中心/偏航派生，网宽 2.2m，控制台移到网右端，避开返航滑行路线。
+- 网面/立柱为节点：收起时网面压缩在网槽（scale.y=0.03），F 后立柱立起、网面展开；控制台/网槽/警示条同步对齐。
+- `flight_ops` 30s@2fps 扫掠：报告 798 / **未豁免 0**（位移扫掠含返航滑行）。
+
+### 第一人称漫游（walk）
+- 新 `CameraMode = "walk"`；点击画面锁定鼠标（失败时拖拽环视），WASD 移动、Shift 冲刺、空格跳、F 交互、Esc 释放鼠标/退出；HUD 含准星、区域名、F 提示、操作说明和区域切换黑场。
+- 框架：`src/app/three/walk.ts`（区域/交互/灯光/障碍配置）、`WalkController.tsx`（指针锁、重力、区域边界 + AABB 碰撞、逐区障碍缓存、门户/门/拦阻网/挡焰板/上下机状态）、`walk.test.ts`（出生点/落点/节点/交互种类）。
+- 内部件可见性：walk 也属于“需要内部件”的视角，进入漫游不再把 internal 零件从场景树摘掉；舱内按区域布点光源 + 轻微手电，甲板保留日光。
+- 节点动画统一走 `motion.ts` 的 walk overlay（机库防火门缩放、挡焰板转角、拦阻网/立柱、两道新增水密门），避免每帧 `resetNodes()` 冲掉交互状态。
+
+#### 福建舰（12 个区域 / 34 个交互）
+- 区域：飞行甲板（含上翘弧面）、机库、弹药库、机舱、反应堆舱、航海舰桥、CIC、生活区走廊、水兵住舱、餐厅、维修车间、停放机翼上。
+- 交互：飞行甲板→升降机下机库、弹药升降机下弹药库、舰岛进舰桥、停放机爬机翼、应急拦阻网升降、3 条挡焰板升降；机库 5 道防火门逐扇开合、升降机回甲板、弹药提升井、维修车间、艉部机舱水密门、艏部生活区水密门；弹药库/机舱/反应堆/舰桥/CIC/生活区/住舱/餐厅/车间/飞机均有返回路径。
+- 新增交互件：机库艉/艏两道可开合水密门、机库顶灯 ×7、拦阻网网面/立柱/控制台；回收角/舷号等按弧面重排。
+- 证据：`carrier-walk-deck-final.jpeg`、`carrier-walk-barrier-final.jpeg`、`carrier-walk-hangar-final2.jpeg`、`carrier-walk-engine-final.jpeg`、`carrier-walk-reactor-spawn.jpeg`、`carrier-walk-bridge-final.jpeg`、`carrier-walk-cic-final.jpeg`、`carrier-walk-crew-spawn.jpeg`、`carrier-walk-magazine-spawn.jpeg`、`carrier-walk-workshop-spawn.jpeg`、`carrier-walk-aircraft-final.jpeg`。
+
+#### 055（11 个区域 / 22 个交互）
+- 区域：前甲板/飞行甲板、航海舰桥、CIC、机舱、机库、生活区走廊/住舱/餐厅、130mm 弹药库、维修车间、直-20 机顶。
+- 交互全部走现有舱门/升降口/机库门位置，F 传送；直-20 可爬上去再跳下。055 是米制模型（presentationScale=1），眼高 1.7m；眼高支持按区域覆盖（坦克坐姿用）。
+- 证据：`carrier-walk-055-deck2.jpeg`、`carrier-walk-055-bridge2.jpeg`、`carrier-walk-055-cic3.jpeg`、`carrier-walk-055-hangar.jpeg`、`carrier-walk-055-engine2.jpeg`、`carrier-walk-055-crew.jpeg`、`carrier-walk-055-magazine.jpeg`、`carrier-walk-055-z20.jpeg`。
+
+#### 坦克（Tiger / MBT-90 / ED-90）
+- 车外绕行 + 驾驶席 / 车长塔 / 炮塔顶部三个位置；F 上下车。虎式驾驶席为真实舱内视角；MBT/ED 因为乘员舱净高不足以站立，驾驶/车长使用舱口视角（眼高按坐姿/舱口单独给），仍可环视车内。
+- 证据：`tank-walk-tiger-exterior2.jpeg`、`tank-walk-tiger-driver.jpeg`、`tank-walk-tiger-commander2.jpeg`、`tank-walk-tiger-top.jpeg`、`tank-walk-mbt-exterior2.jpeg`、`tank-walk-mbt-driver2.jpeg`、`tank-walk-mbt-commander2.jpeg`、`tank-walk-mbt-top.jpeg`。
+
+### 门禁（2026-10-25 最终）
+- 福建舰：10,249 定义件 / 11,403 实例；注册表校验 0 错；悬空 0、悬空孤岛 0、合并件内部悬空 0；**静态穿模 15,273 报告 / 未豁免 0**。
+- 扫掠：`flight_ops` 30s@2fps 798 / **0**；`hangar` 26 / 0；`engine` 558 / 0；`ciws` 166 / 0。
+- 单元测试：`npx vitest run` **368 通过 / 1 跳过**（55 个文件通过 / 1 跳过）；`npm run build`（tsc --noEmit + vite build）通过。新增 `walk.test.ts` 7 项（福建舰 4 / 055 1 / 坦克 2），航母测试 13 项。
+- 055：11,944 件；坦克：虎式 293 件 / MBT 1,299 件（既有门禁不受本轮漫游配置影响）。
+
+### 已知限制
+- 门户/升降机/梯口使用 0.4s 黑场过渡，不是连续可走的真实梯道；舰内 10,000+ 件尺度下优先保证不穿模与可读性。
+- 055 舰岛/机库是实体块，甲板漫游通过两舷通道绕行，入口按现有舱门/升降口布置。
+- MBT/ED 驾驶席为舱口视角；虎式为舱内视角。

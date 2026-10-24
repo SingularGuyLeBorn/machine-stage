@@ -22,6 +22,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import { IsolationView } from "./IsolationView";
 import { PartInfoCard } from "./PartInfoCard";
 import { CAMERA_MODE_LABELS, isCarrierInteriorMode } from "../three/viewpoints";
+import { walkConfigOf } from "../three/walk";
 
 // ============================================================================
 // Viewport —— 中栏：3D 视口 + 视口工具条 + 穿模报告抽屉 + 隔离小视图 + 读数图例
@@ -80,7 +81,13 @@ export function Viewport() {
   const setLidsOpen = useStageStore((state) => state.setLidsOpen);
   const cameraMode = useStageStore((state) => state.cameraMode);
   const setCameraMode = useStageStore((state) => state.setCameraMode);
+  const walkArea = useStageStore((state) => state.walkArea);
+  const walkPrompt = useStageStore((state) => state.walkPrompt);
+  const walkLocked = useStageStore((state) => state.walkLocked);
+  const walkFading = useStageStore((state) => state.walkFading);
   const model = findModel(modelId);
+  const walkConfig = walkConfigOf(modelId);
+  const walkAreaLabel = walkConfig?.areas[walkArea]?.label ?? "甲板";
   const stateLabel = model.states?.find((state) => state.id === machineState)?.label ?? machineState;
 
   // 实例检查器：选中重复件里的某一实例（在视口里直接点中单只负重轮）
@@ -119,7 +126,33 @@ export function Viewport() {
       <IsolationView />
       <PartInfoCard />
 
-      {cameraMode !== "orbit" ? (
+      {cameraMode === "walk" ? (
+        <div className="walk-hud">
+          <div className="walk-hud__crosshair" aria-hidden />
+          <div className="walk-hud__area">{walkAreaLabel} · 第一人称漫游</div>
+          {walkPrompt ? (
+            <div className="walk-hud__prompt" role="status">
+              <kbd>F</kbd>
+              <span>{walkPrompt}</span>
+            </div>
+          ) : null}
+          {!walkLocked ? <div className="walk-hud__lock">点击画面锁定鼠标环视</div> : null}
+          <div className="walk-hud__hints">
+            WASD 移动 · Shift 冲刺 · 空格跳 · F 交互 · Esc {walkLocked ? "释放鼠标" : "退出漫游"}
+          </div>
+          <button
+            type="button"
+            className="btn btn--sm walk-hud__exit"
+            onClick={() => {
+              if (document.pointerLockElement) document.exitPointerLock();
+              setCameraMode("orbit");
+            }}
+          >
+            退出漫游
+          </button>
+          <div className={`walk-fade${walkFading ? " is-on" : ""}`} aria-hidden />
+        </div>
+      ) : cameraMode !== "orbit" ? (
         isCarrierInteriorMode(cameraMode) || cameraMode === "flight" ? (
           <div className="interior-view">
             <div className="interior-view__label">{CAMERA_MODE_LABELS[cameraMode].label}</div>

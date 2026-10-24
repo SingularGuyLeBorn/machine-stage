@@ -24,6 +24,7 @@ import { Type055Vfx } from "./vfx/Type055Vfx";
 import { BridgeSkybox, CommandExterior, CommandScreens } from "./vfx/CommandScreens";
 import { applyTigerLidPose, effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
 import { firstPersonView, type CameraMode, isCarrierInteriorMode } from "./viewpoints";
+import { WalkGate } from "./WalkController";
 import { setAk47Mode } from "@/three/parts/models/ak47/motion";
 import { setM249Mode } from "@/three/parts/models/m249/motion";
 import { setM2hbMode } from "@/three/parts/models/m2hb/motion";
@@ -107,6 +108,7 @@ export function StageCanvas() {
         <CommandExterior />
         <BridgeSkybox />
         <CameraRig />
+        <WalkGate />
         <CarrierCameraFloor />
         {!qaNoFx && <StageEffects />}
       </Canvas>
@@ -914,6 +916,8 @@ function StageRuntime() {
       buildIndex < buildOrdersOf(modelId).length ||
       selectedInternal ||
       // 舰内第一人称（舰桥/情报中心/机舱/反应堆/弹药库/机库）必须看到舱内部件。
+      // walk 漫游会走进舱内/车内，同样不能把 internal 零件从场景树摘掉。
+      cameraMode === "walk" ||
       (modelId === "carrier" && isCarrierInteriorMode(cameraMode));
     camera.layers.enable(0);
     camera.layers.disable(2);
@@ -1125,6 +1129,7 @@ function AssembledObject({
       object={assembled.root}
       onPointerOver={(event: ThreeEvent<PointerEvent>) => {
         event.stopPropagation();
+        if (useStageStore.getState().cameraMode === "walk") return;
         const partId = event.object.name;
         if (!partId) return;
         onHover(partId, event.instanceId ?? null);
@@ -1137,12 +1142,14 @@ function AssembledObject({
       onClick={(event: ThreeEvent<MouseEvent>) => {
         event.stopPropagation();
         if (event.delta > 6) return;
+        if (useStageStore.getState().cameraMode === "walk") return;
         const partId = event.object.name;
         if (partId) onSelect(partId, event.instanceId ?? null);
       }}
       onDoubleClick={(event: ThreeEvent<MouseEvent>) => {
         event.stopPropagation();
         if (event.delta > 6) return;
+        if (useStageStore.getState().cameraMode === "walk") return;
         const partId = event.object.name;
         if (!partId || lidAt(partId, event.instanceId)) return;
         onFocus(partId);

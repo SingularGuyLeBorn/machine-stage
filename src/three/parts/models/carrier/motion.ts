@@ -2,7 +2,7 @@ import * as THREE from "three";
 import type { AssembledModel } from "../../assembler/assembler";
 import { CAT_TRACKS, CV, catPoint } from "./constants";
 import { AIRCRAFT_NODE, AIRCRAFT_SCALE_Z, HOOK_NODE, WING_FOLD_L, WING_FOLD_R } from "./aircraft";
-import { SHUTTLE_NODE, JBD_NODES, WIRE_NODES } from "./flightdeck";
+import { BARRIER_NET_NODE, BARRIER_POST_NODES, JBD_NODES, SHUTTLE_NODE, WIRE_NODES } from "./flightdeck";
 import { LANDING_RUNWAY } from "./runwayPlan";
 import { RADAR_NODE, CIWS_NODES } from "./island";
 import { AMMO_ELEVATOR_NODE, HANGAR_DOOR_NODES } from "./hangar";
@@ -122,11 +122,12 @@ function setWirePull(assembled: AssembledModel, pull: number): void {
 }
 
 function setJbd(assembled: AssembledModel, raised: number): void {
-  const angle = lerp(-Math.PI / 2, 0, raised);
-  for (const node of JBD_NODES) {
+  const overrides = walkOverlays.get(assembled)?.jbd;
+  JBD_NODES.forEach((node, index) => {
+    const value = overrides?.get(index + 1) ?? raised;
     const jbd = assembled.getNode(node);
-    if (jbd) jbd.rotation.x = angle;
-  }
+    if (jbd) jbd.rotation.x = lerp(-Math.PI / 2, 0, value);
+  });
 }
 
 function setBridgeMotion(assembled: AssembledModel, t: number): void {
@@ -191,12 +192,61 @@ function setRadar(assembled: AssembledModel, angle: number): void {
   if (radar) radar.rotation.y = angle;
 }
 
+// ---- 第一人称漫游交互覆盖 ----
+// 漫游时 F 键会改变个别舱门/挡焰板/拦阻网；这些值必须由每帧的动画统一应用，
+// 否则 resetNodes() 会把节点姿态冲掉。覆盖表只记录目标值，平滑在控制器里做。
+export interface CarrierWalkOverlay {
+  /** 机库防火门（1..5）：0 收拢 / 1 全开。 */
+  doors: Map<number, number>;
+  /** 挡焰板（1..3）：0 平放 / 1 竖起。 */
+  jbd: Map<number, number>;
+  /** 应急拦阻网：0 收起 / 1 升起。 */
+  barrier: number;
+  /** 漫游新增水密门：节点名 → 0 关闭 / 1 全开。 */
+  walkDoors: Map<string, number>;
+}
+
+const walkOverlays = new WeakMap<AssembledModel, CarrierWalkOverlay>();
+
+export function carrierWalkOverlay(assembled: AssembledModel): CarrierWalkOverlay {
+  let overlay = walkOverlays.get(assembled);
+  if (!overlay) {
+    overlay = { doors: new Map(), jbd: new Map(), barrier: 0, walkDoors: new Map() };
+    walkOverlays.set(assembled, overlay);
+  }
+  return overlay;
+}
+
+export function clearCarrierWalkOverlay(assembled: AssembledModel): void {
+  walkOverlays.delete(assembled);
+}
+
 function setDoors(assembled: AssembledModel, open: number): void {
-  const fold = 1 - smooth(open) * 0.92;
-  for (const name of HANGAR_DOOR_NODES) {
+  const overrides = walkOverlays.get(assembled)?.doors;
+  HANGAR_DOOR_NODES.forEach((name, index) => {
+    const value = overrides?.get(index + 1) ?? open;
+    const fold = 1 - smooth(value) * 0.92;
     for (const nodeName of [name, `${name}_R`]) {
       const door = assembled.getNode(nodeName);
       if (door) door.scale.x = fold;
+    }
+  });
+}
+
+function applyWalkOverlay(assembled: AssembledModel): void {
+  const overlay = walkOverlays.get(assembled);
+  const barrier = overlay?.barrier ?? 0;
+  const net = assembled.getNode(BARRIER_NET_NODE);
+  if (net) net.scale.y = 0.03 + 0.97 * barrier;
+  const postAngle = (-Math.PI / 2) * barrier;
+  for (const name of BARRIER_POST_NODES) {
+    const post = assembled.getNode(name);
+    if (post) post.rotation.x = postAngle;
+  }
+  if (overlay) {
+    for (const [name, open] of overlay.walkDoors) {
+      const door = assembled.getNode(name);
+      if (door) door.rotation.y = -1.8326 * open;
     }
   }
 }
@@ -345,6 +395,7 @@ export function animateCarrier(assembled: AssembledModel, seconds: number, state
   setControlRods(assembled, 0);
   setRotors(assembled, 0, 0);
   setBridgeMotion(assembled, t);
+  applyWalkOverlay(assembled);
 
   if (state === "engine") {
     setRotors(assembled, t, 6.0);

@@ -33,7 +33,8 @@ export type CameraMode =
   | "workshop"
   | "fuel"
   | "cockpit"
-  | "flight";
+  | "flight"
+  | "walk";
 
 export const CARRIER_INTERIOR_MODES = [
   "bridge",
@@ -101,7 +102,7 @@ export function firstPersonView(
   mode: CameraMode,
   assembled: AssembledModel | null,
 ): FirstPersonView | null {
-  if (mode === "orbit" || mode === "flight" || !assembled) return null;
+  if (mode === "orbit" || mode === "flight" || mode === "walk" || !assembled) return null;
   const toWorld = (local: THREE.Vector3) => local.applyMatrix4(assembled.root.matrixWorld);
 
   if (mode === "driver") {
@@ -344,4 +345,8 @@ export const CAMERA_MODE_LABELS: Record<CameraMode, { label: string; hint: strin
   fuel: { label: "加油作业", hint: "飞行甲板燃油站：加油车 / 软管 / 加油枪 / 接地线，连接到停放舰载机；再点一次退出" },
   cockpit: { label: "舰载机座舱", hint: "舰载机座舱：平显 / 多功能显示器 / 操纵杆，拖动环视；再点一次退出" },
   flight: { label: "跟拍舰载机", hint: "跟拍舰载机：完整看滑行 / 弹射 / 爬升 / 进近 / 拦阻；再点一次退出" },
+  walk: {
+    label: "第一人称漫游",
+    hint: "点击画面锁定鼠标：WASD 移动 / Shift 冲刺 / 空格跳 / F 交互 / Esc 释放鼠标；走到舷梯、舱门、飞机旁按 F",
+  },
 };

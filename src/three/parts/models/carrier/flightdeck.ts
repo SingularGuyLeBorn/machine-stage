@@ -1,7 +1,22 @@
 import * as THREE from "three";
-import { CAT_TRACKS, CV, carrierJbdOffset, catAcross, catPoint } from "./constants";
+import {
+  BOW_RAMP_Z0,
+  BOW_RAMP_Z1,
+  CAT_TRACKS,
+  CV,
+  carrierJbdOffset,
+  catAcross,
+  catPoint,
+  deckPitchDegAt,
+  deckTopAt,
+} from "./constants";
 import { deckEdgeAt, deckPlan, hullSurfaceHalfAt } from "./kits";
-import { LANDING_RUNWAY, LANDING_RUNWAY_POLYGON, TAKEOFF_RUNWAY_POLYGON } from "./runwayPlan";
+import {
+  LANDING_RUNWAY,
+  LANDING_RUNWAY_POLYGON,
+  TAKEOFF_RUNWAY_POLYGON,
+  clipPolygonZMax,
+} from "./runwayPlan";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
 import type { GeometrySpec } from "../../registry/types";
 
@@ -20,6 +35,24 @@ export const WIRE_NODES = [
   ["CV_Wire_3_L", "CV_Wire_3_R"],
   ["CV_Wire_4_L", "CV_Wire_4_R"],
 ] as const;
+
+// 应急拦阻网：网槽位置（斜角着舰区前段）与可交互控制台。
+export const BARRIER_NET_NODE = "CV_BarrierNet";
+export const BARRIER_POST_NODES = ["CV_BarrierPost_L", "CV_BarrierPost_R"] as const;
+export const BARRIER_NET_Z = 3.3;
+// 应急拦阻网必须横跨当前 lnj 着舰跑道；旧版用的是移跑道之前的 -3.59°/中心
+// 0.88，网整个偏到右舷，返航滑行的飞机还会撞上新控制台。
+export const BARRIER_NET_HALF = 1.1;
+export const BARRIER_NET_YAW = -LANDING_RUNWAY.deg;
+const BARRIER_NET_RAD = (BARRIER_NET_YAW * Math.PI) / 180;
+const BARRIER_RUNWAY_T =
+  (BARRIER_NET_Z - LANDING_RUNWAY.aftZ) / (LANDING_RUNWAY.foreZ - LANDING_RUNWAY.aftZ);
+export const BARRIER_NET_CENTER_X =
+  LANDING_RUNWAY.aftX + (LANDING_RUNWAY.foreX - LANDING_RUNWAY.aftX) * BARRIER_RUNWAY_T;
+export const BARRIER_CONTROL_POS: [number, number] = [
+  BARRIER_NET_CENTER_X + BARRIER_NET_HALF + 0.35,
+  BARRIER_NET_Z - 0.38,
+];
 
 export function addFlightDeck(ctx: CarrierCtx): void {
   const add = (part: Parameters<CarrierCtx["add"]>[0]) => ctx.add(part);
@@ -66,8 +99,11 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     const rawZ0 = zLines[zi]!;
     const rawZ1 = zLines[zi + 1]!;
     if (rawZ1 - rawZ0 < 0.1) continue;
+    // 起翘段由弧面装甲板单独铺，平甲板装甲止于起翘起点，不再埋进弧面里。
+    if (rawZ0 >= BOW_RAMP_Z0 - 1e-6) continue;
     const z0 = zi === 0 ? rawZ0 : rawZ0 + armorJoint / 2;
-    const z1 = zi === zLines.length - 2 ? rawZ1 : rawZ1 - armorJoint / 2;
+    const z1 = Math.min(zi === zLines.length - 2 ? rawZ1 : rawZ1 - armorJoint / 2, BOW_RAMP_Z0);
+    if (z1 - z0 < 0.1) continue;
     const port0 = deckEdgeAt(z0, -1).x;
     const star0 = deckEdgeAt(z0, 1).x;
     const port1 = deckEdgeAt(z1, -1).x;
@@ -106,6 +142,101 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         source: "按甲板真实折线与横向分列切块；板缝 0.022，露出水密基层，非整块甲板。",
       });
     }
+  }
+
+  // ---- 舰艏甲板本体上翘：弧形实体甲板 + 分块装甲板 + 随弧面抬起的舷缘线 ----
+  add({
+    id: `${P}bow_ramp_core`,
+    name_cn: "舰艏上翘甲板本体",
+    name_en: "upturned bow deck structure",
+    assembly: ASSEMBLY,
+    build_layer: 3,
+    geometry: { type: "kit", kit: "carrierBowRamp" },
+    material: "cv_deck_plate",
+    mate: A([0, 0, 0]),
+    source: `甲板面从 z=${BOW_RAMP_Z0} 起按二次弧线抬到艏端 ${BOW_RAMP_Z1}，抬升 0.3（约 2.4m），不是另贴板。`,
+  });
+  const rampPlateCount = 5;
+  for (let i = 0; i < rampPlateCount; i++) {
+    const gap = i === 0 || i === rampPlateCount - 1 ? 0 : 0.016;
+    const z0 = BOW_RAMP_Z0 + ((BOW_RAMP_Z1 - BOW_RAMP_Z0) * i) / rampPlateCount + gap / 2;
+    const z1 = BOW_RAMP_Z0 + ((BOW_RAMP_Z1 - BOW_RAMP_Z0) * (i + 1)) / rampPlateCount - gap / 2;
+    add({
+      id: `${P}bow_ramp_plate_${pad(i + 1)}`,
+      name_cn: `舰艏上翘装甲板 ${i + 1}`,
+      name_en: `bow ramp armor plate ${i + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: { type: "kit", kit: "carrierBowRampPlate", params: { z0, z1 } },
+      material: i % 2 === 0 ? "cv_deck" : "cv_deck_panel",
+      mate: A([0, 0, 0]),
+      source: "沿弧面分块铺板；横缝随坡度倾斜，板缝露出下面的实体甲板。",
+    });
+  }
+  for (const side of [-1, 1] as const) {
+    const tag = side === -1 ? "p" : "s";
+    add({
+      id: `${P}bow_ramp_edge_${tag}_red`,
+      name_cn: `舰艏上翘舷缘红线 ${tag.toUpperCase()}`,
+      name_en: `bow ramp edge red ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: { type: "kit", kit: "carrierBowRampEdge", params: { side, width: 0.18, inset: 0.01, lift: 0.0035 } },
+      material: "cv_deck_red",
+      mate: A([0, 0, 0]),
+    });
+    add({
+      id: `${P}bow_ramp_edge_${tag}`,
+      name_cn: `舰艏上翘舷缘白线 ${tag.toUpperCase()}`,
+      name_en: `bow ramp edge white ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: { type: "kit", kit: "carrierBowRampEdge", params: { side, width: 0.09, inset: 0.01, lift: 0.0065 } },
+      material: "cv_deck_line",
+      mate: A([0, 0, 0]),
+    });
+  }
+  {
+    const zTip = BOW_RAMP_Z1 - 0.11;
+    const port = deckEdgeAt(zTip, -1).x;
+    const star = deckEdgeAt(zTip, 1).x;
+    const cx = (port + star) / 2;
+    const width = star - port - 0.08;
+    const y = deckTopAt(zTip);
+    add({
+      id: `${P}bow_ramp_front_red`,
+      name_cn: "舰艏上翘前缘红线",
+      name_en: "bow ramp front red band",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(width, 0.006, 0.19, [0, 0, 0], 0.0012)),
+      material: "cv_deck_red",
+      mate: A([cx, y + 0.0035, zTip]),
+    });
+    add({
+      id: `${P}bow_ramp_front_line`,
+      name_cn: "舰艏上翘前缘白线",
+      name_en: "bow ramp front white band",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(width - 0.06, 0.006, 0.09, [0, 0, 0], 0.0012)),
+      material: "cv_deck_line",
+      mate: A([cx, y + 0.0065, zTip]),
+    });
+  }
+  {
+    const port = deckEdgeAt(BOW_RAMP_Z0, -1).x;
+    const star = deckEdgeAt(BOW_RAMP_Z0, 1).x;
+    add({
+      id: `${P}bow_ramp_joint`,
+      name_cn: "舰艏上翘起始折缝",
+      name_en: "bow ramp knuckle joint",
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M(B(star - port - 0.04, 0.008, 0.045, [0, 0, 0], 0.0015)),
+      material: "cv_hull_dark",
+      mate: A([(port + star) / 2, deckTop + 0.002, BOW_RAMP_Z0]),
+    });
   }
 
   // ---- 电磁弹射器 ×3：三条轨道等长，舰艏两条内收 1.5°，腰部三号与斜角跑道平行 ----
@@ -577,13 +708,13 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // 真实航母在非降落作业时拦阻网是收起的，这里按“收起”建模：两根折叠立柱贴在
   // 跑道两舷，网包横卧在甲板上的低矮网槽里，不挡弹射器、不与挡焰板重叠。
   {
-    const netZ = 3.3;
-    const netRad = (3.59 * Math.PI) / 180;
+    const netZ = BARRIER_NET_Z;
+    const netRad = BARRIER_NET_RAD;
     const netSin = Math.sin(netRad);
     const netCos = Math.cos(netRad);
-    const netCenterX = -0.5756 - ((netZ + 19.9) / netCos) * netSin;
-    const netHalf = 1.55;
-    const netYaw = -3.59;
+    const netCenterX = BARRIER_NET_CENTER_X;
+    const netHalf = BARRIER_NET_HALF;
+    const netYaw = BARRIER_NET_YAW;
     const postAt = (side: -1 | 1): [number, number] => [
       netCenterX + side * netHalf * netCos,
       netZ + side * netHalf * netSin,
@@ -606,7 +737,16 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         material: "cv_steel_dark",
         mate: A([px, deckTop, pz]),
       });
-      // 折叠立柱：沿甲板纵轴倒伏，落在两只鞍座上，不横跨跑道。
+      // 折叠立柱：收起时沿甲板纵轴倒伏；F 升起时绕铰座转 90° 立起。
+      const postNode = side === -1 ? BARRIER_POST_NODES[0] : BARRIER_POST_NODES[1];
+      ctx.node({
+        name: postNode,
+        parent: "root",
+        pivot: [px, deckTop + 0.1, pz],
+        motion: "rotate",
+        axis: "x",
+        note: `应急拦阻网立柱 ${tag}（铰座）`,
+      });
       add({
         id: `${P}arrestor_net_stanchion_${tag}`,
         name_cn: `拦阻网折叠立柱 ${side === -1 ? "左" : "右"}`,
@@ -619,7 +759,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
           B(0.04, 0.04, 0.04, [0, 0.01, 0.72], 0.002),
         ),
         material: "cv_steel",
-        mate: A([px, deckTop + 0.1, pz]),
+        node: postNode,
+        mate: A([0, 0, 0]),
       });
       add({
         id: `${P}arrestor_net_cradle_${tag}`,
@@ -681,9 +822,72 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         build_layer: 4,
         geometry: M(B(0.16, 0.004, 0.1, [0, 0.058, 0], 0.001)),
         material: w % 2 === 0 ? "cv_deck_red" : "cv_deck_yellow",
-        mate: A([netCenterX - netHalf + 0.4 + w * 0.34, deckTop, netZ], [0, netYaw, 0]),
+        // 警示条必须全部落在网槽宽度内，旧版最后一条越出网槽后悬空。
+        mate: A([netCenterX - netHalf + 0.2 + (w * (netHalf * 2 - 0.4)) / 10, deckTop, netZ], [0, netYaw, 0]),
       });
     }
+    // 可升降网面：收起时压缩在网槽里（运行时 scale.y≈0.03），F 后升起。
+    ctx.node({
+      name: BARRIER_NET_NODE,
+      parent: "root",
+      pivot: [netCenterX, deckTop + 0.006, netZ],
+      rest_rotation: [0, netYaw, 0],
+      scale: [1, 0.03, 1],
+      motion: "scalar",
+      axis: "y",
+      note: "应急拦阻网网面（可升起）",
+    });
+    const netWires: Parameters<typeof M>[0][] = [];
+    for (let i = 0; i <= 12; i++) {
+      const x = -netHalf + 0.06 + (i * (netHalf * 2 - 0.12)) / 12;
+      netWires.push({ type: "weld", from: [x, 0.035, 0], to: [x, 0.83, 0], radius: 0.0045, seed: 9100 + i });
+    }
+    for (let j = 0; j <= 5; j++) {
+      const y = 0.05 + (j * 0.78) / 5;
+      netWires.push({ type: "weld", from: [-netHalf + 0.04, y, 0], to: [netHalf - 0.04, y, 0], radius: 0.0045, seed: 9200 + j });
+    }
+    add({
+      id: `${P}barrier_net_panel`,
+      name_cn: "应急拦阻网网面",
+      name_en: "emergency barrier net panel",
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M(...netWires),
+      material: "cv_canvas",
+      node: BARRIER_NET_NODE,
+      mate: A([0, 0, 0]),
+      source: "收起时压进网槽；交互升起后由立柱撑开成整面拦阻网。",
+    });
+    add({
+      id: `${P}barrier_net_top_cable`,
+      name_cn: "应急拦阻网顶部张紧索",
+      name_en: "barrier net top tension cable",
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M({ type: "weld", from: [-netHalf, 0.82, 0], to: [netHalf, 0.82, 0], radius: 0.009 }),
+      material: "cv_steel",
+      node: BARRIER_NET_NODE,
+      mate: A([0, 0, 0]),
+    });
+    // 控制台：甲板上的液压控制箱 + 手柄 + 警示灯；F 在此升降拦阻网。
+    add({
+      id: `${P}barrier_net_control`,
+      name_cn: "应急拦阻网控制台",
+      name_en: "emergency barrier control pedestal",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        B(0.24, 0.06, 0.2, [0, 0.03, 0], 0.006),
+        B(0.18, 0.26, 0.16, [0, 0.16, 0], 0.008),
+        B(0.14, 0.05, 0.12, [0, 0.31, 0], 0.004),
+        { type: "weld", from: [0, 0.33, 0], to: [0.06, 0.45, 0.03], radius: 0.012 },
+        C(0.022, 0.06, [0.065, 0.47, 0.035], 10),
+        C(0.018, 0.03, [-0.06, 0.34, 0], 10),
+        T(0.03, 0.018, 0.02, [0.07, 0.3, 0.085], 12),
+      ),
+      material: "cv_warning",
+      mate: A([BARRIER_CONTROL_POS[0], deckTop, BARRIER_CONTROL_POS[1]], [0, netYaw, 0]),
+    });
   }
 
   // ---- 右舷艉部航空吊车：基座/回转齿圈/桅柱/司机室/桁架吊臂/绞车/吊钩 ----
@@ -1129,10 +1333,12 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     }
   }
   // 舰艏起飞跑道：用户 lnj-coordinates.json 的四点窄楔形，覆盖两条右舷弹射器。
-  const tpForePort = TAKEOFF_RUNWAY_POLYGON[0]!;
-  const tpAftPort = TAKEOFF_RUNWAY_POLYGON[1]!;
-  const tpAftStar = TAKEOFF_RUNWAY_POLYGON[2]!;
-  const tpForeStar = TAKEOFF_RUNWAY_POLYGON[3]!;
+  // 起翘段是抬起的实体甲板，跑道底色/边线在起翘起点截断，不能平铺进弧面里。
+  const tpPolygon = clipPolygonZMax(TAKEOFF_RUNWAY_POLYGON, BOW_RAMP_Z0);
+  const tpForePort = tpPolygon[0]!;
+  const tpAftPort = tpPolygon[1]!;
+  const tpAftStar = tpPolygon[2]!;
+  const tpForeStar = tpPolygon[3]!;
   add({
     id: `${P}takeoff_runway_underlay`,
     name_cn: "舰艏起飞跑道底色",
@@ -1142,7 +1348,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     geometry: {
       type: "kit",
       kit: "carrierDeckArmorPlate",
-      params: { points: TAKEOFF_RUNWAY_POLYGON, topY: deckTop + 0.004, thickness: 0.003 },
+      params: { points: tpPolygon, topY: deckTop + 0.004, thickness: 0.003 },
     },
     material: "cv_runway",
     mate: A([0, 0, 0]),
@@ -1182,15 +1388,17 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       material: "cv_deck_line",
       mate: A([x, bowNumberY, z]),
     });
-  deckBar("1_stem", -0.82, 18.1, 0.28, 2.45);
-  deckBar("1_base", -0.78, 16.95, 0.92, 0.22);
-  deckBar("8_top", 0.68, 19.12, 1.12, 0.22);
-  deckBar("8_mid", 0.68, 18.1, 1.12, 0.22);
-  deckBar("8_bot", 0.68, 17.08, 1.12, 0.22);
-  deckBar("8_left_up", 0.23, 18.62, 0.22, 0.86);
-  deckBar("8_left_lo", 0.23, 17.58, 0.22, 0.86);
-  deckBar("8_right_up", 1.13, 18.62, 0.22, 0.86);
-  deckBar("8_right_lo", 1.13, 17.58, 0.22, 0.86);
+  // 艏端可用甲板只剩右舷起飞跑道外侧的窄条，18 整体内收/缩小，避免被
+  // 起飞跑道、舷墙和回收角遮住；1 的竖笔不再伸出左舷甲板。
+  deckBar("1_stem", -0.18, 18.2, 0.2, 1.25);
+  deckBar("1_base", -0.15, 17.66, 0.58, 0.16);
+  deckBar("8_top", 0.4, 18.78, 0.58, 0.16);
+  deckBar("8_mid", 0.4, 18.2, 0.58, 0.16);
+  deckBar("8_bot", 0.4, 17.62, 0.58, 0.16);
+  deckBar("8_left_up", 0.13, 18.49, 0.14, 0.42);
+  deckBar("8_left_lo", 0.13, 17.91, 0.14, 0.42);
+  deckBar("8_right_up", 0.67, 18.49, 0.14, 0.42);
+  deckBar("8_right_lo", 0.67, 17.91, 0.14, 0.42);
   // 甲板使用痕迹：着舰轮胎擦痕（两列）、停机位油污、挡焰板烧蚀。
   for (const side of [-1, 1] as const) {
     for (let t = 0; t < 11; t++) {
@@ -1249,7 +1457,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // 停机位框线 + 编号（七段数字），全部贴在甲板上；避开着舰/起飞跑道。
   const parkingSpots: Array<[number, number, number, number]> = [
     // x, z, 编号, 机体朝向（与 PARKED_SPOTS 一致）
-    [3.95, -10.2, 1, 0], [4.1, 5.2, 2, 0],
+    [3.2, -10.2, 1, 0], [4.05, 5.2, 2, 0],
     // 5 号是现役演示机位：艏部右舷弹射跑道外侧，不压着舰跑道/拦阻网。
     [2.95, 8.8, 5, 0],
   ];
@@ -1283,7 +1491,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   };
   parkingSpots.forEach(([sx, sz, n, yaw]) => {
     // 5 号位停现役 J20（20.4m），框线按 2.2×3.0；折叠翼 J-15 用 1.28×2.7。
-    const w = n === 5 ? 2.2 : 1.1;
+    // 2 号位靠右舷，框线略收窄，避免右边线压出甲板外缘。
+    const w = n === 5 ? 2.2 : n === 2 ? 0.9 : 1.1;
     const d = n === 5 ? 3.0 : 2.7;
     add({
       id: `${P}parking_box_${pad(n)}`,
@@ -1296,10 +1505,11 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       mate: A([sx, markY + 0.003, sz], [0, yaw, 0]),
     });
     const yawRad = (yaw * Math.PI) / 180;
-    // 右侧贴舷停机位的编号往舰内放，不能刷到甲板外。
-    const numSide = sx > 3.8 ? -1 : 1;
-    const numX = sx + numSide * (w / 2 + 0.22) * Math.cos(yawRad) + (d / 2 + 0.14) * Math.sin(yawRad);
-    const numZ = sz - numSide * (w / 2 + 0.22) * Math.sin(yawRad) + (d / 2 + 0.14) * Math.cos(yawRad);
+    // 右舷停机位编号统一放到舰内一侧，不能刷到甲板外；5 号单独放在框线艉侧，
+    // 避开右侧起飞跑道和艏部甲板收窄区。
+    const numSide = sx > 3.0 ? -1 : 1;
+    const numX = n === 5 ? sx : sx + numSide * (w / 2 + 0.22) * Math.cos(yawRad) + (d / 2 + 0.14) * Math.sin(yawRad);
+    const numZ = n === 5 ? sz - 1.75 : sz - numSide * (w / 2 + 0.22) * Math.sin(yawRad) + (d / 2 + 0.14) * Math.cos(yawRad);
     drawDigit(String(n), `parking_num_${n}`, numX, numZ, 0.36);
   });
   // 甲板外缘线：直接沿真实 deckPlan 折线勾边，向甲板内侧偏 0.05。
@@ -1338,12 +1548,27 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   for (let i = 0; i < outline.length; i++) {
     const [ax, az] = outline[i]!;
     const [bx, bz] = outline[(i + 1) % outline.length]!;
-    const dx = bx - ax;
-    const dz = bz - az;
-    const len = Math.hypot(dx, dz);
-    if (len < 1e-6) continue;
+    if (Math.hypot(bx - ax, bz - az) < 1e-6) continue;
+    // 平甲板舷缘线止于起翘起点；起翘段另有随弧面抬起的红/白边带。
+    if (az > BOW_RAMP_Z0 + 1e-6 && bz > BOW_RAMP_Z0 + 1e-6) continue;
+    let x0 = ax;
+    let z0 = az;
+    let x1 = bx;
+    let z1 = bz;
+    if (x0 !== x1 || z0 !== z1) {
+      if (z0 > BOW_RAMP_Z0) {
+        const t = (BOW_RAMP_Z0 - z1) / (z0 - z1);
+        x0 = x1 + (x0 - x1) * t;
+        z0 = BOW_RAMP_Z0;
+      } else if (z1 > BOW_RAMP_Z0) {
+        const t = (BOW_RAMP_Z0 - z0) / (z1 - z0);
+        x1 = x0 + (x1 - x0) * t;
+        z1 = BOW_RAMP_Z0;
+      }
+    }
+    if (Math.hypot(x1 - x0, z1 - z0) < 1e-4) continue;
     // 不向内偏：外缘线直接压在甲板折线上，装甲板不会再“超出外缘线”。
-    const midX = (ax + bx) / 2;
+    const midX = (x0 + x1) / 2;
     let id: string;
     let label: string;
     if (midX > 0.15) {
@@ -1359,7 +1584,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       id = `deck_edge_end_${endEdgeIndex}`;
       label = az + bz < 0 ? `艉甲板外缘线 ${endEdgeIndex}` : `艏甲板外缘线 ${endEdgeIndex}`;
     }
-    edgeLine(ax, az, bx, bz, id, label);
+    edgeLine(x0, z0, x1, z1, id, label);
   }
 
   // 直升机停靠点（圆圈 + H）。
@@ -1383,9 +1608,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     material: "cv_deck_line",
     mate: A([0.8, markY + 0.007, 3.5]),
   });
-  // 舷号 18 刷在艏端：真实福建舰的 18 在两根弹射轨前方、靠近艏尖，不能被轨道压住。
-  drawDigit("1", "hull_number_1", -0.95, 19.6, 1.5, "舰艏舷号");
-  drawDigit("8", "hull_number_8", 0.75, 19.6, 1.5, "舰艏舷号");
+  // 艏端甲板舷号只保留 bow_number_* 一组（z 17.6~18.8 平甲板区）；
+  // 旧版在 z=19.6 又刷了一套大号 18，正好压到舷墙/起翘段上，已移除。
   // 挡焰板危险区：随各自轨道/JBD 旋转，只放在 JBD 与弹射起点之间，
   // 不铺到斜角着舰跑道上；弹射位数字已在上方按轨道生成，这里不再重复。
   CAT_TRACKS.forEach((track) => {
@@ -1535,13 +1759,22 @@ export function addFlightDeck(ctx: CarrierCtx): void {
 
   // ---- 舰艏回收角（山羊角）+ 尼龙网 ----
   for (const side of [-1, 1] as const) {
+    // 回收角必须贴着当前 36 点艏部外缘；旧版写死 ±2.05/±2.55，左舷艏部
+    // 收窄后整根角梁悬在甲板外并插进外飘。
+    const baseX = deckEdgeAt(19.45, side).x;
+    const tipBaseX = deckEdgeAt(20.45, side).x;
+    const braceX = deckEdgeAt(18.4, side).x;
+    const tipX = tipBaseX + side * 0.18;
+    const baseY = deckTopAt(19.45) + 0.04;
+    const tipY = deckTopAt(BOW_RAMP_Z1) + 0.08;
+    const braceY = deckTopAt(18.4) + 0.06;
     add({
       id: `${P}recovery_horn_${side === -1 ? "p" : "s"}`,
       name_cn: `舰艏回收角 ${side === -1 ? "左" : "右"}`,
       name_en: `bow recovery horn ${side === -1 ? "p" : "s"}`,
       assembly: ASSEMBLY,
       build_layer: 3,
-      geometry: M({ type: "weld", from: [side * 2.05, deckTop + 0.04, 19.45], to: [side * 2.55, deckTop + 0.08, 21.15], radius: 0.045 }),
+      geometry: M({ type: "weld", from: [baseX - side * 0.05, baseY, 19.45], to: [tipX, tipY, 21.15], radius: 0.045 }),
       material: "cv_steel",
       mate: A([0, 0, 0]),
     });
@@ -1551,12 +1784,14 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       name_en: `recovery horn brace ${side === -1 ? "p" : "s"}`,
       assembly: ASSEMBLY,
       build_layer: 3,
-      geometry: M({ type: "weld", from: [side * 2.55, deckTop + 0.08, 21.15], to: [side * 0.9, deckTop + 0.06, 18.4], radius: 0.03 }),
+      geometry: M({ type: "weld", from: [tipX, tipY, 21.15], to: [braceX - side * 0.05, braceY, 18.4], radius: 0.03 }),
       material: "cv_steel",
       mate: A([0, 0, 0]),
     });
   }
   for (let i = 0; i < 4; i++) {
+    const z = 19.8 + i * 0.18;
+    const netCx = (deckEdgeAt(z, -1).x + deckEdgeAt(z, 1).x) / 2;
     add({
       id: `${P}recovery_net_bar_${i + 1}`,
       name_cn: `回收角尼龙网横杆 ${i + 1}`,
@@ -1567,7 +1802,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       // 从舰桥看就是一把横跨舰艏的长杆。
       geometry: M(C(0.004, 0.58, [0, 0, 0], 6)),
       material: "cv_canvas",
-      mate: A([0, deckTop + 0.1, 19.8 + i * 0.18], [0, 0, 90]),
+      mate: A([netCx, deckTopAt(z) + 0.1, z], [0, 0, 90]),
     });
     for (const side of [-1, 1] as const) {
       add({
@@ -1578,10 +1813,11 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         build_layer: 3,
         geometry: M(B(0.012, 0.1, 0.012, [0, 0.05, 0], 0.0015)),
         material: "cv_steel",
-        mate: A([side * 0.29, deckTop, 19.8 + i * 0.18]),
+        mate: A([netCx + side * 0.29, deckTopAt(z), z]),
       });
     }
   }
+  const netCx20 = (deckEdgeAt(20.2, -1).x + deckEdgeAt(20.2, 1).x) / 2;
   for (let i = 0; i < 8; i++) {
     add({
       id: `${P}recovery_net_line_${i + 1}`,
@@ -1591,26 +1827,13 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       build_layer: 3,
       geometry: M(C(0.003, 0.2, [0, 0, 0], 6)),
       material: "cv_canvas",
-      mate: A([-0.23 + i * 0.066, deckTop + 0.09, 20.2], [90, 0, 0]),
+      mate: A(
+        [netCx20 - 0.23 + i * 0.066, deckTopAt(20.2) + 0.09, 20.2],
+        [90 + deckPitchDegAt(20.2), 0, 0],
+      ),
     });
   }
 
-  // ---- 舰艏上翘甲板（真实甲板有轻微上翘/外飘，不是一块平板） ----
-  for (let i = 0; i < 2; i++) {
-    const z = 19.0 + i * 0.72;
-    const port = deckEdgeAt(z, -1).x;
-    const star = deckEdgeAt(z, 1).x;
-    add({
-      id: `${P}bow_ramp_${pad(i + 1)}`,
-      name_cn: `舰艏上翘唇口 ${i + 1}`,
-      name_en: `bow ramp lip ${i + 1}`,
-      assembly: ASSEMBLY,
-      build_layer: 3,
-      geometry: M(B(Math.max(0.8, star - port - 0.18), 0.05, 0.8, [0, 0, 0], 0.004)),
-      material: "cv_deck_plate",
-      mate: A([(port + star) / 2, deckTop + 0.035 + i * 0.025, z], [-4 - i * 3, 0, 0]),
-    });
-  }
   // 舰艏舷墙：沿用户 36 点轮廓的实际舷缘逐段生成，不再写死 x=±1.5/±2.0。
   // 这艘轮廓的艏部向右舷偏置且收窄，固定横板会一侧悬出、一侧露空。
   const bowZs = [16.2, 17.2, 18.2, 19.2, 20.1, 20.45];
@@ -1625,6 +1848,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       const dz = z1 - z0;
       // 右舷艏部是起飞跑道出口，舷墙做低矮唇口，避免飞机翼尖/导弹越舷时穿墙。
       const h = side === 1 ? 0.08 : 0.3 + i * 0.012;
+      const midZ = (z0 + z1) / 2;
       add({
         id: `${P}bow_bulwark_${tag}_${i + 1}`,
         name_cn: `舰艏舷墙 ${tag.toUpperCase()}-${i + 1}`,
@@ -1633,34 +1857,42 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         build_layer: 3,
         geometry: M(B(0.055, h, Math.hypot(dx, dz), [0, 0, 0], 0.004)),
         material: "cv_hull",
-        mate: A([(x0 + x1) / 2, deckTop + h / 2 + (side === 1 ? 0 : i * 0.006), (z0 + z1) / 2], [0, (Math.atan2(dx, dz) * 180) / Math.PI, 0]),
+        mate: A(
+          [(x0 + x1) / 2, deckTopAt(midZ) + h / 2 + (side === 1 ? 0 : i * 0.006), midZ],
+          [deckPitchDegAt(midZ), (Math.atan2(dx, dz) * 180) / Math.PI, 0],
+        ),
       });
     }
   }
-  // 前舷墙取轮廓首尾两点（艉板对面的艏端横边），随真实斜边旋转。
+  // 前舷墙取轮廓首尾两点（艉板对面的艏端横边），抬到上翘后的艏端高度。
   const bowPlan = deckPlan();
   const bowStar = bowPlan[0]!;
   const bowPort = bowPlan[bowPlan.length - 1]!;
   const frontDx = bowStar[0] - bowPort[0];
   const frontDz = bowStar[1] - bowPort[1];
+  const frontZ = (bowStar[1] + bowPort[1]) / 2;
   add({
     id: `${P}bow_bulwark_front`,
     name_cn: "舰艏前舷墙",
     name_en: "bow front bulwark",
     assembly: ASSEMBLY,
     build_layer: 3,
-    geometry: M(B(0.075, 0.38, Math.hypot(frontDx, frontDz), [0, 0, 0], 0.006)),
+    geometry: M(B(0.075, 0.14, Math.hypot(frontDx, frontDz), [0, 0, 0], 0.006)),
     material: "cv_hull",
-    mate: A([(bowStar[0] + bowPort[0]) / 2, deckTop + 0.19, (bowStar[1] + bowPort[1]) / 2], [0, (Math.atan2(frontDx, frontDz) * 180) / Math.PI, 0]),
+    mate: A(
+      [(bowStar[0] + bowPort[0]) / 2, deckTopAt(frontZ) + 0.07, frontZ],
+      [0, (Math.atan2(frontDx, frontDz) * 180) / Math.PI, 0],
+    ),
   });
 
   // ---- 甲板航空燃油补给站 / 加油车 / 接地与软管 ----
   // 公开资料：飞行甲板设多个飞机加油站，加油车开到机旁；这里做 3 个站点，
   // 其中右舷艉部站点用软管连接到停放 J-15，展示完整加油作业。
+  // 右舷补给站整体内收：底座+软管盘外缘不再伸出甲板边线。
   const fuelStations: Array<[number, number, string, boolean]> = [
-    [4.4, -7.6, "starboard_aft", true],
+    [3.4, -12.4, "starboard_aft", true],
     [-3.8, 4.0, "port_mid", false],
-    [4.3, -0.5, "starboard_amidships", false],
+    [3.5, -0.5, "starboard_amidships", false],
   ];
   for (const [fx, fz, tag, detailed] of fuelStations) {
     add({
@@ -1724,8 +1956,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
 
   // 加油车：停在右舷舰岛后方停放 J-15 旁，软管接到机翼根部油箱口。
   {
-    const cx = 2.85;
-    const cz = -10.9;
+    // 随停放机 1 内收后，加油车移到机尾左后方，软管端头对准左翼根部但不穿机体。
+    const cx = 1.5;
+    const cz = -12.6;
     add({
       id: `${P}fuel_cart`,
       name_cn: "航空燃油加油车",

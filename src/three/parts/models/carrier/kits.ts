@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { GeometryBuilder } from "../../assembler/geometry";
-import { CV, hullHalfBeamAt } from "./constants";
+import { BOW_RAMP_Z0, BOW_RAMP_Z1, CV, deckTopAt, hullHalfBeamAt } from "./constants";
 
 // ============================================================================
 // models/carrier/kits —— 舰体/飞行甲板平面轮廓与少量专用几何
@@ -377,29 +377,157 @@ export const carrierBowRake: GeometryBuilder = () => {
   return geometry;
 };
 
-/** 艏部外飘下方的封闭楔形：上缘贴甲板艏端，向下收成艏柱，把甲板外飘与船壳之间的
- *  V 形空腔封死；与旧“艏柱整流块”不同，上缘沿用甲板艏端折线、下缘贴真实艏柱，
- *  侧面连续过渡，不会在壳板旁边留下一条暗缝。 */
+/** 艏部上翘甲板实体：从平甲板最后一段起，沿 36 点甲板轮廓逐站抬升；
+ *  上表面就是可站立的甲板弧面，不是另贴一块板。 */
+export const carrierBowRamp: GeometryBuilder = () => {
+  const N = 14;
+  const bottomY = CV.DECK_Y + CV.DECK_T - 0.024;
+  const sections: Array<{ z: number; port: number; star: number; top: number }> = [];
+  for (let i = 0; i <= N; i++) {
+    const z = BOW_RAMP_Z0 + ((BOW_RAMP_Z1 - BOW_RAMP_Z0) * i) / N;
+    sections.push({ z, port: deckEdgeAt(z, -1).x, star: deckEdgeAt(z, 1).x, top: deckTopAt(z) });
+  }
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const push = (x: number, y: number, z: number) => {
+    positions.push(x, y, z);
+    return positions.length / 3 - 1;
+  };
+  const topIdx: Array<[number, number]> = [];
+  const botIdx: Array<[number, number]> = [];
+  for (const s of sections) {
+    topIdx.push([push(s.port, s.top, s.z), push(s.star, s.top, s.z)]);
+    botIdx.push([push(s.port, bottomY, s.z), push(s.star, bottomY, s.z)]);
+  }
+  for (let i = 0; i < N; i++) {
+    const [pt0, st0] = topIdx[i]!;
+    const [pt1, st1] = topIdx[i + 1]!;
+    const [pb0, sb0] = botIdx[i]!;
+    const [pb1, sb1] = botIdx[i + 1]!;
+    // 弧面（上）
+    indices.push(pt0, pt1, st1, pt0, st1, st0);
+    // 左/右舷侧封
+    indices.push(pt0, pb0, pb1, pt0, pb1, pt1);
+    indices.push(st0, st1, sb1, st0, sb1, sb0);
+    // 底面
+    indices.push(pb0, sb0, sb1, pb0, sb1, pb1);
+  }
+  const [pt0, st0] = topIdx[0]!;
+  const [pb0, sb0] = botIdx[0]!;
+  indices.push(pt0, st0, sb0, pt0, sb0, pb0);
+  const [ptN, stN] = topIdx[N]!;
+  const [pbN, sbN] = botIdx[N]!;
+  indices.push(ptN, pbN, sbN, ptN, sbN, stN);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+/** 上翘段装甲板：沿弧面分块铺板，板缝露出下面的实体甲板。 */
+export const carrierBowRampPlate: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: { z0?: number; z1?: number; thickness?: number } }).params ?? {};
+  const z0 = params.z0 ?? BOW_RAMP_Z0;
+  const z1 = params.z1 ?? BOW_RAMP_Z1;
+  const thickness = params.thickness ?? 0.018;
+  const inset = 0.05;
+  const sample = (z: number) => {
+    const port = deckEdgeAt(z, -1).x + inset;
+    const star = deckEdgeAt(z, 1).x - inset;
+    return { z, port, star, top: deckTopAt(z) + 0.0015 };
+  };
+  const a = sample(z0);
+  const b = sample(z1);
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const push = (x: number, y: number, z: number) => {
+    positions.push(x, y, z);
+    return positions.length / 3 - 1;
+  };
+  const at = (s: ReturnType<typeof sample>, port: boolean, top: boolean) =>
+    push(port ? s.port : s.star, top ? s.top : s.top - thickness, s.z);
+  const aPt = at(a, true, true), aSt = at(a, false, true);
+  const bPt = at(b, true, true), bSt = at(b, false, true);
+  const aPb = at(a, true, false), aSb = at(a, false, false);
+  const bPb = at(b, true, false), bSb = at(b, false, false);
+  indices.push(aPt, bPt, bSt, aPt, bSt, aSt);
+  indices.push(aPt, aPb, bPb, aPt, bPb, bPt);
+  indices.push(aSt, bSt, bSb, aSt, bSb, aSb);
+  indices.push(aPb, aSb, bSb, aPb, bSb, bPb);
+  indices.push(aPt, aSt, aSb, aPt, aSb, aPb);
+  indices.push(bPt, bPb, bSb, bPt, bSb, bSt);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+/** 上翘段舷缘红/白边带：贴着弧面与甲板轮廓走，侧视能看到边线跟着甲板抬起。 */
+export const carrierBowRampEdge: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: { side?: -1 | 1; width?: number; inset?: number; lift?: number } }).params ?? {};
+  const side = params.side ?? -1;
+  const width = params.width ?? 0.09;
+  const inset = params.inset ?? 0.04;
+  const lift = params.lift ?? 0.006;
+  const N = 18;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const edges: Array<[number, number]> = [];
+  for (let i = 0; i <= N; i++) {
+    const z = BOW_RAMP_Z0 + ((BOW_RAMP_Z1 - BOW_RAMP_Z0) * i) / N;
+    const outer = deckEdgeAt(z, side).x - side * inset;
+    const inner = outer - side * width;
+    const y = deckTopAt(z) + lift;
+    const o = positions.length / 3;
+    positions.push(outer, y, z, inner, y, z);
+    edges.push([o, o + 1]);
+  }
+  for (let i = 0; i < N; i++) {
+    const [o0, i0] = edges[i]!;
+    const [o1, i1] = edges[i + 1]!;
+    // 两舷的横向点序相反，按舷别翻转绕序，保证面法线朝上。
+    if (side === -1) indices.push(o0, o1, i1, o0, i1, i0);
+    else indices.push(o0, i1, o1, o0, i0, i1);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
+/** 艏部外飘下方的封闭楔形：上缘贴甲板艏端/上翘段底，向下收成艏柱，把甲板外飘与
+ *  船壳之间的 V 形空腔封死；不再用与壳板曲面不匹配的独立“整流块”。 */
 export const carrierBowClosure: GeometryBuilder = () => {
+  // 上缘严格贴当前 36 点艏部甲板外缘，不再用旧版 ±1.52/±2.28 的宽楔形；
+  // 用户轮廓的艏端向右舷偏置，旧楔形左侧会伸出甲板一大截。
+  const portFore = deckEdgeAt(20.66, -1).x;
+  const starFore = deckEdgeAt(20.66, 1).x;
+  const portAft = deckEdgeAt(20.0, -1).x;
+  const starAft = deckEdgeAt(20.0, 1).x;
   const top: Array<[number, number]> = [
-    [-1.52, 20.66],
-    [1.82, 20.66],
-    [2.28, 19.0],
-    [-2.28, 19.0],
+    [portFore, 20.66],
+    [starFore, 20.66],
+    [starAft, 20.0],
+    [portAft, 20.0],
   ];
   const bottom: Array<[number, number]> = [
-    [-0.28, 18.55],
-    [0.28, 18.55],
-    [0.28, 18.15],
-    [-0.28, 18.15],
+    [-0.35, 19.4],
+    [0.35, 19.4],
+    [0.35, 19.05],
+    [-0.35, 19.05],
   ];
   const blend = (t: number): Array<[number, number]> =>
     top.map(([x, z], i) => [x + (bottom[i]![0] - x) * t, z + (bottom[i]![1] - z) * t] as [number, number]);
+  // 顶环抬到上翘甲板底（4.556），刚好托住起翘段，不再在艏端留一圈空腔。
   const rings = [
-    { y: 4.1, pts: top },
-    { y: 3.3, pts: blend(0.35) },
-    { y: 2.5, pts: blend(0.7) },
-    { y: 1.74, pts: bottom },
+    { y: CV.DECK_Y + CV.DECK_T - 0.024, pts: top },
+    { y: 4.0, pts: blend(0.35) },
+    { y: 3.5, pts: blend(0.65) },
+    { y: 3.0, pts: blend(0.85) },
+    { y: 2.55, pts: bottom },
   ];
   const positions: number[] = [];
   const indices: number[] = [];

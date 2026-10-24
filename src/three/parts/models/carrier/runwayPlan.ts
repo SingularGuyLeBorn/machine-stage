@@ -22,13 +22,17 @@ function mapPolygon(points: ReadonlyArray<readonly [number, number]>): PlanPoint
   return points.map(([px, py]) => mapLnJPixel(px, py));
 }
 
-/** 降落跑道：艏端窄、艉端略宽，几乎沿舰体中线。点序：艏右、艏左、艉左、艉右。 */
-export const LANDING_RUNWAY_POLYGON = mapPolygon([
-  [326, 230.3],
-  [365.8, 297.1],
-  [1266.8, 297.1],
-  [1274.2, 209.9],
-]);
+/** 降落跑道：用户目标是让两端与左舷甲板外缘线 1/13 严丝合缝。
+ *  外缘线 13（艏端斜边）(-4.1219,9.8405)→(-1.9386,11.2018)，
+ *  外缘线 1（艉端横边）(1.5019,-19.7989)→(-3.4206,-20)；
+ *  目标跑道前缘取外缘线 13 上宽 2.34 的一段，后缘取外缘线 1 上
+ *  以 x≈-1.72 为中心、宽 1.96 的一段。点序：艏右、艏左、艉左、艉右。 */
+export const LANDING_RUNWAY_POLYGON = [
+  [-2.037, 11.14],
+  [-4.023, 9.902],
+  [-2.7, -19.95],
+  [-0.74, -19.9],
+] as PlanPoint[];
 
 /** 起飞跑道：右舷舰艏的楔形窄跑道。点序：艏右、艉右、艉左、艏左。 */
 export const TAKEOFF_RUNWAY_POLYGON = mapPolygon([
@@ -37,6 +41,23 @@ export const TAKEOFF_RUNWAY_POLYGON = mapPolygon([
   [371.5, 107.2],
   [40.9, 102.8],
 ]);
+
+/** 用 z = zMax 的水平线裁剪平面多边形（Sutherland–Hodgman，保留输入点序）。 */
+export function clipPolygonZMax(points: ReadonlyArray<PlanPoint>, zMax: number): PlanPoint[] {
+  const out: PlanPoint[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]!;
+    const b = points[(i + 1) % points.length]!;
+    const aIn = a[1] <= zMax;
+    const bIn = b[1] <= zMax;
+    if (aIn) out.push([a[0], a[1]]);
+    if (aIn !== bIn) {
+      const t = (zMax - a[1]) / (b[1] - a[1]);
+      out.push([a[0] + (b[0] - a[0]) * t, zMax]);
+    }
+  }
+  return out;
+}
 
 export const TAKEOFF_CAT_X = [0.9, 2.0] as const;
 // 飞机挂上滑梭时机体原点会落后滑梭约 1.1，机尾再向后约 1.2；起点前移到

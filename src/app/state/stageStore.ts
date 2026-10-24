@@ -187,6 +187,14 @@ interface StageState {
   toggleEnergyBoost(): void;
   /** 相机模式：自由视角 / 第一人称（驾驶员潜望镜 / 车长指挥塔）。 */
   cameraMode: CameraMode;
+  /** 第一人称漫游：当前区域（walk 配置里的 area id）。 */
+  walkArea: string;
+  /** 第一人称漫游：当前可执行交互提示（null = 附近无交互）。 */
+  walkPrompt: string | null;
+  /** 第一人称漫游：指针是否锁定（HUD 提示点击画面）。 */
+  walkLocked: boolean;
+  /** 第一人称漫游：区域切换淡入淡出中。 */
+  walkFading: boolean;
   /** 战损形态（完好/破损/破碎）：只切预制变体，不影响碰撞与支撑检测。 */
   damage: DamageState;
   /** 随机破口种子：每次「随机破口」+1，重建时由 damage kit 读取。 */
@@ -228,6 +236,10 @@ interface StageState {
   stepReport(delta: number): void;
   setMachineState(state: string): void;
   setCameraMode(mode: CameraMode): void;
+  setWalkArea(area: string): void;
+  setWalkPrompt(prompt: string | null): void;
+  setWalkLocked(locked: boolean): void;
+  setWalkFading(fading: boolean): void;
   setDamage(state: DamageState): void;
   /** 换一组随机破口并切到破碎，触发重建。 */
   rerollDamage(): void;
@@ -339,6 +351,10 @@ export const useStageStore = create<StageState>((set, get) => ({
   energyBoost: false,
   energyWidth: 1,
   cameraMode: "orbit",
+  walkArea: "",
+  walkPrompt: null,
+  walkLocked: false,
+  walkFading: false,
   damage: "intact",
   damageSeed: 0,
   lidOverrides: {},
@@ -376,6 +392,10 @@ export const useStageStore = create<StageState>((set, get) => ({
       energyBoost: false,
       energyWidth: 1,
       cameraMode: "orbit",
+      walkArea: "",
+      walkPrompt: null,
+      walkLocked: false,
+      walkFading: false,
       damage: "intact",
       damageSeed: 0,
       lidOverrides: {},
@@ -565,6 +585,12 @@ export const useStageStore = create<StageState>((set, get) => ({
 
   // 相机模式与机器状态解耦：切状态不该把人从驾驶舱里踢出来。
   setCameraMode: (mode) => set({ cameraMode: mode }),
+  setWalkArea: (walkArea) => set({ walkArea }),
+  setWalkPrompt: (walkPrompt) => {
+    if (get().walkPrompt !== walkPrompt) set({ walkPrompt });
+  },
+  setWalkLocked: (walkLocked) => set({ walkLocked }),
+  setWalkFading: (walkFading) => set({ walkFading }),
 
   setDamage: (damage) => set({ damage }),
 

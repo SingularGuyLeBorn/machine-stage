@@ -5,9 +5,21 @@ import { detectFloatingIslands } from "@/three/parts/solver/support";
 import { detectKitIslands } from "@/three/parts/solver/kitConnectivity";
 import { findModel } from "@/app/catalog";
 import { animateCarrier, carrierFlightPhase, CAT_NOSE_ENGAGE } from "./motion";
-import { CAT_TRACKS, CV } from "./constants";
-import { HANGAR_DOOR_NODES, AMMO_ELEVATOR_NODE } from "./hangar";
-import { WIRE_NODES, SHUTTLE_NODE, JBD_NODES, ELEVATOR_NODES } from "./flightdeck";
+import { BOW_RAMP_RISE, BOW_RAMP_Z0, BOW_RAMP_Z1, CAT_TRACKS, CV, deckTopAt } from "./constants";
+import {
+  HANGAR_CREW_DOOR_NODE,
+  HANGAR_DOOR_NODES,
+  HANGAR_ENGINE_DOOR_NODE,
+  AMMO_ELEVATOR_NODE,
+} from "./hangar";
+import {
+  BARRIER_NET_NODE,
+  BARRIER_POST_NODES,
+  WIRE_NODES,
+  SHUTTLE_NODE,
+  JBD_NODES,
+  ELEVATOR_NODES,
+} from "./flightdeck";
 import { deckPlan } from "./kits";
 import { LANDING_RUNWAY, LANDING_RUNWAY_POLYGON, TAKEOFF_RUNWAY_POLYGON } from "./runwayPlan";
 import { RADAR_NODE, CIWS_NODES } from "./island";
@@ -76,8 +88,8 @@ describe("福建舰 · 整机", () => {
     };
     checkPolygon(LANDING_RUNWAY_POLYGON, 0.06);
     checkPolygon(TAKEOFF_RUNWAY_POLYGON, 0.04);
-    // 用户 JSON 的着舰跑道几乎沿舰体中轴，不是旧的 3.59° 斜角。
-    expect(Math.abs(LANDING_RUNWAY.deg)).toBeLessThan(1);
+    // 目标跑道艏端压在外缘线 13、艉端压在外缘线 1 上，航向约 2.46°。
+    expect(LANDING_RUNWAY.deg).toBeCloseTo(2.46, 1);
     for (const track of CAT_TRACKS.slice(0, 2)) {
       expect(inside(TAKEOFF_RUNWAY_POLYGON, track.x0, track.z0), `cat ${track.id} start`).toBe(true);
     }
@@ -299,5 +311,38 @@ describe("福建舰 · 整机", () => {
     built.root.updateMatrixWorld(true);
     expect(Math.abs(built.getNode(CIWS_NODES[0])!.rotation.y)).toBeGreaterThan(0.1);
     expect(Math.abs(built.getNode("CV_CiwsRotor_1")!.rotation.z)).toBeGreaterThan(1);
+  });
+});
+
+describe("福建舰 · 舰艏甲板上翘与漫游交互件", () => {
+  it("甲板本体从起翘起点连续抬升，艏端抬升 0.3（不是另贴一块板）", () => {
+    const flat = CV.DECK_Y + CV.DECK_T;
+    expect(deckTopAt(BOW_RAMP_Z0)).toBeCloseTo(flat, 6);
+    expect(deckTopAt(BOW_RAMP_Z1)).toBeCloseTo(flat + BOW_RAMP_RISE, 6);
+    let previous = -Infinity;
+    for (let i = 0; i <= 24; i++) {
+      const z = BOW_RAMP_Z0 + ((BOW_RAMP_Z1 - BOW_RAMP_Z0) * i) / 24;
+      const y = deckTopAt(z);
+      expect(y).toBeGreaterThanOrEqual(previous - 1e-9);
+      previous = y;
+    }
+    expect(staticIds.has("carrier.deck.bow_ramp_core")).toBe(true);
+    expect(staticIds.has("carrier.deck.bow_ramp_plate_05")).toBe(true);
+    expect(staticIds.has("carrier.deck.bow_ramp_edge_p")).toBe(true);
+    expect(staticIds.has("carrier.deck.bow_ramp_edge_s")).toBe(true);
+    expect(staticIds.has("carrier.deck.bow_ramp_01")).toBe(false);
+  });
+
+  it("应急拦阻网/漫游水密门节点齐备；拦阻网静止时收在网槽内", () => {
+    expect(built.getNode(BARRIER_NET_NODE)).toBeDefined();
+    for (const name of BARRIER_POST_NODES) expect(built.getNode(name)).toBeDefined();
+    expect(registry.nodes.find((node) => node.name === BARRIER_NET_NODE)?.scale).toEqual([1, 0.03, 1]);
+    expect(built.getNode(HANGAR_ENGINE_DOOR_NODE)).toBeDefined();
+    expect(built.getNode(HANGAR_CREW_DOOR_NODE)).toBeDefined();
+    expect(staticIds.has("carrier.deck.barrier_net_panel")).toBe(true);
+    expect(staticIds.has("carrier.deck.barrier_net_control")).toBe(true);
+    expect(staticIds.has("carrier.hangar.walk_engine_door_leaf")).toBe(true);
+    expect(staticIds.has("carrier.hangar.walk_crew_door_leaf")).toBe(true);
+    expect(staticIds.has("carrier.hangar.ceiling_lamp_01_glow")).toBe(true);
   });
 });

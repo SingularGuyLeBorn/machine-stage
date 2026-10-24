@@ -63,6 +63,31 @@ export const CV_CONSTANTS: Record<string, number> = Object.fromEntries(
   Object.entries(CV).filter(([, value]) => typeof value === "number"),
 ) as Record<string, number>;
 
+/** 舰艏上翘：从平甲板最后一段开始，用二次曲线抬到艏端，艏部甲板本体连续起翘。
+ *  起点放在弹射器末端之后，弹射轨/滑梭/挡焰板仍落在平甲板上。 */
+export const BOW_RAMP_Z0 = 19.4;
+export const BOW_RAMP_Z1 = 20.669;
+export const BOW_RAMP_RISE = 0.3;
+
+/** 甲板面高度：平甲板区恒为 DECK_Y+DECK_T，艏部按二次弧线抬起。 */
+export function deckTopAt(z: number): number {
+  const flat = CV.DECK_Y + CV.DECK_T;
+  if (z <= BOW_RAMP_Z0) return flat;
+  const t = Math.min(1, (z - BOW_RAMP_Z0) / (BOW_RAMP_Z1 - BOW_RAMP_Z0));
+  return flat + BOW_RAMP_RISE * t * t;
+}
+
+/** 甲板纵坡 dy/dz（用于让舷墙/标线/设备随弧面俯仰）。 */
+export function deckSlopeAt(z: number): number {
+  if (z <= BOW_RAMP_Z0 || z >= BOW_RAMP_Z1) return 0;
+  const t = (z - BOW_RAMP_Z0) / (BOW_RAMP_Z1 - BOW_RAMP_Z0);
+  return (2 * BOW_RAMP_RISE * t) / (BOW_RAMP_Z1 - BOW_RAMP_Z0);
+}
+
+export function deckPitchDegAt(z: number): number {
+  return (-Math.atan(deckSlopeAt(z)) * 180) / Math.PI;
+}
+
 /** 三条电磁弹射器：x0/z0 为起点，yawDeg 为相对 +Z 的偏航，长度统一。 */
 export type CatTrack = {
   id: number;

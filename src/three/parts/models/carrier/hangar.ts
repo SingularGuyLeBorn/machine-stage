@@ -11,6 +11,11 @@ const ASSEMBLY = "hangar";
 const P = "carrier.hangar.";
 export const AMMO_ELEVATOR_NODE = "CV_AmmoElevator";
 export const HANGAR_DOOR_NODES = [1, 2, 3, 4, 5].map((i) => `CV_HangarDoor_${i}`);
+// 第一人称漫游新增的两道可开合水密门：机库艉部→机舱、机库艏部→生活区梯口。
+export const HANGAR_ENGINE_DOOR_NODE = "CV_WalkEngineDoor";
+export const HANGAR_CREW_DOOR_NODE = "CV_WalkCrewDoor";
+export const HANGAR_ENGINE_DOOR_POS: [number, number] = [0.55, -16.1];
+export const HANGAR_CREW_DOOR_POS: [number, number] = [0.35, 12.35];
 
 export function addHangar(ctx: CarrierCtx): void {
   const add = (part: Parameters<CarrierCtx["add"]>[0]) => ctx.add(part);
@@ -654,5 +659,131 @@ export function addHangar(ctx: CarrierCtx): void {
     geometry: M(B(0.14, 0.1, 0.18, [0, 0, 0], 0.006), B(0.03, 0.03, 0.12, [0, -0.09, 0.1], 0.002)),
     material: "cv_steel_dark",
     mate: A([1.8, CV.HANGAR_Y + 0.85, 0.0]),
+  });
+
+  // ---- 机库顶灯：沿机库长轴布置的吊装灯带，照亮停放机与防火门 ----
+  const hangarLightZ = [-14, -9.5, -5, -0.5, 4, 8.5, 12];
+  hangarLightZ.forEach((z, index) => {
+    add({
+      id: `${P}ceiling_lamp_${pad(index + 1)}`,
+      name_cn: `机库顶灯 ${index + 1}`,
+      name_en: `hangar ceiling lamp ${index + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 2,
+      geometry: M(
+        B(0.035, 0.2, 0.035, [-0.24, 0.1, 0], 0.002),
+        B(0.035, 0.2, 0.035, [0.24, 0.1, 0], 0.002),
+        B(0.64, 0.06, 0.18, [0, 0, 0], 0.004),
+        B(0.54, 0.012, 0.12, [0, -0.032, 0], 0.002),
+        B(0.5, 0.006, 0.08, [0, -0.04, 0], 0.001),
+      ),
+      material: "cv_steel_dark",
+      mate: A([0, CV.DECK_Y - 0.06, z]),
+    });
+    add({
+      id: `${P}ceiling_lamp_${pad(index + 1)}_glow`,
+      name_cn: `机库顶灯灯带 ${index + 1}`,
+      name_en: `hangar ceiling lamp glow ${index + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.48, 0.008, 0.07, [0, 0, 0], 0.001)),
+      material: "cv_glow",
+      mate: A([0, CV.DECK_Y - 0.102, z]),
+    });
+  });
+
+  // ---- 漫游用可开合水密门：机库艉部（下机舱）/ 艏部（生活区梯口） ----
+  const addWalkDoor = (opts: {
+    node: string;
+    pos: [number, number];
+    width: number;
+    height: number;
+    doorWidth: number;
+    label: string;
+    idTag: string;
+  }) => {
+    const [doorX, z] = opts.pos;
+    const floorY = CV.HANGAR_Y + 0.14;
+    const thickness = 0.1;
+    const h = opts.height;
+    const w = opts.width;
+    const dw = opts.doorWidth;
+    const leftEdge = -w / 2;
+    const rightEdge = w / 2;
+    const leafZ = z + thickness / 2 + 0.02;
+    const hingeX = doorX - dw / 2;
+    add({
+      id: `${P}${opts.idTag}_bulkhead`,
+      name_cn: `${opts.label} 舱壁`,
+      name_en: `${opts.idTag} bulkhead`,
+      assembly: ASSEMBLY,
+      build_layer: 2,
+      geometry: M(
+        B(doorX - dw / 2 - 0.03 - leftEdge, h, thickness, [(leftEdge + doorX - dw / 2 - 0.03) / 2, h / 2, 0], 0.008),
+        B(rightEdge - (doorX + dw / 2 + 0.03), h, thickness, [((doorX + dw / 2 + 0.03) + rightEdge) / 2, h / 2, 0], 0.008),
+        B(dw + 0.06, h - 1.28, thickness, [doorX, 1.28 + (h - 1.28) / 2, 0], 0.006),
+      ),
+      material: "cv_hull_dark",
+      mate: A([0, floorY, z]),
+    });
+    add({
+      id: `${P}${opts.idTag}_frame`,
+      name_cn: `${opts.label} 门框`,
+      name_en: `${opts.idTag} door frame`,
+      assembly: ASSEMBLY,
+      build_layer: 2,
+      geometry: M(
+        B(0.07, 1.3, thickness + 0.06, [hingeX - 0.01, 0.65, 0], 0.005),
+        B(0.07, 1.3, thickness + 0.06, [doorX + dw / 2 + 0.01, 0.65, 0], 0.005),
+        B(dw + 0.16, 0.07, thickness + 0.06, [doorX, 1.31, 0], 0.005),
+      ),
+      material: "cv_steel_dark",
+      mate: A([0, floorY, z]),
+    });
+    ctx.node({
+      name: opts.node,
+      parent: "root",
+      pivot: [hingeX, floorY, leafZ],
+      rest_rotation: [0, 0, 0],
+      motion: "rotate",
+      axis: "y",
+      note: `${opts.label}（第一人称漫游 F 开启）`,
+    });
+    add({
+      id: `${P}${opts.idTag}_leaf`,
+      name_cn: opts.label,
+      name_en: `${opts.idTag} leaf`,
+      assembly: ASSEMBLY,
+      build_layer: 2,
+      geometry: M(
+        B(dw - 0.03, 1.24, 0.04, [(dw - 0.03) / 2 + 0.015, 0.62, 0], 0.006),
+        B(0.05, 0.05, 0.05, [0.04, 1.16, 0.03], 0.003),
+        B(0.05, 0.05, 0.05, [dw - 0.08, 1.16, 0.03], 0.003),
+        { type: "torus", radius: 0.09, tube: 0.008, radialSegments: 8, tubularSegments: 18, at: [dw * 0.55, 0.62, 0.04] },
+        B(0.1, 0.02, 0.01, [dw * 0.55, 0.62, 0.045], 0.0015),
+        B(0.012, 0.19, 0.012, [dw * 0.55, 0.62, 0.045], 0.0015),
+      ),
+      material: "cv_steel",
+      node: opts.node,
+      mate: A([0, 0, 0]),
+    });
+  };
+  addWalkDoor({
+    node: HANGAR_ENGINE_DOOR_NODE,
+    pos: HANGAR_ENGINE_DOOR_POS,
+    width: 4.4,
+    height: 1.72,
+    doorWidth: 0.62,
+    label: "机舱水密门",
+    idTag: "walk_engine_door",
+  });
+  addWalkDoor({
+    node: HANGAR_CREW_DOOR_NODE,
+    pos: HANGAR_CREW_DOOR_POS,
+    width: 2.7,
+    height: 1.68,
+    doorWidth: 0.56,
+    label: "生活区梯口水密门",
+    idTag: "walk_crew_door",
   });
 }
