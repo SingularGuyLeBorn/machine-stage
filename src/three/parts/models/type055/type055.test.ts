@@ -72,7 +72,8 @@ describe("055 型驱逐舰", () => {
       "type055.interior.crew_mess_eye",
       "type055.interior.crew_partitions",
       "type055.interior.crew_bunk_curtains",
-      "type055.interior.crew_bunk_personal",
+      "type055.interior.crew_bed_sheets",
+      "type055.interior.crew_bed_personal_paper",
       "type055.interior.crew_ceiling_panels",
     ]) {
       expect(built.getPart(id), id).toBeDefined();

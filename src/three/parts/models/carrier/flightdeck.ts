@@ -1637,7 +1637,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // 舰艏舷墙：沿最后 3 段甲板边缘抬起，侧视能看到舰艏上翘而不是平切方盒。
   const bowEdges: Array<{ tag: string; points: Array<[number, number]> }> = [
     { tag: "p", points: [[-1.95, 17.0], [-1.5, 20.55]] },
-    { tag: "s", points: [[1.95, 17.0], [1.5, 20.55]] },
+    { tag: "s", points: [[2.0, 17.0], [1.55, 20.55]] },
   ];
   for (const edge of bowEdges) {
     for (let i = 0; i < edge.points.length - 1; i++) {
@@ -1651,9 +1651,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
         name_en: `bow bulwark ${edge.tag} ${i + 1}`,
         assembly: ASSEMBLY,
         build_layer: 3,
-        geometry: M(B(0.06, 0.34, Math.hypot(dx, dz), [0, 0, 0], 0.004)),
+        geometry: M(B(0.06, 0.3, Math.hypot(dx, dz), [0, 0, 0], 0.004)),
         material: "cv_hull",
-        mate: A([(x0 + x1) / 2, deckTop + 0.17 + i * 0.03, (z0 + z1) / 2], [0, (Math.atan2(dx, dz) * 180) / Math.PI, 0]),
+        mate: A([(x0 + x1) / 2, deckTop + 0.15 + i * 0.03, (z0 + z1) / 2], [0, (Math.atan2(dx, dz) * 180) / Math.PI, 0]),
       });
     }
   }
@@ -1667,4 +1667,292 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     material: "cv_hull",
     mate: A([0, deckTop + 0.22, 20.65], [0, 0, 0]),
   });
+
+  // ---- 甲板航空燃油补给站 / 加油车 / 接地与软管 ----
+  // 公开资料：飞行甲板设多个飞机加油站，加油车开到机旁；这里做 3 个站点，
+  // 其中右舷艉部站点用软管连接到停放 J-15，展示完整加油作业。
+  const fuelStations: Array<[number, number, string, boolean]> = [
+    [4.4, -7.6, "starboard_aft", true],
+    [-3.55, -3.0, "port_mid", false],
+    [4.3, -0.5, "starboard_amidships", false],
+  ];
+  for (const [fx, fz, tag, detailed] of fuelStations) {
+    add({
+      id: `${P}fuel_station_${tag}`,
+      name_cn: `航空燃油补给站 ${tag}`,
+      name_en: `aviation fuel station ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        B(0.34, 0.02, 0.28, [0, 0.01, 0], 0.004),
+        B(0.3, 0.3, 0.22, [0, 0.17, 0], 0.012),
+        B(0.26, 0.03, 0.24, [0, 0.33, 0], 0.006),
+        B(0.02, 0.24, 0.18, [-0.16, 0.17, 0], 0.004),
+        T(0.09, 0.06, 0.06, [0.2, 0.18, 0.02], 18),
+        C(0.025, 0.05, [0.2, 0.18, 0.02], 12),
+        C(0.028, 0.012, [-0.08, 0.25, 0.115], 12),
+        C(0.028, 0.012, [0.02, 0.25, 0.115], 12),
+        B(0.1, 0.07, 0.012, [0.08, 0.18, 0.116], 0.003),
+        B(0.12, 0.02, 0.32, [0.44, 0.01, 0], 0.004),
+        C(0.035, 0.18, [0.38, 0.1, 0.16], 10),
+        T(0.055, 0.03, 0.07, [0.38, 0.1, 0.16], 16),
+        B(0.16, 0.08, 0.06, [-0.12, 0.36, 0], 0.004),
+      ),
+      material: "cv_steel_dark",
+      mate: A([fx, deckTop, fz]),
+    });
+    if (detailed) {
+      add({
+        id: `${P}fuel_station_${tag}_hose`,
+        name_cn: "加油软管与接头",
+        name_en: "fuel hose and coupling",
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(
+          { type: "weld", from: [0.18, 0.18, 0.03], to: [0.12, 0.05, -0.3], radius: 0.018 },
+          { type: "weld", from: [0.12, 0.05, -0.3], to: [-0.3, 0.03, -0.8], radius: 0.018 },
+          { type: "weld", from: [-0.3, 0.03, -0.8], to: [-0.45, 0.02, -1.35], radius: 0.018 },
+          C(0.028, 0.1, [-0.48, 0.06, -1.4], 10),
+          T(0.035, 0.025, 0.03, [-0.5, 0.1, -1.4], 12),
+        ),
+        material: "cv_rubber",
+        mate: A([fx, deckTop, fz]),
+      });
+    }
+    // 站点接地盘/警示条
+    add({
+      id: `${P}fuel_station_${tag}_ground`,
+      name_cn: `加油接地盘 ${tag}`,
+      name_en: `fuel grounding reel ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        T(0.06, 0.04, 0.02, [0.2, 0.02, 0.16], 14),
+        { type: "weld", from: [0.2, 0.03, 0.16], to: [0.3, 0.01, 0.5], radius: 0.008 },
+        B(0.2, 0.006, 0.05, [0, 0.008, 0.2], 0.001),
+      ),
+      material: "cv_warning",
+      mate: A([fx, deckTop, fz]),
+    });
+  }
+
+  // 加油车：停在右舷舰岛后方停放 J-15 旁，软管接到机翼根部油箱口。
+  {
+    const cx = 2.85;
+    const cz = -10.9;
+    add({
+      id: `${P}fuel_cart`,
+      name_cn: "航空燃油加油车",
+      name_en: "aviation fuel servicing cart",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        B(0.34, 0.04, 0.2, [0, 0.24, 0], 0.008),
+        B(0.04, 0.22, 0.04, [-0.13, 0.34, 0.08], 0.004),
+        B(0.04, 0.22, 0.04, [0.13, 0.34, 0.08], 0.004),
+        B(0.34, 0.04, 0.04, [0, 0.46, 0.08], 0.004),
+        B(0.04, 0.2, 0.04, [0, 0.14, 0.08], 0.004),
+        C(0.1, 0.06, [-0.16, 0.12, 0], 14),
+        C(0.1, 0.06, [0.16, 0.12, 0], 14),
+        T(0.12, 0.075, 0.07, [0, 0.3, -0.01], 18),
+        C(0.05, 0.2, [0.1, 0.3, 0.02], 12),
+        C(0.03, 0.02, [0.1, 0.42, 0.02], 10),
+        B(0.12, 0.09, 0.02, [-0.08, 0.3, 0.1], 0.003),
+        C(0.025, 0.01, [-0.03, 0.32, 0.115], 10),
+        T(0.04, 0.028, 0.025, [-0.08, 0.26, 0.115], 12),
+        { type: "weld", from: [-0.16, 0.28, 0.02], to: [-0.38, 0.42, 0.1], radius: 0.008 },
+      ),
+      material: "cv_warning",
+      mate: A([cx, deckTop, cz]),
+    });
+    add({
+      id: `${P}fuel_cart_hose`,
+      name_cn: "加油车软管/加油枪",
+      name_en: "fuel cart hose and nozzle",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        { type: "weld", from: [0.2, 0.42, 0.08], to: [0.45, 0.3, 0.55], radius: 0.018 },
+        { type: "weld", from: [0.45, 0.3, 0.55], to: [0.5, 0.24, 1.0], radius: 0.018 },
+        { type: "weld", from: [0.5, 0.24, 1.0], to: [0.45, 0.22, 1.6], radius: 0.018 },
+        { type: "weld", from: [0.45, 0.22, 1.6], to: [0.4, 0.2, 1.95], radius: 0.018 },
+        C(0.03, 0.14, [0.41, 0.23, 2.0], 10),
+        T(0.042, 0.028, 0.05, [0.41, 0.3, 2.02], 12),
+      ),
+      material: "cv_rubber",
+      mate: A([cx, deckTop, cz]),
+    });
+    add({
+      id: `${P}fuel_cart_bonding`,
+      name_cn: "加油车静电接地线",
+      name_en: "fuel cart bonding cable",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        { type: "weld", from: [-0.14, 0.26, -0.08], to: [-0.35, 0.03, -0.35], radius: 0.007 },
+        { type: "weld", from: [-0.35, 0.03, -0.35], to: [-0.55, 0.015, -0.55], radius: 0.007 },
+        C(0.03, 0.02, [-0.56, 0.02, -0.56], 10),
+      ),
+      material: "cv_copper",
+      mate: A([cx, deckTop, cz]),
+    });
+    // 受油口并入加油枪端头，不再单独挂在进气道旁边。
+    // 站点视点
+    add({
+      id: `${P}fuel_view_mast`,
+      name_cn: "加油作业视点立柱",
+      name_en: "fuel view mast",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.035, 0.75, 0.035, [0, 0.375, 0], 0.003), B(0.12, 0.02, 0.12, [0, 0.01, 0], 0.003)),
+      material: "cv_steel_dark",
+      mate: A([2.6, deckTop, -14.8]),
+    });
+    add({
+      id: `${P}fuel_view_eye`,
+      name_cn: "加油作业视点",
+      name_en: "fuel servicing view eye",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.004, 0.004, 0.004, [0, 0, 0], 0.001)),
+      material: "cv_steel_dark",
+      mate: A([2.6, deckTop + 0.75, -14.8]),
+    });
+  }
+
+  // ---- 甲板弹药升降机 / 挂弹准备区 / 待发弹药 ----
+  ctx.node({ name: "CV_OrdnanceStage", parent: "root", pivot: [1.75, deckTop + 0.35, -4.0], note: "甲板挂弹/弹药升降机视点" });
+  // 与机库弹药库对应的飞行甲板升降口，旁边是挂弹准备区（炸弹车/导弹架）。
+  {
+    const ox = 1.75;
+    const oz = -5.0;
+    add({
+      id: `${P}ordnance_hatch_frame`,
+      name_cn: "甲板弹药升降机口框",
+      name_en: "flight deck weapons elevator frame",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        B(0.86, 0.012, 1.36, [0, 0.008, 0], 0.004),
+        B(0.06, 0.04, 1.4, [-0.44, 0.04, 0], 0.003),
+        B(0.06, 0.04, 1.4, [0.44, 0.04, 0], 0.003),
+        B(0.88, 0.04, 0.06, [0, 0.04, -0.69], 0.003),
+        B(0.88, 0.04, 0.06, [0, 0.04, 0.69], 0.003),
+        T(0.08, 0.04, 0.02, [-0.5, 0.05, 0], 12),
+        T(0.08, 0.04, 0.02, [0.5, 0.05, 0], 12),
+      ),
+      material: "cv_deck_yellow",
+      mate: A([ox, deckTop, oz]),
+    });
+    add({
+      id: `${P}ordnance_hatch_cover`,
+      name_cn: "弹药升降机盖板",
+      name_en: "weapons elevator cover",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        B(0.76, 0.016, 1.22, [0, 0.018, 0], 0.004),
+        B(0.66, 0.006, 1.1, [0, 0.03, 0], 0.002),
+        B(0.08, 0.04, 0.08, [0, 0.06, 0.48], 0.003),
+      ),
+      material: "cv_deck_plate",
+      mate: A([ox, deckTop, oz]),
+    });
+    // 挂弹准备区：移动炸弹车 + 2 枚炸弹 + 2 枚导弹
+    add({
+      id: `${P}ordnance_cart`,
+      name_cn: "挂弹准备车",
+      name_en: "ordnance loading cart",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        B(0.72, 0.035, 0.34, [0, 0.2, 0], 0.008),
+        B(0.04, 0.2, 0.04, [-0.3, 0.32, 0.13], 0.004),
+        B(0.04, 0.2, 0.04, [0.3, 0.32, 0.13], 0.004),
+        B(0.68, 0.035, 0.035, [0, 0.42, 0.13], 0.004),
+        C(0.09, 0.06, [-0.3, 0.155, 0], 12),
+        C(0.09, 0.06, [0.3, 0.155, 0], 12),
+        B(0.04, 0.45, 0.35, [0, 0.22, 0], 0.003),
+        B(0.22, 0.05, 0.06, [0.38, 0.2, 0], 0.003),
+      ),
+      material: "cv_warning",
+      mate: A([ox, deckTop, -3.15]),
+    });
+    // 炸弹：Mk-82 形状（尖头/尾翼/吊耳）
+    for (const [dx, dz, tag] of [[-0.2, 0, "a"], [0.2, 0, "b"]] as const) {
+      add({
+        id: `${P}bomb_${tag}`,
+        name_cn: `航空炸弹 ${tag.toUpperCase()}`,
+        name_en: `aircraft bomb ${tag}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(
+          { type: "latheZ", profile: [[0.02, -0.34], [0.07, -0.25], [0.095, 0.02], [0.08, 0.22], [0.035, 0.34]], segments: 18 },
+          B(0.03, 0.2, 0.1, [0, 0.08, 0.25], 0.002),
+          B(0.24, 0.02, 0.02, [0, 0.05, 0], 0.002),
+          T(0.09, 0.07, 0.02, [0, 0, 0.08], 14),
+        ),
+        material: "cv_aircraft_dark",
+        mate: A([ox + dx, deckTop + 0.28, -3.15 + dz], [0, 0, 90]),
+      });
+    }
+    // 导弹：细长弹体 + 尾翼
+    for (const [dx, dz, tag] of [[-0.2, 0, "a"], [0.2, 0, "b"]] as const) {
+      add({
+        id: `${P}ordnance_missile_${tag}`,
+        name_cn: `航空导弹 ${tag.toUpperCase()}`,
+        name_en: `aircraft missile ${tag}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(
+          { type: "latheZ", profile: [[0.01, -0.55], [0.045, -0.4], [0.055, 0.2], [0.03, 0.45], [0.008, 0.55]], segments: 16 },
+          B(0.18, 0.012, 0.08, [0, 0, -0.38], 0.002),
+          B(0.18, 0.08, 0.012, [0, 0, -0.38], 0.002),
+          B(0.06, 0.02, 0.04, [0, 0.04, -0.1], 0.002),
+        ),
+        material: "cv_radar",
+        mate: A([ox + dx, deckTop + 0.32, -3.15 + dz], [0, 0, 90]),
+      });
+    }
+    // 待发弹药架（靠近舰岛一侧）
+    add({
+      id: `${P}ordnance_ready_rack`,
+      name_cn: "待发弹药架",
+      name_en: "ready service ordnance rack",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        B(0.8, 0.04, 0.3, [0, 0.02, 0], 0.004),
+        B(0.04, 0.3, 0.04, [-0.38, 0.17, -0.13], 0.003),
+        B(0.04, 0.3, 0.04, [0.38, 0.17, -0.13], 0.003),
+        B(0.04, 0.3, 0.04, [-0.38, 0.17, 0.13], 0.003),
+        B(0.04, 0.3, 0.04, [0.38, 0.17, 0.13], 0.003),
+        B(0.8, 0.03, 0.04, [0, 0.32, -0.13], 0.003),
+        B(0.8, 0.03, 0.04, [0, 0.32, 0.13], 0.003),
+      ),
+      material: "cv_steel_dark",
+      mate: A([1.75, deckTop, -7.2]),
+    });
+    // 视点
+    add({
+      id: `${P}ordnance_view_eye`,
+      name_cn: "挂弹作业视点",
+      name_en: "ordnance view eye",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.004, 0.004, 0.004, [0, 0, 0], 0.001)),
+      material: "cv_steel_dark",
+      mate: A([2.7, deckTop + 1.2, -3.3]),
+    });
+    add({
+      id: `${P}ordnance_view_target`,
+      name_cn: "挂弹作业目标",
+      name_en: "ordnance view target",
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.004, 0.004, 0.004, [0, 0, 0], 0.001)),
+      material: "cv_steel_dark",
+      mate: A([1.75, deckTop + 0.25, -3.15]),
+    });
+  }
 }

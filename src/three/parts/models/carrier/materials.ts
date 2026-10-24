@@ -42,6 +42,8 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_mattress: { base: "#c9c8bc", metalness: 0.0, roughness: 0.92, preset: "canvas", envMapIntensity: 0.14 },
   cv_055_bulkhead: { base: "#8d989d", metalness: 0.06, roughness: 0.84, preset: "primer", envMapIntensity: 0.2, doubleSided: true },
   cv_apron: { base: "#a8a79b", metalness: 0.0, roughness: 0.9, preset: "canvas", envMapIntensity: 0.16 },
+  cv_food: { base: "#a9764b", metalness: 0.0, roughness: 0.78, preset: "none", envMapIntensity: 0.12 },
+  cv_food_green: { base: "#6d7f45", metalness: 0.0, roughness: 0.82, preset: "none", envMapIntensity: 0.12 },
   cv_skin: { base: "#c79b78", metalness: 0.0, roughness: 0.72, preset: "none", envMapIntensity: 0.12 },
   cv_deck_tile: { base: "#b8bbb3", metalness: 0.02, roughness: 0.82, preset: "primer", envMapIntensity: 0.2 },
   cv_055_carpet: { base: "#1a242b", metalness: 0.0, roughness: 0.96, preset: "canvas", envMapIntensity: 0.08, doubleSided: true },

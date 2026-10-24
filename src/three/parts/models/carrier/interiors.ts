@@ -170,7 +170,11 @@ export function addCarrierInteriors(ctx: CarrierCtx): void {
     add("carrier.hangar.magazine_control_screen", "弹药库存屏", M(B(0.42, 0.17, 0.008, [0, 0, 0], 0.002)), "cv_screen", [1.4, CV.LOWER_DECK_Y + 0.35, -3.27]);
     gaugeGroup(ctx, HANGAR, 2, "carrier.hangar.magazine", MAGAZINE_GAUGE_NODES, 1.68, CV.LOWER_DECK_Y + 0.35, -3.25);
     seat(ctx, HANGAR, 2, "carrier.hangar.magazine_control", "carrier.hangar.magazine_control_seat_back", 2.35, CV.LOWER_DECK_Y + 0.1, -3.05, -1);
-    add("carrier.hangar.magazine_view_camera", "弹药库监控相机", M(B(0.12, 0.1, 0.16, [0, 0, 0], 0.006), B(0.03, 0.03, 0.14, [0, 0, 0.1], 0.002)), "cv_steel_dark", [0.5, CV.LOWER_DECK_Y + 0.3, -4.62]);
+    // 弹药库沿左舷通道取景：左侧弹药箱/发射筒，右侧四排弹架纵深，尽端为巡检标牌。
+    add("carrier.hangar.magazine_view_mast", "弹药库视点立柱", M(B(0.03, 0.3, 0.03, [0, 0.15, 0], 0.004), B(0.1, 0.015, 0.1, [0, 0.008, 0], 0.004)), "cv_steel_dark", [-1.6, CV.LOWER_DECK_Y, -1.35]);
+    add("carrier.hangar.magazine_view_camera", "弹药库监控相机", M(B(0.12, 0.1, 0.16, [0, 0, 0], 0.006), B(0.03, 0.03, 0.14, [0, 0, 0.1], 0.002)), "cv_steel_dark", [-1.6, CV.LOWER_DECK_Y + 0.3, -1.35]);
+    add("carrier.hangar.magazine_view_target_post", "弹药库巡检标牌立柱", M(B(0.025, 0.22, 0.025, [0, 0.11, 0], 0.004)), "cv_steel", [-1.6, CV.LOWER_DECK_Y, -7.4]);
+    add("carrier.hangar.magazine_view_target", "弹药库巡检标牌", M(B(0.18, 0.13, 0.025, [0, 0, 0], 0.006), B(0.14, 0.09, 0.006, [0, 0, 0.016], 0.002)), "cv_warning", [-1.6, CV.LOWER_DECK_Y + 0.26, -7.4]);
     add("carrier.hangar.magazine_inspection_tray", "弹药检验托盘", M(B(0.3, 0.03, 0.2, [0, 0, 0], 0.004)), "cv_steel", [1.16, CV.LOWER_DECK_Y + 0.27, -3.13]);
     add("carrier.hangar.magazine_inspection_round", "待检弹药", M(C(0.04, 0.32, [0, 0, 0], 12), C(0.014, 0.1, [0, 0.2, 0], 10)), "cv_steel", [1.16, CV.LOWER_DECK_Y + 0.39, -3.13], [90, 0, 0]);
   }

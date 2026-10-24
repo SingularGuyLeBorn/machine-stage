@@ -1814,6 +1814,73 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     mate: A([-0.15, 5.45, T55.GUN_Z - 9.2]),
   });
 
+  // VLS 备用弹/装填准备区：与 130mm 弹药库同层，导弹筒卧放在托架上，
+  // 顶部有单轨吊与吊钩，可把筒体送到垂发装填口。
+  for (const [cx, cz, tag] of [
+    [-1.7, T55.GUN_Z - 10.2, "l1"],
+    [1.7, T55.GUN_Z - 10.2, "r1"],
+    [-1.7, T55.GUN_Z - 6.8, "l2"],
+    [1.7, T55.GUN_Z - 6.8, "r2"],
+  ] as const) {
+    add({
+      id: `${P}gun.vls_canister_${tag}`,
+      name_cn: `VLS 备用弹筒 ${tag.toUpperCase()}`,
+      name_en: `VLS spare canister ${tag}`,
+      assembly: "weapons",
+      build_layer: 2,
+      geometry: M(
+        { type: "latheZ", profile: [[0.02, -1.7], [0.22, -1.55], [0.32, -1.1], [0.32, 1.1], [0.22, 1.55], [0.02, 1.7]], segments: 20 },
+        T(0.34, 0.28, 0.08, [0, 0, 1.62], 18),
+        T(0.34, 0.28, 0.08, [0, 0, -1.62], 18),
+        B(0.06, 0.04, 0.7, [0, 0.32, 0.2], 0.004),
+        B(0.06, 0.04, 0.7, [0, -0.32, 0.2], 0.004),
+      ),
+      material: "cv_055_shell",
+      mate: A([cx, 5.65, cz]),
+    });
+    add({
+      id: `${P}gun.vls_canister_cradle_${tag}`,
+      name_cn: `VLS 备用弹托架 ${tag.toUpperCase()}`,
+      name_en: `VLS canister cradle ${tag}`,
+      assembly: "weapons",
+      build_layer: 2,
+      geometry: M(
+        B(0.9, 0.08, 1.5, [0, 0.04, 0], 0.006),
+        B(0.1, 0.45, 0.1, [-0.35, -0.18, -0.55], 0.004),
+        B(0.1, 0.45, 0.1, [0.35, -0.18, -0.55], 0.004),
+        B(0.1, 0.45, 0.1, [-0.35, -0.18, 0.55], 0.004),
+        B(0.1, 0.45, 0.1, [0.35, -0.18, 0.55], 0.004),
+      ),
+      material: "cv_steel_dark",
+      mate: A([cx, 5.28, cz]),
+    });
+  }
+  add({
+    id: `${P}gun.vls_reload_rail`,
+    name_cn: "VLS 装填单轨/吊钩",
+    name_en: "VLS reload monorail and hoist",
+    assembly: "weapons",
+    build_layer: 2,
+    geometry: M(
+      B(3.8, 0.08, 0.1, [0, 0, 0], 0.006),
+      { type: "weld", from: [0, -0.04, 0], to: [0, -0.55, 0], radius: 0.03 },
+      { type: "torus", radius: 0.12, tube: 0.025, radialSegments: 8, tubularSegments: 16, at: [0, -0.62, 0] },
+      B(0.25, 0.3, 0.25, [1.5, -0.15, 0], 0.008),
+    ),
+    material: "cv_steel",
+    mate: A([0, 6.7, T55.GUN_Z - 10.4]),
+  });
+  add({
+    id: `${P}gun.vls_reload_screen`,
+    name_cn: "VLS 装填控制屏",
+    name_en: "VLS reload control screen",
+    assembly: "weapons",
+    build_layer: 2,
+    geometry: M(B(0.7, 0.45, 0.04, [0, 0, 0], 0.004), B(0.56, 0.32, 0.01, [0, 0, 0.03], 0.002)),
+    material: "cv_055_console",
+    mate: A([1.7, 6.0, T55.GUN_Z - 8.9]),
+  });
+
   // ---------------- 近防/导弹 ----------------
   // 前近防炮真实位置在主炮/前垂发之后、舰桥之前的独立炮位平台上；
   // 旧版把它放在舰桥正前方同一高度（DECK+7.85，z=37.2），从舰桥看出去
@@ -3974,7 +4041,13 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     red: "cv_berth_red",
   };
   const curtainGeos: Array<ReturnType<typeof B>> = [];
-  const bunkProps: Array<ReturnType<typeof B>> = [];
+  const sheets: Array<ReturnType<typeof B>> = [];
+  const personalPaper: Array<ReturnType<typeof B>> = [];
+  const personalDark: Array<ReturnType<typeof B>> = [];
+  const personalColor: Array<ReturnType<typeof B>> = [];
+  const personalRed: Array<ReturnType<typeof B>> = [];
+  const food: Array<ReturnType<typeof B>> = [];
+  const foodGreen: Array<ReturnType<typeof B>> = [];
   const rack = (
     cx: number,
     cz: number,
@@ -3992,8 +4065,13 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       frame.push(B(0.06, 1.98, 0.06, [cx + wid / 2 - 0.03, FT + 0.99, cz - len / 2 + 0.03], 0.004));
       frame.push(B(0.06, 1.98, 0.06, [cx + wid / 2 - 0.03, FT + 0.99, cz + len / 2 - 0.03], 0.004));
       mattress.push(B(wid - 0.05, 0.12, len - 0.1, [cx, FT + y + 0.1, cz], 0.03));
+      // 铺好的床：白床单 + 包角 + 被子折边 + 枕头
+      sheets.push(B(wid - 0.08, 0.005, len - 0.12, [cx, FT + y + 0.163, cz], 0.002));
       bedding[color]!.push(B(0.5, 0.07, 0.3, [cx, FT + y + 0.2, cz + len / 2 - 0.22], 0.02));
       bedding[color]!.push(B(wid - 0.08, 0.03, 0.95, [cx, FT + y + 0.19, cz - 0.1], 0.01));
+      bedding[color]!.push(B(wid - 0.1, 0.04, 0.06, [cx, FT + y + 0.2, cz + len / 2 - 0.63], 0.008));
+      bedding[color]!.push(B(0.025, 0.035, 0.95, [cx - wid / 2 + 0.06, FT + y + 0.185, cz - 0.1], 0.006));
+      bedding[color]!.push(B(0.025, 0.035, 0.95, [cx + wid / 2 - 0.06, FT + y + 0.185, cz - 0.1], 0.006));
       frame.push(B(0.05, 0.05, 0.12, [cx + wid / 2 - 0.07, FT + y + 0.42, cz + len / 2 - 0.1], 0.003));
       // 隐私帘只拉一半，不同铺位长短不一；金属帘盒与挂环在床架上。
       curtainGeos.push(B(0.018, 0.5, len * 0.62, [cx + curtainSide * (wid / 2 + 0.035), FT + y + 0.35, cz - len * 0.12], 0.003));
@@ -4006,10 +4084,22 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     }
     frame.push(B(wid - 0.12, 0.28, len - 0.18, [cx, FT + 0.16, cz], 0.006));
     frame.push(B(wid - 0.18, 0.02, 0.04, [cx, FT + 0.24, cz - len / 2 + 0.12], 0.002));
-    // 每个铺位的私人物品不完全一样：书/耳机/水杯/背包/毛巾
-    bunkProps.push(B(0.24, 0.05, 0.32, [cx + wid * 0.15, FT + 0.52, cz + len / 2 - 0.45], 0.004));
-    bunkProps.push(B(0.16, 0.22, 0.28, [cx - wid * 0.18, FT + 0.9, cz + len / 2 - 0.55], 0.02));
-    bunkProps.push(B(0.18, 0.03, 0.26, [cx - wid * 0.12, FT + 1.28, cz - len / 2 + 0.35], 0.003));
+    // 每个铺位的私人物品不完全一样
+    const py = tierY[tierY.length - 1]!;
+    const seed = Math.round((cx * 1007 + cz * 1013 + py * 1019) * 10) % 7;
+    if (seed === 0) {
+      personalPaper.push(B(0.24, 0.04, 0.32, [cx + wid * 0.15, FT + py + 0.22, cz + len / 2 - 0.45], 0.004));
+      personalRed.push(B(0.26, 0.015, 0.34, [cx + wid * 0.15, FT + py + 0.25, cz + len / 2 - 0.45], 0.002));
+    } else if (seed === 2) {
+      personalDark.push(B(0.16, 0.2, 0.24, [cx - wid * 0.16, FT + py + 0.28, cz + len / 2 - 0.55], 0.02));
+      personalColor.push(B(0.02, 0.5, 0.28, [cx + curtainSide * (wid / 2 + 0.05), FT + py + 0.35, cz + 0.2], 0.004));
+    } else if (seed === 4) {
+      personalColor.push(B(0.02, 0.26, 0.2, [cx - wid * 0.2, FT + py + 0.25, cz + 0.3], 0.003));
+      personalPaper.push(C(0.04, 0.1, [cx + wid * 0.18, FT + py + 0.23, cz + 0.1], 10));
+    } else if (seed === 6) {
+      personalDark.push(B(0.4, 0.18, 0.22, [cx, FT + 0.1, cz + len / 2 - 0.25], 0.02));
+      personalPaper.push(B(0.12, 0.2, 0.16, [cx - wid * 0.15, FT + py + 0.3, cz - 0.2], 0.004));
+    }
   };
   // A 舱（8 人，2 层铺 ×4，深蓝/灰）
   rack(-3.62, -7.15, 2, "navy", 2.0, 0.9, 1);
@@ -4044,7 +4134,11 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
   }
 
   crewPart("bunk_curtains", "铺位隐私帘", M(...curtainGeos), "cv_berth_grey");
-  crewPart("bunk_personal", "铺位上的书/耳机/水杯/背包", M(...bunkProps), "cv_055_console");
+  if (sheets.length) crewPart("bed_sheets", "铺位白色床单/包角", M(...sheets), "cv_deck_line");
+  if (personalPaper.length) crewPart("bed_personal_paper", "铺位书籍/水杯", M(...personalPaper), "cv_deck_line");
+  if (personalDark.length) crewPart("bed_personal_dark", "铺位耳机/背包/鞋", M(...personalDark), "cv_055_console");
+  if (personalColor.length) crewPart("bed_personal_color", "铺位照片/毛巾/衣服", M(...personalColor), "cv_055_seat_alt2");
+  if (personalRed.length) crewPart("bed_personal_red", "铺位书皮/私人物品", M(...personalRed), "cv_deck_red");
 
   // A 舱：可折叠小桌 + 壁挂电视 + 风扇
   crewPart(
@@ -4275,12 +4369,97 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
   props.push(B(0.08, 0.7, 0.08, [3.25, FT + 0.35, 7.1], 0.004));
   props.push(B(0.5, 0.65, 0.05, [3.2, FT + 1.3, 5.0], 0.004));
 
+  // ---- 生活细节：开放柜/照片/毛巾/鞋/洗衣袋/厕所/餐厅/厨房/损管 ----
+  // 水兵 A/B 舱：后壁照片板、时钟、挂衣、毛巾、鞋、洗衣袋、垃圾桶
+  for (const [rz, tag] of [[-7.92, "a"], [-0.02, "b"]] as const) {
+    wood.push(B(1.4, 0.7, 0.04, [-2.55, FT + 1.9, rz], 0.004));
+    for (let ph = 0; ph < 4; ph++) {
+      white.push(B(0.18, 0.22, 0.01, [-3.05 + ph * 0.34, FT + 1.9, rz + 0.03], 0.002));
+      fabric.push(B(0.14, 0.16, 0.01, [-3.08 + ph * 0.34, FT + 1.96, rz + 0.035], 0.002));
+    }
+    props.push(C(0.14, 0.03, [-1.35, FT + 2.1, rz], 18));
+    props.push(B(0.02, 0.18, 0.02, [-1.35, FT + 2.1, rz + 0.03], 0.002));
+    props.push(C(0.03, 0.1, [-1.85, FT + 2.25, rz], 10));
+    for (let b = 0; b < 3; b++) {
+      props.push(B(0.5, 0.02, 0.06, [-1.85 + Math.cos(b * 2.1) * 0.34, FT + 2.22, rz + Math.sin(b * 2.1) * 0.34], 0.002));
+    }
+    // 挂衣/毛巾
+    fabric.push(B(0.03, 0.75, 0.42, [-1.02, FT + 1.45, rz + 0.45], 0.004));
+    fabric.push(B(0.03, 0.5, 0.3, [-1.02, FT + 1.3, rz + 0.85], 0.004));
+    // 鞋/洗衣袋/垃圾桶
+    dark.push(B(0.16, 0.14, 0.32, [-2.2, FT + 0.07, rz + 0.35], 0.01));
+    dark.push(B(0.16, 0.14, 0.32, [-1.9, FT + 0.07, rz + 0.35], 0.01));
+    fabric.push(B(0.55, 0.65, 0.45, [-3.6, FT + 0.33, rz + 0.4], 0.012));
+    props.push(C(0.24, 0.6, [-2.9, FT + 0.3, rz + 0.45], 14));
+    void tag;
+  }
+  // 士官/军官舱：开放衣柜、桌面照片/书、毛巾、拖鞋
+  for (const [z0, x0] of [[1.7, -1.0], [4.6, -1.0], [6.3, -1.0], [7.5, -1.0]] as const) {
+    fabric.push(B(0.03, 0.8, 0.5, [x0, FT + 1.3, z0], 0.004));
+    fabric.push(B(0.03, 0.55, 0.36, [x0, FT + 1.2, z0 + 0.4], 0.004));
+    wood.push(B(0.5, 0.04, 0.35, [-1.55, FT + 0.8, z0 + 0.2], 0.006));
+    white.push(B(0.24, 0.3, 0.02, [-1.55, FT + 0.98, z0 + 0.2], 0.003));
+    props.push(C(0.06, 0.08, [-1.3, FT + 0.84, z0 + 0.1], 10));
+  }
+  // 卫生间：隔间/马桶/水箱/扶手/洗手池/镜子/淋浴
+  for (const [cx0, cz0] of [[-3.2, -4.1], [3.2, 4.1]] as const) {
+    for (let s = 0; s < 2; s++) {
+      const sx = cx0 - 0.9 + s * 1.8;
+      white.push(C(0.22, 0.4, [sx, FT + 0.2, cz0], 14));
+      white.push(B(0.55, 0.55, 0.22, [sx, FT + 0.55, cz0 + 0.32], 0.01));
+      dark.push(B(0.03, 1.7, 1.1, [sx - 0.65, FT + 0.85, cz0], 0.004));
+      dark.push(B(0.03, 1.7, 1.1, [sx + 0.65, FT + 0.85, cz0], 0.004));
+      props.push(C(0.06, 0.02, [sx + 0.45, FT + 1.0, cz0 + 0.35], 10));
+      props.push(B(0.3, 0.02, 0.2, [sx + 0.45, FT + 1.15, cz0 + 0.35], 0.002));
+    }
+    white.push(B(1.8, 0.06, 0.55, [cx0, FT + 0.9, cz0 + 0.8], 0.006));
+    for (const sx of [cx0 - 0.55, cx0 + 0.55]) {
+      white.push(C(0.2, 0.16, [sx, FT + 0.98, cz0 + 0.8], 14));
+      props.push(C(0.025, 0.16, [sx, FT + 1.08, cz0 + 0.8], 10));
+    }
+    props.push(B(1.4, 0.8, 0.02, [cx0, FT + 1.5, cz0 + 1.05], 0.002));
+    white.push(B(1.4, 0.04, 1.0, [cx0, FT + 0.02, cz0 - 0.5], 0.004));
+    props.push(C(0.04, 0.4, [cx0 + 0.6, FT + 1.8, cz0 - 0.5], 10));
+    props.push(C(0.12, 0.03, [cx0 + 0.6, FT + 2.0, cz0 - 0.5], 12));
+    props.push(B(0.03, 0.02, 0.2, [cx0 + 0.6, FT + 2.02, cz0 - 0.35], 0.002));
+  }
+  // 餐厅：托盘/餐盘/食物/调料/咖啡/饮水机/回收架
+  for (const [tx, tz] of [[2.55, -7.2], [2.55, -5.6], [2.55, -4.1]] as const) {
+    white.push(B(0.75, 0.03, 0.5, [tx - 0.3, FT + 0.79, tz], 0.004));
+    props.push(C(0.16, 0.04, [tx + 0.15, FT + 0.8, tz], 18));
+    food.push(B(0.2, 0.06, 0.16, [tx + 0.15, FT + 0.83, tz], 0.008));
+    foodGreen.push(B(0.08, 0.06, 0.1, [tx + 0.35, FT + 0.83, tz + 0.12], 0.008));
+    props.push(C(0.04, 0.08, [tx - 0.35, FT + 0.84, tz + 0.15], 10));
+    props.push(B(0.08, 0.12, 0.05, [tx + 0.45, FT + 0.85, tz - 0.1], 0.004));
+    props.push(B(0.18, 0.08, 0.12, [tx - 0.15, FT + 0.83, tz - 0.15], 0.004));
+  }
+  props.push(C(0.28, 0.7, [3.75, FT + 0.4, -4.2], 16));
+  props.push(C(0.22, 0.2, [3.75, FT + 0.9, -4.2], 16));
+  white.push(B(0.6, 0.9, 0.5, [1.1, FT + 0.45, -4.2], 0.008));
+  props.push(C(0.12, 0.5, [1.1, FT + 1.1, -4.2], 12));
+  white.push(B(0.5, 0.04, 0.35, [1.1, FT + 1.0, -4.0], 0.004));
+  // 厨房：冷库温度表/切配/锅具/洗碗架
+  props.push(B(0.2, 0.15, 0.04, [2.2, FT + 1.6, -2.82], 0.003));
+  props.push(B(0.2, 0.15, 0.04, [3.45, FT + 1.6, -2.82], 0.003));
+  props.push(B(0.45, 0.04, 0.3, [2.6, FT + 0.95, -0.6], 0.004));
+  props.push(C(0.25, 0.25, [2.9, FT + 1.1, -1.0], 14));
+  props.push(C(0.3, 0.18, [3.2, FT + 1.05, -1.0], 14));
+  white.push(B(0.7, 0.25, 0.5, [2.25, FT + 0.95, 0.05], 0.006));
+  // 走廊损管柜：SCBA/水带/水枪/支撑
+  dark.push(B(0.7, 1.8, 0.4, [0.82, FT + 0.9, -2.0], 0.006));
+  white.push(C(0.1, 0.5, [0.82, FT + 1.0, -2.0], 12));
+  props.push(C(0.03, 1.2, [0.82, FT + 0.6, -1.8], 8));
+  props.push(B(0.5, 0.12, 0.08, [0.82, FT + 1.4, -2.0], 0.004));
+  props.push(B(0.18, 0.18, 0.18, [0.82, FT + 0.2, -2.0], 0.004));
+
   crewPart("wood_furniture", "生活区木纹家具/床板/桌面", M(...wood), "cv_055_wood");
   crewPart("dark_furniture", "生活区深色金属家具/柜架", M(...dark), "cv_055_console");
   crewPart("fabric_furniture", "生活区布艺/沙发/床垫/隔帘", M(...fabric), "cv_055_seat");
   crewPart("white_furniture", "厨房/医务/卫生白色设备", M(...white), "cv_055_ceiling");
   crewPart("screens", "生活区电视/医疗监护屏", M(...displayGeos), "cv_scr_camera");
   crewPart("props", "生活区随身物件/餐具/器材", M(...props), "cv_steel");
+  crewPart("food", "餐厅食物/配餐", M(...food), "cv_food");
+  crewPart("food_green", "餐厅蔬菜/配菜", M(...foodGreen), "cv_food_green");
 
   // 走廊附件：扶手/消防瓶/损管柜/管路/标识/救生衣
   const corridorProps: Array<ReturnType<typeof B>> = [];
@@ -4319,6 +4498,323 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       geometry: M(B(0.004, 0.004, 0.004, [0, 0, 0], 0.001)),
       material: "cv_055_console",
       mate: A(at),
+    });
+  }
+
+  // ---------------- 轮机维修车间（机舱右侧，备用燃气轮机/车床/工具/吊车） ----------------
+  // 公开资料：QC-280 燃气轮机采用整机模块更换——拆进排气道、开吊装通道、吊出旧机、
+  // 换新机后激光对中。这里把维修/机加工/备件/吊装区做在机舱右侧，可从“维修车间”视角看。
+  {
+    const wx = 7.0;
+    const wz = -30.0;
+    const wy = 4.2;
+    add({
+      id: `${P}power.workshop_floor`,
+      name_cn: "维修车间花钢板/围栏",
+      name_en: "workshop deck and railing",
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(
+        B(4.0, 0.06, 7.0, [0, 0, 0], 0.01),
+        B(4.0, 0.06, 0.05, [0, 1.0, -3.45], 0.003),
+        B(4.0, 0.06, 0.05, [0, 1.0, 3.45], 0.003),
+        B(0.05, 0.06, 7.0, [-1.95, 1.0, 0], 0.003),
+        B(0.05, 0.06, 7.0, [1.95, 1.0, 0], 0.003),
+        ...[-1.8, -0.6, 0.6, 1.8].flatMap((dz) => [
+          B(0.03, 1.0, 0.03, [-1.95, 0.5, dz], 0.002),
+          B(0.03, 1.0, 0.03, [1.95, 0.5, dz], 0.002),
+        ]),
+      ),
+      material: "cv_grate",
+      mate: A([wx, wy, wz]),
+    });
+    add({
+      id: `${P}power.workshop_bench`,
+      name_cn: "维修工作台/台钳/工具板",
+      name_en: "workshop bench and tool board",
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(
+        B(2.4, 0.1, 1.0, [0, 0.8, 0], 0.01),
+        B(0.1, 0.75, 0.9, [-1.05, 0.4, 0], 0.006),
+        B(0.1, 0.75, 0.9, [1.05, 0.4, 0], 0.006),
+        B(1.8, 0.5, 0.04, [0, 1.35, -0.5], 0.006),
+        C(0.08, 0.16, [-0.6, 0.95, 0.2], 12),
+        B(0.14, 0.08, 0.1, [-0.6, 0.9, 0.2], 0.004),
+      ),
+      material: "cv_055_console",
+      mate: A([wx - 0.8, wy, wz - 2.3]),
+    });
+    add({
+      id: `${P}power.workshop_tools`,
+      name_cn: "工具/量具/备件箱",
+      name_en: "workshop tools and parts",
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(
+        B(0.6, 0.5, 0.4, [0, 0.25, 0], 0.01),
+        ...[0, 1, 2].flatMap((d) => B(0.55, 0.03, 0.02, [0, 0.12 + d * 0.12, 0.21], 0.002)),
+        B(0.25, 0.12, 0.2, [0.5, 0.12, 0.1], 0.004),
+        B(0.18, 0.08, 0.14, [-0.3, 0.85, 0.0], 0.003),
+      ),
+      material: "cv_055_hull",
+      mate: A([wx + 1.0, wy, wz - 2.3]),
+    });
+    // 车床/钻床/砂轮机
+    add({
+      id: `${P}power.workshop_machines`,
+      name_cn: "维修车间车床/钻床/砂轮机",
+      name_en: "workshop lathe drill and grinder",
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(
+        B(1.5, 0.18, 0.5, [0, 0.55, 0], 0.01),
+        C(0.16, 0.5, [-0.5, 0.7, 0], 16),
+        C(0.08, 0.5, [0.5, 0.68, 0], 12),
+        B(0.3, 0.08, 0.14, [0.5, 0.72, 0], 0.004),
+        C(0.04, 0.3, [0, 0.9, 0], 10),
+        B(0.25, 0.04, 0.25, [0, 1.05, 0], 0.006),
+        B(0.3, 0.12, 0.3, [1.0, 0.2, 0], 0.006),
+        C(0.14, 0.04, [1.0, 0.3, 0], 18),
+      ),
+      material: "cv_055_hull",
+      mate: A([wx, wy, wz + 1.9]),
+    });
+    // 焊机/气瓶/焊接屏
+    add({
+      id: `${P}power.workshop_welding`,
+      name_cn: "维修车间焊机/气瓶/焊接屏",
+      name_en: "workshop welder and gas bottles",
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(
+        B(0.6, 0.5, 0.35, [0, 0.4, 0], 0.01),
+        C(0.12, 0.8, [-0.9, 0.4, 0.3], 12),
+        C(0.12, 0.8, [-0.6, 0.4, 0.3], 12),
+        B(0.04, 1.2, 1.1, [0.7, 0.6, 0.1], 0.004),
+        { type: "weld", from: [0.25, 0.55, 0], to: [-0.35, 0.35, 0.25], radius: 0.02 },
+      ),
+      material: "cv_055_console",
+      mate: A([wx - 0.8, wy, wz + 5.0]),
+    });
+    // 备用 QC-280 整机模块（轮式托架 + 转子 + 管线 + 吊装梁）
+    add({
+      id: `${P}power.workshop_spare_turbine`,
+      name_cn: "备用 QC-280 燃气轮机模块",
+      name_en: "spare QC-280 gas turbine module",
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(
+        B(2.1, 0.3, 1.4, [0, 0.25, 0], 0.02),
+        { type: "latheZ", profile: [[0.02, -1.3], [0.45, -1.2], [0.62, -0.8], [0.62, 0.8], [0.45, 1.2], [0.02, 1.3]], segments: 22 },
+        C(0.1, 0.55, [0, 1.5, -0.7], 12),
+        B(1.5, 0.12, 0.12, [0, 1.62, 0], 0.006),
+        ...[-0.85, 0.85].flatMap((dz) => [
+          C(0.22, 0.12, [-0.9, 0.16, dz], 14),
+          C(0.22, 0.12, [0.9, 0.16, dz], 14),
+        ]),
+      ),
+      material: "cv_055_hull",
+      mate: A([wx + 0.2, wy, wz - 0.2]),
+    });
+    add({
+      id: `${P}power.workshop_crane`,
+      name_cn: "维修车间吊装梁/吊钩",
+      name_en: "workshop crane rail and hook",
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(
+        B(0.12, 0.16, 7.0, [-1.0, 3.2, 0], 0.006),
+        B(0.12, 0.16, 7.0, [1.0, 3.2, 0], 0.006),
+        B(2.2, 0.12, 0.2, [0, 3.2, -0.5], 0.006),
+        { type: "weld", from: [0, 3.12, -0.5], to: [0, 2.35, -0.5], radius: 0.02 },
+        { type: "torus", radius: 0.08, tube: 0.016, radialSegments: 8, tubularSegments: 16, at: [0, 2.27, -0.5] },
+      ),
+      material: "cv_steel_dark",
+      mate: A([wx, wy, wz]),
+    });
+    // 备件架/消防瓶/控制屏/视点
+    add({
+      id: `${P}power.workshop_shelf`,
+      name_cn: "维修车间备件架/控制屏",
+      name_en: "workshop spare parts shelf and panel",
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(
+        B(1.8, 0.06, 0.4, [0, 0.6, 0], 0.004),
+        B(1.8, 0.06, 0.4, [0, 1.0, 0], 0.004),
+        B(1.8, 0.06, 0.4, [0, 1.4, 0], 0.004),
+        ...Array.from({ length: 8 }, (_, k) => B(0.16, 0.2, 0.25, [-0.75 + k * 0.21, 0.75 + (k % 3) * 0.4, 0], 0.004)),
+        B(0.7, 0.5, 0.06, [1.0, 1.4, 0.2], 0.006),
+        C(0.06, 0.02, [1.0, 1.4, 0.24], 14),
+        C(0.06, 0.25, [-1.2, 0.12, -1.8], 12),
+        B(0.16, 0.03, 0.16, [-1.2, 0.3, -1.8], 0.003),
+      ),
+      material: "cv_055_console",
+      mate: A([wx, wy, wz + 3.0]),
+    });
+    add({
+      id: `${P}power.workshop_eye_post`,
+      name_cn: "维修车间视点立柱",
+      name_en: "workshop view mast",
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(B(0.08, 2.8, 0.08, [0, 1.4, 0], 0.004), B(0.2, 0.04, 0.2, [0, 0.02, 0], 0.004)),
+      material: "cv_steel_dark",
+      mate: A([wx - 0.8, wy, wz + 5.4]),
+    });
+    add({
+      id: `${P}power.workshop_eye`,
+      name_cn: "维修车间视点",
+      name_en: "workshop view eye",
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(B(0.004, 0.004, 0.004, [0, 0, 0], 0.001)),
+      material: "cv_055_console",
+      mate: A([wx + 1.3, wy + 1.8, wz + 3.0]),
+    });
+    add({
+      id: `${P}power.workshop_target`,
+      name_cn: "维修车间目标",
+      name_en: "workshop view target",
+      assembly: "propulsion",
+      build_layer: 2,
+      geometry: M(B(0.004, 0.004, 0.004, [0, 0, 0], 0.001)),
+      material: "cv_055_console",
+      mate: A([wx + 0.2, wy + 1.0, wz - 0.2]),
+    });
+  }
+
+  // ---------------- 直升机甲板加油作业（站点 + 加油车 + 软管 + 接地） ----------------
+  {
+    const fy = t55DeckTop(T55.HELIPAD_Z) + 0.12;
+    const sz = T55.HELIPAD_Z + 2.8;
+    add({
+      id: `${P}hangar.fuel_station`,
+      name_cn: "直升机甲板燃油补给站",
+      name_en: "helipad fuel servicing station",
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(
+        B(1.1, 0.08, 0.9, [0, 0.04, 0], 0.008),
+        B(1.0, 1.1, 0.7, [0, 0.6, 0], 0.012),
+        B(0.9, 0.07, 0.78, [0, 1.18, 0], 0.006),
+        B(0.7, 0.32, 0.03, [0, 0.78, 0.36], 0.004),
+        B(0.55, 0.18, 0.015, [0, 0.78, 0.38], 0.002),
+        C(0.1, 0.3, [0.62, 0.6, 0.2], 14),
+        T(0.28, 0.2, 0.08, [-0.45, 0.55, 0], 18),
+        C(0.08, 0.16, [0.5, 0.35, 0.35], 10),
+        C(0.06, 0.16, [0.5, 0.2, 0.35], 10),
+        T(0.14, 0.08, 0.06, [0.4, 0.03, 0.55], 16),
+      ),
+      material: "cv_055_hull",
+      mate: A([5.6, fy, sz]),
+    });
+    add({
+      id: `${P}hangar.fuel_station_screen`,
+      name_cn: "加油计量屏",
+      name_en: "fuel metering screen",
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(B(0.5, 0.3, 0.02, [0, 0, 0], 0.003)),
+      material: "cv_scr_engine",
+      mate: A([5.6, fy + 0.76, sz + 0.4]),
+    });
+    add({
+      id: `${P}hangar.fuel_cart`,
+      name_cn: "直升机加油车",
+      name_en: "helicopter fuel servicing cart",
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(
+        B(1.35, 0.14, 0.7, [0, 0.55, 0], 0.02),
+        B(0.16, 0.55, 0.16, [-0.5, 0.85, 0], 0.008),
+        B(0.16, 0.55, 0.16, [0.5, 0.85, 0], 0.008),
+        B(1.3, 0.12, 0.14, [0, 1.12, 0], 0.008),
+        C(0.32, 0.18, [-0.5, 0.32, 0], 18),
+        C(0.32, 0.18, [0.5, 0.32, 0], 18),
+        T(0.45, 0.3, 0.18, [0, 0.9, 0], 20),
+        C(0.2, 0.4, [0.2, 0.8, 0.1], 14),
+        C(0.1, 0.06, [0.2, 1.02, 0.1], 12),
+        B(0.3, 0.22, 0.03, [-0.2, 0.82, 0.36], 0.004),
+      ),
+      material: "cv_warning",
+      mate: A([2.6, fy, T55.HELIPAD_Z + 2.2]),
+    });
+    add({
+      id: `${P}hangar.fuel_cart_hose`,
+      name_cn: "加油软管/加油枪",
+      name_en: "fuel hose and nozzle",
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(
+        { type: "weld", from: [0.4, 0.9, 0.2], to: [-0.2, 0.8, 0.9], radius: 0.035 },
+        { type: "weld", from: [-0.2, 0.8, 0.9], to: [-0.8, 0.75, 1.5], radius: 0.035 },
+        { type: "weld", from: [-0.8, 0.75, 1.5], to: [-1.1, 0.7, 2.0], radius: 0.035 },
+        C(0.06, 0.28, [-1.15, 0.78, 2.08], 12),
+        T(0.08, 0.055, 0.08, [-1.15, 0.9, 2.1], 14),
+        { type: "weld", from: [-1.15, 0.68, 2.1], to: [-1.4, 0.66, 2.3], radius: 0.035 },
+      ),
+      material: "cv_rubber",
+      mate: A([2.6, fy, T55.HELIPAD_Z + 2.2]),
+    });
+    add({
+      id: `${P}hangar.fuel_ground`,
+      name_cn: "加油接地线/接地盘",
+      name_en: "fuel bonding cable",
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(
+        { type: "weld", from: [0.5, 0.6, -0.3], to: [1.1, 0.08, -0.8], radius: 0.012 },
+        { type: "weld", from: [1.1, 0.08, -0.8], to: [1.7, 0.03, -1.2], radius: 0.012 },
+        C(0.06, 0.025, [1.72, 0.04, -1.21], 12),
+      ),
+      material: "cv_copper",
+      mate: A([2.6, fy, T55.HELIPAD_Z + 2.2]),
+    });
+    add({
+      id: `${P}hangar.fuel_receptacle`,
+      name_cn: "Z-20 受油口",
+      name_en: "Z-20 fuel receptacle",
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(
+        T(0.08, 0.04, 0.06, [0, 0, 0], 14),
+        C(0.05, 0.12, [0, 0, 0], 12),
+        B(0.12, 0.05, 0.18, [0, -0.09, 0], 0.006),
+      ),
+      material: "cv_brass",
+      mate: A([1.7, fy + 0.9, T55.HELIPAD_Z - 0.4]),
+    });
+    add({
+      id: `${P}hangar.fuel_view_mast`,
+      name_cn: "直升机加油视点立柱",
+      name_en: "helipad fuel view mast",
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(B(0.09, 3.6, 0.09, [0, 1.8, 0], 0.004), B(0.24, 0.04, 0.24, [0, 0.02, 0], 0.004)),
+      material: "cv_steel_dark",
+      mate: A([5.6, fy, T55.HELIPAD_Z + 8.2]),
+    });
+    add({
+      id: `${P}hangar.fuel_view_eye`,
+      name_cn: "直升机加油视点",
+      name_en: "helipad fuel view eye",
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(B(0.004, 0.004, 0.004, [0, 0, 0], 0.001)),
+      material: "cv_055_console",
+      mate: A([5.6, fy + 3.6, T55.HELIPAD_Z + 8.2]),
+    });
+    add({
+      id: `${P}hangar.fuel_view_target`,
+      name_cn: "直升机加油目标",
+      name_en: "helipad fuel view target",
+      assembly: "hangar",
+      build_layer: 4,
+      geometry: M(B(0.004, 0.004, 0.004, [0, 0, 0], 0.001)),
+      material: "cv_055_console",
+      mate: A([1.4, fy + 0.8, T55.HELIPAD_Z - 0.6]),
     });
   }
 

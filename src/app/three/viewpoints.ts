@@ -30,6 +30,8 @@ export type CameraMode =
   | "crew"
   | "crew_berth"
   | "crew_mess"
+  | "workshop"
+  | "fuel"
   | "cockpit"
   | "flight";
 
@@ -43,6 +45,8 @@ export const CARRIER_INTERIOR_MODES = [
   "crew",
   "crew_berth",
   "crew_mess",
+  "workshop",
+  "fuel",
   "cockpit",
 ] as const;
 
@@ -232,6 +236,18 @@ const TYPE055_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec
     targetPart: "type055.interior.crew_mess_target",
     fov: 74,
   },
+  workshop: {
+    eyePart: "type055.power.workshop_eye",
+    eye: [0, 0, 0],
+    targetPart: "type055.power.workshop_target",
+    fov: 68,
+  },
+  fuel: {
+    eyePart: "type055.hangar.fuel_view_eye",
+    eye: [0, 0, 0],
+    targetPart: "type055.hangar.fuel_view_target",
+    fov: 60,
+  },
   magazine: {
     eyePart: "type055.gun.magazine",
     eye: [0, -0.55, 2.2],
@@ -265,6 +281,18 @@ const CARRIER_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec
     targetPart: "carrier.crew.mess_target",
     fov: 74,
   },
+  workshop: {
+    eyePart: "carrier.hangar.workshop_eye",
+    eye: [0, 0, 0],
+    targetPart: "carrier.hangar.workshop_target",
+    fov: 62,
+  },
+  fuel: {
+    eyePart: "carrier.deck.fuel_view_eye",
+    eye: [0, 0, 0],
+    targetPart: "carrier.aircraft.parked1_fuselage_mid",
+    fov: 62,
+  },
   cic: {
     eyePart: "carrier.island.cic_watch_seat_back",
     eye: [0, 0.32, 1.2],
@@ -287,8 +315,8 @@ const CARRIER_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec
   magazine: {
     eyePart: "carrier.hangar.magazine_view_camera",
     eye: [0, 0, 0],
-    targetPart: "carrier.hangar.magazine_rack_ext_2",
-    fov: 72,
+    targetPart: "carrier.hangar.magazine_view_target",
+    fov: 55,
   },
   hangar: {
     eyePart: "carrier.hangar.hangar_view_camera",
@@ -312,6 +340,8 @@ export const CAMERA_MODE_LABELS: Record<CameraMode, { label: string; hint: strin
   crew: { label: "生活区走廊", hint: "站在水下生活甲板走廊，两侧是水兵住舱 / 士官舱 / 军官舱 / 餐厅 / 厨房 / 医务室；再点一次退出" },
   crew_berth: { label: "水兵住舱", hint: "8 人住舱：两层铺 / 个人衣柜 / 床头灯 / 折叠凳，拖动环视；再点一次退出" },
   crew_mess: { label: "餐厅/厨房", hint: "舰员餐厅与全电厨房：配餐台 / 餐桌 / 电磁灶 / 冷库；再点一次退出" },
+  workshop: { label: "维修车间", hint: "轮机/机加工/备件/损管：车床 / 钻床 / 工具柜 / 备用燃气轮机 / 吊车；再点一次退出" },
+  fuel: { label: "加油作业", hint: "飞行甲板燃油站：加油车 / 软管 / 加油枪 / 接地线，连接到停放舰载机；再点一次退出" },
   cockpit: { label: "舰载机座舱", hint: "舰载机座舱：平显 / 多功能显示器 / 操纵杆，拖动环视；再点一次退出" },
   flight: { label: "跟拍舰载机", hint: "跟拍舰载机：完整看滑行 / 弹射 / 爬升 / 进近 / 拦阻；再点一次退出" },
 };

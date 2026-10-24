@@ -48,7 +48,10 @@ export function addCarrierCrew(ctx: CarrierCtx): void {
     B(X1 - X0, 0.025, Z1 - Z0, [0, CEIL, 8.0], 0.004),
     B(0.025, H, Z1 - Z0, [X0, FLOOR + H / 2, 8.0], 0.004),
     B(0.025, H, Z1 - Z0, [X1, FLOOR + H / 2, 8.0], 0.004),
-    B(X1 - X0, H, 0.025, [0, FLOOR + H / 2, Z0], 0.004),
+    // 后壁给维修车间留一道 0.3m 宽的门洞
+    B(0.72, H, 0.025, [-0.51, FLOOR + H / 2, Z0], 0.004),
+    B(0.72, H, 0.025, [0.51, FLOOR + H / 2, Z0], 0.004),
+    B(0.3, H - 0.3, 0.025, [0, FLOOR + 0.3 + (H - 0.3) / 2, Z0], 0.004),
     B(X1 - X0, H, 0.025, [0, FLOOR + H / 2, Z1], 0.004),
   ), "cv_055_bulkhead");
 
@@ -153,6 +156,13 @@ export function addCarrierCrew(ctx: CarrierCtx): void {
   const frame: Array<ReturnType<typeof B>> = [];
   const mattress: Array<ReturnType<typeof B>> = [];
   const curtains: Array<ReturnType<typeof B>> = [];
+  const sheets: Array<ReturnType<typeof B>> = [];
+  const personalPaper: Array<ReturnType<typeof B>> = [];
+  const personalDark: Array<ReturnType<typeof B>> = [];
+  const personalColor: Array<ReturnType<typeof B>> = [];
+  const personalRed: Array<ReturnType<typeof B>> = [];
+  const food: Array<ReturnType<typeof B>> = [];
+  const foodGreen: Array<ReturnType<typeof B>> = [];
   const bedding: Record<"navy" | "grey" | "olive" | "tan", Array<ReturnType<typeof B>>> = {
     navy: [], grey: [], olive: [], tan: [],
   };
@@ -174,11 +184,32 @@ export function addCarrierCrew(ctx: CarrierCtx): void {
       frame.push(B(0.004, 0.26, 0.004, [cx + wid / 2, FLOOR + 0.13, cz - len / 2], 0.001));
       frame.push(B(0.004, 0.26, 0.004, [cx + wid / 2, FLOOR + 0.13, cz + len / 2], 0.001));
       mattress.push(B(wid - 0.008, 0.014, len - 0.012, [cx, FLOOR + y + 0.012, cz], 0.004));
+      // 铺好的床：白色床单包角 + 被子铺平 + 被子折边 + 枕头
+      sheets.push(B(wid - 0.014, 0.0025, len - 0.016, [cx, FLOOR + y + 0.0215, cz], 0.001));
       bedding[color].push(B(0.045, 0.014, 0.032, [cx, FLOOR + y + 0.028, cz + len / 2 - 0.028], 0.003));
-      bedding[color].push(B(wid - 0.012, 0.006, 0.13, [cx, FLOOR + y + 0.023, cz - 0.005], 0.002));
-      bedding[color].push(B(wid - 0.02, 0.012, 0.045, [cx, FLOOR + y + 0.027, cz - len / 2 + 0.04], 0.002));
+      bedding[color].push(B(wid - 0.012, 0.006, 0.13, [cx, FLOOR + y + 0.024, cz - 0.005], 0.002));
+      bedding[color].push(B(wid - 0.018, 0.009, 0.013, [cx, FLOOR + y + 0.028, cz + 0.06], 0.0015));
+      bedding[color].push(B(0.004, 0.008, 0.13, [cx - wid / 2 + 0.007, FLOOR + y + 0.023, cz - 0.005], 0.001));
+      bedding[color].push(B(0.004, 0.008, 0.13, [cx + wid / 2 - 0.007, FLOOR + y + 0.023, cz - 0.005], 0.001));
+      bedding[color].push(B(wid - 0.02, 0.012, 0.045, [cx, FLOOR + y + 0.028, cz - len / 2 + 0.04], 0.002));
       curtains.push(B(0.003, 0.075, len * 0.6, [cx + curtainSide * (wid / 2 + 0.005), FLOOR + y + 0.055, cz - 0.005], 0.001));
       frame.push(B(0.006, 0.006, 0.01, [cx + wid / 2 - 0.012, FLOOR + y + 0.055, cz + len / 2 - 0.015], 0.001));
+      // 私人物品：不是每床都一样；有的放书/耳机，有的放照片/水杯，有的放背包/毛巾
+      const seed = Math.round((cx * 1007 + cz * 1013 + y * 1019) * 10) % 7;
+      if (seed === 0) {
+        personalPaper.push(B(0.026, 0.005, 0.038, [cx + 0.018, FLOOR + y + 0.034, cz + 0.055], 0.001));
+        personalRed.push(B(0.028, 0.002, 0.04, [cx + 0.018, FLOOR + y + 0.038, cz + 0.055], 0.001));
+        personalDark.push(B(0.016, 0.006, 0.022, [cx - 0.018, FLOOR + y + 0.032, cz + 0.045], 0.001));
+      } else if (seed === 2) {
+        personalColor.push(B(0.004, 0.026, 0.02, [cx - 0.02, FLOOR + y + 0.04, cz + 0.06], 0.0008));
+        personalPaper.push(C(0.009, 0.012, [cx + 0.024, FLOOR + y + 0.033, cz + 0.045], 6));
+      } else if (seed === 4) {
+        personalDark.push(B(0.03, 0.026, 0.018, [cx - 0.02, FLOOR + y + 0.03, cz - 0.05], 0.002));
+        personalColor.push(B(0.003, 0.05, 0.018, [cx + curtainSide * (wid / 2 + 0.006), FLOOR + y + 0.02, cz + 0.02], 0.001));
+      } else if (seed === 6) {
+        personalDark.push(B(0.018, 0.016, 0.035, [cx, FLOOR + 0.016, cz + len / 2 - 0.02], 0.001));
+        personalPaper.push(C(0.006, 0.01, [cx + 0.028, FLOOR + y + 0.032, cz - 0.04], 6));
+      }
     }
     // 底部个人柜 + 爬梯
     frame.push(B(wid - 0.012, 0.045, len - 0.02, [cx, FLOOR + 0.028, cz], 0.002));
@@ -213,6 +244,11 @@ export function addCarrierCrew(ctx: CarrierCtx): void {
     if (bedding[c].length) part(`bedding_${c}`, `各住舱被褥/枕头（${c}）`, M(...bedding[c]), beddingMat[c]);
   }
   part("bunk_curtains", "铺位隐私帘", M(...curtains), "cv_berth_grey");
+  part("bed_sheets", "铺位白色床单/包角", M(...sheets), "cv_deck_line");
+  part("bed_personal_paper", "铺位书籍/水杯/纸张", M(...personalPaper), "cv_deck_line");
+  part("bed_personal_dark", "铺位耳机/背包/鞋", M(...personalDark), "cv_055_console");
+  part("bed_personal_color", "铺位照片/毛巾", M(...personalColor), "cv_055_seat_alt2");
+  part("bed_personal_red", "铺位书皮/私人物品", M(...personalRed), "cv_deck_red");
 
   // ---- 家具（按舱室分组，材质/布局不同） ----
   const wood: Array<ReturnType<typeof B>> = [];
@@ -344,6 +380,92 @@ export function addCarrierCrew(ctx: CarrierCtx): void {
   props.push(C(0.02, 0.004, [0.25, FLOOR + 0.08, 11.34], 12));
   props.push(C(0.02, 0.004, [0.25, FLOOR + 0.19, 11.34], 12));
   props.push(B(0.1, 0.006, 0.05, [0.45, FLOOR + 0.12, 11.4], 0.001));
+  // 墙面/储物/个人物品：开放柜、照片板、挂衣、鞋、毛巾、洗衣袋、垃圾桶
+  for (const [zWall, tone] of [[5.94, 0], [8.08, 1]] as const) {
+    for (let l = 0; l < 3; l++) {
+      const lx = -0.7 + l * 0.2;
+      dark.push(B(0.17, 0.17, 0.035, [lx, FLOOR + 0.085, zWall], 0.002));
+      dark.push(B(0.004, 0.15, 0.06, [lx - 0.086, FLOOR + 0.085, zWall - 0.03], 0.001));
+      fabric.push(B(0.06, 0.08, 0.008, [lx, FLOOR + 0.1, zWall - 0.022], 0.001));
+      fabric.push(B(0.06, 0.012, 0.025, [lx, FLOOR + 0.15, zWall - 0.02], 0.001));
+      props.push(B(0.02, 0.012, 0.01, [lx + 0.045, FLOOR + 0.12, zWall - 0.03], 0.001));
+    }
+    wood.push(B(0.26, 0.07, 0.006, [-0.6, FLOOR + 0.27, zWall + 0.002], 0.001));
+    for (let ph = 0; ph < 4; ph++) {
+      white.push(B(0.018, 0.022, 0.002, [-0.7 + ph * 0.06, FLOOR + 0.27, zWall - 0.003], 0.001));
+      fabric.push(B(0.014, 0.018, 0.002, [-0.68 + ph * 0.06, FLOOR + 0.3, zWall - 0.003], 0.001));
+    }
+    props.push(C(0.015, 0.008, [-0.28, FLOOR + 0.32, zWall], 10));
+    props.push(C(0.006, 0.01, [-0.28, FLOOR + 0.32, zWall + 0.006], 8));
+    props.push(B(0.012, 0.04, 0.004, [-0.28, FLOOR + 0.34, zWall + 0.006], 0.001));
+    // 吊扇
+    props.push(C(0.012, 0.012, [-0.45, CEIL - 0.04, zWall - 0.1], 8));
+    for (let b = 0; b < 3; b++) {
+      props.push(B(0.035, 0.002, 0.008, [-0.45 + Math.cos(b * 2.1) * 0.03, CEIL - 0.05, zWall - 0.1 + Math.sin(b * 2.1) * 0.03], 0.001));
+    }
+    fabric.push(B(0.004, 0.08, 0.03, [-0.86, FLOOR + 0.13, zWall - 0.16], 0.001));
+    dark.push(B(0.02, 0.018, 0.045, [-0.58, FLOOR + 0.012, zWall - 0.07], 0.002));
+    dark.push(B(0.02, 0.018, 0.045, [-0.54, FLOOR + 0.012, zWall - 0.07], 0.002));
+    fabric.push(B(0.06, 0.075, 0.05, [-0.82, FLOOR + 0.045, zWall - 0.3], 0.002));
+    props.push(C(0.028, 0.06, [-0.2, FLOOR + 0.04, zWall - 0.12], 10));
+    void tone;
+  }
+  // 餐厅：托盘/餐盘/食物/调料/咖啡/饮水机/回收架/菜单
+  for (const [tx, tz] of [[0.35, 4.6], [0.65, 4.6], [0.35, 5.05], [0.65, 5.05], [0.5, 5.5]] as const) {
+    white.push(B(0.09, 0.003, 0.06, [tx - 0.035, FLOOR + 0.128, tz], 0.001));
+    props.push(C(0.025, 0.004, [tx + 0.02, FLOOR + 0.132, tz], 10));
+    food.push(B(0.03, 0.008, 0.022, [tx + 0.02, FLOOR + 0.137, tz], 0.002));
+    foodGreen.push(B(0.012, 0.01, 0.015, [tx + 0.045, FLOOR + 0.138, tz + 0.015], 0.002));
+    props.push(C(0.008, 0.012, [tx - 0.055, FLOOR + 0.135, tz + 0.025], 6));
+    props.push(B(0.008, 0.018, 0.008, [tx + 0.06, FLOOR + 0.14, tz - 0.02], 0.001));
+    props.push(B(0.026, 0.012, 0.02, [tx - 0.03, FLOOR + 0.137, tz - 0.025], 0.001));
+  }
+  // 配餐台：保温盖/夹子/雪挡/托盘轨
+  for (let p = 0; p < 4; p++) {
+    white.push(B(0.075, 0.006, 0.06, [0.35 + p * 0.09, FLOOR + 0.165, 5.89], 0.001));
+    props.push(B(0.06, 0.006, 0.04, [0.35 + p * 0.09, FLOOR + 0.155, 5.89], 0.001));
+  }
+  props.push(B(0.36, 0.03, 0.03, [0.5, FLOOR + 0.17, 5.82], 0.001));
+  props.push(B(0.36, 0.02, 0.02, [0.5, FLOOR + 0.18, 5.96], 0.001));
+  props.push(B(0.28, 0.02, 0.005, [0.5, FLOOR + 0.2, 5.88], 0.001));
+  // 咖啡桶/饮水机/托盘回收/垃圾桶
+  props.push(C(0.045, 0.11, [0.82, FLOOR + 0.1, 5.65], 12));
+  props.push(C(0.035, 0.04, [0.82, FLOOR + 0.17, 5.65], 12));
+  white.push(B(0.09, 0.16, 0.08, [0.15, FLOOR + 0.08, 5.55], 0.002));
+  props.push(C(0.025, 0.09, [0.15, FLOOR + 0.18, 5.55], 10));
+  white.push(B(0.13, 0.006, 0.08, [0.15, FLOOR + 0.17, 5.55], 0.001));
+  props.push(B(0.12, 0.04, 0.08, [0.7, FLOOR + 0.04, 5.7], 0.002));
+  props.push(B(0.11, 0.02, 0.07, [0.7, FLOOR + 0.07, 5.7], 0.001));
+  props.push(C(0.03, 0.07, [0.85, FLOOR + 0.04, 5.25], 10));
+  // 菜单板 + 托盘 + 餐巾
+  screens.push(B(0.002, 0.06, 0.1, [0.86, FLOOR + 0.27, 5.15], 0.001));
+  props.push(B(0.05, 0.004, 0.035, [0.6, FLOOR + 0.13, 5.2], 0.001));
+  white.push(B(0.04, 0.004, 0.03, [0.6, FLOOR + 0.135, 5.2], 0.001));
+  // 厕所：隔间/马桶/水箱/扶手/洗手池/镜子/淋浴
+  for (const [cx, cz, tag] of [[-0.5, 6.17, "p"], [0.5, 8.0, "s"]] as const) {
+    for (let s = 0; s < 2; s++) {
+      const sx = cx - 0.18 + s * 0.22;
+      white.push(C(0.032, 0.045, [sx, FLOOR + 0.025, cz], 10));
+      white.push(B(0.07, 0.09, 0.035, [sx, FLOOR + 0.075, cz + 0.05], 0.002));
+      dark.push(B(0.004, 0.2, 0.13, [sx - 0.095, FLOOR + 0.1, cz], 0.001));
+      dark.push(B(0.004, 0.2, 0.13, [sx + 0.095, FLOOR + 0.1, cz], 0.001));
+      props.push(C(0.012, 0.018, [sx + 0.07, FLOOR + 0.12, cz + 0.065], 8));
+      props.push(B(0.04, 0.006, 0.004, [sx, FLOOR + 0.17, cz + 0.08], 0.001));
+    }
+    white.push(B(0.22, 0.006, 0.06, [cx, FLOOR + 0.11, cz + 0.13], 0.001));
+    props.push(C(0.026, 0.008, [cx - 0.06, FLOOR + 0.115, cz + 0.13], 10));
+    props.push(C(0.026, 0.008, [cx + 0.06, FLOOR + 0.115, cz + 0.13], 10));
+    props.push(C(0.006, 0.02, [cx - 0.06, FLOOR + 0.14, cz + 0.13], 6));
+    props.push(B(0.16, 0.12, 0.003, [cx, FLOOR + 0.22, cz + 0.16], 0.001));
+    props.push(B(0.02, 0.03, 0.02, [cx + 0.1, FLOOR + 0.14, cz + 0.13], 0.001));
+    // 淋浴
+    white.push(B(0.14, 0.004, 0.12, [cx, FLOOR + 0.005, cz - 0.14], 0.001));
+    props.push(C(0.012, 0.18, [cx + 0.06, FLOOR + 0.19, cz - 0.14], 8));
+    props.push(C(0.03, 0.012, [cx + 0.06, FLOOR + 0.28, cz - 0.14], 10));
+    props.push(B(0.012, 0.012, 0.03, [cx + 0.06, FLOOR + 0.29, cz - 0.12], 0.001));
+    void tag;
+  }
+
   // 厕所/淋浴
   for (const [cx, cz] of [[-0.5, 6.17], [0.5, 8.0]] as const) {
     white.push(B(0.16, 0.004, 0.14, [cx, FLOOR + 0.004, cz], 0.001));
@@ -372,6 +494,8 @@ export function addCarrierCrew(ctx: CarrierCtx): void {
   part("white_furniture", "厨房/医务/卫生白色设备", M(...white), "cv_055_ceiling");
   part("screens", "生活区电视/医疗监护屏", M(...screens), "cv_scr_camera");
   part("props", "生活区餐具/书籍/器材/私人物品", M(...props), "cv_steel");
+  part("food", "餐厅食物/配餐保温", M(...food), "cv_food");
+  part("food_green", "餐厅蔬菜/配菜", M(...foodGreen), "cv_food_green");
 
   // 相机锚点
   const anchors: Array<[string, string, [number, number, number]]> = [
@@ -385,4 +509,83 @@ export function addCarrierCrew(ctx: CarrierCtx): void {
   for (const [tag, cn, at] of anchors) {
     part(tag, cn, M(B(0.002, 0.002, 0.002, [0, 0, 0], 0.0005)), "cv_055_console", at);
   }
+
+  // ---- 维修车间（生活甲板后侧，轮机/机加工/备件/损管） ----
+  // 位置：生活区后壁 z=4.2 外，z=1.0..4.2；编辑尺度 1:8，约 7m 宽 ×25m 长 ×2.5m 高。
+  const WZ0 = 1.0;
+  const WZ1 = Z0;
+  const WF = FLOOR;
+  const WC = CEIL;
+  part("workshop_shell", "维修车间围壁/地板/天花", M(
+    B(1.8, 0.03, WZ1 - WZ0, [0, WF, (WZ0 + WZ1) / 2], 0.004),
+    B(1.8, 0.025, WZ1 - WZ0, [0, WC, (WZ0 + WZ1) / 2], 0.004),
+    B(0.025, 0.32, WZ1 - WZ0, [-0.9, WF + 0.16, (WZ0 + WZ1) / 2], 0.004),
+    B(0.025, 0.32, WZ1 - WZ0, [0.9, WF + 0.16, (WZ0 + WZ1) / 2], 0.004),
+    B(1.8, 0.32, 0.025, [0, WF + 0.16, WZ0], 0.004),
+    // 门框 + 敞开的门扇
+    B(0.04, 0.3, 0.04, [-0.16, WF + 0.15, WZ1], 0.003),
+    B(0.04, 0.3, 0.04, [0.16, WF + 0.15, WZ1], 0.003),
+    B(0.36, 0.04, 0.04, [0, WF + 0.31, WZ1], 0.003),
+    B(0.006, 0.28, 0.14, [-0.17, WF + 0.14, WZ1 - 0.09], 0.002),
+  ), "cv_055_bulkhead");
+  const wWood: Array<ReturnType<typeof B>> = [];
+  const wDark: Array<ReturnType<typeof B>> = [];
+  const wWhite: Array<ReturnType<typeof B>> = [];
+  const wProps: Array<Parameters<typeof M>[0]> = [];
+  const wScreens: Array<Parameters<typeof M>[0]> = [];
+  // 工作台 + 台钳 + 工具板
+  wWood.push(B(0.62, 0.045, 0.14, [-0.55, WF + 0.1, 2.15], 0.004));
+  wDark.push(B(0.035, 0.1, 0.12, [-0.83, WF + 0.05, 2.15], 0.002));
+  wDark.push(B(0.035, 0.1, 0.12, [-0.27, WF + 0.05, 2.15], 0.002));
+  wDark.push(B(0.05, 0.05, 0.035, [-0.36, WF + 0.14, 2.15], 0.002));
+  wProps.push(C(0.012, 0.06, [-0.36, WF + 0.17, 2.15], 10));
+  wDark.push(B(0.45, 0.16, 0.01, [-0.55, WF + 0.26, 2.23], 0.002));
+  for (let t = 0; t < 8; t++) wProps.push(B(0.012, 0.04, 0.006, [-0.74 + t * 0.05, WF + 0.24, 2.225], 0.001));
+  // 工具柜（红）/ 零件架 / 手册
+  wWhite.push(B(0.18, 0.13, 0.08, [-0.72, WF + 0.07, 1.35], 0.003));
+  for (let d = 0; d < 3; d++) wDark.push(B(0.16, 0.025, 0.01, [-0.72, WF + 0.03 + d * 0.035, 1.31], 0.001));
+  for (let sh = 0; sh < 3; sh++) {
+    wWood.push(B(0.3, 0.008, 0.05, [0.55, WF + 0.08 + sh * 0.055, 1.45], 0.001));
+    for (let b = 0; b < 5; b++) wProps.push(B(0.04, 0.03, 0.035, [0.44 + b * 0.045, WF + 0.1 + sh * 0.055, 1.45], 0.001));
+  }
+  wProps.push(B(0.08, 0.12, 0.012, [0.82, WF + 0.22, 1.3], 0.001));
+  // 车床 / 钻床 / 砂轮机
+  wDark.push(B(0.28, 0.06, 0.09, [0.55, WF + 0.07, 2.3], 0.002));
+  wWhite.push(B(0.06, 0.07, 0.07, [0.42, WF + 0.1, 2.3], 0.002));
+  wProps.push(C(0.025, 0.04, [0.48, WF + 0.12, 2.3], 10));
+  wProps.push(C(0.008, 0.12, [0.7, WF + 0.14, 2.3], 8));
+  wDark.push(C(0.025, 0.17, [0.78, WF + 0.12, 2.6], 10));
+  wDark.push(B(0.07, 0.02, 0.07, [0.78, WF + 0.22, 2.6], 0.002));
+  wProps.push(C(0.04, 0.012, [0.78, WF + 0.15, 2.54], 10));
+  wDark.push(B(0.13, 0.06, 0.08, [0.55, WF + 0.06, 2.75], 0.002));
+  // 焊机/气瓶/焊接屏
+  wWhite.push(B(0.12, 0.12, 0.08, [0.25, WF + 0.06, 2.85], 0.003));
+  wProps.push(C(0.025, 0.16, [0.1, WF + 0.08, 2.85], 10));
+  wProps.push(C(0.025, 0.16, [0.2, WF + 0.08, 2.85], 10));
+  wDark.push(B(0.005, 0.22, 0.2, [0.38, WF + 0.13, 2.85], 0.002));
+  // 备用燃气轮机模块（轮式托架 + 转子 + 管线）
+  wDark.push(B(0.3, 0.16, 0.14, [-0.35, WF + 0.11, 3.15], 0.006));
+  wWhite.push(C(0.045, 0.28, [-0.35, WF + 0.13, 3.15], 12));
+  wProps.push(C(0.02, 0.32, [-0.23, WF + 0.13, 3.15], 8));
+  wProps.push(C(0.02, 0.02, [-0.35, WF + 0.2, 3.0], 8));
+  wProps.push({ type: "torus", radius: 0.07, tube: 0.012, radialSegments: 8, tubularSegments: 16, at: [-0.35, WF + 0.06, 3.25] });
+  for (const dz of [-0.18, 0.18]) wDark.push(C(0.035, 0.025, [-0.5, WF + 0.025, 3.15 + dz], 10));
+  // 吊车轨道/吊钩/链条
+  wDark.push(B(0.8, 0.015, 0.02, [0, WC - 0.03, 2.3], 0.001));
+  wProps.push({ type: "weld", from: [-0.2, WC - 0.03, 2.3], to: [-0.2, WF + 0.24, 2.3], radius: 0.006 });
+  wProps.push({ type: "torus", radius: 0.03, tube: 0.006, radialSegments: 6, tubularSegments: 12, at: [-0.2, WF + 0.22, 2.3] });
+  // 备件/电缆盘/灭火器/损管柜
+  wProps.push(C(0.06, 0.04, [0.75, WF + 0.02, 3.1], 12));
+  wProps.push(C(0.02, 0.13, [0.75, WF + 0.09, 3.1], 10));
+  wProps.push(C(0.035, 0.1, [-0.8, WF + 0.06, 3.55], 10));
+  wWhite.push(B(0.15, 0.14, 0.07, [-0.7, WF + 0.08, 3.7], 0.003));
+  wScreens.push(B(0.002, 0.06, 0.1, [-0.78, WF + 0.24, 3.0], 0.001));
+  part("workshop_wood", "维修车间工作台/备件架", M(...wWood), "cv_055_wood");
+  part("workshop_dark", "维修车间车床/工具柜/吊轨/托架", M(...wDark), "cv_055_console");
+  part("workshop_white", "维修车间焊机/备件箱/控制盒", M(...wWhite), "cv_055_ceiling");
+  part("workshop_props", "维修车间工具/气瓶/吊钩/备件", M(...wProps), "cv_steel");
+  part("workshop_screen", "维修车间状态屏", M(...wScreens), "cv_scr_camera");
+  part("workshop_view_post", "维修车间视点立柱", M(B(0.04, 0.17, 0.04, [0, 0.085, 0], 0.002), B(0.12, 0.02, 0.12, [0, 0.01, 0], 0.003)), "cv_steel_dark", [0, WF, 4.0]);
+  part("workshop_eye", "维修车间视点", M(B(0.002, 0.002, 0.002, [0, 0, 0], 0.0005)), "cv_055_console", [0, WF + 0.17, 4.0]);
+  part("workshop_target", "维修车间目标", M(B(0.002, 0.002, 0.002, [0, 0, 0], 0.0005)), "cv_055_console", [0, WF + 0.05, 1.3]);
 }

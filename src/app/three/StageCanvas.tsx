@@ -256,6 +256,29 @@ function InteriorFillLight() {
           </>
         )
       ) : null}
+      {cameraMode === "workshop" ? (
+        modelId === "carrier" ? (
+          <>
+            <pointLight position={[-13.0, 28.0, -62.0]} intensity={2.2} distance={14} decay={1.35} color="#e8f1f5" />
+            <pointLight position={[-18.0, 28.0, -66.0]} intensity={2.0} distance={14} decay={1.4} color="#f0e7d6" />
+            <pointLight position={[-18.0, 26.0, -60.0]} intensity={1.6} distance={12} decay={1.4} color="#d9e4e8" />
+            <pointLight position={[-15.5, 24.5, -70.0]} intensity={1.4} distance={11} decay={1.4} color="#e8f1f5" />
+          </>
+        ) : (
+          <>
+            <pointLight position={[7.0, 7.1, -27]} intensity={1.6} distance={10} decay={1.35} color="#e8f1f5" />
+            <pointLight position={[6.0, 7.1, -31]} intensity={1.4} distance={10} decay={1.4} color="#f0e7d6" />
+            <pointLight position={[7.5, 6.6, -33]} intensity={1.2} distance={8} decay={1.4} color="#d9e4e8" />
+          </>
+        )
+      ) : null}
+      {cameraMode === "magazine" ? (
+        <>
+          <pointLight position={[-8.0, 15.5, -14.0]} intensity={2.2} distance={16} decay={1.35} color="#e8f1f5" />
+          <pointLight position={[-10.0, 15.5, -36.0]} intensity={2.0} distance={18} decay={1.4} color="#f0e7d6" />
+          <pointLight position={[-6.0, 15.0, -55.0]} intensity={1.8} distance={16} decay={1.4} color="#d9e4e8" />
+        </>
+      ) : null}
       {cameraMode === "bridge" ? (
         modelId === "carrier" ? (
           <>
@@ -742,19 +765,21 @@ function StageRuntime() {
   }, [assembled, views.xray, modelId, selectedPart]);
 
   // ---- 海面开关：海面/白浪/艏浪/尾流统一显隐；关掉后可绕到舰体下方检查 ----
+  // 进入舰内视角时也必须隐藏：海面是无限大平面，会穿进弹药库/生活区等水下舱室。
   useEffect(() => {
     if (!assembled) return;
+    const showSea = views.sea && !isCarrierInteriorMode(cameraMode);
     for (const handle of assembled.parts) {
       if (!handle.partId.startsWith("carrier.sea.")) continue;
-      handle.object.visible = views.sea;
-      setPickable(handle.object, views.sea);
+      handle.object.visible = showSea;
+      setPickable(handle.object, showSea);
       for (const variant of Object.values(handle.damageObjects)) {
         if (!variant) continue;
-        variant.visible = views.sea;
-        setPickable(variant, views.sea);
+        variant.visible = showSea;
+        setPickable(variant, showSea);
       }
     }
-  }, [assembled, views.sea, rebuildToken]);
+  }, [assembled, views.sea, cameraMode, rebuildToken]);
 
   const damage = useStageStore((state) => state.damage);
   useEffect(() => {

@@ -938,7 +938,7 @@ export const CATALOG: StageModel[] = [
     // 编辑数据是 1:8；场景统一为 1 单位 = 1 米：40×7.9=316m，9.6×7.9≈76m。
     presentationScale: [7.9, 7.9, 7.9],
     animatedStates: [...CARRIER_ANIMATED_STATES],
-    cameras: ["orbit", "bridge", "cic", "crew", "crew_berth", "crew_mess", "engine_room", "reactor_room", "magazine", "hangar", "cockpit", "flight"],
+    cameras: ["orbit", "bridge", "cic", "crew", "crew_berth", "crew_mess", "workshop", "fuel", "engine_room", "reactor_room", "magazine", "hangar", "cockpit", "flight"],
     states: [
       ...CARRIER_STATE_LABELS.map((state) => ({ id: state.id as string, label: state.label, hint: state.hint })),
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
@@ -954,6 +954,8 @@ export const CATALOG: StageModel[] = [
       { id: "cv-cam-crew", group: "内部视角", label: "生活区走廊", kind: "camera", mode: "crew" },
       { id: "cv-cam-crew-berth", group: "内部视角", label: "水兵住舱", kind: "camera", mode: "crew_berth" },
       { id: "cv-cam-crew-mess", group: "内部视角", label: "餐厅/厨房", kind: "camera", mode: "crew_mess" },
+      { id: "cv-cam-workshop", group: "内部视角", label: "维修车间", kind: "camera", mode: "workshop" },
+      { id: "cv-cam-fuel", group: "内部视角", label: "加油作业", kind: "camera", mode: "fuel" },
       { id: "cv-cam-engine", group: "内部视角", label: "机舱", kind: "camera", mode: "engine_room" },
       { id: "cv-cam-reactor", group: "内部视角", label: "反应堆舱", kind: "camera", mode: "reactor_room" },
       { id: "cv-cam-magazine", group: "内部视角", label: "弹药库", kind: "camera", mode: "magazine" },
@@ -962,6 +964,7 @@ export const CATALOG: StageModel[] = [
       { id: "cv-cam-flight", group: "内部视角", label: "跟拍舰载机", kind: "camera", mode: "flight" },
       { id: "cv-aircraft-closeup", group: "航空", label: "舰载机特写", kind: "focus-node", node: "CV_Aircraft", offset: [0, 4, 0], radius: 14 },
       { id: "cv-catapult-closeup", group: "航空", label: "电磁弹射器", kind: "focus-node", node: "CV_Shuttle", offset: [0, 5, -3], radius: 22 },
+      { id: "cv-ordnance", group: "武器", label: "甲板挂弹/弹药升降机", kind: "focus-node", node: "CV_OrdnanceStage", offset: [2, 4, 6], radius: 7 },
       { id: "cv-explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
       { id: "cv-xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
       { id: "cv-labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
@@ -992,7 +995,7 @@ export const CATALOG: StageModel[] = [
     animate: animateType055,
     presentationScale: [1, 1, 1],
     animatedStates: [...TYPE055_ANIMATED_STATES],
-    cameras: ["orbit", "bridge", "cic", "crew", "crew_berth", "crew_mess", "engine_room", "hangar", "magazine"],
+    cameras: ["orbit", "bridge", "cic", "crew", "crew_berth", "crew_mess", "workshop", "fuel", "engine_room", "hangar", "magazine"],
     states: [
       ...TYPE055_STATE_LABELS.map((state) => ({ ...state })),
       { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
@@ -1011,6 +1014,8 @@ export const CATALOG: StageModel[] = [
       { id: "ddg-crew", group: "内部视角", label: "生活区走廊", kind: "camera", mode: "crew" },
       { id: "ddg-crew-berth", group: "内部视角", label: "水兵住舱", kind: "camera", mode: "crew_berth" },
       { id: "ddg-crew-mess", group: "内部视角", label: "餐厅/厨房", kind: "camera", mode: "crew_mess" },
+      { id: "ddg-cam-workshop", group: "内部视角", label: "维修车间", kind: "camera", mode: "workshop" },
+      { id: "ddg-cam-fuel", group: "内部视角", label: "加油作业", kind: "camera", mode: "fuel" },
       { id: "ddg-bow", group: "舰体", label: "艏部球鼻艏", kind: "focus-node", node: "CV_055_Radar", offset: [0, -14, 44], radius: 26 },
       { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
       { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
