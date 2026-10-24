@@ -10,7 +10,7 @@ import { detectStatic } from "../../solver/detect";
 import { detectFloatingIslands, detectUnsupportedParts } from "../../solver/support";
 import { applyExplode, clearExplode, explodeOffsetOf } from "@/app/three/pose";
 import { makeHmtRegistry } from "./registry";
-import { hmtBuilders } from "./geometry";
+import { hmtBuilders, shellPoint } from "./geometry";
 import machining from "./machined.generated.json";
 
 const build = () => buildModel(makeHmtRegistry(), { builders: hmtBuilders });
@@ -35,18 +35,21 @@ describe("HMT 参考重建", () => {
       ).toBe(hash);
     }
   });
-  it("注册表合法，五层装配均无穿模，不使用豁免", async () => {
+  it("注册表合法且不使用碰撞豁免", () => {
     const registry = makeHmtRegistry();
     expect(validateRegistry(registry)).toEqual([]);
     expect(registry.expectedContacts ?? []).toEqual([]);
-    for (const layer of [1, 2, 3, 4, 5]) {
+  });
+  // 每层独立报告并使用既有超时，避免五次完整扫描共用一个用例的时间额度。
+  it.each([1, 2, 3, 4, 5])(
+    "L%s 实际装配无穿模",
+    (layer) => {
       const reports = detectStatic(model, { filter: (p) => p.buildLayer <= layer });
-      expect(
-        reports.map((r) => `${r.a} ↔ ${r.b}`),
-        `L${layer}`,
-      ).toEqual([]);
-      await yieldToRunner();
-    }
+      expect(reports.map((r) => `${r.a} ↔ ${r.b}`)).toEqual([]);
+    },
+    120_000,
+  );
+  it("全部零件属于一个有支撑的装配组件", () => {
     expect(detectUnsupportedParts(model)).toEqual([]);
     expect(detectFloatingIslands(model).components).toBe(1);
   }, 120_000);
@@ -61,6 +64,24 @@ describe("HMT 参考重建", () => {
     expect(ray.intersectObject(plate.object, false)).toHaveLength(0);
     ray.ray.origin.set(0.205, -0.02, 0.5).applyMatrix4(plate.object.matrixWorld);
     expect(ray.intersectObject(plate.object, false).length).toBeGreaterThan(0);
+  }, 120_000);
+
+  it("三节腰部铸造甲从正面分别可见，不被相邻护甲或缸体遮住", () => {
+    const source = makeHmtRegistry({ machined: false });
+    model.root.updateMatrixWorld(true);
+    for (const i of [0, 1, 2]) {
+      const id = `hmt.waist.vertebra_${i}`;
+      const plate = model.getPart(id)!;
+      const def = source.parts.find((part) => part.id === id)!;
+      const spec = resolveSpec(def.geometry, model.constants) as { params: Record<string, unknown> };
+      const point = shellPoint(spec.params, 0, 0).applyMatrix4(plate.object.matrixWorld);
+      const ray = new Raycaster(point.clone().add(new Vector3(0, 0, 1)), new Vector3(0, 0, -1));
+      const hits = ray.intersectObjects(
+        model.parts.map((part) => part.object),
+        false,
+      );
+      expect(hits[0]?.object, id).toBe(plate.object);
+    }
   }, 120_000);
 
   it("液压缸有连续轴孔，活塞杆实际伸入缸内", () => {

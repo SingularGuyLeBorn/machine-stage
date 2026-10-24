@@ -5,7 +5,7 @@ import { machinedBuilder } from "./machined";
 import { tubeGeometry } from "../../kernel/geometry";
 
 /** 白模近景中的铸造曲面；同一曲面函数同时决定护甲与紧固件位置。 */
-export function shellHeight(p: Record<string, unknown>, x: number, y: number): number {
+function baseShellHeight(p: Record<string, unknown>, x: number, y: number): number {
   const width = Number(p.width),
     round = Number(p.round ?? 0.006);
   const ax = Math.sqrt(x * x + round * round) - round;
@@ -89,6 +89,69 @@ export function shellHeight(p: Record<string, unknown>, x: number, y: number): n
   return z;
 }
 
+/** 折面与压筋直接进入壳体曲面；不是贴图，也不增加无支撑的装饰浮片。 */
+function shellRelief(p: Record<string, unknown>, x: number, y: number): number {
+  const base = 0;
+  const a = Math.abs(x);
+  const crease = (v: number, width: number, height: number) => {
+    const d = Math.sqrt(v * v + 0.0015 ** 2);
+    const t = 1 - d / width;
+    return height * (t + Math.sqrt(t * t + 0.0025)) * 0.5;
+  };
+  const facet = (cx: number, cy: number, wx: number, wy: number, h: number) => {
+    const t = 1 - Math.abs((x - cx) / wx) - Math.abs((y - cy) / wy);
+    return h * (t + Math.sqrt(t * t + 0.0036)) * 0.5;
+  };
+  switch (p.relief) {
+    case "scapula":
+      return (
+        base +
+        crease(y + a * 0.6 - 0.07, 0.065, 0.032) +
+        crease(y - a * 0.48 + 0.12, 0.055, 0.026) +
+        crease(x, 0.05, 0.022) +
+        facet(0, -0.01, 0.1, 0.065, 0.018)
+      );
+    case "pectoral":
+      return base + crease(y + x * 0.58 - 0.055, 0.024, 0.024) + facet(0.16, -0.038, 0.085, 0.055, 0.023);
+    case "collar":
+      return base + crease(x + y * 0.38 - 0.017, 0.018, 0.014) + facet(0.06, -0.025, 0.055, 0.05, 0.01);
+    case "pelvis":
+      return base + crease(y - a * 0.48 + 0.045, 0.02, 0.019) + crease(x, 0.025, 0.013);
+    case "vertebra": {
+      const flow = y + 0.007 * Math.cos(x / 0.014);
+      return (
+        base +
+        crease(flow - 0.011, 0.0045, 0.004) +
+        crease(flow + 0.004, 0.004, 0.0035) +
+        facet(0.04, 0, 0.02, 0.025, 0.009) +
+        facet(-0.04, 0, 0.02, 0.025, 0.009)
+      );
+    }
+    case "palm":
+      return (
+        base +
+        crease(x + y * 0.25, 0.012, 0.009) +
+        facet(-0.04, 0.01, 0.017, 0.039, 0.006) +
+        facet(0.04, -0.01, 0.016, 0.03, 0.006)
+      );
+    case "occipital":
+      return (
+        base +
+        crease(x, 0.017, 0.012) +
+        crease(y + a * 0.52 - 0.046, 0.014, 0.01) +
+        crease(y - a * 0.62 + 0.035, 0.013, 0.008)
+      );
+    case "limb":
+      return base + crease(x - y * 0.19, 0.018, 0.012) + crease(y + x * 0.6, 0.018, 0.006);
+    default:
+      return base;
+  }
+}
+export function shellHeight(p: Record<string, unknown>, x: number, y: number): number {
+  const scale = Number(p.reliefScale ?? 0.1) / 0.1;
+  return baseShellHeight(p, x, y) + scale * shellRelief(p, x / scale, y / scale);
+}
+
 /** 肩罩沿前—顶—后连续回包；壳厚沿真实法线，避免四块平板拼出方盒。 */
 export function shellPoint(p: Record<string, unknown>, x: number, y: number, z = 0): T.Vector3 {
   if (p.form === "shoulder") {
@@ -97,7 +160,7 @@ export function shellPoint(p: Record<string, unknown>, x: number, y: number, z =
     const fold = (v: number) => (v + Math.sqrt(v * v + 0.0016)) * 0.5;
     const radius = w * (0.22 + 1.32 * u - 1.9 * fold(u - 0.48));
     const angle = y / (w * 0.84);
-    const centerY = w * (-0.09 - 0.38 * u) - w * 0.25 * (1 - u) ** 4;
+    const centerY = w * (-0.09 - 0.38 * u) - w * 0.25 * (1 - u) ** 4 - w * (0.026 / 0.118) * u ** 2;
     // 顶面、斜向棱和向下收尖的前后板共用一条圆角折线，不再使用球帽截面。
     const a = Math.sqrt(angle * angle + 0.0001) - 0.01;
     const hinge = (v: number) => (v + Math.sqrt(v * v + 0.0036)) * 0.5;

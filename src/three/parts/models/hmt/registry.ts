@@ -35,6 +35,8 @@ interface ShellOptions {
   layer?: BuildLayer;
   form?: string;
   edge?: number;
+  relief?: string;
+  segmented?: boolean;
 }
 /**
  * Vitaly Bulgarov / HMT 2-xm-robotdesign，用户指定深灰红色版本。
@@ -163,12 +165,82 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
     );
   }
   function shell(a: string, id: string, name: string, outline: Loop, pos: V3, o: ShellOptions = {}) {
+    // 分缝落在两组窗口之间的实心梁上，保留各窗口完整孔壁；两块各自可拆。
+    if (!o.segmented && ((a === "arms" && id === "fore_shell") || (a === "legs" && id === "thigh"))) {
+      const cut = a === "arms" ? -0.095 : 0.04;
+      // 分缝还需容纳两侧向外扩出的倒角，防止名义分开但实体仍互相叠入。
+      const gap = 2 * ((o.bevel ?? 0.0024) + (o.rim ?? 0)) + 0.003;
+      const clip = (loop: Loop, sign: number) => {
+        const level = cut + (sign * gap) / 2;
+        const result: Loop = [];
+        for (let i = 0; i < loop.length; i++) {
+          const p = loop[i],
+            q = loop[(i + 1) % loop.length];
+          const insideP = sign * (p[1] - level) >= 0;
+          const insideQ = sign * (q[1] - level) >= 0;
+          if (insideP) result.push(p);
+          if (insideP !== insideQ) {
+            const t = (level - p[1]) / (q[1] - p[1]);
+            result.push([p[0] + t * (q[0] - p[0]), level]);
+          }
+        }
+        return result;
+      };
+      for (const sign of [1, -1]) {
+        const keep = (p: number[]) => sign * (p[1] - cut) > 0;
+        const holes = (o.holes ?? []).filter((loop) => loop.every(keep));
+        if ((o.holes ?? []).some((loop) => loop.some(keep) && !loop.every(keep)))
+          throw new Error(id + " 分缝切过窗口");
+        shell(
+          a,
+          sign === 1 ? id : id + "_distal",
+          name + (sign === 1 ? "·近端分片" : "·远端分片"),
+          clip(outline, sign),
+          pos,
+          {
+            ...o,
+            segmented: true,
+            holes,
+            pins: o.pins?.filter(keep),
+            latches: o.latches?.filter(keep),
+            width: o.width ?? Math.max(...outline.map(([x]) => Math.abs(x))),
+            rotation: [o.rotation?.[0] ?? 0, (o.rotation?.[1] ?? 0) + 6, o.rotation?.[2] ?? 0],
+          },
+        );
+      }
+      return;
+    }
+    const relief =
+      a === "back"
+        ? "scapula"
+        : a === "pelvis"
+          ? "pelvis"
+          : a === "waist" && id.startsWith("rear_link_")
+            ? "vertebra"
+            : a === "chest" && id === "pectoral_plate"
+              ? "pectoral"
+              : a === "chest" && id.includes("collar")
+                ? "collar"
+                : a === "hands" && id === "palm"
+                  ? "palm"
+                  : a === "head" && id === "occipital"
+                    ? "occipital"
+                    : ["arms", "legs"].includes(a) && !id.includes("latch")
+                      ? "limb"
+                      : undefined;
+    o = { ...o, relief: o.relief ?? relief };
+    // 腰骨保持确认姿态，只错开三片外甲，使弯腰后的下两片不互相遮住，顶片露出缸体前方。
+    if (a === "waist" && id === "vertebra_0") pos = [pos[0], pos[1], pos[2] + 0.014];
+    if (a === "waist" && id === "vertebra_1") pos = [pos[0], pos[1] + 0.04, pos[2] + 0.035];
+    if (a === "waist" && id === "vertebra_2") pos = [pos[0], pos[1] + 0.055, pos[2] + 0.065];
+    if (a === "waist" && id === "rear_link_0") pos = [pos[0], pos[1] + 0.024, pos[2] + 0.025];
+    if (a === "legs" && id === "thigh_side") pos = [pos[0] + 0.015, pos[1] + 0.125, pos[2]];
     if (a === "chest" && id === "carapace") {
       // 收短胸骨上下端，给锁骨层与下肋层留出真实台阶，而非一块竖长面板。
       const chestProfile = (loop: Loop) =>
         loop.map(([x, y]) => [
           x,
-          y > 0.05 ? 0.05 + (y - 0.05) * 0.6 : y < -0.09 ? -0.09 + (y + 0.09) * 0.5 : y,
+          y > 0.05 ? 0.05 + (y - 0.05) * 0.95 : y < -0.09 ? -0.09 + (y + 0.09) * 0.5 : y,
         ]);
       outline = chestProfile(outline);
       o = { ...o, holes: o.holes?.map(chestProfile), pins: o.pins ? chestProfile(o.pins) : undefined };
@@ -214,7 +286,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
         latches: o.latches ? shoulderVolume(o.latches) : undefined,
       };
     }
-    if (a === "legs" && ["thigh", "thigh_back"].includes(id)) {
+    if (a === "legs" && ["thigh", "thigh_distal", "thigh_back"].includes(id)) {
       // 大腿中上段收敛，膝上端保持宽度，避免壳体与膝轴之间突然变细。
       const thighVolume = (loop: Loop) =>
         loop.map(([x, y]) => [x * (0.88 + 0.12 * Math.max(0, Math.min(1, (-y - 0.08) / 0.14))), y]);
@@ -242,6 +314,8 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       bulges: o.bulges ?? [],
       edge: o.edge ?? 0.006,
       form: o.form ?? "cast",
+      relief: o.relief ?? "none",
+      reliefScale: 0.1,
       rim: o.rim ?? 0,
     };
     shellSurfaces.set(a + "." + id, { params: p, position: pos, rotation: o.rotation ?? [0, 0, 0] });
@@ -272,7 +346,12 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
           kit: "hmt_shell",
           params: {
             ...p,
-            outline,
+            outline:
+              a === "arms" && id === "fore_shell"
+                ? outline.map(([x, y]) => [x * 0.94, y > 0.16 ? 0.16 + (y - 0.16) * 0.25 : y])
+                : a === "chest" && id === "collar"
+                  ? outline.map(([x, y]) => [x, Math.min(y, 0.054)])
+                  : outline,
             thickness: 0.004,
             bevel: 0.0008,
             edge: 0.008,
@@ -377,6 +456,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
     mat = "steel",
     dual = true,
     layer: BuildLayer = 2,
+    endpointFrames?: [Matrix4, Matrix4],
   ) {
     for (const side of dual ? [1, -1] : [1]) {
       const suffix = dual ? (side === 1 ? "_l" : "_r") : "";
@@ -388,8 +468,12 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
           type: "kit",
           kit: "hmt_link",
           params: {
-            from: restPose.point(a, id, from, side).toArray(),
-            to: restPose.point(a, id, to, side).toArray(),
+            from: endpointFrames
+              ? new Vector3(from[0] * side, from[1], from[2]).applyMatrix4(endpointFrames[0]).toArray()
+              : restPose.point(a, id, from, side).toArray(),
+            to: endpointFrames
+              ? new Vector3(to[0] * side, to[1], to[2]).applyMatrix4(endpointFrames[1]).toArray()
+              : restPose.point(a, id, to, side).toArray(),
             radius: r,
           },
         },
@@ -398,26 +482,6 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
         false,
         [0, 0, 0],
         layer,
-        [0, 0, 1],
-        true,
-      );
-    }
-  }
-  function cable(a: string, id: string, points: V3[], r = 0.002, mat = "red", dual = true) {
-    for (const side of dual ? [1, -1] : [1]) {
-      const suffix = dual ? (side === 1 ? "_l" : "_r") : "";
-      const baseId = id.replace(/_\d+$/, "");
-      const placed = points.map((p) => restPose.point(a, baseId, p, side).toArray());
-      add(
-        a,
-        id + suffix,
-        "沿机构布置的线束",
-        { type: "kit", kit: "hmt_cable", params: { points: placed, radius: r } },
-        [0, 0, 0],
-        mat,
-        false,
-        [0, 0, 0],
-        3,
         [0, 0, 1],
         true,
       );
@@ -525,8 +589,9 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
   function piston(a: string, id: string, from: V3, to: V3, r = 0.014, dual = true) {
     for (const side of dual ? [1, -1] : [1]) {
       const suffix = dual ? (side === 1 ? "_l" : "_r") : "";
-      const start = restPose.point(a, id, from, side),
-        end = restPose.point(a, id, to, side);
+      const poseId = id.startsWith("knee_drive") ? "knee_drive" : id;
+      const start = restPose.point(a, poseId, from, side),
+        end = restPose.point(a, poseId, to, side);
       const delta = end.clone().sub(start),
         length = delta.length(),
         axis = delta.clone().normalize();
@@ -584,6 +649,50 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
         [0, 0, 0],
         "chrome",
       );
+      if (a === "waist" && id === "lateral_drive") {
+        // 护壳直接沿缸筒轴线布置，端部止于抱箍之间，不覆盖活塞行程。
+        const half = length * 0.19;
+        for (const sign of [-1, 1]) {
+          const offset = new Vector3(sign * (r + 0.008), 0, 0).applyQuaternion(q);
+          const mount = new Vector3(...at(0.34)).add(offset);
+          const panelQ = q
+            .clone()
+            .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), (sign * Math.PI) / 2));
+          const e = new Euler().setFromQuaternion(panelQ);
+          emit(
+            "guard_" + sign,
+            "腰部液压缸筒棱面护甲",
+            {
+              type: "kit",
+              kit: "hmt_shell",
+              params: {
+                outline: [
+                  [-0.016, -half],
+                  [-0.019, half * 0.65],
+                  [-0.01, half],
+                  [0.013, half * 0.9],
+                  [0.019, -half * 0.6],
+                  [0.01, -half],
+                ],
+                holes: [],
+                width: 0.02,
+                rise: 0.004,
+                thickness: 0.004,
+                bevel: 0.0008,
+                corner: 0.002,
+                edge: 0.003,
+                round: 0.002,
+                form: "cast",
+                fold: -0.04,
+              },
+            },
+            mount.toArray(),
+            "armor",
+            [e.x, e.y, e.z].map((v) => (v * 180) / Math.PI) as V3,
+            4,
+          );
+        }
+      }
       for (const t of [Math.max(margin + 0.025, 0.12), 0.24, 0.51, 0.58])
         emit(
           "collar_" + t.toFixed(4),
@@ -596,7 +705,9 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       for (const [j, t] of [0, 1].entries()) {
         const center = new Vector3(...at(t));
         const neutral = j === 0 ? from : to;
-        const axisX = new Vector3(side, 0, 0).transformDirection(restPose.matrix(a, id, side, neutral[1]));
+        const axisX = new Vector3(side, 0, 0).transformDirection(
+          restPose.matrix(a, poseId, side, neutral[1]),
+        );
         const eyeQ = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), axisX);
         const eyeE = new Euler().setFromQuaternion(eyeQ);
         const eyeR = [eyeE.x, eyeE.y, eyeE.z].map((v) => (v * 180) / Math.PI) as V3;
@@ -662,23 +773,6 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       2,
     );
   }
-
-  // 胸背空间骨架，关节与活塞占据护甲背面的真实深度。
-  cable(
-    "torso",
-    "abdominal_harness",
-    [
-      [0, 1.3, -0.045],
-      [0, 1.39, -0.045],
-      [0, 1.481, -0.045],
-      [0, 1.572, -0.045],
-      [0, 1.7, -0.045],
-      [0, 2.06, -0.045],
-    ],
-    0.033,
-    "dark",
-    false,
-  );
   link("torso", "clavicle", [0.035, 1.99, -0.025], [0.343, 1.985, -0.012], 0.026, "dark", true, 1);
   joint("shoulder", "bearing", [0.355, 1.985, -0.012], 0.066, 0.074);
   joint("arms", "elbow", [0.434, 1.644, 0.002], 0.043, 0.075);
@@ -754,18 +848,6 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       // 三根信号线分层绕过斜肋，端部直接进入端子，避免回钩截断相邻线束。
       const behindRib = level === 3 && strand < 2;
       const wireZ = 0.045 + strand * 0.004 - (behindRib ? 0.018 : 0);
-      cable(
-        "torso",
-        "rib_signal_" + level + "_" + strand,
-        [
-          [0.045, y - 0.02 + offsetY, wireZ - 0.001],
-          [0.09, y + 0.005 + offsetY, wireZ + 0.005],
-          [x + 0.008, y + 0.011 + offsetY, wireZ + 0.007],
-          [x + 0.021, y + 0.011 + offsetY, wireZ],
-        ],
-        0.0013,
-        strand === 0 ? "red" : "dark",
-      );
       cyl(
         "torso",
         "rib_terminal_" + level + "_" + strand,
@@ -782,13 +864,25 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
   piston("arms", "upper_drive", [0.463, 1.904, -0.025], [0.47, 1.697, -0.02], 0.013);
   piston("arms", "fore_drive", [0.405, 1.589, 0.029], [0.426, 1.302, 0.035], 0.012);
   piston("legs", "hip_drive", [0.119, 1.187, -0.012], [0.162, 0.904, 0.013], 0.019);
-  piston("legs", "knee_drive", [0.236, 0.854, -0.022], [0.25, 0.598, -0.018], 0.014);
+  piston("legs", "knee_drive", [0.197, 0.854, -0.125], [0.211, 0.598, -0.121], 0.01);
+  piston("legs", "knee_drive_outer", [0.259, 0.854, -0.125], [0.273, 0.598, -0.121], 0.01);
   piston("waist", "lateral_drive", [0.074, 1.365, -0.014], [0.065, 1.656, -0.016], 0.0125);
   piston("pelvis", "hip_oblique", [0.052, 1.298, 0.023], [0.137, 1.207, 0.047], 0.014);
   // 三节腹部呈柔性机械椎体，前罩、轴承、后部连接耳分别成件。
   for (let i = 0; i < 3; i++) {
     const y = 1.39 + i * 0.091;
-    ring("waist", "disc_" + i, [0, y, -0.037], 0.0504, 0.034, 0.068, "dark", false, [0, 0, 0]);
+    // 中腰环下端避开下节倾斜端面；上端承接面与确认的腰节轴心保持不变。
+    ring(
+      "waist",
+      "disc_" + i,
+      [0, y + (i === 1 ? 0.003 : 0), -0.037],
+      0.0504,
+      0.034,
+      i === 1 ? 0.062 : 0.068,
+      "dark",
+      false,
+      [0, 0, 0],
+    );
     ring("waist", "disc_rim_" + i, [0, y + 0.035, -0.037], 0.0504, 0.034, 0.005, "steel", false, [0, 0, 0]);
     shell(
       "waist",
@@ -840,19 +934,27 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       "rear_link_" + i,
       "腰椎背侧耳板",
       [
-        [-0.058, -0.025],
-        [-0.066, 0.018],
-        [0, 0.034],
-        [0.066, 0.018],
-        [0.058, -0.025],
-        [0, -0.034],
+        [-0.034, -0.027],
+        [-0.069, -0.032],
+        [-0.086, -0.016],
+        [-0.083, 0.015],
+        [-0.066, 0.036],
+        [-0.032, 0.022],
+        [0, 0.015],
+        [0.032, 0.022],
+        [0.066, 0.036],
+        [0.083, 0.015],
+        [0.086, -0.016],
+        [0.069, -0.032],
+        [0.034, -0.027],
+        [0, -0.014],
       ],
       // 中节向后错开、上下节少量过渡；用背甲轮廓显出已有腰弧，不再增加关节转角。
       [0, y, -0.096 - [0.002, 0.012, 0.003][i]],
       {
-        rise: 0.018,
+        rise: 0.022,
         rotation: [0, 180, 0],
-        material: "steel",
+        material: "armor",
         holes: [
           [
             [-0.02, -0.012],
@@ -921,14 +1023,23 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       );
     }
     if (i < 2) {
-      piston("waist", "intervertebral_" + i, [0.059, y + 0.022, -0.078], [0.061, y + 0.071, -0.079], 0.0045);
+      piston(
+        "waist",
+        "intervertebral_" + i,
+        [i === 0 ? 0.077 : 0.059, y + 0.022, -0.078],
+        [i === 0 ? 0.077 : 0.061, y + 0.071, -0.079],
+        0.0045,
+      );
       link(
         "waist",
         "oblique_front_" + i,
-        shellAnchor("waist.vertebra_" + i, 0.044, 0.018, 0.026),
-        shellAnchor("waist.vertebra_" + (i + 1), 0.04, -0.02, 0.026),
+        shellAnchor("waist.vertebra_" + i, 0.032, 0.018, 0.006),
+        shellAnchor("waist.vertebra_" + (i + 1), 0.03, -0.02, 0.006),
         0.006,
         "darkArmor",
+        true,
+        2,
+        [restPose.waist(y), restPose.waist(y + 0.091)],
       );
       link(
         "waist",
@@ -937,24 +1048,11 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
         shellAnchor("waist.rear_link_" + (i + 1), -0.029, -0.016, 0.016),
         0.005,
         "darkArmor",
+        true,
+        2,
+        [restPose.waist(y), restPose.waist(y + 0.091)],
       );
     }
-  }
-  for (let i = 0; i < 6; i++) {
-    const x = 0.039 + i * 0.0038;
-    cable(
-      "waist",
-      "spinal_bus_" + i,
-      [
-        [x, 1.345, -0.18],
-        [x, 1.393, -0.13],
-        [x, 1.478, -0.132],
-        [x, 1.567, -0.13],
-        [x, 1.627, -0.071],
-      ],
-      0.00125,
-      i % 3 === 0 ? "red" : "dark",
-    );
   }
   // 胸廓开窗内有斜向肋、执行器和接线端，避免只有一根中央柱。
   for (let i = 0; i < 5; i++) {
@@ -977,17 +1075,6 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
     );
     cyl("torso", "rib_pin_" + i, [0.197, y + 0.041, 0.065], 0.008, 0.014, "steel");
     bolt("torso", "rib_lock_" + i, [0.206, y + 0.041, 0.065], [0, 90, 0], true, 0.0028);
-    cable(
-      "torso",
-      "rib_wire_" + i,
-      [
-        [0.055, y, -0.018],
-        [0.117, y + 0.018, 0.015],
-        [0.176, y + 0.025, 0.049],
-      ],
-      0.0015,
-      i % 2 ? "red" : "dark",
-    );
   }
   piston("torso", "scapula_actuator", [0.072, 1.784, -0.075], [0.221, 1.959, -0.065], 0.009);
   piston("torso", "pectoral_actuator", [0.062, 1.811, 0.009], [0.185, 1.967, -0.044], 0.008);
@@ -1192,7 +1279,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       [0.058, -0.111],
       [0.052, -0.035],
     ],
-    [0, 1.863, 0.082],
+    [0, 1.863, 0.117],
     {
       dual: true,
       form: "chest",
@@ -1553,18 +1640,6 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       direction: [1, 0, 0],
     },
   );
-  // 红色嵌条沿肩甲外表面铺设，不再用粗杆穿壳后留下两个三角残端。
-  cable(
-    "shoulder",
-    "red_crossbar",
-    [
-      shellAnchor("shoulder.pauldron", -0.055, 0.084, 0.0142),
-      shellAnchor("shoulder.pauldron", -0.005, 0.088, 0.0142),
-      shellAnchor("shoulder.pauldron", 0.048, 0.088, 0.0142),
-    ],
-    0.0016,
-    "red",
-  );
   // 手臂护甲：不规则骨架窗口与起伏的实体边梁。
   const upper = [
     [-0.041, 0.135],
@@ -1605,7 +1680,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       [0.039, -0.084],
     ],
   });
-  shell("arms", "upper_rear", "上臂背侧护甲", upper, [0.412, 1.799, -0.059], {
+  shell("arms", "upper_rear", "上臂背侧护甲", upper, [0.412, 1.799, -0.075], {
     dual: true,
     rotation: [0, 180, 0],
     rise: 0.029,
@@ -1707,24 +1782,12 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       direction: [1, 0, 0],
     },
   );
-  for (let j = 0; j < 2; j++)
-    cable(
-      "arms",
-      "upper_cable_" + j,
-      [
-        [0.383 + j * 0.006, 1.915, 0.028],
-        [0.377 + j * 0.006, 1.848, 0.045],
-        [0.393 + j * 0.006, 1.755, 0.044],
-        [0.417 + j * 0.006, 1.69, 0.024],
-      ],
-      0.0022,
-    );
   spring("arms", "upper_spring", [0.427, 1.794, 0.037], 0.142, 0.012, 25);
   // 腰胯外轮廓：上挑髂骨、横向开窗支架、中央长裆壳。
   shell(
     "pelvis",
     "girdle",
-    "骨盆开窗横梁",
+    "骨盆开窗横梁与中央下护甲一体壳",
     [
       [-0.212, -0.016],
       [-0.204, 0.055],
@@ -1736,9 +1799,11 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       [0.204, 0.055],
       [0.212, -0.016],
       [0.145, -0.043],
-      [0.075, -0.065],
-      [0, -0.104],
-      [-0.075, -0.065],
+      [0.068, -0.085],
+      [0.041, -0.194],
+      [0, -0.217],
+      [-0.041, -0.194],
+      [-0.068, -0.085],
       [-0.145, -0.043],
     ],
     [0, 1.307, 0.035],
@@ -1783,30 +1848,6 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
   );
   shell(
     "pelvis",
-    "crotch",
-    "中央骨盆下护甲",
-    [
-      [-0.078, 0.04],
-      [0.078, 0.04],
-      [0.064, -0.04],
-      [0.032, -0.126],
-      [0, -0.143],
-      [-0.032, -0.126],
-      [-0.064, -0.04],
-    ],
-    [0, 1.233, 0.05],
-    {
-      rise: 0.048,
-      fold: -0.14,
-      liner: true,
-      pins: [
-        [-0.05, 0.017],
-        [0.05, 0.017],
-      ],
-    },
-  );
-  shell(
-    "pelvis",
     "iliac_spur",
     "髂骨上挑侧翼",
     [
@@ -1838,13 +1879,13 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
     "rear",
     "骨盆背面框架",
     [
-      [-0.2, 0.029],
-      [-0.16, 0.077],
-      [-0.063, 0.02],
-      [0, 0.04],
-      [0.063, 0.02],
-      [0.16, 0.077],
-      [0.2, 0.029],
+      [-0.218, 0.043],
+      [-0.188, 0.119],
+      [-0.063, 0.049],
+      [0, 0.073],
+      [0.063, 0.049],
+      [0.188, 0.119],
+      [0.218, 0.043],
       [0.14, -0.038],
       [0.04, -0.083],
       [0, -0.11],
@@ -2095,30 +2136,6 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
   );
   spring("legs", "thigh_spring", [0.199, 0.925, 0.048], 0.19, 0.013, 28);
   spring("legs", "calf_spring", [0.248, 0.43, 0.033], 0.19, 0.013, 28);
-  for (let i = 0; i < 3; i++) {
-    cable(
-      "legs",
-      "thigh_cable_" + i,
-      [
-        [0.146 + i * 0.005, 1.12, 0.015],
-        [0.132 + i * 0.005, 1.017, 0.044],
-        [0.157 + i * 0.005, 0.885, 0.05],
-        [0.191 + i * 0.005, 0.767, 0.025],
-      ],
-      0.002,
-    );
-    cable(
-      "legs",
-      "shin_cable_" + i,
-      [
-        [0.229 + i * 0.005, 0.603, -0.002],
-        [0.207 + i * 0.005, 0.514, 0.014],
-        [0.214 + i * 0.005, 0.365, 0.017],
-        [0.259 + i * 0.005, 0.226, -0.003],
-      ],
-      0.0018,
-    );
-  }
   // 足背为向踝部上升的楔形壳；三趾有独立关节、侧梁、趾尖及底部承重垫。
   shell(
     "feet",
@@ -2497,22 +2514,6 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       }
     }
     piston("hands", "finger_drive_" + finger, [x, 1.177, 0.031], [x, y + 0.008, 0.032], 0.0038);
-    cable(
-      "hands",
-      "finger_tendon_" + finger,
-      pts.map((point, index) => {
-        const a = new Vector3(...pts[Math.max(0, index - 1)]);
-        const b = new Vector3(...pts[Math.min(pts.length - 1, index + 1)]);
-        const tangent = b.sub(a).normalize();
-        const inside = new Vector3(0, -tangent.z, tangent.y).multiplyScalar(0.0075);
-        return new Vector3(...point)
-          .add(inside)
-          .addScaledVector(tangent, index === pts.length - 1 ? -0.009 : 0)
-          .toArray() as V3;
-      }),
-      0.0011,
-      "red",
-    );
   }
   piston("hands", "thumb_drive", [0.412, 1.157, -0.008], [0.39, 1.104, 0.008], 0.006);
   joint("hands", "thumb_hinge", [0.397, 1.135, 0.028], 0.012, 0.019);
@@ -3031,24 +3032,6 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
     },
   );
   joint("head", "ear", [0.069, 2.264, -0.025], 0.015, 0.014);
-  cable(
-    "head",
-    "jaw_wire",
-    [
-      [0.075, 2.273, -0.014],
-      [0.08, 2.243, 0.008],
-      [0.071, 2.226, 0.024],
-      shellAnchor("head.jaw", 0.039, -0.0225, 0.003),
-    ],
-    0.0021,
-  );
-  cable(
-    "head",
-    "jaw_wire_lower",
-    [[0.078, 2.264, -0.039], [0.073, 2.232, -0.02], shellAnchor("head.jaw", 0.028, -0.03525, 0.003)],
-    0.0016,
-    "red",
-  );
   shell(
     "head",
     "occipital",
@@ -3166,98 +3149,242 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
     },
   );
 
-  // 关节后的电缆按多视图可见起终点布置；弧线连接而非悬空直杆。
-  for (let i = 0; i < 4; i++) {
-    cable(
-      "shoulder",
-      "harness_" + i,
+  // 按用户要求移除沿机构线束，也移除其专用分线座和悬空接头。
+  // 颈根环绕领甲：每片向外折出，前片承接胸骨，侧后片包住颈根，保留抬头间隙。
+  for (let i = 0; i < 8; i++) {
+    const angle = (i * Math.PI) / 4;
+    shell(
+      "chest",
+      "collar_ring_" + i,
+      "环绕颈根的分瓣立领",
       [
-        [0.13 + i * 0.008, 1.962, -0.115],
-        [0.145 + i * 0.008, 1.972 + i * 0.004, -0.142],
-        [0.288 + i * 0.008, 1.998 + i * 0.004, -0.145],
-        [0.368 + i * 0.008, 1.952, -0.146 - i * 0.005],
-        [0.408 + i * 0.008, 1.904, -0.11],
+        [-0.025, -0.039],
+        [-0.024, 0.049],
+        [-0.012, 0.058],
+        [0.021, 0.049],
+        [0.025, -0.029],
+        [0.012, -0.048],
       ],
-      0.0018,
-      i % 2 ? "dark" : "red",
-    );
-    cyl(
-      "torso",
-      "shoulder_harness_socket_" + i,
-      [0.13 + i * 0.008, 1.962, -0.116],
-      0.0035,
-      0.008,
-      "darkArmor",
-      true,
-      [90, 0, 0],
-      2,
-    );
-    cyl(
-      "arms",
-      "upper_harness_socket_" + i,
-      [0.408 + i * 0.008, 1.904, -0.11],
-      0.0025,
-      0.012,
-      "darkArmor",
-      true,
-      [90, 0, 0],
-      2,
-    );
-    cable(
-      "torso",
-      "abdominal_harness_" + i,
-      [
-        [0.2 + i * 0.0075, 1.799, -0.018],
-        [0.142 + i * 0.0075, 1.708, 0.018],
-        [0.1 + i * 0.0075, 1.644, -0.1],
-        [0.082 + i * 0.0075, 1.396, -0.105],
-      ],
-      0.0021,
-      i % 2 ? "dark" : "red",
+      [Math.sin(angle) * 0.064, 2.145, -0.031 + Math.cos(angle) * 0.064],
+      {
+        rotation: [0, i * 45, 0],
+        rise: 0.007,
+        fold: -0.08,
+        thickness: 0.006,
+        bevel: 0.001,
+        corner: 0.003,
+        edge: 0.003,
+        relief: "collar",
+        direction: [Math.sin(angle), 0, Math.cos(angle)],
+      },
     );
   }
-  // 腰侧线束末端进入分线座，座体由连接耳承接到腰椎，保留插接活动余量。
-  add(
-    "waist",
-    "lower_bus_socket",
-    "腰侧线束分线座",
-    { type: "box", w: 0.045, h: 0.018, d: 0.018, bevel: 0.001 },
-    [0.093, 1.399, -0.105],
-    "darkArmor",
-    true,
-    [0, 0, 0],
-    2,
+  shell(
+    "back",
+    "flank_bridge",
+    "肩背与肋侧之间的折面回包甲",
+    [
+      [-0.042, 0.11],
+      [0.025, 0.096],
+      [0.044, 0.023],
+      [0.031, -0.069],
+      [-0.013, -0.122],
+      [-0.038, -0.029],
+    ],
+    [0.235, 1.829, -0.079],
+    {
+      dual: true,
+      rotation: [0, 126, -9],
+      rise: 0.015,
+      width: 0.055,
+      thickness: 0.008,
+      corner: 0.004,
+      edge: 0.003,
+      relief: "limb",
+      direction: [1, 0, -1],
+    },
+  );
+  shell(
+    "pelvis",
+    "iliac_bridge",
+    "骨盆前后横梁上沿连接鞍甲",
+    [
+      [-0.104, 0.021],
+      [-0.081, 0.043],
+      [0.077, 0.041],
+      [0.103, 0.006],
+      [0.078, -0.009],
+      [0.027, -0.017],
+      [-0.069, -0.012],
+    ],
+    [0.189, 1.324, -0.018],
+    {
+      dual: true,
+      rotation: [0, 90, 0],
+      rise: 0.011,
+      fold: -0.12,
+      width: 0.11,
+      thickness: 0.008,
+      corner: 0.004,
+      relief: "pelvis",
+      direction: [1, 1, 0],
+    },
   );
   link(
     "waist",
-    "lower_bus_mount",
-    shellAnchor("waist.rear_link_0", -0.029, 0.005, 0.016),
-    [0.077, 1.399, -0.105],
+    "vertebra_2_front_mount",
+    [0.025, 1.572, 0.018],
+    shellAnchor("waist.vertebra_2", 0.025, -0.01, 0),
     0.0045,
-    "steel",
-    true,
-    2,
-  );
-  add(
-    "waist",
-    "spinal_bus_socket",
-    "脊柱线束下端插接座",
-    { type: "box", w: 0.031, h: 0.015, d: 0.015, bevel: 0.001 },
-    [0.049, 1.347, -0.18],
     "darkArmor",
     true,
-    [0, 0, 0],
     2,
   );
-  link(
-    "waist",
-    "spinal_bus_mount",
-    shellAnchor("pelvis.rear", -0.07, 0.02, 0.014),
-    [0.064, 1.347, -0.18],
-    0.004,
-    "steel",
-    true,
-    2,
+
+  // 内外侧护甲与前后壳围成有层次的包覆，关节轴和活塞行程仍留空。
+  const sidePlate = (
+    assembly: string,
+    id: string,
+    name: string,
+    pos: V3,
+    height: number,
+    width: number,
+    outward: number,
+  ) => {
+    shell(
+      assembly,
+      id,
+      name,
+      [
+        [-width * 0.7, height],
+        [width * 0.42, height * 0.92],
+        [width, height * 0.36],
+        [width * 0.7, -height * 0.49],
+        [width * 0.24, -height],
+        [-width * 0.51, -height * 0.91],
+        [-width, -height * 0.22],
+      ],
+      pos,
+      {
+        dual: true,
+        rotation: [0, outward * 90, 0],
+        rise: 0.009,
+        width,
+        thickness: 0.007,
+        bevel: 0.0012,
+        corner: 0.004,
+        edge: 0.003,
+        relief: "limb",
+        direction: [outward, 0, 0],
+      },
+    );
+  };
+  sidePlate("arms", "upper_outer_guard", "上臂外侧折面护甲", [0.478, 1.8, -0.018], 0.121, 0.039, 1);
+  sidePlate("arms", "upper_inner_guard", "上臂内侧折面护甲", [0.349, 1.8, -0.02], 0.117, 0.036, -1);
+  sidePlate("arms", "fore_inner_guard", "前臂内侧折面护甲", [0.39, 1.423, -0.008], 0.148, 0.034, -1);
+  sidePlate("legs", "thigh_inner_guard", "大腿内侧分层护甲", [0.113, 0.95, -0.025], 0.202, 0.046, -1);
+  sidePlate("legs", "calf_inner_guard", "小腿内侧棱面护甲", [0.195, 0.42, -0.025], 0.191, 0.037, -1);
+  const fork: Loop = [
+    [-0.05, 0.044],
+    [0.044, 0.046],
+    [0.055, -0.023],
+    [0.035, -0.063],
+    [0.031, -0.059],
+    [0.029, -0.012],
+    [-0.026, -0.009],
+    [-0.034, -0.056],
+    [-0.043, -0.063],
+    [-0.057, -0.023],
+  ];
+  for (const back of [false, true]) {
+    shell(
+      "arms",
+      "upper_elbow_fork" + (back ? "_back" : ""),
+      "肘部凹形双叉护甲",
+      fork,
+      [0.434, 1.662, back ? -0.063 : 0.07],
+      {
+        dual: true,
+        rotation: [0, back ? 180 : 0, 0],
+        rise: 0.01,
+        thickness: 0.007,
+        corner: 0.003,
+        edge: 0.003,
+        relief: "limb",
+        direction: [0, 0, back ? -1 : 1],
+      },
+    );
+    shell(
+      "arms",
+      "fore_elbow_tongue" + (back ? "_back" : ""),
+      "肘部凸形嵌接护甲",
+      [
+        [-0.017, 0.055],
+        [0.015, 0.061],
+        [0.021, 0.012],
+        [0.042, -0.008],
+        [0.032, -0.044],
+        [-0.035, -0.039],
+        [-0.039, -0.002],
+        [-0.02, 0.014],
+      ],
+      [0.434, 1.613, back ? -0.06 : 0.048],
+      {
+        dual: true,
+        rotation: [0, back ? 180 : 0, 0],
+        rise: 0.009,
+        thickness: 0.006,
+        corner: 0.003,
+        edge: 0.003,
+        relief: "limb",
+        direction: [0, 0, back ? -1 : 1],
+      },
+    );
+  }
+  shell(
+    "hands",
+    "thumb_root_guard",
+    "拇指根独立棱面护甲",
+    [
+      [-0.014, 0.018],
+      [0.009, 0.021],
+      [0.018, 0.004],
+      [0.011, -0.021],
+      [-0.008, -0.019],
+      [-0.019, -0.004],
+    ],
+    [0.399, 1.137, 0.039],
+    {
+      dual: true,
+      rise: 0.006,
+      fold: -0.12,
+      thickness: 0.004,
+      corner: 0.002,
+      bevel: 0.0007,
+      rotation: [0, -20, -13],
+    },
+  );
+  shell(
+    "hands",
+    "thumb_side_guard",
+    "拇指近节侧面回包护甲",
+    [
+      [-0.012, 0.026],
+      [0.01, 0.024],
+      [0.014, -0.015],
+      [0.005, -0.031],
+      [-0.011, -0.025],
+    ],
+    [0.375, 1.108, 0.006],
+    {
+      dual: true,
+      rotation: [0, -90, -12],
+      rise: 0.004,
+      thickness: 0.004,
+      corner: 0.002,
+      bevel: 0.0007,
+      direction: [-1, 0, 0],
+    },
   );
   parts.sort((a, b) => a.build_layer - b.build_layer || a.build_order - b.build_order);
   if (options.machined !== false) {

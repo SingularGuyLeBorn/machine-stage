@@ -4,15 +4,46 @@
 超过 25% 的切除另列，必须逐项回查设计，不能直接当验收通过。
 """
 from pathlib import Path
-import json,time,hashlib
+from collections import OrderedDict
+import json,time,hashlib,sys
 import numpy as np
 import manifold3d as m
 from hmt_mesh_patch import make_patch
 from hmt_solid import connected_material_regions
+from hmt_part_cache import PartCache
 ROOT=Path(__file__).resolve().parents[1]
 META=ROOT/'qa-out/hmt-mesh.json'
 OUTPUT=ROOT/'src/three/parts/models/hmt/machined.generated.json'
 CLEARANCE=0.00022
+
+def kernel_hash():
+ return hashlib.sha256(b''.join((Path(__file__).parent/name).read_bytes() for name in ['machine-hmt.py','hmt_mesh_patch.py','hmt_solid.py','hmt_part_cache.py'])).digest()
+
+class SolidStore:
+ """逐件加载实体；已加工件精确落盘，避免整机布尔缓存同时驻留内存。"""
+ def __init__(self,pieces,mats,folder):
+  self.pieces=pieces;self.mats=mats;self.folder=Path(folder);self.cache=OrderedDict();self.saved=set()
+ def source(self,i,normals=False):
+  p=self.pieces[i];n=p['vertices']
+  with open(ROOT/'qa-out/hmt-mesh.bin','rb') as f:
+   f.seek(p['offset']);v=np.frombuffer(f.read(n*12),dtype='<f4').reshape(-1,3).copy()
+   normal=np.frombuffer(f.read(n*12),dtype='<f4').reshape(-1,3).copy() if normals else None
+   f.seek(p['offset']+n*24);t=np.frombuffer(f.read(p['indices']*4),dtype='<u4').reshape(-1,3).copy()
+  return v,t,normal
+ def __getitem__(self,i):
+  if i in self.cache:self.cache.move_to_end(i);return self.cache[i]
+  if i in self.saved:
+   s=m.Manifold(m.Mesh64(np.load(self.folder/f'{i}-v.npy'),np.load(self.folder/f'{i}-t.npy')))
+  else:
+   v,t,_=self.source(i);mesh=m.Mesh(v,t,tolerance=1e-7);mesh.merge();s=m.Manifold(mesh).transform(self.mats[i][:3,:])
+  if s.status()!=m.Error.NoError:raise RuntimeError(self.pieces[i]['id']+' '+str(s.status()))
+  self.cache[i]=s
+  while len(self.cache)>12:self.cache.popitem(last=False)
+  return s
+ def __setitem__(self,i,s):
+  mesh=s.to_mesh64();np.save(self.folder/f'{i}-v.npy',mesh.vert_properties[:,:3]);np.save(self.folder/f'{i}-t.npy',mesh.tri_verts)
+  self.saved.add(i);self.cache[i]=s;self.cache.move_to_end(i)
+  while len(self.cache)>12:self.cache.popitem(last=False)
 
 def surface_clearance(s):
  # 完整承接表面的法向斜接偏置；锐角、回折或不稳定处回退到精确实体包络。
@@ -76,17 +107,22 @@ def expanded(s):
  return out
 
 def main():
- start=time.time();meta=json.loads(META.read_text());pieces=meta['pieces'];solids=[];bounds=[];mats=[];original_meshes=[];original_normals=[]
+ start=time.time();meta=json.loads(META.read_text());pieces=meta['pieces'];bounds=[];mats=[]
  if meta.get('kind')!='source':raise RuntimeError('必须先运行 export-hmt.ts --raw，禁止对已加工模型重复加工')
+ source_hashes={name:hashlib.sha256((ROOT/'src/three/parts/models/hmt'/name).read_bytes()).hexdigest() for name in ['registry.ts','geometry.ts','restPose.ts']}
+ if meta.get('sources')!=source_hashes:raise RuntimeError('源文件与待加工网格不同步，必须重新导出原始网格')
+ # 检查点只复用完全相同的输入及加工器版本；崩溃后无需重新处理已核验零件。
+ signature=hashlib.sha256(kernel_hash()+META.read_bytes())
+ with open(ROOT/'qa-out/hmt-mesh.bin','rb') as source_file:
+  for chunk in iter(lambda:source_file.read(8*1024*1024),b''):signature.update(chunk)
+ folder=ROOT/'qa-out'/('hmt-machining-'+signature.hexdigest()[:20]);folder.mkdir(exist_ok=True)
  with open(ROOT/'qa-out/hmt-mesh.bin','rb') as f:
-  for p in pieces:
+  for number,p in enumerate(pieces):
+   if number%25==0:print('载入',number,p['id'],flush=True)
    f.seek(p['offset']);n=p['vertices'];v=np.frombuffer(f.read(n*12),dtype='<f4').reshape(-1,3).copy()
-   original_normals.append(np.frombuffer(f.read(n*12),dtype='<f4').reshape(-1,3).copy())
-   tri=np.frombuffer(f.read(p['indices']*4),dtype='<u4').reshape(-1,3).copy()
-   original_meshes.append((v,tri))
-   mesh=m.Mesh(v,tri,tolerance=1e-7);mesh.merge();s=m.Manifold(mesh)
-   if s.status()!=m.Error.NoError:raise RuntimeError(p['id']+' '+str(s.status()))
-   mat=np.array(p['matrix']).reshape(4,4).T;mats.append(mat);s=s.transform(mat[:3,:]);solids.append(s);bounds.append(s.bounding_box())
+   mat=np.array(p['matrix']).reshape(4,4).T;mats.append(mat)
+   world=v@mat[:3,:3].T+mat[:3,3];bounds.append((*world.min(axis=0),*world.max(axis=0)))
+ solids=SolidStore(pieces,mats,folder)
  features={}
  for i,p in enumerate(pieces):
   if p['id'] not in ('hmt.head.forehead','hmt.head.forehead_lining'):continue
@@ -97,10 +133,24 @@ def main():
     drills.append(m.Manifold.cube((0.004,0.0008,0.12),True).translate((x,y,0.03)).transform(mats[i][:3,:]))
   features[i]=drills
  order=sorted(range(len(pieces)),key=lambda i:(-priority(pieces[i]),pieces[i]['id']))
- b=np.array(bounds);done=[];result=[];audit=[];severe=[];clearance_tools={}
- print('载入闭合零件',len(solids),round(time.time()-start,1),flush=True)
+ b=np.array(bounds);done=[];result=[];audit=[];severe=[];clearance_tools=OrderedDict()
+ part_cache=PartCache(ROOT,pieces,mats,kernel_hash());part_keys={};cache_hits=0
+ batch_size=next((int(a.split('=')[1]) for a in sys.argv if a.startswith('--batch-size=')),0);processed=0
+ print('载入零件索引',len(pieces),round(time.time()-start,1),flush=True)
  for step,i in enumerate(order):
   candidates=[j for j in done if np.all(b[i,:3]-CLEARANCE<b[j,3:]) and np.all(b[j,:3]-CLEARANCE<b[i,3:])]
+  key=part_cache.key(i,candidates,part_keys);part_keys[i]=key
+  checkpoint=folder/f'step-{step}.json'
+  record=json.loads(checkpoint.read_text(encoding='utf8')) if checkpoint.exists() else part_cache.get(key,folder,i)
+  if record is not None:
+   if record['id']!=pieces[i]['id']:raise RuntimeError('加工检查点顺序不匹配')
+   if record['patch'] is not None:result.append(record['patch']);solids.saved.add(i)
+   if record['audit'] is not None:audit.append(record['audit'])
+   severe.extend(record['severe']);done.append(i)
+   cache_hits+=1
+   if step%200==0:print('复用相同输入和配合件',step,flush=True)
+   continue
+  previous_audit=len(audit);previous_result=len(result);previous_severe=len(severe)
   s=solids[i];original=s.volume();active=list(features.get(i,[]))
   # 刀具只需覆盖当前零件包围盒，外留四倍间隙。裁掉远处曲面不改变相减结果，
   # 避免一个小轴承与整片高密度腿甲做多刀具全域布尔。
@@ -109,7 +159,9 @@ def main():
    overlap=s^solids[j]
    if overlap.volume()>1e-16:
     print('配合',step,pieces[i]['id'],pieces[j]['id'],overlap.num_tri(),flush=True)
-    if j not in clearance_tools:clearance_tools[j]=surface_clearance(solids[j])
+    if j not in clearance_tools:
+     clearance_tools[j]=surface_clearance(solids[j])
+     while len(clearance_tools)>8:clearance_tools.popitem(last=False)
     tool=clearance_tools[j]
     active.append((tool if tool is not None else expanded(overlap))^crop)
   if active:
@@ -145,12 +197,20 @@ def main():
     if s.is_empty():continue
    local=s.transform(np.linalg.inv(mats[i])[:3,:]).calculate_normals(0,45).to_mesh()
    props=local.vert_properties
-   result.append({'id':pieces[i]['id'],'data':make_patch(*original_meshes[i],props[:,:3],props[:,3:6],local.tri_verts,original_normals[i])})
+   original_v,original_tri,original_normal=solids.source(i,True)
+   result.append({'id':pieces[i]['id'],'data':make_patch(original_v,original_tri,props[:,:3],props[:,3:6],local.tri_verts,original_normal)})
    solids[i]=s
   done.append(i)
+  record={'id':pieces[i]['id'],'patch':result[-1] if len(result)>previous_result else None,'audit':audit[-1] if len(audit)>previous_audit else None,'severe':severe[previous_severe:]}
+  temporary=checkpoint.with_suffix('.tmp');temporary.write_text(json.dumps(record,separators=(',',':')),encoding='utf8');temporary.replace(checkpoint)
+  part_cache.put(key,record,folder,i)
   if step%100==0:print('加工',step,'修配',len(result),'秒',round(time.time()-start,1),flush=True)
+  processed+=1
+  if batch_size and processed>=batch_size and step<len(order)-1:
+   print('批次检查点',step+1,'/',len(order),flush=True);raise SystemExit(75)
  sources=['registry.ts','geometry.ts','restPose.ts']
  hashes={name:hashlib.sha256((ROOT/'src/three/parts/models/hmt'/name).read_bytes()).hexdigest() for name in sources}
+ if hashes!=source_hashes:raise RuntimeError('加工期间源文件发生变化，本次结果不能发布')
  (ROOT/'qa-out/machining-audit.json').write_text(json.dumps(sorted(audit,key=lambda a:-a['removed']),indent=2))
  if severe:raise RuntimeError('修正源尺寸后再生成：'+', '.join(severe))
  OUTPUT.write_text(json.dumps({'format':'triangle-patch-v1','clearance':CLEARANCE,'sources':hashes,'parts':result},separators=(',',':')),encoding='utf8')

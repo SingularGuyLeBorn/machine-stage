@@ -1,9 +1,11 @@
-import bpy, json, numpy as np, os, math, sys
+import bpy, json, numpy as np, os, math, sys, hashlib
 requested = next((set(a.split("=",1)[1].split(",")) for a in sys.argv if a.startswith("--views=")),set())
 from mathutils import Matrix, Vector
 from pathlib import Path
 root=str(Path(__file__).resolve().parents[1])
-meta=json.load(open(root+r'\qa-out\hmt-mesh.json',encoding='utf-8'))
+source_dir=Path(next((a.split('=',1)[1] for a in sys.argv if a.startswith('--mesh-dir=')),root+'/qa-out'))
+output_dir=Path(next((a.split('=',1)[1] for a in sys.argv if a.startswith('--output-dir=')),root+'/qa-out'));output_dir.mkdir(parents=True,exist_ok=True)
+meta=json.load(open(source_dir/'hmt-mesh.json',encoding='utf-8'))
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 materials={}
 for name,spec in meta['materials'].items():
@@ -22,12 +24,27 @@ for name,spec in meta['materials'].items():
     normal=nodes.new('ShaderNodeNormalMap');normal.inputs['Strength'].default_value=spec.get('normalScale',.55);links.new(tex.outputs['Color'],normal.inputs['Color']);links.new(normal.outputs[0],p.inputs['Normal'])
  if 'emissive' in spec:p.inputs['Emission Color'].default_value=(*rgb,1);p.inputs['Emission Strength'].default_value=spec.get('emissiveIntensity',1)
  materials[name]=m
-f=open(root+r'\qa-out\hmt-mesh.bin','rb')
+f=open(source_dir/'hmt-mesh.bin','rb')
 # glTF/Three Y up → Blender Z up, preserving handedness.
 convert=Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))
+mesh_cache={}
 for number,p in enumerate(meta['pieces']):
  f.seek(p['offset']);n=p['vertices'];count=p['indices'];v=np.frombuffer(f.read(n*12),dtype='<f4').copy();norm=np.frombuffer(f.read(n*12),dtype='<f4').reshape(-1,3).copy();ind=np.frombuffer(f.read(count*4),dtype='<u4').copy()
+ transform=convert@Matrix(np.asarray(p['matrix']).reshape(4,4).T.tolist())
+ if p['id'].endswith('_r'):
+  # 把镜像还原到共享几何，再通过对象矩阵还原镜像；顶点和 UV 不减精度。
+  v.reshape(-1,3)[:,0]*=-1;norm[:,0]*=-1;ind=ind.reshape(-1,3)[:,[0,2,1]].ravel()
+  transform=transform@Matrix.Diagonal((-1,1,1,1))
  print('piece',number,p['id'],n,count,flush=True)
+ # 完全相同的网格共享数据块，零件对象、变换和拆解归属保持独立。
+ digest=hashlib.sha256()
+ for data in (v,norm,ind):digest.update(data.tobytes())
+ if p.get('uvOffset') is not None:
+  f.seek(p['uvOffset']);digest.update(f.read(n*8))
+ digest.update(p['material'].encode());key=digest.hexdigest()
+ if key in mesh_cache:
+  obj=bpy.data.objects.new(p['id'],mesh_cache[key]);bpy.context.collection.objects.link(obj);obj.matrix_world=transform
+  continue
  mesh=bpy.data.meshes.new(p['id']);mesh.vertices.add(n);mesh.vertices.foreach_set('co',v);mesh.loops.add(count);mesh.loops.foreach_set('vertex_index',ind);mesh.polygons.add(count//3);mesh.polygons.foreach_set('loop_start',np.arange(0,count,3,dtype=np.int32));mesh.polygons.foreach_set('loop_total',np.full(count//3,3,dtype=np.int32));mesh.polygons.foreach_set('use_smooth',np.ones(count//3,dtype=np.bool_));mesh.update(calc_edges=True)
  if p.get('uvOffset') is not None:
   f.seek(p['uvOffset']);uv=np.frombuffer(f.read(n*8),dtype='<f4').reshape(-1,2);layer=mesh.uv_layers.new(name='UVMap');layer.data.foreach_set('uv',uv[ind].ravel())
@@ -36,11 +53,17 @@ for number,p in enumerate(meta['pieces']):
  area2=np.linalg.norm(np.cross(coords[tri[:,1]]-coords[tri[:,0]],coords[tri[:,2]]-coords[tri[:,0]]),axis=1)
  if np.all(area2>1e-12) or (p['layer']==4 and p['material'] in ('armor','darkArmor') and not p['id'].startswith('hmt.feet.')):
   mesh.normals_split_custom_set_from_vertices(norm.tolist())
- obj=bpy.data.objects.new(p['id'],mesh);bpy.context.collection.objects.link(obj);obj.matrix_world=convert@Matrix(np.asarray(p['matrix']).reshape(4,4).T.tolist());mesh.materials.append(materials[p['material']])
+ obj=bpy.data.objects.new(p['id'],mesh);bpy.context.collection.objects.link(obj);obj.matrix_world=transform;mesh.materials.append(materials[p['material']])
+ mesh_cache[key]=mesh
  if number%250==0:print('import',number,flush=True)
 f.close()
 scene=bpy.context.scene
 scene.render.engine='CYCLES';scene.cycles.samples=40;scene.cycles.use_denoising=True
+if '--gpu' in sys.argv:
+ preferences=bpy.context.preferences.addons['cycles'].preferences;preferences.compute_device_type='CUDA';preferences.get_devices()
+ for device in preferences.devices:device.use=device.type=='CUDA'
+ if not any(device.use for device in preferences.devices):raise RuntimeError('未发现 CUDA 渲染设备')
+ scene.cycles.device='GPU'
 scene.render.resolution_x=950;scene.render.resolution_y=1250;scene.render.resolution_percentage=100
 scene.world.use_nodes=True;wn=scene.world.node_tree;wn.nodes.clear();out=wn.nodes.new('ShaderNodeOutputWorld');bg=wn.nodes.new('ShaderNodeBackground');env=wn.nodes.new('ShaderNodeTexEnvironment');env.image=bpy.data.images.load(root+r'\public\hdr\studio_small_08_1k.hdr');bg.inputs[1].default_value=.35;wn.links.new(env.outputs[0],bg.inputs[0]);wn.links.new(bg.outputs[0],out.inputs[0])
 bpy.ops.mesh.primitive_plane_add(size=200,location=(0,0,-.002));floor=bpy.context.object
@@ -51,20 +74,21 @@ area('softbox',(-2,-3,4),180,1.4,3.8);area('strip',(2,-1,2.4),90,.55,3.3);area('
 bpy.ops.object.camera_add();cam=bpy.context.object;scene.camera=cam;cam.data.type='ORTHO';cam.data.ortho_scale=2.8;cam.data.lens=70
 scene.view_settings.view_transform='AgX'
 cam.location=(3,-7,1.8);cam.rotation_euler=(Vector((0,0,1.18))-cam.location).to_track_quat('-Z','Y').to_euler()
-bpy.ops.wm.save_as_mainfile(filepath=root+r'\qa-out\hmt-current.blend')
+if '--no-save' not in sys.argv:bpy.ops.wm.save_as_mainfile(filepath=str(output_dir/'hmt-current.blend'))
 for name,pos in [('front',(0,-7,1.5)),('three-quarter',(3,-7,1.8)),('reference',(-4.8,-7,2.4)),('side',(7,0,1.5)),('back',(2,7,1.7))]:
  if requested and name not in requested:continue
- cam.location=pos;cam.rotation_euler=(Vector((0,0,1.18))-cam.location).to_track_quat('-Z','Y').to_euler();scene.render.filepath=root+'\\qa-out\\hmt-'+name+'.png';bpy.ops.render.render(write_still=True)
+ cam.location=pos;cam.rotation_euler=(Vector((0,0,1.18))-cam.location).to_track_quat('-Z','Y').to_euler();scene.render.filepath=str(output_dir/('hmt-'+name+'.png'));bpy.ops.render.render(write_still=True)
 
 # 近景仍使用同一个实际模型，不修图，不替换零件。
-for name,part,scale,offset in [('head','hmt.head.forehead',.45,(.5,-3,.7)),('head-side','hmt.head.forehead',.45,(3,-.7,.5)),('shoulder','hmt.shoulder.pauldron_l',.40,(1,-3,.3)),('waist','hmt.waist.vertebra_1',.53,(1,-3,.12)),('chest','hmt.chest.carapace',.87,(1,-4,.7)),('hand','hmt.hands.palm_l',.34,(.5,-3,.12)),('legs','hmt.legs.thigh_l',1.2,(1,-4,.1))]:
+for name,part,scale,offset in [('head','hmt.head.forehead',.45,(.5,-3,.7)),('head-side','hmt.head.forehead',.45,(3,-.7,.5)),('shoulder','hmt.shoulder.pauldron_l',.40,(1,-3,.3)),('waist','hmt.waist.vertebra_1',.53,(1,-3,.12)),('chest','hmt.chest.carapace',.87,(1,-4,.7)),('hand','hmt.hands.palm_l',.34,(.5,-3,.12)),('legs','hmt.legs.thigh_l',1.2,(1,-4,.1)),('head-back','hmt.head.occipital',.34,(.6,3,.35)),('back-detail','hmt.back.carapace',.88,(1,4,.4)),('waist-back','hmt.waist.rear_link_1',.50,(.6,3,.2)),('elbow','hmt.arms.upper_elbow_fork_l',.40,(.7,-3,.2)),('knee-back','hmt.legs.thigh_l',.66,(.8,4,.1))]:
  if requested and name not in requested:continue
  target=bpy.data.objects[part].matrix_world.translation.copy()
  if name=='legs':target.z-=.30
- cam.data.ortho_scale=scale;cam.location=target+Vector(offset);cam.rotation_euler=(target-cam.location).to_track_quat('-Z','Y').to_euler();scene.render.filepath=root+'\\qa-out\\hmt-'+name+'.png';bpy.ops.render.render(write_still=True)
+ if name=='knee-back':target.z-=.25
+ cam.data.ortho_scale=scale;cam.location=target+Vector(offset);cam.rotation_euler=(target-cam.location).to_track_quat('-Z','Y').to_euler();scene.render.filepath=str(output_dir/('hmt-'+name+'.png'));bpy.ops.render.render(write_still=True)
 
 # 隐藏外甲与外表紧固件，检查同一装配中的驱动器、线束和承力骨架。
 if not requested or 'internal' in requested:
  for p in meta['pieces']:bpy.data.objects[p['id']].hide_render=p['layer']>=4 or 'lining' in p['id']
  target=Vector((0,0,1.65));cam.data.ortho_scale=1.25;cam.location=target+Vector((2,-5,.6));cam.rotation_euler=(target-cam.location).to_track_quat('-Z','Y').to_euler()
- scene.render.filepath=root+'\\qa-out\\hmt-internal.png';bpy.ops.render.render(write_still=True)
+ scene.render.filepath=str(output_dir/'hmt-internal.png');bpy.ops.render.render(write_still=True)

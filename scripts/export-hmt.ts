@@ -8,6 +8,14 @@ import { exportHmtRuntime } from "./hmt-runtime";
 import machining from "../src/three/parts/models/hmt/machined.generated.json";
 mkdirSync("qa-out", { recursive: true });
 const raw = process.argv.includes("--raw");
+const sourceHashes = Object.fromEntries(
+  ["registry.ts", "geometry.ts", "restPose.ts"].map((name) => [
+    name,
+    createHash("sha256")
+      .update(readFileSync(`src/three/parts/models/hmt/${name}`))
+      .digest("hex"),
+  ]),
+);
 if (raw && process.argv.includes("--runtime")) throw new Error("发布缓存必须来自完成加工的装配");
 if (!raw) {
   for (const [name, expected] of Object.entries(machining.sources)) {
@@ -56,7 +64,13 @@ for (const part of model.parts) {
 closeSync(fd);
 writeFileSync(
   "qa-out/hmt-mesh.json",
-  JSON.stringify({ kind: raw ? "source" : "assembled", pieces, materials: registry.materials, triangles }),
+  JSON.stringify({
+    kind: raw ? "source" : "assembled",
+    sources: sourceHashes,
+    pieces,
+    materials: registry.materials,
+    triangles,
+  }),
 );
 process.stdout.write(JSON.stringify({ pieces: pieces.length, triangles, bytes: offset }) + "\n");
 if (process.argv.includes("--runtime")) exportHmtRuntime(model);
