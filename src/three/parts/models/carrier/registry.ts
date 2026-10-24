@@ -14,6 +14,8 @@ import { addSea } from "./sea";
 import { addCarrierDetails } from "./details";
 import { addCarrierInteriors } from "./interiors";
 import { addScaleFigure } from "./scaleFigure";
+import { addCarrierDensity } from "./carrierDensity";
+import { addCarrierDeckOps } from "./carrierDeckOps";
 import {
   carrierBootStripe,
   carrierBottom,
@@ -65,6 +67,8 @@ function buildCarrierOnce(): { registry: ModelRegistry; layouts: Record<string, 
   addScaleFigure(ctx);
   addCarrierDetails(ctx);
   addCarrierInteriors(ctx);
+  addCarrierDensity(ctx);
+  addCarrierDeckOps(ctx);
 
   const staticOnly = (
     family: string,
@@ -145,8 +149,8 @@ function buildCarrierOnce(): { registry: ModelRegistry; layouts: Record<string, 
     {
       family: "cv-hook-wire",
       a: "carrier.aircraft.hook_*",
-      b: "carrier.deck.wire_2_*",
-      reason: "尾钩钩住第 2 道拦阻索（钩头与钢索的啮合）",
+      b: "carrier.deck.wire_3_*",
+      reason: "尾钩钩住第 3 道拦阻索（钩头与钢索的啮合）",
       maxDepthMm: 25,
       allowDisplaced: true,
     },

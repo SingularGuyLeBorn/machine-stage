@@ -8,12 +8,13 @@ import { animateCarrier, carrierFlightPhase, CAT_NOSE_ENGAGE } from "./motion";
 import { CV } from "./constants";
 import { HANGAR_DOOR_NODES, AMMO_ELEVATOR_NODE } from "./hangar";
 import { WIRE_NODES, SHUTTLE_NODE, JBD_NODES, ELEVATOR_NODES } from "./flightdeck";
+import { deckPlan } from "./kits";
 import { RADAR_NODE, CIWS_NODES } from "./island";
 import { AIRCRAFT_NODE, HOOK_NODE, WING_FOLD_L, WING_FOLD_R } from "./aircraft";
 import { CARRIER_CREW_FIGURES } from "../crewFigures";
 
 // ============================================================================
-// 福建舰验收：3000+ 定义件、自内向外五层、核心弹射/拦阻闭环、零悬空。
+// 福建舰验收：10,000+ 定义件、用户甲板轮廓/着舰区、自内向外五层、核心弹射/拦阻闭环、零悬空。
 // 静态穿模与全状态扫掠由 scripts/diag-carrier.ts / diag-carrier-sweep.ts 负责。
 // ============================================================================
 
@@ -37,19 +38,46 @@ const poseAt = (t: number, state = "flight_ops") => {
     shuttleZ: built.getNode(SHUTTLE_NODE)!.position.z,
     hook: built.getNode(HOOK_NODE)!.rotation.x,
     wing: built.getNode(WING_FOLD_L)!.rotation.z,
-    wire: built.getNode(WIRE_NODES[1]![0])!.rotation.y,
+    wire: built.getNode(WIRE_NODES[2]![0])!.rotation.y,
   };
 };
 
 afterAll(() => built.dispose());
 
 describe("福建舰 · 整机", () => {
-  it("零件数 3000+ 定义件、3500+ 实例（不是空壳）", () => {
-    expect(registry.parts.length).toBeGreaterThanOrEqual(3000);
-    expect(instances).toBeGreaterThanOrEqual(3500);
+  it("零件数 10000+ 定义件、11000+ 实例（不是空壳）", () => {
+    expect(registry.parts.length).toBeGreaterThanOrEqual(10000);
+    expect(instances).toBeGreaterThanOrEqual(11000);
     expect(built.parts.length).toBe(
       registry.parts.reduce((sum, p) => sum + (p.dual ? 2 : 1), 0),
     );
+  });
+
+  it("甲板轮廓采用用户 36 点数据，着舰区四点落在甲板内", () => {
+    const plan = deckPlan();
+    expect(plan).toHaveLength(36);
+    const inside = (x: number, z: number): boolean => {
+      let hit = false;
+      for (let i = 0, j = plan.length - 1; i < plan.length; j = i++) {
+        const [xi, zi] = plan[i]!;
+        const [xj, zj] = plan[j]!;
+        if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) hit = !hit;
+      }
+      return hit;
+    };
+    const landing: Array<[number, number]> = [
+      [-1.277, 11.496],
+      [-3.725, 10.042],
+      [-1.806, -19.938],
+      [0.655, -19.861],
+    ];
+    // 艉端两角几乎贴着艉板折线（仅 ~13cm 余量），向着舰区中心收 3% 再判内，
+    // 避免点在边界上的射线法数值歧义；前两角同样收一点，语义仍是四点都在甲板内。
+    const cx = landing.reduce((sum, p) => sum + p[0], 0) / landing.length;
+    const cz = landing.reduce((sum, p) => sum + p[1], 0) / landing.length;
+    for (const [x, z] of landing) {
+      expect(inside(x + (cx - x) * 0.03, z + (cz - z) * 0.03), `${x},${z}`).toBe(true);
+    }
   });
 
   it("自内向外五层都有零件级内容", () => {
@@ -192,7 +220,7 @@ describe("福建舰 · 整机", () => {
     expect(built.getNode(WING_FOLD_R)).toBeDefined();
   });
 
-  it("零悬空：3660+ 实例每个都在 20mm 内有支撑邻居，且无悬空孤岛", () => {
+  it("零悬空：11300+ 实例每个都在 20mm 内有支撑邻居，且无悬空孤岛", () => {
     const unsupported = detectUnsupportedParts(built, { maxGapM: 0.02, ignoreDonorPartIds: ["carrier.hull.hull_shell"] });
     expect(unsupported.map((r) => `${r.ref} ${r.gap_mm.toFixed(1)}mm`)).toEqual([]);
     const islands = detectFloatingIslands(built, { maxGapM: 0.02 });
@@ -224,12 +252,12 @@ describe("福建舰 · 整机", () => {
     // 机翼从折叠 1.72 rad 展开到 0
     expect(Math.abs(taxi.wing)).toBeGreaterThan(1.4);
     expect(Math.abs(launch.wing)).toBeLessThan(0.05);
-    // 进近放钩、着舰钩住第 2 道索并拉出
+    // 进近放钩、着舰钩住第 3 道索并拉出
     expect(approach.hook).toBeLessThan(-0.3);
     expect(caught.hook).toBeLessThan(-0.3);
     expect(Math.abs(caught.wire)).toBeGreaterThan(0.25);
     expect(caught.aircraft.z).toBeGreaterThan(approach.aircraft.z);
-    // 进近/滑跑贴 9.3° 斜角跑道中线：机身 x 随 z 向港侧偏移，不再走 x=0 的直线。
+    // 进近/滑跑贴 3.59° 斜角跑道中线：机身 x 随 z 向港侧偏移，不再走 x=0 的直线。
     expect(approach.aircraft.x).toBeLessThan(1.0);
     expect(caught.aircraft.x).toBeLessThan(0);
     // 复位后重新折叠系留

@@ -19,6 +19,7 @@ const CARRIER_ISLAND_INTERIOR =
 export function isInternalPart(modelId: string, handle: PartHandle): boolean {
   if (modelId === "carrier") {
     if (handle.def.tags?.includes("fx")) return false;
+    if (handle.def.tags?.includes("internal")) return true;
     if (handle.assembly === "hangar") return true;
     if (handle.partId.startsWith("carrier.aircraft.hangarparked")) return true;
     if (handle.assembly === "power") return !CARRIER_POWER_EXTERIOR.test(handle.partId);

@@ -20,7 +20,7 @@ import { CIC_SWEEP_NODE } from "./cic";
 // idle   系泊检查（折叠翼/挡焰板平放）
 // engine 动力运转（堆芯控制棒/主泵/涡轮/双桨/旋转雷达）
 // flight_ops 核心闭环：折叠翼展开 → 弹射滑跑 → 离舰爬升 → 航线回转 →
-//            进近放下尾钩 → 钩住第 2 道拦阻索 → 减速停住 → 复位系留
+//            进近放下尾钩 → 钩住第 3 道拦阻索 → 减速停住 → 复位系留
 // hangar 机库作业（防火门/弹药升降机）
 // ciws   近防（1130 转管 + 随动跟踪）
 // ============================================================================
@@ -35,12 +35,12 @@ export const CAT_NOSE_ENGAGE = AIRCRAFT_SCALE_Z * 1.13;
 const LAUNCH_START_POINT = catPoint(LAUNCH_TRACK, -CAT_NOSE_ENGAGE);
 const LAUNCH_END_POINT = catPoint(LAUNCH_TRACK, LAUNCH_TRACK.length - CAT_NOSE_ENGAGE);
 const CAT_START = new THREE.Vector3(LAUNCH_START_POINT.x, DECK_TOP, LAUNCH_START_POINT.z);
-// 斜角着舰跑道：与甲板标线同一坐标系（艉端 x=1.05/z=-18.5，向左舷偏 9.3°）。
+// 斜角着舰跑道：与甲板标线同一坐标系（艉端 x=-0.576/z=-19.9，向左舷偏 3.59°）。
 // 进近/滑跑/拦阻全部贴跑道中线，不能再用 x=0 的直线。
-const RUNWAY_DEG = 9.3;
+const RUNWAY_DEG = 3.59;
 const RUNWAY_YAW = (-RUNWAY_DEG * Math.PI) / 180;
-const RUNWAY_AFT_X = 1.05;
-const RUNWAY_AFT_Z = -18.5;
+const RUNWAY_AFT_X = -0.5756;
+const RUNWAY_AFT_Z = -19.9;
 const RUNWAY_COS = Math.cos((RUNWAY_DEG * Math.PI) / 180);
 const RUNWAY_SIN = Math.sin((RUNWAY_DEG * Math.PI) / 180);
 const runwayX = (z: number): number => RUNWAY_AFT_X - ((z - RUNWAY_AFT_Z) / RUNWAY_COS) * RUNWAY_SIN;
@@ -48,7 +48,11 @@ const TAXI_BACK_MID = new THREE.Vector3(1.8, DECK_TOP, 3.9);
 // 绕网第二拐点：越过已收起的拦阻网槽后回到右舷停机位。路线保持在 x≈2.2，
 // 否则展开的右翼尖会扫到右舷停放 J-15 的左翼。
 const TAXI_BACK_FWD = new THREE.Vector3(1.8, DECK_TOP, 7.2);
-const CATCH_Z = -7.5;
+// 尾钩比机体原点靠后约 1.5，机体停在第三道索前方；着舰区比旧版更长，
+// 落点后移后不再压到 3 号弹射器的待发滑梭/挡焰板。
+const CATCH_WIRE = 2;
+const CATCH_Z = CV.WIRE_Z[CATCH_WIRE]! + 1.5;
+const RELEASE_Z = CATCH_Z + 0.8;
 const WIRE_PULL_MAX = 1.5;
 
 const FLIGHT_CURVE = new THREE.CatmullRomCurve3(
@@ -109,7 +113,7 @@ function setHook(assembled: AssembledModel, angle: number): void {
 
 function setWirePull(assembled: AssembledModel, pull: number): void {
   const angle = Math.asin(Math.min(0.94, Math.max(0, pull) / CV.WIRE_HALF));
-  const [left, right] = WIRE_NODES[1]!;
+  const [left, right] = WIRE_NODES[CATCH_WIRE]!;
   const leftNode = assembled.getNode(left);
   const rightNode = assembled.getNode(right);
   if (leftNode) leftNode.rotation.y = -angle;
@@ -289,7 +293,7 @@ function flightPose(t: number): {
   } else if (t < STOP) {
     phase = "arrested";
     const u = smooth((t - CATCH) / (STOP - CATCH));
-    const z = lerp(CATCH_Z, -6.0, u);
+    const z = lerp(CATCH_Z, RELEASE_Z, u);
     position.set(runwayX(z), DECK_TOP - 0.02 * Math.sin(u * Math.PI), z);
     yaw = RUNWAY_YAW;
     hook = -0.41;
@@ -300,7 +304,7 @@ function flightPose(t: number): {
     const u = smooth((t - STOP) / (PARKED - STOP));
     // 返航滑行绕过仍竖起的拦阻网：先滑到网前右侧，沿右舷越过网线，再横越回停机区。
     if (u < 0.4) {
-      position.lerpVectors(new THREE.Vector3(runwayX(-6.0), DECK_TOP, -6.0), TAXI_BACK_MID, smooth(u / 0.4));
+      position.lerpVectors(new THREE.Vector3(runwayX(RELEASE_Z), DECK_TOP, RELEASE_Z), TAXI_BACK_MID, smooth(u / 0.4));
       yaw = RUNWAY_YAW * (1 - smooth(u / 0.4));
     } else if (u < 0.62) {
       position.lerpVectors(TAXI_BACK_MID, TAXI_BACK_FWD, smooth((u - 0.4) / 0.22));
@@ -377,7 +381,7 @@ export function animateCarrier(assembled: AssembledModel, seconds: number, state
 export const CARRIER_STATE_LABELS = [
   { id: "idle", label: "系泊检查", hint: "全舰静态装配；舰载机折叠翼系留在甲板，挡焰板平放" },
   { id: "engine", label: "动力运转", hint: "控制棒插抽、主泵/涡轮/双桨转动、旋转雷达扫描" },
-  { id: "flight_ops", label: "弹射/拦阻闭环", hint: "30s 循环：滑行到位 → 电磁弹射 → 离舰爬升 → 回转进近 → 尾钩钩住第 2 道拦阻索 → 减速停住" },
+  { id: "flight_ops", label: "弹射/拦阻闭环", hint: "30s 循环：滑行到位 → 电磁弹射 → 离舰爬升 → 回转进近 → 尾钩钩住第 3 道拦阻索 → 减速停住" },
   { id: "hangar", label: "机库作业", hint: "机库防火门开合 + 弹药升降机在弹药库与机库层之间升降" },
   { id: "ciws", label: "近防拦截", hint: "1130 近防炮随动 + 11 管转管" },
 ] as const;

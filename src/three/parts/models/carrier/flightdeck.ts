@@ -325,8 +325,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     node: SHUTTLE_NODE,
     mate: A([0, 0.08, 0.25], [90, 0, 0]),
   });
-  // 1、3 号弹射器各放一枚待发滑梭（2 号由动画节点驱动）。
-  for (const track of [CAT_TRACKS[0]!, CAT_TRACKS[2]!]) {
+  // 1 号弹射器放一枚待发滑梭；2 号由动画节点驱动。
+  // 3 号滑梭待发位落在用户给定的斜角着舰区里，收起滑梭，避免挡着舰滑跑路径。
+  for (const track of [CAT_TRACKS[0]!]) {
     const tag = pad(track.id);
     const parked = catPoint(track, 0.1);
     add({
@@ -573,12 +574,12 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // 跑道两舷，网包横卧在甲板上的低矮网槽里，不挡弹射器、不与挡焰板重叠。
   {
     const netZ = 3.3;
-    const netRad = (9.3 * Math.PI) / 180;
+    const netRad = (3.59 * Math.PI) / 180;
     const netSin = Math.sin(netRad);
     const netCos = Math.cos(netRad);
-    const netCenterX = 1.05 - ((netZ + 18.5) / netCos) * netSin;
-    const netHalf = 1.9;
-    const netYaw = -9.3;
+    const netCenterX = -0.5756 - ((netZ + 19.9) / netCos) * netSin;
+    const netHalf = 1.55;
+    const netYaw = -3.59;
     const postAt = (side: -1 | 1): [number, number] => [
       netCenterX + side * netHalf * netCos,
       netZ + side * netHalf * netSin,
@@ -683,7 +684,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
 
   // ---- 右舷艉部航空吊车：基座/回转齿圈/桅柱/司机室/桁架吊臂/绞车/吊钩 ----
   {
-    const cx = 3.55;
+    const cx = 3.2;
     const cz = -15.8;
     const baseY = deckTop;
     add({
@@ -1021,16 +1022,17 @@ export function addFlightDeck(ctx: CarrierCtx): void {
 
   // ---- 甲板标记与系留点 ----
   const markY = deckTop + 0.014;
-  // 斜角着舰跑道：右舷艉部向舰艏左舷斜置 9.3°（福建舰实测 ~9.5°，落在 6°~14° 区间）。
-  // 所有标线都按跑道坐标系（沿跑道 s / 横跨跑道 d）生成并随跑道同角度旋转，保证平行、前后对齐。
-  const RUNWAY_DEG = 9.3;
+  // 斜角着舰跑道：按用户给定的四点着舰区标定（艉端中心 -0.576/-19.9，艏端 -2.5/10.77），
+  // 长 30.7、宽约 2.5、相对甲板轴线左偏 3.59°。
+  const RUNWAY_DEG = 3.59;
   const RUNWAY_RAD = (RUNWAY_DEG * Math.PI) / 180;
   const RUNWAY_SIN = Math.sin(RUNWAY_RAD);
   const RUNWAY_COS = Math.cos(RUNWAY_RAD);
   const RUNWAY_YAW = -RUNWAY_DEG;
-  const RUNWAY_AFT_X = 1.05;
-  const RUNWAY_AFT_Z = -18.5;
-  const RUNWAY_LEN = 25.0;
+  const RUNWAY_AFT_X = -0.5756;
+  const RUNWAY_AFT_Z = -19.9;
+  const RUNWAY_LEN = 30.7;
+  const RUNWAY_WIDTH = 2.5;
   const runwayAt = (s: number): [number, number] => [RUNWAY_AFT_X - s * RUNWAY_SIN, RUNWAY_AFT_Z + s * RUNWAY_COS];
   const runwayAcross = (s: number, side: number, distance: number): [number, number] => {
     const [x, z] = runwayAt(s);
@@ -1038,20 +1040,20 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   };
   // 斜角跑道底层浅灰漆带：给所有白色标线提供连续附着面，同时形成真实跑道底色。
   // 用 cv_runway（比甲板浅一档）而不是甲板板材质——俯视时能一眼认出是斜跑道。
-  const underlay = runwayAt(12.55);
+  const underlay = runwayAt(RUNWAY_LEN / 2);
   add({
     id: `${P}runway_underlay`,
     name_cn: "斜角着舰跑道底色",
     name_en: "angled runway underlay",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(B(4.0, 0.004, 24.6, [0, 0, 0], 0.0015)),
+    geometry: M(B(RUNWAY_WIDTH, 0.004, RUNWAY_LEN - 0.3, [0, 0, 0], 0.0015)),
     material: "cv_runway",
     mate: A([underlay[0], deckTop + 0.006, underlay[1]], [0, RUNWAY_YAW, 0]),
   });
-  // 中线虚线：沿跑道纵向等距 1.22，22 段从头到尾严格一条直线。
-  for (let d = 0; d < 20; d++) {
-    const [x, z] = runwayAt(0.75 + d * 1.22);
+  // 中线虚线：沿跑道纵向等距 1.24，24 段从头到尾严格一条直线。
+  for (let d = 0; d < 24; d++) {
+    const [x, z] = runwayAt(0.9 + d * 1.24);
     add({
       id: `${P}runway_center_${pad(d + 1)}`,
       name_cn: `斜角跑道中线 ${d + 1}`,
@@ -1063,17 +1065,17 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       mate: A([x, markY + 0.004, z], [0, RUNWAY_YAW, 0]),
     });
   }
-  // 跑道两侧边线：9 段实线沿跑道横向 ±1.35，与中线同角度。
+  // 跑道两侧边线：沿跑道横向 ±1.17，与中线同角度。
   for (const side of [-1, 1] as const) {
-    for (let s = 0; s < 8; s++) {
-      const [x, z] = runwayAcross(2.25 + s * 3.0, side, 1.8);
+    for (let s = 0; s < 10; s++) {
+      const [x, z] = runwayAcross(1.6 + s * 3.0, side, 1.17);
       add({
         id: `${P}runway_edge_${side === -1 ? "p" : "s"}_${pad(s + 1)}`,
         name_cn: `斜角跑道${side === -1 ? "左" : "右"}边线 ${s + 1}`,
         name_en: `angled runway edge ${side === -1 ? "p" : "s"} ${s + 1}`,
         assembly: ASSEMBLY,
         build_layer: 4,
-        geometry: M(B(0.14, 0.006, 2.5, [0, 0, 0], 0.0015)),
+        geometry: M(B(0.12, 0.006, 2.6, [0, 0, 0], 0.0015)),
         material: "cv_deck_line",
         mate: A([x, markY + 0.004, z], [0, RUNWAY_YAW, 0]),
       });
@@ -1081,7 +1083,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   }
   // 着舰区“钢琴键”：8 根纵向条带横跨跑道，全部按跑道角度排齐。
   for (let bar = 0; bar < 8; bar++) {
-    const [x, z] = runwayAcross(2.4, 1, -1.84 + bar * 0.526);
+    const [x, z] = runwayAcross(2.4, 1, -0.98 + bar * 0.28);
     add({
       id: `${P}runway_threshold_${pad(bar + 1)}`,
       name_cn: `着舰区钢琴键 ${bar + 1}`,
@@ -1096,7 +1098,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // 接地点：两列 × 三排，沿跑道横向 ±0.58。
   for (let row = 0; row < 3; row++) {
     for (const side of [-1, 1] as const) {
-      const [x, z] = runwayAcross(8.2 + row * 1.4, side, 0.58);
+      const [x, z] = runwayAcross(8.2 + row * 1.4, side, 0.52);
       add({
         id: `${P}runway_touchdown_${pad(row * 2 + (side === -1 ? 1 : 2))}`,
         name_cn: `着舰接地点标记 ${row * 2 + (side === -1 ? 1 : 2)}`,
@@ -1117,13 +1119,13 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       name_en: `angled runway end ${tag}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(3.8, 0.006, 0.12, [0, 0, 0], 0.0015)),
+      geometry: M(B(RUNWAY_WIDTH - 0.14, 0.006, 0.12, [0, 0, 0], 0.0015)),
       material: "cv_deck_line",
       mate: A([cx, markY + 0.006, cz], [0, RUNWAY_YAW, 0]),
     });
   }
   // 舰艏直通起飞区：一整条浅灰跑道底色 + 两条弹射轨 + 中线 + 起飞位横线，
-  // 俯视时与左侧 9.3° 斜角着舰跑道形成清晰的“直通 + 斜角”双跑道。
+  // 俯视时与左侧 3.59° 斜角着舰跑道形成清晰的“直通 + 斜角”双跑道。
   add({
     id: `${P}launch_runway`,
     name_cn: "舰艏直通起飞跑道",
@@ -1193,7 +1195,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // 甲板使用痕迹：着舰轮胎擦痕（两列）、停机位油污、挡焰板烧蚀。
   for (const side of [-1, 1] as const) {
     for (let t = 0; t < 11; t++) {
-      const [x, z] = runwayAcross(4.4 + t * 0.85, side, 0.62);
+      const [x, z] = runwayAcross(4.4 + t * 0.9, side, 0.55);
       add({
         id: `${P}tire_streak_${side === -1 ? "l" : "r"}_${pad(t + 1)}`,
         name_cn: `着舰轮胎擦痕 ${side === -1 ? "左" : "右"} ${t + 1}`,
