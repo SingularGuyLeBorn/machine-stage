@@ -41,7 +41,7 @@ export function addCicInterior(ctx: CarrierCtx): void {
   add("display_cabinet", "CIC 显控墙机柜", M(B(0.92, 0.52, 0.14, [0, 0, 0], 0.006)), "cv_steel_dark", [x, floorTop + 0.3, z + 2.66]);
   add("display_bezel", "CIC 主屏屏框", M(B(0.88, 0.42, 0.02, [0, 0, 0], 0.004)), "cv_gauge_face", [x, floorTop + 0.32, z + 2.58]);
   (["l", "c", "r"] as const).forEach((tag, index) => {
-    add(`main_screen_${tag}`, `CIC 战术主屏 ${index + 1}`, M(B(0.26, 0.34, 0.008, [0, 0, 0], 0.002)), "cv_screen", [x + (index - 1) * 0.29, floorTop + 0.32, z + 2.564]);
+    add(`main_screen_${tag}`, `CIC 战术主屏 ${index + 1}`, M(B(0.26, 0.34, 0.008, [0, 0, 0], 0.002)), ["cv_scr_chart", "cv_scr_tactical", "cv_scr_radar"][index] ?? "cv_scr_tactical", [x + (index - 1) * 0.29, floorTop + 0.32, z + 2.564]);
   });
   ctx.node({ name: CIC_SWEEP_NODE, parent: "root", pivot: [x, floorTop + 0.32, z + 2.554], motion: "rotate", axis: "z", note: "CIC 主屏雷达扫描线" });
   ctx.add({
@@ -61,7 +61,7 @@ export function addCicInterior(ctx: CarrierCtx): void {
     const tag = side === -1 ? "p" : "s";
     const rx = x + side * 0.6;
     add(`rack_${tag}`, `CIC 机柜 ${side === -1 ? "左" : "右"}`, M(B(0.24, 0.58, 0.34, [0, 0, 0], 0.006), B(0.26, 0.04, 0.36, [0, 0.29, 0], 0.004)), "cv_steel_dark", [rx, floorTop + 0.29, z + 2.55]);
-    add(`rack_${tag}_screen`, `CIC 机柜显控 ${side === -1 ? "左" : "右"}`, M(B(0.008, 0.3, 0.26, [0, 0, 0], 0.002)), "cv_mfd", [rx - side * 0.124, floorTop + 0.36, z + 2.55]);
+    add(`rack_${tag}_screen`, `CIC 机柜显控 ${side === -1 ? "左" : "右"}`, M(B(0.008, 0.3, 0.26, [0, 0, 0], 0.002)), side === -1 ? "cv_scr_radar" : "cv_scr_comms", [rx - side * 0.124, floorTop + 0.36, z + 2.55]);
     for (let vent = 0; vent < 3; vent++) {
       add(`rack_${tag}_vent_${vent + 1}`, `CIC 机柜通风口 ${side === -1 ? "左" : "右"}-${vent + 1}`, M(B(0.006, 0.03, 0.2, [0, 0, 0], 0.001)), "cv_gauge_face", [rx - side * 0.123, floorTop + 0.12 + vent * 0.055, z + 2.55]);
     }
@@ -78,7 +78,7 @@ export function addCicInterior(ctx: CarrierCtx): void {
       const cx = x + col;
       add(`console_${row.prefix}_${index + 1}`, `CIC 显控台 ${row.prefix.toUpperCase()}-${index + 1}`, M(B(0.34, 0.16, 0.3, [0, 0, 0], 0.006)), "cv_steel_dark", [cx, floorTop + 0.08, row.z]);
       add(`console_${row.prefix}_${index + 1}_riser`, `CIC 显控台屏架 ${row.prefix.toUpperCase()}-${index + 1}`, M(B(0.34, 0.18, 0.04, [0, 0, 0], 0.004)), "cv_gauge_face", [cx, floorTop + 0.25, row.z - 0.12]);
-      add(`console_${row.prefix}_${index + 1}_screen`, `CIC 显控屏 ${row.prefix.toUpperCase()}-${index + 1}`, M(B(0.28, 0.13, 0.006, [0, 0, 0], 0.002)), "cv_mfd", [cx, floorTop + 0.25, row.z - 0.143]);
+      add(`console_${row.prefix}_${index + 1}_screen`, `CIC 显控屏 ${row.prefix.toUpperCase()}-${index + 1}`, M(B(0.28, 0.13, 0.006, [0, 0, 0], 0.002)), ["cv_scr_tactical", "cv_scr_sonar", "cv_scr_chart", "cv_scr_camera", "cv_scr_engine", "cv_scr_damage"][(row.prefix === "a" ? 0 : 3) + index] ?? "cv_scr_tactical", [cx, floorTop + 0.25, row.z - 0.143]);
       add(`console_${row.prefix}_${index + 1}_keyboard`, `CIC 键盘 ${row.prefix.toUpperCase()}-${index + 1}`, M(B(0.28, 0.02, 0.1, [0, 0, 0], 0.003)), "cv_gauge_face", [cx, floorTop + 0.17, row.z + 0.07]);
       addChair(ctx, add, `cic_seat_${row.prefix}_${index + 1}`, cx, floorTop, row.z - 0.42, 1);
     });
@@ -101,7 +101,7 @@ export function addCicInterior(ctx: CarrierCtx): void {
     for (const [index, zPos] of [-4.15, -6.15].entries()) {
       const rx = x + side * 0.69;
       add(`wall_rack_${tag}_${index + 1}`, `CIC 舷侧机柜 ${tag.toUpperCase()}-${index + 1}`, M(B(0.16, 0.55, 0.5, [0, 0, 0], 0.005), B(0.18, 0.035, 0.52, [0, 0.28, 0], 0.003)), "cv_steel_dark", [rx, floorTop + 0.275, zPos]);
-      add(`wall_rack_${tag}_${index + 1}_screen`, `CIC 舷侧显控 ${tag.toUpperCase()}-${index + 1}`, M(B(0.008, 0.3, 0.34, [0, 0, 0], 0.002)), "cv_mfd", [rx - side * 0.084, floorTop + 0.36, zPos]);
+      add(`wall_rack_${tag}_${index + 1}_screen`, `CIC 舷侧显控 ${tag.toUpperCase()}-${index + 1}`, M(B(0.008, 0.3, 0.34, [0, 0, 0], 0.002)), side === -1 ? "cv_scr_sonar" : "cv_scr_damage", [rx - side * 0.084, floorTop + 0.36, zPos]);
       for (let vent = 0; vent < 2; vent++) {
         add(`wall_rack_${tag}_${index + 1}_vent_${vent + 1}`, `CIC 舷侧机柜通风口 ${tag.toUpperCase()}-${index + 1}-${vent + 1}`, M(B(0.006, 0.028, 0.4, [0, 0, 0], 0.001)), "cv_gauge_face", [rx - side * 0.084, floorTop + 0.12 + vent * 0.05, zPos]);
       }

@@ -1142,3 +1142,239 @@ export const type055GunTurret: GeometryBuilder = () => {
   mantlet.translate(0, 1.35, 1.55);
   return merge([body, roof, mantlet]);
 };
+
+/**
+ * 指挥舱显控台：柜体、台面、斜面控制板、键盘、轨迹球、按钮阵列、话机、
+ * 散热格栅、脚踏与电缆槽。屏幕另做贴图件，避免整台变成一块灰盒子。
+ * 局部原点在柜体落地中心，操作员在 -Z 侧。
+ */
+export const type055CommandConsole: GeometryBuilder = (spec) => {
+  const raw = ((spec as { params?: { kind?: string } }).params?.kind ?? "cic_ops") as string;
+  const isCic = raw.startsWith("cic_");
+  const kind = raw.replace(/^(bridge|cic)_/, "");
+  const parts: THREE.BufferGeometry[] = [];
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number) =>
+    new THREE.BoxGeometry(w, h, d).translate(x, y, z);
+  const cyl = (r: number, h: number, x: number, y: number, z: number, seg = 12) =>
+    new THREE.CylinderGeometry(r, r, h, seg).translate(x, y, z);
+  const bay = (w: number, h: number, x: number, y: number) => {
+    parts.push(box(w + 0.16, h + 0.14, 0.1, x, y, -0.33));
+    parts.push(box(w + 0.04, h + 0.04, 0.04, x, y, -0.39));
+  };
+
+  parts.push(box(1.46, 0.62, 0.74, 0, 0.31, 0.05));
+  parts.push(box(1.24, 0.12, 0.68, 0, 0.07, 0.09));
+  parts.push(box(1.58, 0.07, 0.94, 0, 0.73, 0));
+  parts.push(box(1.52, 0.05, 0.88, 0, 0.775, 0.01));
+  parts.push(box(1.42, 0.1, 0.9, 0, 0.69, -0.02));
+  parts.push(box(1.5, 0.5, 0.07, 0, 0.98, 0.36));
+  const slope = new THREE.BoxGeometry(1.26, 0.045, 0.36);
+  slope.rotateX(-0.28);
+  slope.translate(0, 0.81, -0.08);
+  parts.push(slope);
+  parts.push(box(0.56, 0.025, 0.2, 0, 0.795, 0.09));
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 12; c++) {
+      parts.push(box(0.034, 0.012, 0.026, -0.25 + c * 0.045, 0.812, 0.04 + r * 0.026));
+    }
+  }
+  parts.push(new THREE.TorusGeometry(0.045, 0.012, 6, 16).rotateX(Math.PI / 2).translate(0.67, 0.81, -0.05));
+  for (const side of [-1, 1] as const) {
+    for (let i = 0; i < 5; i++) {
+      parts.push(box(0.02, 0.022, 0.3, side * 0.735, 0.42 + i * 0.045, 0.2));
+    }
+    parts.push(box(0.03, 0.035, 0.22, side * 0.72, 0.66, 0.12));
+    parts.push(box(0.06, 0.16, 0.42, side * 0.5, 0.18, 0.32));
+  }
+  parts.push(box(0.94, 0.05, 0.26, 0, 0.13, -0.46));
+  parts.push(box(0.08, 0.12, 0.08, -0.4, 0.07, -0.46));
+  parts.push(box(0.08, 0.12, 0.08, 0.4, 0.07, -0.46));
+
+  if (kind === "helm") {
+    bay(1.1, 0.56, 0, 1.0);
+    // 舵轮 + 双车钟
+    const wheel = new THREE.TorusGeometry(0.2, 0.022, 8, 28);
+    wheel.translate(0, 0.82, -0.28);
+    parts.push(wheel);
+    for (let i = 0; i < 3; i++) {
+      const spoke = new THREE.BoxGeometry(0.035, 0.36, 0.025);
+      spoke.rotateZ((i / 3) * Math.PI);
+      spoke.translate(0, 0.82, -0.275);
+      parts.push(spoke);
+    }
+    parts.push(box(0.06, 0.22, 0.06, 0.44, 0.88, -0.12));
+    parts.push(box(0.06, 0.22, 0.06, 0.56, 0.88, -0.12));
+    parts.push(cyl(0.09, 0.02, 0.5, 0.99, -0.27, 18));
+  } else if (kind === "nav") {
+    bay(0.52, 0.44, -0.32, 0.98);
+    bay(0.52, 0.44, 0.32, 0.98);
+    parts.push(box(0.78, 0.012, 0.46, 0, 0.79, 0.02));
+    parts.push(box(0.7, 0.006, 0.4, 0, 0.798, 0.02));
+    parts.push(box(0.4, 0.03, 0.04, -0.1, 0.81, 0.12));
+  } else if (kind === "weapons") {
+    bay(0.34, 0.3, -0.4, 1.0);
+    bay(0.34, 0.3, 0, 1.0);
+    bay(0.34, 0.3, 0.4, 1.0);
+    parts.push(cyl(0.07, 0.03, 0.52, 0.8, 0.06, 14));
+    parts.push(new THREE.SphereGeometry(0.055, 12, 8).translate(0.52, 0.84, 0.06));
+    parts.push(box(0.02, 0.1, 0.28, -0.56, 0.84, -0.08));
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) {
+      parts.push(box(0.05, 0.03, 0.04, 0.16 + c * 0.065, 0.82 - r * 0.055, -0.18));
+    }
+  } else if (kind === "comms") {
+    bay(0.68, 0.5, 0, 0.98);
+    parts.push(box(0.34, 0.42, 0.22, 0.52, 0.94, 0.14));
+    for (let i = 0; i < 4; i++) parts.push(cyl(0.04, 0.03, 0.52, 0.8 + i * 0.07, -0.02, 14));
+    parts.push(box(0.06, 0.035, 0.22, -0.66, 0.82, 0.02));
+    parts.push(box(0.12, 0.08, 0.04, 0.52, 1.22, 0.15));
+  } else if (kind === "sonar") {
+    bay(0.46, 0.62, -0.3, 1.02);
+    bay(0.46, 0.62, 0.3, 1.02);
+    parts.push(box(0.05, 0.24, 0.05, 0.7, 1.12, 0.06));
+    parts.push(new THREE.TorusGeometry(0.1, 0.015, 6, 18).translate(0.7, 1.27, 0.06));
+    parts.push(box(0.5, 0.03, 0.28, 0, 0.79, -0.02));
+  } else if (kind === "damage") {
+    bay(0.82, 0.54, 0, 0.99);
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) {
+      parts.push(box(0.08, 0.05, 0.035, -0.34 + c * 0.17, 0.86 - r * 0.07, -0.16));
+    }
+    parts.push(box(0.3, 0.12, 0.04, 0.5, 1.09, -0.25));
+    parts.push(box(0.2, 0.05, 0.18, -0.5, 0.8, 0.16));
+  } else if (kind === "radar") {
+    bay(0.94, 0.54, 0, 0.99);
+    parts.push(new THREE.SphereGeometry(0.05, 12, 8).translate(0.52, 0.83, -0.16));
+    parts.push(new THREE.TorusGeometry(0.065, 0.012, 6, 18).rotateX(Math.PI / 2).translate(0.52, 0.818, -0.16));
+    parts.push(cyl(0.04, 0.04, -0.52, 0.83, -0.16, 14));
+  } else if (kind === "engine") {
+    bay(0.52, 0.44, -0.3, 0.98);
+    bay(0.52, 0.44, 0.3, 0.98);
+    for (let i = 0; i < 6; i++) {
+      parts.push(new THREE.CylinderGeometry(0.045, 0.045, 0.02, 14).rotateX(Math.PI / 2).translate(-0.45 + i * 0.18, 0.8, -0.16));
+    }
+    parts.push(box(0.24, 0.18, 0.04, 0.52, 0.86, -0.12));
+  } else if (kind === "tactical") {
+    bay(1.12, 0.54, 0, 1.0);
+    parts.push(box(0.7, 0.012, 0.36, 0, 0.795, 0.06));
+    parts.push(new THREE.SphereGeometry(0.045, 12, 8).translate(-0.5, 0.82, -0.12));
+    parts.push(new THREE.TorusGeometry(0.058, 0.011, 6, 18).rotateX(Math.PI / 2).translate(-0.5, 0.808, -0.12));
+  } else if (kind === "chart") {
+    bay(0.88, 0.5, 0, 0.98);
+    parts.push(box(0.7, 0.012, 0.4, 0, 0.795, 0.05));
+    parts.push(box(0.16, 0.02, 0.04, 0, 0.81, 0.16));
+  } else {
+    // ops / eval：双屏
+    bay(0.54, 0.46, -0.31, 0.98);
+    bay(0.54, 0.46, 0.31, 0.98);
+    parts.push(box(0.06, 0.1, 0.2, 0.58, 0.82, 0.04));
+  }
+
+  // 每个战位的附加硬件不同；CIC 与舰桥同岗位也不共用同一套侧舱。
+  if (isCic) {
+    parts.push(box(0.26, 0.5, 0.5, -0.78, 0.35, 0.16));
+    parts.push(box(0.22, 0.06, 0.44, -0.78, 0.64, 0.16));
+    if (kind === "ops" || kind === "tactical") {
+      parts.push(new THREE.SphereGeometry(0.055, 12, 8).translate(-0.56, 0.83, -0.12));
+      parts.push(new THREE.TorusGeometry(0.07, 0.012, 6, 18).rotateX(Math.PI / 2).translate(-0.56, 0.816, -0.12));
+    }
+    if (kind === "weapons") {
+      parts.push(cyl(0.06, 0.03, -0.52, 0.8, 0.04, 14));
+      parts.push(new THREE.SphereGeometry(0.05, 12, 8).translate(-0.52, 0.84, 0.04));
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) {
+        parts.push(box(0.045, 0.028, 0.035, 0.2 + c * 0.06, 0.8 - r * 0.05, -0.16));
+      }
+    }
+    if (kind === "comms") {
+      parts.push(box(0.3, 0.3, 0.18, 0.56, 1.05, 0.18));
+      for (let i = 0; i < 3; i++) parts.push(cyl(0.035, 0.025, 0.56, 0.98 + i * 0.08, -0.02, 12));
+    }
+    if (kind === "damage") {
+      parts.push(box(0.34, 0.24, 0.05, 0.56, 1.06, -0.2));
+      parts.push(box(0.2, 0.05, 0.16, -0.56, 0.8, 0.14));
+    }
+  } else {
+    parts.push(box(0.22, 0.34, 0.6, 0.8, 0.32, 0.16));
+    if (kind === "comms") {
+      parts.push(box(0.28, 0.34, 0.2, -0.62, 1.02, 0.12));
+      parts.push(box(0.06, 0.03, 0.22, -0.72, 0.82, 0.02));
+    }
+    if (kind === "damage") {
+      parts.push(box(0.26, 0.18, 0.04, 0.62, 1.05, -0.24));
+    }
+  }
+  return merge(parts);
+};
+
+/** 指挥舱座椅：分段坐垫、靠背、腰托、头枕、扶手；底座单独一件。 */
+export const type055CommandChair: GeometryBuilder = (spec) => {
+  const p = (spec as { params?: { kind?: string; station?: string } }).params ?? {};
+  const kind = (p.kind ?? "operator") as string;
+  const station = p.station ?? "";
+  const parts: THREE.BufferGeometry[] = [];
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number) =>
+    new THREE.BoxGeometry(w, h, d).translate(x, y, z);
+  const captain = kind === "captain";
+  const helm = kind === "helm";
+  const jump = kind === "jump";
+  const noHeadrest = ["cic_damage", "cic_engine", "cic_eval", "bridge_damage"].includes(station);
+  const noArms = ["cic_chart", "cic_engine", "cic_eval", "cic_damage"].includes(station);
+  const wide = ["bridge_helm", "cic_radar", "cic_tactical"].includes(station);
+  const tall = ["bridge_helm", "cic_radar", "cic_tactical", "cic_sonar"].includes(station);
+  const width = captain || wide ? 0.62 : 0.54;
+  parts.push(box(width, 0.11, 0.54, 0, 0.52, 0));
+  parts.push(box(width - 0.06, 0.07, 0.25, 0, 0.58, -0.12));
+  parts.push(box(width - 0.06, 0.06, 0.23, 0, 0.575, 0.12));
+  const backHeight = captain ? 0.82 : tall ? 0.74 : 0.62;
+  const back = new THREE.BoxGeometry(width, backHeight, 0.12);
+  back.rotateX(-0.1);
+  back.translate(0, captain ? 1.02 : tall ? 0.96 : 0.9, -0.24);
+  parts.push(back);
+  parts.push(box(width - 0.08, 0.14, 0.13, 0, 0.7, -0.19));
+  if (!jump && !noHeadrest) {
+    parts.push(box(0.34, captain ? 0.24 : 0.2, 0.12, 0, captain ? 1.5 : 1.35, -0.29));
+  }
+  if (!jump && !noArms) {
+    for (const side of [-1, 1] as const) {
+      parts.push(box(0.09, 0.05, 0.42, side * (width / 2 + 0.05), 0.73, -0.04));
+      parts.push(box(0.04, 0.12, 0.04, side * (width / 2 + 0.02), 0.65, 0.05));
+    }
+  }
+  if (captain) {
+    parts.push(box(width + 0.12, 0.04, 0.5, 0, 0.75, 0));
+    for (const side of [-1, 1] as const) parts.push(box(0.16, 0.03, 0.5, side * (width / 2 + 0.13), 0.63, 0));
+  }
+  if (helm) {
+    // 安全带/扶手锁扣
+    parts.push(box(0.05, 0.4, 0.04, -0.2, 1.02, -0.31));
+    parts.push(box(0.05, 0.4, 0.04, 0.2, 1.02, -0.31));
+  }
+  if (kind === "comms" || station === "cic_sonar") {
+    parts.push(box(0.05, 0.2, 0.05, width / 2 + 0.12, 1.2, -0.18));
+    parts.push(new THREE.TorusGeometry(0.08, 0.012, 6, 16).translate(width / 2 + 0.12, 1.3, -0.18));
+  }
+  if (station === "cic_damage" || station === "cic_eval") {
+    parts.push(box(width, 0.03, 0.05, 0, 0.36, -0.04));
+  }
+  if (jump) {
+    parts.push(box(width, 0.03, 0.05, 0, 0.34, -0.05));
+  }
+  return merge(parts);
+};
+
+export const type055CommandChairBase: GeometryBuilder = () => {
+  const parts: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const arm = new THREE.BoxGeometry(0.32, 0.05, 0.09);
+    arm.rotateY(-a);
+    arm.translate(Math.cos(a) * 0.16, 0.055, Math.sin(a) * 0.16);
+    parts.push(arm);
+    parts.push(new THREE.SphereGeometry(0.045, 10, 8).translate(Math.cos(a) * 0.3, 0.045, Math.sin(a) * 0.3));
+  }
+  parts.push(new THREE.CylinderGeometry(0.055, 0.06, 0.28, 14).translate(0, 0.21, 0));
+  parts.push(new THREE.TorusGeometry(0.26, 0.014, 6, 22).rotateX(Math.PI / 2).translate(0, 0.44, 0));
+  for (const side of [-1, 1] as const) {
+    parts.push(new THREE.CylinderGeometry(0.02, 0.02, 0.22, 10).translate(side * 0.32, 0.62, 0.02));
+  }
+  return merge(parts);
+};
+

@@ -256,7 +256,7 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
   // ---- 两侧显控台：雷达屏 + 通信台 ----
   part(`radar_console`, "雷达显控台", M(B(0.32, 0.12, 0.3, [0, 0, 0], 0.006)), "cv_steel_dark", [x - 0.47, floorY + 0.06, z + 1.55]);
   part(`radar_board`, "雷达显控屏框", M(B(0.34, 0.24, 0.03, [0, 0, 0], 0.006)), "cv_steel_dark", [x - 0.47, floorY + 0.13, z + 1.71]);
-  part(`radar_screen`, "相控阵雷达显示屏", M(B(0.24, 0.16, 0.008, [0, 0, 0], 0.002)), "cv_screen", [x - 0.47, floorY + 0.13, z + 1.686]);
+  part(`radar_screen`, "相控阵雷达显示屏", M(B(0.24, 0.16, 0.008, [0, 0, 0], 0.002)), "cv_scr_radar", [x - 0.47, floorY + 0.13, z + 1.686]);
   for (const [ri, rr] of [0.074, 0.05, 0.026].entries()) {
     part(`radar_ring_${ri + 1}`, `雷达距离圈 ${ri + 1}`, M({ type: "torus", radius: rr, tube: 0.0018, radialSegments: 6, tubularSegments: 24 }), "cv_glow", [x - 0.47, floorY + 0.13, z + 1.68]);
   }
@@ -274,7 +274,7 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
   });
   part(`comms_console`, "通信台", M(B(0.32, 0.12, 0.3, [0, 0, 0], 0.006)), "cv_steel_dark", [x + 0.47, floorY + 0.06, z + 1.55]);
   part(`comms_board`, "通信显控屏框", M(B(0.34, 0.24, 0.03, [0, 0, 0], 0.006)), "cv_steel_dark", [x + 0.47, floorY + 0.13, z + 1.71]);
-  part(`comms_screen`, "通信显控屏", M(B(0.22, 0.14, 0.008, [0, 0, 0], 0.002)), "cv_screen", [x + 0.47, floorY + 0.13, z + 1.692]);
+  part(`comms_screen`, "通信显控屏", M(B(0.22, 0.14, 0.008, [0, 0, 0], 0.002)), "cv_scr_comms", [x + 0.47, floorY + 0.13, z + 1.692]);
   for (let k = 0; k < 6; k++) {
     part(`comms_knob_${k + 1}`, `通信台旋钮 ${k + 1}`, M(C(0.008, 0.016, [0, 0, 0], 10)), "cv_steel", [x + 0.36 + (k % 3) * 0.05, floorY + 0.13, z + 1.58 + Math.floor(k / 3) * 0.05]);
   }
@@ -315,7 +315,7 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
     const tag = side === -1 ? "p" : "s";
     for (const [idx, dz] of [-0.9, 0.45].entries()) {
       part(`side_console_${tag}_${idx + 1}`, `两舷备用显控台 ${tag.toUpperCase()}-${idx + 1}`, M(B(0.22, 0.22, 0.55, [0, 0, 0], 0.006), B(0.2, 0.18, 0.04, [0, 0.2, -0.18], 0.004)), "cv_steel_dark", [x + side * 0.6, floorY + 0.12, z - dz]);
-      part(`side_screen_${tag}_${idx + 1}`, `两舷备用显控屏 ${tag.toUpperCase()}-${idx + 1}`, M(B(0.16, 0.1, 0.008, [0, 0, 0], 0.002)), "cv_screen", [x + side * 0.6, floorY + 0.27, z - dz - 0.18]);
+      part(`side_screen_${tag}_${idx + 1}`, `两舷备用显控屏 ${tag.toUpperCase()}-${idx + 1}`, M(B(0.16, 0.1, 0.008, [0, 0, 0], 0.002)), idx === 0 ? "cv_scr_chart" : "cv_scr_camera", [x + side * 0.6, floorY + 0.27, z - dz - 0.18]);
       part(`side_switch_${tag}_${idx + 1}`, `两舷备用开关组 ${tag.toUpperCase()}-${idx + 1}`, M(B(0.016, 0.12, 0.28, [0, 0, 0], 0.003)), "cv_gauge_face", [x + side * 0.6, floorY + 0.295, z - dz + 0.14]);
     }
   }

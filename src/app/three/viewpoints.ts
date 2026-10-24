@@ -182,16 +182,16 @@ const TYPE055_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec
   bridge: {
     eyePart: "type055.interior.bridge_captain_seat_back",
     eye: [0, 0.05, 0.25],
-    targetPart: "type055.interior.bridge_dashboard",
-    targetOffset: [0, 0.55, 0],
-    fov: 70,
+    targetPart: "type055.super.bridge_glass_front",
+    targetOffset: [0, -1.8, 0],
+    fov: 68,
   },
   cic: {
     eyePart: "type055.interior.cic_chart_table",
-    eye: [0, 0.8, 0],
+    eye: [0, 1.3, 0],
     targetPart: "type055.interior.cic_screen_c",
-    targetOffset: [0, 0, 0],
-    fov: 70,
+    targetOffset: [0, 0.2, 0],
+    fov: 68,
   },
   engine_room: {
     eyePart: "type055.power.engine_console",

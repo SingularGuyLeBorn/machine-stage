@@ -20,6 +20,7 @@ import { setArmourWet } from "@/three/parts/kernel/armourSurface";
 import { TigerVfx } from "./vfx/TigerVfx";
 import { MbtVfx } from "./vfx/MbtVfx";
 import { Type055Vfx } from "./vfx/Type055Vfx";
+import { BridgeSkybox, CommandExterior, CommandScreens } from "./vfx/CommandScreens";
 import { applyTigerLidPose, effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
 import { firstPersonView, type CameraMode, isCarrierInteriorMode } from "./viewpoints";
 import { setAk47Mode } from "@/three/parts/models/ak47/motion";
@@ -90,6 +91,9 @@ export function StageCanvas() {
         <TigerVfx />
         <MbtVfx />
         <Type055Vfx />
+        <CommandScreens />
+        <CommandExterior />
+        <BridgeSkybox />
         <CameraRig />
         <CarrierCameraFloor />
         <StageEffects />
@@ -195,7 +199,10 @@ function InteriorFillLight() {
   // 机舱里还有大量金属转子，单靠环境光会发黑，再补一盏舱顶点光。
   return (
     <>
-      <ambientLight intensity={cameraMode === "engine_room" ? 0.85 : 1.05} color="#eaf5ff" />
+      <ambientLight
+        intensity={cameraMode === "engine_room" ? 0.85 : cameraMode === "bridge" || cameraMode === "cic" ? 0.5 : 1.05}
+        color="#eaf5ff"
+      />
       {cameraMode === "engine_room" ? (
         <>
           <pointLight position={[0, 9.2, -34]} intensity={2.3} distance={24} decay={1.35} color="#dbe9f5" />
@@ -206,13 +213,18 @@ function InteriorFillLight() {
       ) : null}
       {cameraMode === "cic" ? (
         <>
-          <pointLight position={[0, 20.9, 13.5]} intensity={1.2} distance={12} decay={1.45} color="#bcd7e2" />
-          <pointLight position={[0, 20.9, 21.5]} intensity={1.1} distance={12} decay={1.45} color="#bcd7e2" />
-          <pointLight position={[0, 20.3, 26.2]} intensity={0.7} distance={8} decay={1.5} color="#4fd0d0" />
+          <pointLight position={[0, 20.75, 13.5]} intensity={1.8} distance={11} decay={1.35} color="#c7dee8" />
+          <pointLight position={[0, 20.75, 21.5]} intensity={1.6} distance={11} decay={1.35} color="#c7dee8" />
+          <pointLight position={[0, 20.4, 26.3]} intensity={1.2} distance={7} decay={1.45} color="#5ed6d6" />
+          <pointLight position={[0, 19.4, 10.5]} intensity={0.7} distance={8} decay={1.5} color="#4f8f9f" />
         </>
       ) : null}
       {cameraMode === "bridge" ? (
-        <pointLight position={[0, 25.9, 27]} intensity={1.3} distance={13} decay={1.45} color="#dbe9f2" />
+        <>
+          <pointLight position={[0, 25.9, 27]} intensity={1.7} distance={12} decay={1.4} color="#f0eadc" />
+          <pointLight position={[0, 23.7, 31.6]} intensity={1.3} distance={9} decay={1.4} color="#cfe4ee" />
+          <pointLight position={[0, 24.4, 39]} intensity={2.2} distance={18} decay={1.3} color="#e6f1f6" />
+        </>
       ) : null}
     </>
   );
