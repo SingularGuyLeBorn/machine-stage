@@ -383,6 +383,24 @@ export function addAircraft(ctx: CarrierCtx): void {
       node: AIRCRAFT_NODE,
       mate: A([side * 0.3, 0.38, -0.45]),
     });
+    // 发动机舱与后机身之间的整流罩/安装梁：把独立圆柱舱体并入机身，
+    // 避免从侧面看右发像一根悬空圆筒。
+    add({
+      id: `${P}engine_${tag}_fairing`,
+      name_cn: `${tag === "l" ? "左" : "右"}发动机舱整流罩`,
+      name_en: `engine fairing ${tag}`,
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry: M(
+        B(0.22, 0.16, 0.5, [-side * 0.08, 0, 0], 0.01),
+        B(0.16, 0.06, 0.42, [-side * 0.08, 0.09, 0], 0.006),
+        B(0.14, 0.05, 0.4, [-side * 0.08, -0.1, 0], 0.005),
+        { type: "weld", from: [-side * 0.02, 0.04, 0.16], to: [-side * 0.16, 0.02, 0.26], radius: 0.018 },
+      ),
+      material: "cv_aircraft",
+      node: AIRCRAFT_NODE,
+      mate: A([side * 0.3, 0.38, -0.45]),
+    });
     add({
       id: `${P}engine_${tag}_fan`,
       name_cn: `${tag === "l" ? "左" : "右"}风扇`,

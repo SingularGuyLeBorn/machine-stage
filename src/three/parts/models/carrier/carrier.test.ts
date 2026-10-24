@@ -188,6 +188,15 @@ describe("福建舰 · 整机", () => {
     expect(CARRIER_CREW_FIGURES.length).toBeGreaterThanOrEqual(8);
     expect(new Set(CARRIER_CREW_FIGURES.map((f) => f.model)).size).toBeGreaterThanOrEqual(5);
     expect(new Set(CARRIER_CREW_FIGURES.map((f) => f.palette)).size).toBeGreaterThanOrEqual(5);
+    // 近程防空按用户要求改为舰艏/舰艉左右舷各一套 HQ-10（共 4 套），
+    // 不再是舰岛顶上的 2 套；左右各一套 6 联装干扰弹发射器。
+    for (const tag of ["bow_p", "bow_s", "stern_p", "stern_s"]) {
+      expect(staticIds.has(`carrier.island.sam_${tag}_body`), `HQ-10 ${tag}`).toBe(true);
+      expect(staticIds.has(`carrier.island.sam_${tag}_cell_rims`), `HQ-10 cells ${tag}`).toBe(true);
+    }
+    for (const tag of ["p", "s"]) {
+      expect(staticIds.has(`carrier.island.decoy_${tag}`), `decoy ${tag}`).toBe(true);
+    }
     expect(CIWS_NODES).toHaveLength(2);
     for (let ciws = 1; ciws <= 2; ciws++) {
       const tag = String(ciws).padStart(2, "0");

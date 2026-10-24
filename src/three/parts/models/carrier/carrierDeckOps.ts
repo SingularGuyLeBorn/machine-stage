@@ -1,5 +1,5 @@
 import { A, B, C, M, S, T, type CarrierCtx } from "./common";
-import { CAT_TRACKS, CV, catAcross } from "./constants";
+import { CAT_TRACKS, CV } from "./constants";
 
 // ============================================================================
 // 福建舰飞行甲板作业链：牵引车/消防车/挂弹车/系留/轮挡/JBD 液压/拦阻索附件。
@@ -96,7 +96,22 @@ export function addCarrierDeckOps(ctx: CarrierCtx): void {
     const oz = -8.5;
     const put = (id: string, cn: string, geo: ReturnType<typeof M>, mat: string, dx: number, dy: number, dz: number, rot?: [number, number, number]) =>
       add(id, cn, geo, mat, [ox + dx, deckTop + dy, oz + dz], undefined, rot);
-    put("skid_frame", "挂弹车车架", M(B(0.32, 0.03, 0.2, [0, 0, 0], 0.004), B(0.3, 0.02, 0.04, [0, 0.12, 0], 0.002)), "cv_deck_yellow", 0, 0.14, 0);
+    // 车架下沿加 4 组轮轴吊架，架体直接坐在车轮上，不再悬在轮顶上方。
+    put(
+      "skid_frame",
+      "挂弹车车架",
+      M(
+        B(0.32, 0.03, 0.2, [0, 0, 0], 0.004),
+        B(0.3, 0.02, 0.04, [0, 0.12, 0], 0.002),
+        B(0.28, 0.02, 0.02, [0, -0.07, 0.2], 0.002),
+        B(0.28, 0.02, 0.02, [0, -0.07, -0.2], 0.002),
+        ...[[-0.13, 0.2], [0.13, 0.2], [-0.13, -0.2], [0.13, -0.2]].map(([ax, az]) => B(0.025, 0.08, 0.025, [ax, -0.035, az], 0.002)),
+      ),
+      "cv_deck_yellow",
+      0,
+      0.14,
+      0,
+    );
     for (const [dx, dz] of [[-0.13, 0.2], [0.13, 0.2], [-0.13, -0.2], [0.13, -0.2]] as const) {
       put("skid_wheel", "挂弹车轮", M(C(0.05, 0.03, [0, 0, 0], 10)), "cv_rubber", dx, 0.06, dz, [0, 0, 90]);
     }
@@ -110,8 +125,14 @@ export function addCarrierDeckOps(ctx: CarrierCtx): void {
   }
 
   // ---------------- JBD 液压动力站/铰链附件 ----------------
-  CAT_TRACKS.forEach((track, index) => {
-    const pos = catAcross(track, -4.0, index === 1 ? 1.5 : -1.5);
+  CAT_TRACKS.forEach((_track, index) => {
+    // 动力站放在着舰区与返航滑行线之间的空档：既避开两条弹射轨道/挡焰板，
+    // 也避开演示机从着舰点返回停机位时经过的 x≈1.8 滑行线。
+    const pos = index === 0
+      ? { x: -3.8, z: 4.8 }
+      : index === 1
+        ? { x: -3.8, z: 5.7 }
+        : { x: -3.6, z: -12.4 };
     for (const [k, dx, dz] of [[0, -0.32, 0], [1, 0.32, 0], [2, 0, 0.26], [3, 0, -0.26]] as const) {
       add(
         `jbd_hyd_pack_${index + 1}_${k + 1}`,

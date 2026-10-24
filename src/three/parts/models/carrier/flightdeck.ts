@@ -220,7 +220,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   };
   CAT_TRACKS.forEach((track) => {
     const digit = String(track.id);
-    const spot = catAcross(track, -1.2, track.id === 1 ? -0.9 : 0.9);
+    const spot = catAcross(track, -1.2, track.id === 3 ? -0.6 : track.id === 1 ? -0.9 : 0.9);
     const bars = digitDefs[digit]!.map(([w, h, dx, dz]) => B(w * 1.5, 0.012, h * 1.5, [dx * 1.5, 0, dz * 1.5], 0.002));
     add({
       id: `${P}cat_number_${digit}`,
@@ -522,7 +522,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       build_layer: 3,
       geometry: M(B(0.9, 0.035, 0.16, [0, 0, 0], 0.006)),
       material: "cv_steel",
-      mate: A([-3.4, deckTop + 0.08, z]),
+      // 三号弹射器移到左舷后，仅第 1 道索支撑片与轨道相交；该片向内收，
+      // 其余支撑片保持原位，仍压在拦阻索下方。
+      mate: A([index === 0 ? -2.85 : -3.4, deckTop + 0.08, z]),
     });
     add({
       id: `${P}wire_${tag}_spring_r`,
@@ -1124,51 +1126,59 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       mate: A([cx, markY + 0.006, cz], [0, RUNWAY_YAW, 0]),
     });
   }
-  // 舰艏直通起飞区：一整条浅灰跑道底色 + 两条弹射轨 + 中线 + 起飞位横线，
-  // 俯视时与左侧 3.59° 斜角着舰跑道形成清晰的“直通 + 斜角”双跑道。
-  add({
-    id: `${P}launch_runway`,
-    name_cn: "舰艏直通起飞跑道",
-    name_en: "bow launch runway",
-    assembly: ASSEMBLY,
-    build_layer: 4,
-    geometry: M(B(3.4, 0.004, 9.2, [0, 0, 0], 0.0015)),
-    material: "cv_runway",
-    mate: A([0, deckTop + 0.005, 12.4]),
-  });
-  for (const side of [-1, 1] as const) {
+  // 舰艏起飞区：两条弹射器各铺一条窄起飞带，不再用一整块 3.4 宽的浅灰跑道。
+  // 这样两条起飞带都落在用户轮廓的窄艏甲板内，也不会与左侧斜角着舰区叠在一起；
+  // 窄带中心随各自轨道偏航，挡焰板/滑梭/喷流烧蚀区仍由 CAT_TRACKS 自动跟随。
+  CAT_TRACKS.slice(0, 2).forEach((track) => {
+    const tag = pad(track.id);
+    const center = catPoint(track, 4.2);
     add({
-      id: `${P}launch_edge_${side === -1 ? "p" : "s"}`,
-      name_cn: `直通起飞跑道${side === -1 ? "左" : "右"}边线`,
-      name_en: `bow launch edge ${side === -1 ? "p" : "s"}`,
+      id: `${P}launch_runway_${tag}`,
+      name_cn: `舰艏 ${track.id} 号起飞带`,
+      name_en: `bow launch strip ${track.id}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(0.12, 0.004, 8.6, [0, 0, 0], 0.0015)),
-      material: "cv_deck_line",
-      mate: A([side * 1.62, markY, 12.6]),
+      geometry: M(B(0.78, 0.004, 7.6, [0, 0, 0], 0.0015)),
+      material: "cv_runway",
+      mate: A([center.x, deckTop + 0.005, center.z], [0, track.yawDeg, 0]),
     });
-  }
-  for (let d = 0; d < 10; d++) {
+    for (const side of [-1, 1] as const) {
+      const edge = catAcross(track, 4.2, side * 0.36);
+      add({
+        id: `${P}launch_edge_${tag}_${side === -1 ? "p" : "s"}`,
+        name_cn: `舰艏 ${track.id} 号起飞带${side === -1 ? "左" : "右"}边线`,
+        name_en: `bow launch strip ${track.id} edge ${side === -1 ? "p" : "s"}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(0.06, 0.004, 7.4, [0, 0, 0], 0.0015)),
+        material: "cv_deck_line",
+        mate: A([edge.x, markY, edge.z], [0, track.yawDeg, 0]),
+      });
+    }
+    for (let d = 0; d < 6; d++) {
+      const dash = catPoint(track, 0.9 + d * 1.25);
+      add({
+        id: `${P}launch_center_${tag}_${pad(d + 1)}`,
+        name_cn: `舰艏 ${track.id} 号起飞带中线 ${d + 1}`,
+        name_en: `bow launch strip ${track.id} centerline ${d + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(0.07, 0.004, 0.5, [0, 0, 0], 0.0015)),
+        material: "cv_deck_line",
+        mate: A([dash.x, markY, dash.z], [0, track.yawDeg, 0]),
+      });
+    }
+    const threshold = catPoint(track, 0.5);
     add({
-      id: `${P}launch_center_${pad(d + 1)}`,
-      name_cn: `舰艏起飞区中线 ${d + 1}`,
-      name_en: `bow launch centerline ${d + 1}`,
+      id: `${P}launch_threshold_${tag}`,
+      name_cn: `舰艏 ${track.id} 号起飞位横线`,
+      name_en: `bow launch threshold ${track.id}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(0.11, 0.004, 0.55, [0, 0, 0], 0.0015)),
+      geometry: M(B(0.88, 0.004, 0.12, [0, 0, 0], 0.0015)),
       material: "cv_deck_line",
-      mate: A([0, markY, 8.2 + d * 0.92]),
+      mate: A([threshold.x, markY + 0.001, threshold.z], [0, track.yawDeg, 0]),
     });
-  }
-  add({
-    id: `${P}launch_threshold`,
-    name_cn: "舰艏起飞位横线",
-    name_en: "bow launch threshold",
-    assembly: ASSEMBLY,
-    build_layer: 4,
-    geometry: M(B(3.6, 0.004, 0.12, [0, 0, 0], 0.0015)),
-    material: "cv_deck_line",
-    mate: A([0, markY + 0.001, 7.55]),
   });
   // 舰艏甲板舷号“18”：真实福建舰舰艏刷有 18，俯视一眼可辨。
   const bowNumberY = markY + 0.002;
@@ -1624,50 +1634,58 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // ---- 舰艏上翘甲板（真实甲板有轻微上翘/外飘，不是一块平板） ----
   for (let i = 0; i < 2; i++) {
     const z = 19.0 + i * 0.72;
-    const width = 2.7 - i * 0.25;
+    const port = deckEdgeAt(z, -1).x;
+    const star = deckEdgeAt(z, 1).x;
     add({
       id: `${P}bow_ramp_${pad(i + 1)}`,
       name_cn: `舰艏上翘唇口 ${i + 1}`,
       name_en: `bow ramp lip ${i + 1}`,
       assembly: ASSEMBLY,
       build_layer: 3,
-      geometry: M(B(width, 0.05, 0.8, [0, 0, 0], 0.004)),
+      geometry: M(B(Math.max(0.8, star - port - 0.18), 0.05, 0.8, [0, 0, 0], 0.004)),
       material: "cv_deck_plate",
-      mate: A([0.1, deckTop + 0.035 + i * 0.025, z], [-4 - i * 3, 0, 0]),
+      mate: A([(port + star) / 2, deckTop + 0.035 + i * 0.025, z], [-4 - i * 3, 0, 0]),
     });
   }
-  // 舰艏舷墙：沿最后 3 段甲板边缘抬起，侧视能看到舰艏上翘而不是平切方盒。
-  const bowEdges: Array<{ tag: string; points: Array<[number, number]> }> = [
-    { tag: "p", points: [[-1.95, 17.0], [-1.5, 20.55]] },
-    { tag: "s", points: [[2.0, 17.0], [1.55, 20.55]] },
-  ];
-  for (const edge of bowEdges) {
-    for (let i = 0; i < edge.points.length - 1; i++) {
-      const [x0, z0] = edge.points[i]!;
-      const [x1, z1] = edge.points[i + 1]!;
+  // 舰艏舷墙：沿用户 36 点轮廓的实际舷缘逐段生成，不再写死 x=±1.5/±2.0。
+  // 这艘轮廓的艏部向右舷偏置且收窄，固定横板会一侧悬出、一侧露空。
+  const bowZs = [16.2, 17.2, 18.2, 19.2, 20.1, 20.45];
+  for (const side of [-1, 1] as const) {
+    const tag = side === -1 ? "p" : "s";
+    for (let i = 0; i < bowZs.length - 1; i++) {
+      const z0 = bowZs[i]!;
+      const z1 = bowZs[i + 1]!;
+      const x0 = deckEdgeAt(z0, side).x + side * 0.028;
+      const x1 = deckEdgeAt(z1, side).x + side * 0.028;
       const dx = x1 - x0;
       const dz = z1 - z0;
       add({
-        id: `${P}bow_bulwark_${edge.tag}_${i + 1}`,
-        name_cn: `舰艏舷墙 ${edge.tag.toUpperCase()}-${i + 1}`,
-        name_en: `bow bulwark ${edge.tag} ${i + 1}`,
+        id: `${P}bow_bulwark_${tag}_${i + 1}`,
+        name_cn: `舰艏舷墙 ${tag.toUpperCase()}-${i + 1}`,
+        name_en: `bow bulwark ${tag} ${i + 1}`,
         assembly: ASSEMBLY,
         build_layer: 3,
-        geometry: M(B(0.06, 0.3, Math.hypot(dx, dz), [0, 0, 0], 0.004)),
+        geometry: M(B(0.055, 0.3 + i * 0.012, Math.hypot(dx, dz), [0, 0, 0], 0.004)),
         material: "cv_hull",
-        mate: A([(x0 + x1) / 2, deckTop + 0.15 + i * 0.03, (z0 + z1) / 2], [0, (Math.atan2(dx, dz) * 180) / Math.PI, 0]),
+        mate: A([(x0 + x1) / 2, deckTop + 0.15 + i * 0.006, (z0 + z1) / 2], [0, (Math.atan2(dx, dz) * 180) / Math.PI, 0]),
       });
     }
   }
+  // 前舷墙取轮廓首尾两点（艉板对面的艏端横边），随真实斜边旋转。
+  const bowPlan = deckPlan();
+  const bowStar = bowPlan[0]!;
+  const bowPort = bowPlan[bowPlan.length - 1]!;
+  const frontDx = bowStar[0] - bowPort[0];
+  const frontDz = bowStar[1] - bowPort[1];
   add({
     id: `${P}bow_bulwark_front`,
     name_cn: "舰艏前舷墙",
     name_en: "bow front bulwark",
     assembly: ASSEMBLY,
     build_layer: 3,
-    geometry: M(B(2.8, 0.38, 0.07, [0, 0, 0], 0.006)),
+    geometry: M(B(0.075, 0.38, Math.hypot(frontDx, frontDz), [0, 0, 0], 0.006)),
     material: "cv_hull",
-    mate: A([0, deckTop + 0.22, 20.65], [0, 0, 0]),
+    mate: A([(bowStar[0] + bowPort[0]) / 2, deckTop + 0.19, (bowStar[1] + bowPort[1]) / 2], [0, (Math.atan2(frontDx, frontDz) * 180) / Math.PI, 0]),
   });
 
   // ---- 甲板航空燃油补给站 / 加油车 / 接地与软管 ----
@@ -1675,7 +1693,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // 其中右舷艉部站点用软管连接到停放 J-15，展示完整加油作业。
   const fuelStations: Array<[number, number, string, boolean]> = [
     [4.4, -7.6, "starboard_aft", true],
-    [-3.55, -3.0, "port_mid", false],
+    [-3.8, 4.0, "port_mid", false],
     [4.3, -0.5, "starboard_amidships", false],
   ];
   for (const [fx, fz, tag, detailed] of fuelStations) {

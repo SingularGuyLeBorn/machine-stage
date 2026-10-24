@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { CV } from "./constants";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
+import { hullSurfaceHalfAt } from "./kits";
 import { addBridgeInterior } from "./bridge";
 import { addCarrierCrew } from "./crew";
 import { addCicInterior } from "./cic";
@@ -932,17 +933,48 @@ export function addIsland(ctx: CarrierCtx): void {
     });
   });
 
-  // 近程防空：HQ-10 18 联装发射装置 ×2（舰岛前、后各一），装在两舷通道外侧。
-  // 旧版是两块 9.5m×7m 的大铁板 + 16 个 4.3m 高的白色圆筒，既不是发射装置，
-  // 又把 1:1 尺寸误写进 1:8 编辑尺度。这里按真实 18 联装筒式发射架重建。
-  // 发射装置布置在传感器舱顶两舷（真实近防导弹不占飞行甲板停机位），
-  // 前后各一，避开 1130 炮位与一体化桅杆。
-  for (const [tag, sz] of [["aft", -7.2], ["fwd", -2.9]] as const) {
-    const sx = 3.55;
-    const plateY = roofY + 0.03;
+  // 近程防空：HQ-10 18 联装发射装置 ×4——舰艏左/右舷、舰艉左/右舷各一套。
+  // 舰艏两套坐在飞行甲板舷外的支撑平台上，舰艉两套直接坐在艉部甲板两舷；
+  // 不再集中堆在舰岛传感器舱顶。发射箱为 18 筒密封箱，弹头按 HQ-10 细长锥形。
+  type Hq10Mount = { tag: string; sx: number; sy: number; sz: number; yaw: number; sponson?: boolean };
+  const hq10Mounts: Hq10Mount[] = [
+    { tag: "bow_p", sx: -3.55, sy: 3.78, sz: 10.6, yaw: 8, sponson: true },
+    { tag: "bow_s", sx: 4.45, sy: 3.78, sz: 10.6, yaw: -8, sponson: true },
+    { tag: "stern_p", sx: -2.85, sy: baseY, sz: -17.3, yaw: 172 },
+    { tag: "stern_s", sx: 1.95, sy: baseY, sz: -17.3, yaw: -172 },
+  ];
+  for (const mount of hq10Mounts) {
+    const { tag, sx, sy, sz, yaw, sponson } = mount;
+    const plateY = sy + (sponson ? 0.035 : 0);
+    const mountLabel = tag === "bow_p" ? "舰艏左舷" : tag === "bow_s" ? "舰艏右舷" : tag === "stern_p" ? "舰艉左舷" : "舰艉右舷";
+    const rad = (yaw * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const at = (dx: number, dz: number, y: number): [number, number, number] => [sx + dx * cos + dz * sin, y, sz - dx * sin + dz * cos];
+    if (sponson) {
+      const inX = sx + (sx < 0 ? 0.4 : -0.4);
+      const hullX = Math.sign(sx) * (hullSurfaceHalfAt(sz, sy) - 0.02);
+      // 平台+托架合成一件，托架端点直接落在壳板上；避免平台与托架之间
+      // 需要额外白名单来豁免“支撑件的构造性重叠”。
+      ctx.add({
+        id: `carrier.surface.hq10_${tag}_sponson`,
+        name_cn: `HQ-10 发射装置 ${mountLabel} 支撑平台`,
+        name_en: `HQ-10 sponson ${tag}`,
+        assembly: "surface",
+        build_layer: 4,
+        geometry: M(
+          B(0.86, 0.07, 1.05, [sx, sy, sz], 0.006),
+          B(0.66, 0.03, 0.85, [sx, sy + 0.045, sz], 0.004),
+          { type: "weld", from: [inX, sy - 0.02, sz - 0.32], to: [hullX, sy - 0.05, sz - 0.32], radius: 0.05 },
+          { type: "weld", from: [inX, sy - 0.02, sz + 0.32], to: [hullX, sy - 0.05, sz + 0.32], radius: 0.05 },
+        ),
+        material: "cv_grate",
+        mate: A([0, 0, 0]),
+      });
+    }
     add({
       id: `${P}sam_${tag}_deck_plate`,
-      name_cn: `HQ-10 发射装置 ${tag === "fwd" ? "前" : "后"} 底座`,
+      name_cn: `HQ-10 发射装置 ${mountLabel} 底座`,
       name_en: `HQ-10 launcher ${tag} deck plate`,
       assembly: ASSEMBLY,
       build_layer: 4,
@@ -952,11 +984,11 @@ export function addIsland(ctx: CarrierCtx): void {
         ...[-1, 1].flatMap((sx2) => [-1, 1].map((sz2) => B(0.05, 0.05, 0.05, [sx2 * 0.19, 0.045, sz2 * 0.16], 0.004))),
       ),
       material: "cv_steel_dark",
-      mate: A([sx, plateY, sz]),
+      mate: A([sx, plateY, sz], [0, yaw, 0]),
     });
     add({
       id: `${P}sam_${tag}_pedestal`,
-      name_cn: `HQ-10 发射装置 ${tag === "fwd" ? "前" : "后"} 回转座`,
+      name_cn: `HQ-10 发射装置 ${mountLabel} 回转座`,
       name_en: `HQ-10 launcher ${tag} pedestal`,
       assembly: ASSEMBLY,
       build_layer: 4,
@@ -967,11 +999,11 @@ export function addIsland(ctx: CarrierCtx): void {
         B(0.06, 0.1, 0.06, [0.12, 0.11, 0.06], 0.004),
       ),
       material: "cv_hull_dark",
-      mate: A([sx, plateY + 0.05, sz]),
+      mate: A([sx, plateY + 0.05, sz], [0, yaw, 0]),
     });
     add({
       id: `${P}sam_${tag}_yoke`,
-      name_cn: `HQ-10 发射装置 ${tag === "fwd" ? "前" : "后"} 俯仰耳轴`,
+      name_cn: `HQ-10 发射装置 ${mountLabel} 俯仰耳轴`,
       name_en: `HQ-10 launcher ${tag} trunnion yoke`,
       assembly: ASSEMBLY,
       build_layer: 4,
@@ -981,7 +1013,7 @@ export function addIsland(ctx: CarrierCtx): void {
         B(0.34, 0.045, 0.045, [0, 0.27, 0], 0.004),
       ),
       material: "cv_steel",
-      mate: A([sx, plateY + 0.02, sz - 0.02]),
+      mate: A(at(0, -0.02, plateY + 0.02), [0, yaw, 0]),
     });
     // 发射箱：18 个筒口，6 列 × 3 排；仰角 12°。筒口内凹，弹头露尖，不是外凸白卷。
     const cellGeos: Parameters<typeof M>[0][] = [];
@@ -989,12 +1021,12 @@ export function addIsland(ctx: CarrierCtx): void {
       for (let r = 0; r < 3; r++) {
         const cx = -0.1 + c * 0.04;
         const cy = -0.075 + r * 0.075;
-        cellGeos.push(T(0.0125, 0.0095, 0.012, [cx, cy, 0.118], 12));
+        cellGeos.push(T(0.0125, 0.0095, 0.014, [cx, cy, 0.122], 12));
       }
     }
     add({
       id: `${P}sam_${tag}_body`,
-      name_cn: `HQ-10 18 联装发射箱 ${tag === "fwd" ? "前" : "后"}`,
+      name_cn: `HQ-10 18 联装发射箱 ${mountLabel}`,
       name_en: `HQ-10 18-cell launcher box ${tag}`,
       assembly: ASSEMBLY,
       build_layer: 4,
@@ -1002,28 +1034,28 @@ export function addIsland(ctx: CarrierCtx): void {
         B(0.29, 0.27, 0.23, [0, 0, 0], 0.012),
         B(0.31, 0.03, 0.25, [0, 0.12, 0], 0.006),
         B(0.31, 0.03, 0.25, [0, -0.12, 0], 0.006),
-        B(0.29, 0.27, 0.02, [0, 0, 0.118], 0.006),
-        B(0.03, 0.27, 0.02, [-0.135, 0, 0.118], 0.004),
-        B(0.03, 0.27, 0.02, [0.135, 0, 0.118], 0.004),
-        B(0.27, 0.02, 0.02, [0, 0.055, 0.12], 0.004),
-        B(0.27, 0.02, 0.02, [0, -0.055, 0.12], 0.004),
+        // 不铺整块前盖板，否则 18 个筒口会被埋在盖板里；只留四周框条。
+        B(0.03, 0.27, 0.02, [-0.135, 0, 0.116], 0.004),
+        B(0.03, 0.27, 0.02, [0.135, 0, 0.116], 0.004),
+        B(0.27, 0.02, 0.02, [0, 0.125, 0.116], 0.004),
+        B(0.27, 0.02, 0.02, [0, -0.125, 0.116], 0.004),
       ),
       material: "cv_hull_dark",
-      mate: A([sx, plateY + 0.47, sz - 0.02], [-12, 0, 0]),
+      mate: A(at(0, -0.02, plateY + 0.47), [-12, yaw, 0]),
     });
     add({
       id: `${P}sam_${tag}_cell_rims`,
-      name_cn: `HQ-10 18 联装筒口 ${tag === "fwd" ? "前" : "后"}`,
+      name_cn: `HQ-10 18 联装筒口 ${mountLabel}`,
       name_en: `HQ-10 18 canister mouths ${tag}`,
       assembly: ASSEMBLY,
       build_layer: 4,
       geometry: M(...cellGeos),
       material: "cv_steel",
-      mate: A([sx, plateY + 0.47, sz - 0.02], [-12, 0, 0]),
+      mate: A(at(0, -0.02, plateY + 0.47), [-12, yaw, 0]),
     });
     add({
       id: `${P}sam_${tag}_missile_tips`,
-      name_cn: `HQ-10 待发弹头 ${tag === "fwd" ? "前" : "后"} ×18`,
+      name_cn: `HQ-10 待发弹头 ${mountLabel} ×18`,
       name_en: `HQ-10 sealed missile tips ${tag}`,
       assembly: ASSEMBLY,
       build_layer: 4,
@@ -1031,15 +1063,15 @@ export function addIsland(ctx: CarrierCtx): void {
         ...Array.from({ length: 18 }, (_, i) => {
           const cx = -0.1 + (i % 6) * 0.04;
           const cy = -0.075 + Math.floor(i / 6) * 0.075;
-          return C(0.009, 0.01, [cx, cy, 0.121], 10);
+          return C(0.011, 0.03, [cx, cy, 0.128], 10, 0.002);
         }),
       ),
       material: "cv_radar",
-      mate: A([sx, plateY + 0.47, sz - 0.02], [-12, 0, 0]),
+      mate: A(at(0, -0.02, plateY + 0.47), [-12, yaw, 0]),
     });
     add({
       id: `${P}sam_${tag}_servo`,
-      name_cn: `HQ-10 俯仰伺服 ${tag === "fwd" ? "前" : "后"}`,
+      name_cn: `HQ-10 俯仰伺服 ${mountLabel}`,
       name_en: `HQ-10 elevation servo ${tag}`,
       assembly: ASSEMBLY,
       build_layer: 4,
@@ -1049,11 +1081,11 @@ export function addIsland(ctx: CarrierCtx): void {
         { type: "weld", from: [0.13, 0.03, 0], to: [0.13, 0.16, 0.04], radius: 0.008 },
       ),
       material: "cv_brass",
-      mate: A([sx + 0.16, plateY + 0.11, sz + 0.05], [0, 0, 90]),
+      mate: A(at(0.16, 0.05, plateY + 0.11), [0, yaw, 90]),
     });
     add({
       id: `${P}sam_${tag}_control`,
-      name_cn: `HQ-10 发射控制盒 ${tag === "fwd" ? "前" : "后"}`,
+      name_cn: `HQ-10 发射控制盒 ${mountLabel}`,
       name_en: `HQ-10 fire control box ${tag}`,
       assembly: ASSEMBLY,
       build_layer: 4,
@@ -1063,76 +1095,55 @@ export function addIsland(ctx: CarrierCtx): void {
         C(0.012, 0.04, [0.04, 0.19, 0], 8),
       ),
       material: "cv_steel_dark",
-      mate: A([sx - 0.24, plateY, sz + 0.12], [0, 25, 0]),
+      mate: A(at(-0.24, 0.12, plateY), [0, yaw + 25, 0]),
     });
   }
 
-  // 干扰弹发射器 ×2：装在舰岛前壁两侧，6 管（3×2）可俯仰的箱式发射器。
-  // 旧版是 6 个叠在一起的 0.55×0.3 大方块，看起来就是一块板。
+  // 干扰弹发射器 ×2：舰岛一层前壁左右各一套 6 联装（3×2）。
+  // 旧版把基座/俯仰架/6 管拆成 4 个错位零件，管口与基座之间留缝，看起来整组悬空。
+  // 这里做成“壁板+支撑臂+耳轴+发射箱+6 管”一体的零件，壁板直接嵌进前壁，零悬空。
   for (const side of [-1, 1] as const) {
     const tag = side === -1 ? "p" : "s";
-    // 装在一层前壁两角、窗带之外，不遮住甲板室窗户。
-    const dx = x + (side === -1 ? -0.8 : 0.75);
-    // 贴在一层舰岛前壁外侧（前壁面 z=-2.02），不能悬在舰桥玻璃外。
-    const dz = z + 3.0;
-    const dy = baseY + 0.78;
-    add({
-      id: `${P}decoy_${tag}_mount`,
-      name_cn: `干扰弹发射器 ${side === -1 ? "左" : "右"} 基座`,
-      name_en: `decoy launcher mount ${tag}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(
-        B(0.2, 0.16, 0.06, [0, 0, 0], 0.006),
-        C(0.045, 0.12, [0, 0.02, 0.07], 12),
-        B(0.1, 0.03, 0.22, [0, 0.1, 0.14], 0.004),
-      ),
-      material: "cv_steel_dark",
-      mate: A([dx, dy - 0.08, dz]),
-    });
-    add({
-      id: `${P}decoy_${tag}_cradle`,
-      name_cn: `干扰弹发射器 ${side === -1 ? "左" : "右"} 俯仰架`,
-      name_en: `decoy launcher cradle ${tag}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(
-        B(0.2, 0.03, 0.2, [0, 0, 0], 0.004),
-        B(0.03, 0.15, 0.16, [-0.085, 0.08, 0], 0.004),
-        B(0.03, 0.15, 0.16, [0.085, 0.08, 0], 0.004),
-        B(0.2, 0.03, 0.03, [0, 0.16, -0.04], 0.004),
-      ),
-      material: "cv_steel",
-      mate: A([dx, dy, dz + 0.06], [18, 0, 0]),
-    });
+    const dx = x + side * 0.62;
+    const dz = z + 2.98;
+    const dy = baseY + 0.62;
     const tubes: Array<Parameters<typeof M>[0]> = [];
     for (let c = 0; c < 3; c++) {
       for (let r = 0; r < 2; r++) {
         const cx = -0.06 + c * 0.06;
-        const cy = 0.06 + r * 0.06;
-        tubes.push({ type: "weld", from: [cx, cy, 0], to: [cx, cy + 0.04, 0.2], radius: 0.013, seed: 900 + c * 2 + r });
-        tubes.push({ type: "torus", radius: 0.015, tube: 0.003, radialSegments: 8, tubularSegments: 12, at: [cx, cy + 0.04, 0.2] });
+        const cy = 0.13 + r * 0.08;
+        tubes.push({ type: "weld", from: [cx, cy, 0.32], to: [cx, cy + 0.04, 0.48], radius: 0.013, seed: 940 + c * 2 + r });
+        tubes.push({ type: "torus", radius: 0.016, tube: 0.003, radialSegments: 8, tubularSegments: 12, at: [cx, cy + 0.04, 0.48] });
       }
     }
     add({
-      id: `${P}decoy_${tag}_tubes`,
+      id: `${P}decoy_${tag}`,
       name_cn: `干扰弹发射器 ${side === -1 ? "左" : "右"} 6 联装`,
       name_en: `decoy launcher ${tag} six tubes`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(...tubes),
+      geometry: M(
+        // 前壁壁板：后表面与舰岛一层前壁外面齐平，嵌入壁体。
+        B(0.24, 0.22, 0.06, [0, 0, 0], 0.006),
+        // 斜支撑臂 + 下方加强肋，从壁板伸到俯仰耳轴。
+        { type: "weld", from: [0, 0.02, 0.02], to: [0, 0.09, 0.2], radius: 0.035 },
+        B(0.06, 0.05, 0.16, [0, 0.02, 0.12], 0.004),
+        // 俯仰架与耳轴。
+        B(0.22, 0.03, 0.18, [0, 0.1, 0.2], 0.004),
+        B(0.03, 0.13, 0.16, [-0.09, 0.16, 0.2], 0.004),
+        B(0.03, 0.13, 0.16, [0.09, 0.16, 0.2], 0.004),
+        // 6 联装发射箱（与俯仰架相接）。
+        B(0.2, 0.17, 0.18, [0, 0.19, 0.26], 0.006),
+        B(0.16, 0.02, 0.02, [0, 0.12, 0.35], 0.002),
+        B(0.16, 0.02, 0.02, [0, 0.26, 0.35], 0.002),
+        ...tubes,
+        // 接线盒与壁板/箱体相连，不再单独悬在发射器侧面。
+        B(0.07, 0.07, 0.05, [0.12, 0.07, 0.08], 0.004),
+        { type: "weld", from: [0.08, 0.07, 0.07], to: [0.12, 0.07, 0.08], radius: 0.012 },
+        C(0.01, 0.07, [0.12, 0.03, 0.09], 8),
+      ),
       material: "cv_steel_dark",
-      mate: A([dx, dy + 0.14, dz + 0.08], [-18, 0, 0]),
-    });
-    add({
-      id: `${P}decoy_${tag}_junction`,
-      name_cn: `干扰弹发射器 ${side === -1 ? "左" : "右"} 接线盒`,
-      name_en: `decoy launcher junction box ${tag}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(B(0.07, 0.07, 0.05, [0, 0, 0], 0.004), C(0.01, 0.07, [0.02, -0.03, 0], 8)),
-      material: "cv_brass",
-      mate: A([dx + side * 0.1, dy - 0.02, dz + 0.02], [0, 0, 90]),
+      mate: A([dx, dy, dz]),
     });
   }
 }

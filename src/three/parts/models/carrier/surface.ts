@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { CV } from "./constants";
 import { deckEdgeAt, hullSurfaceHalfAt } from "./kits";
-import { A, B, C, M, T, pad, type CarrierCtx } from "./common";
+import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
 
 // ============================================================================
 // L5 表面质感 + 甲板作业：舰体做旧、舷号、锚、栏杆、救生设备、
@@ -318,7 +318,7 @@ export function addSurface(ctx: CarrierCtx): void {
     assembly: ASSEMBLY,
     build_layer: 4,
     geometry: M({ type: "latheZ", profile: [[0.02, -0.68], [0.1, -0.55], [0.17, -0.2], [0.18, 0.15], [0.13, 0.48], [0.03, 0.64]], segments: 26 }),
-    material: "cv_canvas",
+    material: "cv_hull_dark",
     mate: A([boatX, boatY + 0.22, boatZ]),
   });
   for (const side of [-1, 1] as const) {
@@ -329,7 +329,7 @@ export function addSurface(ctx: CarrierCtx): void {
       assembly: ASSEMBLY,
       build_layer: 4,
       geometry: M(C(0.055, 1.1, [0, 0, 0], 12)),
-      material: "cv_warning",
+      material: "cv_deck_red",
       mate: A([boatX + side * 0.17, boatY + 0.28, boatZ], [90, 0, 0]),
     });
   }
@@ -340,9 +340,43 @@ export function addSurface(ctx: CarrierCtx): void {
     assembly: ASSEMBLY,
     build_layer: 4,
     geometry: M(C(0.055, 0.36, [0, 0, 0], 12)),
-    material: "cv_warning",
+    material: "cv_deck_red",
     mate: A([boatX, boatY + 0.28, boatZ + 0.56], [0, 0, 90]),
   });
+  add({
+    id: `${P}boat_stern_tube`,
+    name_cn: "救生艇艉部舷管",
+    name_en: "RHIB stern collar",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(C(0.055, 0.34, [0, 0, 0], 12)),
+    material: "cv_deck_red",
+    mate: A([boatX, boatY + 0.28, boatZ - 0.55], [0, 0, 90]),
+  });
+  for (const side of [-1, 1] as const) {
+    for (let s = 0; s < 3; s++) {
+      add({
+        id: `${P}boat_collar_seam_${side === -1 ? "p" : "s"}_${s + 1}`,
+        name_cn: `救生艇舷管接缝 ${side === -1 ? "左" : "右"}-${s + 1}`,
+        name_en: `RHIB collar seam ${side === -1 ? "p" : "s"} ${s + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M({ type: "torus", radius: 0.056, tube: 0.006, radialSegments: 8, tubularSegments: 14, at: [0, 0, 0] }),
+        material: "cv_steel_dark",
+        mate: A([boatX + side * 0.17, boatY + 0.28, boatZ - 0.32 + s * 0.32]),
+      });
+    }
+    add({
+      id: `${P}boat_sheer_stripe_${side === -1 ? "p" : "s"}`,
+      name_cn: `救生艇舷侧腰线 ${side === -1 ? "左" : "右"}`,
+      name_en: `RHIB sheer stripe ${side === -1 ? "p" : "s"}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M({ type: "weld", from: [side * 0.175, 0.235, -0.55], to: [side * 0.115, 0.275, 0.42], radius: 0.008 }),
+      material: "cv_deck_line",
+      mate: A([boatX, boatY, boatZ]),
+    });
+  }
   add({
     id: `${P}boat_console`,
     name_cn: "救生艇操控台",
@@ -360,7 +394,7 @@ export function addSurface(ctx: CarrierCtx): void {
     assembly: ASSEMBLY,
     build_layer: 4,
     geometry: M(B(0.34, 0.1, 0.2, [0, 0, 0], 0.004)),
-    material: "cv_canvas",
+    material: "cv_upholstery",
     mate: A([boatX, boatY + 0.33, boatZ - 0.38]),
   });
   add({
@@ -383,6 +417,203 @@ export function addSurface(ctx: CarrierCtx): void {
     material: "cv_steel",
     mate: A([boatX, boatY + 0.32, boatZ - 0.56]),
   });
+  // 艇体细节：舷侧防溅条/龙骨/艉板/艇底甲板/登艇踏板，先把放样艇壳从“黄香蕉”
+  // 拉回硬壳充气艇的轮廓；再补操控台屏/方向盘/油门、双骑座、挂机整流罩/桨轴、
+  // 航行灯、抓绳和桨。所有零件仍属 surface.boat_*，沿用 cv-boat-self 装配白名单。
+  add({
+    id: `${P}boat_sole`,
+    name_cn: "救生艇艇底甲板",
+    name_en: "RHIB deck sole",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.28, 0.025, 0.92, [0, 0, 0], 0.004)),
+    material: "cv_steel_dark",
+    mate: A([boatX, boatY + 0.26, boatZ - 0.02]),
+  });
+  add({
+    id: `${P}boat_transom`,
+    name_cn: "救生艇艉板",
+    name_en: "RHIB transom",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.3, 0.16, 0.025, [0, 0, 0], 0.004), B(0.2, 0.1, 0.012, [0, -0.01, -0.02], 0.002)),
+    material: "cv_hull_dark",
+    mate: A([boatX, boatY + 0.2, boatZ - 0.66]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}boat_spray_rail_${side === -1 ? "p" : "s"}`,
+      name_cn: `救生艇防溅条 ${side === -1 ? "左" : "右"}`,
+      name_en: `RHIB spray rail ${side === -1 ? "p" : "s"}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M({ type: "weld", from: [side * 0.18, 0.19, -0.52], to: [side * 0.11, 0.24, 0.46], radius: 0.012 }),
+      material: "cv_hull_dark",
+      mate: A([boatX, boatY, boatZ]),
+    });
+    add({
+      id: `${P}boat_rub_strake_${side === -1 ? "p" : "s"}`,
+      name_cn: `救生艇舷管护条 ${side === -1 ? "左" : "右"}`,
+      name_en: `RHIB rub strake ${side === -1 ? "p" : "s"}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M({ type: "weld", from: [side * 0.225, 0.3, -0.46], to: [side * 0.19, 0.32, 0.32], radius: 0.009 }),
+      material: "cv_rubber",
+      mate: A([boatX, boatY, boatZ]),
+    });
+    // 两舷抓绳与吊点。
+    for (let g = 0; g < 3; g++) {
+      add({
+        id: `${P}boat_grab_${side === -1 ? "p" : "s"}_${g + 1}`,
+        name_cn: `救生艇抓绳 ${side === -1 ? "左" : "右"}-${g + 1}`,
+        name_en: `RHIB grab line ${side === -1 ? "p" : "s"} ${g + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M({ type: "weld", from: [side * 0.24, 0.32, -0.35 + g * 0.32], to: [side * 0.235, 0.34, -0.15 + g * 0.32], radius: 0.004 }),
+        material: "cv_canvas",
+        mate: A([boatX, boatY, boatZ]),
+      });
+    }
+  }
+  add({
+    id: `${P}boat_keel`,
+    name_cn: "救生艇龙骨",
+    name_en: "RHIB keel",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M({ type: "weld", from: [0, 0.055, -0.6], to: [0, 0.09, 0.52], radius: 0.016 }),
+    material: "cv_steel_dark",
+    mate: A([boatX, boatY, boatZ]),
+  });
+  // 操控台：仪表屏/指南针/方向盘/油门。
+  add({
+    id: `${P}boat_dash`,
+    name_cn: "救生艇仪表台",
+    name_en: "RHIB dash",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.2, 0.06, 0.1, [0, 0, 0], 0.004), B(0.18, 0.02, 0.09, [0, 0.04, 0.01], 0.002)),
+    material: "cv_055_console",
+    mate: A([boatX, boatY + 0.52, boatZ - 0.1]),
+  });
+  add({
+    id: `${P}boat_windscreen`,
+    name_cn: "救生艇风挡",
+    name_en: "RHIB windscreen",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.2, 0.12, 0.01, [0, 0, 0], 0.002)),
+    material: "cv_glass",
+    mate: A([boatX, boatY + 0.59, boatZ - 0.055]),
+  });
+  add({
+    id: `${P}boat_wheel`,
+    name_cn: "救生艇方向盘",
+    name_en: "RHIB steering wheel",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(T(0.05, 0.008, 0.012, [0, 0, 0], 16), C(0.012, 0.08, [0, 0, -0.03], 8)),
+    material: "cv_steel_dark",
+    mate: A([boatX, boatY + 0.5, boatZ - 0.01], [90, 0, 0]),
+  });
+  add({
+    id: `${P}boat_throttle`,
+    name_cn: "救生艇油门手柄",
+    name_en: "RHIB throttle",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M({ type: "weld", from: [0.09, 0.54, -0.08], to: [0.11, 0.6, -0.13], radius: 0.008 }, S(0.012, [0.11, 0.6, -0.13], 8)),
+    material: "cv_steel",
+    mate: A([boatX, boatY, boatZ]),
+  });
+  for (let g = 0; g < 3; g++) {
+    add({
+      id: `${P}boat_gauge_${g + 1}`,
+      name_cn: `救生艇仪表 ${g + 1}`,
+      name_en: `RHIB gauge ${g + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(C(0.014, 0.01, [0, 0, 0], 12)),
+      material: "cv_gauge_face",
+      mate: A([boatX - 0.06 + g * 0.06, boatY + 0.56, boatZ - 0.055], [90, 0, 0]),
+    });
+  }
+  // 双骑座。
+  for (const [dz, tag] of [[-0.3, "fwd"], [-0.48, "aft"]] as const) {
+    add({
+      id: `${P}boat_jockey_${tag}`,
+      name_cn: `救生艇骑座 ${tag === "fwd" ? "前" : "后"}`,
+      name_en: `RHIB jockey seat ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        B(0.14, 0.06, 0.17, [0, 0, 0], 0.004),
+        B(0.14, 0.13, 0.035, [0, 0.09, -0.07], 0.004),
+        B(0.03, 0.1, 0.12, [-0.08, 0.04, 0], 0.003),
+        B(0.03, 0.1, 0.12, [0.08, 0.04, 0], 0.003),
+      ),
+      material: "cv_upholstery",
+      mate: A([boatX, boatY + 0.3, boatZ + dz]),
+    });
+  }
+  // 挂机整流罩/桨轴/防溅板。
+  add({
+    id: `${P}boat_motor_cowl`,
+    name_cn: "救生艇挂机整流罩",
+    name_en: "RHIB outboard cowl",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(
+      { type: "latheZ", profile: [[0.065, -0.14], [0.1, -0.08], [0.11, 0.05], [0.085, 0.13], [0.02, 0.16]], segments: 18 },
+      B(0.14, 0.025, 0.05, [0, -0.02, 0.1], 0.004),
+    ),
+    material: "cv_055_console_alt",
+    mate: A([boatX, boatY + 0.42, boatZ - 0.71]),
+  });
+  add({
+    id: `${P}boat_motor_leg`,
+    name_cn: "救生艇挂机桨轴",
+    name_en: "RHIB outboard leg",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(C(0.04, 0.5, [0, 0, 0], 10), B(0.03, 0.1, 0.16, [0, -0.26, -0.04], 0.003), T(0.055, 0.012, 0.02, [0, -0.3, -0.06], 3)),
+    material: "cv_steel_dark",
+    mate: A([boatX, boatY + 0.14, boatZ - 0.76]),
+  });
+  // 艏部航行灯、艉部拖曳灯与登记牌。
+  add({
+    id: `${P}boat_nav_light`,
+    name_cn: "救生艇航行灯",
+    name_en: "RHIB navigation light",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.055, 0.035, 0.045, [0, 0, 0], 0.003), S(0.012, [0, 0.025, 0.02], 8)),
+    material: "cv_glow",
+    mate: A([boatX, boatY + 0.36, boatZ + 0.5]),
+  });
+  add({
+    id: `${P}boat_registration`,
+    name_cn: "救生艇登记牌",
+    name_en: "RHIB registration plate",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: M(B(0.14, 0.055, 0.006, [0, 0, 0], 0.002)),
+    material: "cv_deck_line",
+    mate: A([boatX + 0.23, boatY + 0.3, boatZ + 0.2], [0, 90, 0]),
+  });
+  // 两支桨收在舷内侧。
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}boat_oar_${side === -1 ? "p" : "s"}`,
+      name_cn: `救生艇桨 ${side === -1 ? "左" : "右"}`,
+      name_en: `RHIB oar ${side === -1 ? "p" : "s"}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M({ type: "weld", from: [0.06, 0.28, -0.55], to: [0.06, 0.3, 0.25], radius: 0.008 }, B(0.05, 0.012, 0.16, [0.06, 0.3, 0.3], 0.002)),
+      material: "cv_canvas",
+      mate: A([boatX + side * 0.08, boatY, boatZ]),
+    });
+  }
   add({
     id: `${P}boat_davit_post`,
     name_cn: "吊艇架立柱",
