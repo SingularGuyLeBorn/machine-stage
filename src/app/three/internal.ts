@@ -27,6 +27,8 @@ export function isInternalPart(modelId: string, handle: PartHandle): boolean {
     if (handle.assembly === "flightdeck") return CARRIER_EMALS_UNDERDECK.test(handle.partId);
     return false;
   }
+  // 055 的直-20 内部框/桁/线束/座舱按 tag 判定；普通外观视角不画，透视显示。
+  if (modelId === "type055") return handle.def.tags?.includes("internal") === true;
   if (modelId !== "mbt90" && modelId !== "ed90") return false;
   // FX / 泄压板在装甲外，不能随内部件隐藏。
   if (handle.def.tags?.includes("fx")) return false;

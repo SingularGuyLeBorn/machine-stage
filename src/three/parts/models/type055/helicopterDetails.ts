@@ -26,7 +26,10 @@ const deg = (v: number) => (v * Math.PI) / 180;
 
 export function addZ20Details({ add, folded, root, mainRotor, tailRotor }: Z20DetailApi): void {
   let serial = 0;
-  const safeId = (id: string) => (/_[lr]$/.test(id) ? `${id}_p` : id);
+  const safeId = (id: string) => {
+    const clean = id.replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
+    return /_[lr]$/.test(clean) ? `${clean}_p` : clean;
+  };
   const plate = (
     id: string,
     cn: string,

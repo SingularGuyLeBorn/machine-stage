@@ -1,6 +1,7 @@
 import type { GeometrySpec, MateSpec } from "../../registry/types";
 import { A, B, C, M, S, T, type CarrierCtx } from "../carrier/common";
 import { addZ20Details } from "./helicopterDetails";
+import { addZ20InternalDetails } from "./helicopterInternal";
 
 // ============================================================================
 // models/type055/helicopter —— 直-20 舰载直升机（反潜/通用）
@@ -55,6 +56,28 @@ export function addZ20(ctx: CarrierCtx, opts: Z20Options): void {
       name_en,
       assembly: "hangar",
       build_layer: 5,
+      geometry,
+      material,
+      node,
+      mate,
+    });
+
+  const addInternal = (
+    id: string,
+    name_cn: string,
+    name_en: string,
+    geometry: GeometrySpec,
+    material: string,
+    mate: MateSpec = A([0, 0, 0]),
+    node: string = root,
+  ) =>
+    ctx.add({
+      id: `type055.hangar.z20_${tag}_${id}`,
+      name_cn,
+      name_en,
+      assembly: "hangar",
+      build_layer: 2,
+      tags: ["internal"],
       geometry,
       material,
       node,
@@ -284,4 +307,5 @@ export function addZ20(ctx: CarrierCtx, opts: Z20Options): void {
   }
 
   addZ20Details({ add, folded, root, mainRotor, tailRotor });
+  addZ20InternalDetails({ add, addInternal, folded, root, mainRotor, tailRotor });
 }

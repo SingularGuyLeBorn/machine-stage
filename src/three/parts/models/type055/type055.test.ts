@@ -48,8 +48,13 @@ describe("055 型驱逐舰", () => {
     expect(built.getPart("type055.hangar.z20_pad_detail_skin_up_l_1_1")).toBeDefined();
     const z20PadParts = built.parts.filter((part) => part.partId.includes(".z20_pad_")).length;
     const z20HangarParts = built.parts.filter((part) => part.partId.includes(".z20_hangar_l_")).length;
-    expect(z20PadParts).toBeGreaterThanOrEqual(1000);
-    expect(z20HangarParts).toBeGreaterThanOrEqual(1000);
+    expect(z20PadParts).toBeGreaterThanOrEqual(3000);
+    expect(z20HangarParts).toBeGreaterThanOrEqual(3000);
+    expect(built.parts.filter((part) => part.partId.startsWith("type055.radar.")).length).toBeGreaterThanOrEqual(800);
+    expect(built.parts.filter((part) => part.partId.startsWith("type055.vls.")).length).toBeGreaterThanOrEqual(860);
+    expect(built.parts.filter((part) => part.partId.startsWith("type055.ciws.")).length).toBeGreaterThanOrEqual(190);
+    expect(built.parts.some((part) => part.partId.startsWith("type055.hangar.z20_pad_internal_frame_"))).toBe(true);
+    expect(built.parts.some((part) => part.partId.startsWith("type055.hangar.z20_pad_internal_avionics_"))).toBe(true);
     expect(built.parts.filter((part) => /^type055\.ciws\.(fwd|aft)_barrel_\d+$/.test(part.partId))).toHaveLength(22);
     expect(built.parts.filter((part) => /tr_cover_(outer_)?(front|aft|port|starboard)_/.test(part.partId))).toHaveLength(512);
     expect(VLS_HEROES).toHaveLength(16);
@@ -116,13 +121,19 @@ describe("055 型驱逐舰", () => {
     expect(built.getPart("type055.vls.missile_fwd_4")).toBeDefined();
   });
 
-  it("零悬空 / 零悬空孤岛 / 静态未豁免 0", () => {
+  it("零悬空 / 零悬空孤岛 / 静态未豁免 0", async () => {
     const unsupported = detectUnsupportedParts(built, { maxGapM: 0.02 });
     expect(unsupported.map((row) => `${row.ref} ${row.gap_mm.toFixed(1)}mm`)).toEqual([]);
     const islands = detectFloatingIslands(built, { maxGapM: 0.02 });
     expect(islands.islands).toHaveLength(0);
     expect(islands.islandInstances).toBe(0);
-    const split = partitionExpectedContacts(detectStatic(built, {}), registry.expectedContacts ?? []);
+    // 1.1 万件整舰的静态检测拆成 4 片并让出事件循环，避免阻塞 vitest worker RPC。
+    const reports: ReturnType<typeof detectStatic> = [];
+    for (let index = 0; index < 4; index++) {
+      reports.push(...detectStatic(built, { pairShard: { index, count: 4 } }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    const split = partitionExpectedContacts(reports, registry.expectedContacts ?? []);
     expect(split.active.slice(0, 10).map(({ report }) => `${report.a} ↔ ${report.b}`)).toEqual([]);
-  }, 120000);
+  }, 180000);
 });

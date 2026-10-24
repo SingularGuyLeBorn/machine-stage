@@ -1407,6 +1407,102 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     });
   }
 
+  // 雷达后端机柜（舱内，透视可查）与桅顶附加电子战/波导
+  for (let i = 0; i < 8; i++) {
+    const x = -2.7 + (i % 4) * 1.8;
+    const z = i < 4 ? 24.5 : 17.5;
+    add({
+      id: `${P}radar.tx_cabinet_${i + 1}`,
+      name_cn: `346B 发射机柜 ${i + 1}`,
+      name_en: `346B transmitter cabinet ${i + 1}`,
+      assembly: "radar",
+      build_layer: 2,
+      tags: ["internal"],
+      geometry: M(B(0.62, 1.2, 0.5, [0, 0, 0], 0.01), B(0.5, 0.06, 0.02, [0, -0.48, 0.26], 0.002)),
+      material: "cv_055_console",
+      mate: A([x, 31.0, z]),
+    });
+    for (let c = 0; c < 4; c++) {
+      add({
+        id: `${P}radar.tx_card_${i + 1}_${c + 1}`,
+        name_cn: `346B 发射模块 ${i + 1}-${c + 1}`,
+        name_en: `346B transmitter module ${i + 1}-${c + 1}`,
+        assembly: "radar",
+        build_layer: 2,
+        tags: ["internal"],
+        geometry: M(B(0.5, 0.18, 0.42, [0, 0, 0], 0.004), C(0.03, 0.06, [0.2, 0, 0.23], 6)),
+        material: "cv_aesa",
+        mate: A([x, 30.65 + c * 0.22, z + 0.02]),
+      });
+    }
+    for (let c = 0; c < 2; c++) {
+      add({
+        id: `${P}radar.tx_conn_${i + 1}_${c + 1}`,
+        name_cn: `346B 发射机柜接头 ${i + 1}-${c + 1}`,
+        name_en: `346B transmitter connector ${i + 1}-${c + 1}`,
+        assembly: "radar",
+        build_layer: 2,
+        tags: ["internal"],
+        geometry: M(C(0.05, 0.1, [0, 0, 0], 8)),
+        material: "cv_brass",
+        mate: A([x - 0.16 + c * 0.32, 30.4, z + 0.24]),
+      });
+    }
+  }
+  for (let i = 0; i < 8; i++) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const z = i < 4 ? 17.8 : 22.2;
+    add({
+      id: `${P}radar.mast_conduit_${i + 1}`,
+      name_cn: `桅顶波导管 ${i + 1}`,
+      name_en: `mast waveguide conduit ${i + 1}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M({ type: "weld", from: [side * 2.5, 40.05, z], to: [side * 2.5, 38.85, z], radius: 0.04 }),
+      material: "cv_copper",
+      mate: A([0, 0, 0]),
+    });
+  }
+  for (let i = 0; i < 4; i++) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const z = i < 2 ? 18.3 : 21.7;
+    add({
+      id: `${P}radar.ew_aux_panel_${i + 1}`,
+      name_cn: `桅顶辅助电子战阵面 ${i + 1}`,
+      name_en: `auxiliary EW array ${i + 1}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(0.8, 0.6, 0.12, [0, 0, 0], 0.008)),
+      material: "cv_aesa",
+      mate: A([side * 2.7, 40.6, z]),
+    });
+    for (let e = 0; e < 8; e++) {
+      add({
+        id: `${P}radar.ew_aux_elem_${i + 1}_${e + 1}`,
+        name_cn: `辅助电子战阵元 ${i + 1}-${e + 1}`,
+        name_en: `auxiliary EW element ${i + 1}-${e + 1}`,
+        assembly: "radar",
+        build_layer: 4,
+        geometry: M(B(0.12, 0.12, 0.04, [0, 0, 0], 0.002)),
+        material: "cv_055_aesa_tile",
+        mate: A([side * 2.7 - 0.3 + (e % 4) * 0.2, 40.44 + Math.floor(e / 4) * 0.16, z + (side > 0 ? 0.08 : -0.08)]),
+      });
+    }
+  }
+  for (let i = 0; i < 12; i++) {
+    const side = i % 2 === 0 ? -1 : 1;
+    add({
+      id: `${P}radar.platform_antenna_${i + 1}`,
+      name_cn: `桅顶通信天线 ${i + 1}`,
+      name_en: `mast communication antenna ${i + 1}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(C(0.018, 0.34, [0, 0, 0], 6)),
+      material: "cv_steel_dark",
+      mate: A([side * (1.0 + (i % 6) * 0.3), 40.47, i < 6 ? 17.7 : 22.3]),
+    });
+  }
+
   // 舷侧刚性充气艇 + 吊艇架
   for (const side of [-1, 1] as const) {
     const deckY = t55DeckTop(-38);
@@ -2153,6 +2249,80 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     }
   }
 
+  // 静态井盖铰链销/锁扣；模块间燃气挡板与甲板喷淋
+  for (const cell of staticCells) {
+    const y = t55DeckTop(cell.z);
+    const tag = `${cell.bank}_${cell.row}_${cell.col}`;
+    add({
+      id: `${P}vls.hinge_pin_${tag}`,
+      name_cn: `垂发井盖铰链销 ${tag}`,
+      name_en: `VLS hatch hinge pin ${tag}`,
+      assembly: "vls",
+      build_layer: 4,
+      geometry: M(C(0.018, 0.07, [0, 0, 0], 6), T(0.035, 0.02, 0.015, [0, 0.04, 0], 8)),
+      material: "cv_steel",
+      mate: A([cell.x, y + 0.06, cell.z - 0.34]),
+    });
+    add({
+      id: `${P}vls.latch_${tag}`,
+      name_cn: `垂发井盖锁扣 ${tag}`,
+      name_en: `VLS hatch latch ${tag}`,
+      assembly: "vls",
+      build_layer: 4,
+      geometry: M(B(0.12, 0.025, 0.05, [0, 0, 0], 0.002), C(0.02, 0.03, [0, 0.02, 0], 6)),
+      material: "cv_steel",
+      mate: A([cell.x, y + 0.055, cell.z + 0.3]),
+    });
+  }
+  for (const [tag, z0, rows] of [
+    ["fwd", VLS.FWD_Z, VLS.FWD_ROWS],
+    ["aft", VLS.AFT_Z, VLS.AFT_ROWS],
+  ] as const) {
+    for (let r = 0; r < rows; r++) {
+      add({
+        id: `${P}vls.blast_plate_${tag}_${r + 1}`,
+        name_cn: `垂发模块燃气挡板 ${tag} ${r + 1}`,
+        name_en: `VLS blast deflector ${tag} ${r + 1}`,
+        assembly: "vls",
+        build_layer: 4,
+        geometry: M(B(7.6, 0.05, 0.1, [0, 0, 0], 0.004)),
+        material: "cv_steel_dark",
+        mate: A([0, t55DeckTop(z0 + r * VLS.PITCH) + 0.025, z0 + r * VLS.PITCH - 0.48]),
+      });
+    }
+    for (let n = 0; n < 8; n++) {
+      const z = z0 + (n < 4 ? -0.55 : rows * VLS.PITCH + 0.2);
+      add({
+        id: `${P}vls.deluge_${tag}_${n + 1}`,
+        name_cn: `垂发甲板喷淋头 ${tag} ${n + 1}`,
+        name_en: `VLS deck deluge nozzle ${tag} ${n + 1}`,
+        assembly: "vls",
+        build_layer: 4,
+        geometry: M(C(0.05, 0.1, [0, 0, 0], 8), T(0.08, 0.03, 0.02, [0, 0.06, 0], 8)),
+        material: "cv_brass",
+        mate: A([-3.0 + (n % 4) * 2.0, t55DeckTop(z) + 0.06, z]),
+      });
+    }
+  }
+  for (const hero of VLS_HEROES) {
+    const spec = MISSILES[hero.type];
+    const half = spec.length / 2;
+    const radius = spec.diameter / 2;
+    for (const s of [-1, 1] as const) {
+      add({
+        id: `${P}vls.fin_actuator_${hero.tag}_${s === -1 ? "l" : "r"}`,
+        name_cn: `${spec.label} 尾翼作动器 ${hero.tag} ${s === -1 ? "左" : "右"}`,
+        name_en: `${spec.label} fin actuator ${hero.tag}`,
+        assembly: "vls",
+        build_layer: 3,
+        geometry: M(B(0.06, 0.12, 0.1, [0, 0, 0], 0.003), C(0.02, 0.06, [0, 0.08, 0], 6)),
+        material: "cv_steel_dark",
+        node: `CV_055_VlsMissile_${hero.tag}`,
+        mate: A([s * radius, half * 0.3, 0]),
+      });
+    }
+  }
+
   // 阵列框/燃气排导
   for (const [tag, z0, rows] of [
     ["fwd", VLS.FWD_Z, VLS.FWD_ROWS],
@@ -2670,6 +2840,108 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
         geometry: M(B(0.05, 0.04, 0.4, [0, 0, 0], 0.003)),
         material: "cv_steel_dark",
         mate: A([0, y - 0.55 + s * 0.22, z + 1.0]),
+      });
+    }
+  }
+  // 1130 供弹/液压/伺服附件（随炮塔回转）
+  for (const [tag] of [["fwd"], ["aft"]] as const) {
+    for (let b = 0; b < 11; b++) {
+      const a = (b / 11) * Math.PI * 2;
+      const x = Math.cos(a) * 0.19;
+      const y = 0.8 + Math.sin(a) * 0.19;
+      add({
+        id: `${P}ciws.${tag}_gas_tube_${pad(b + 1)}`,
+        name_cn: `1130 导气管 ${tag} ${b + 1}`,
+        name_en: `1130 gas tube ${tag} ${b + 1}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M({ type: "weld", from: [x, y, 0.2], to: [x, y, 0.55], radius: 0.02 }),
+        material: "cv_steel",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([0, 0, 0]),
+      });
+      add({
+        id: `${P}ciws.${tag}_recoil_spring_${pad(b + 1)}`,
+        name_cn: `1130 复进簧 ${tag} ${b + 1}`,
+        name_en: `1130 recoil spring ${tag} ${b + 1}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M({ type: "weld", from: [x, y, 0.12], to: [x, y, 0.34], radius: 0.032 }),
+        material: "cv_steel_dark",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([0, 0, 0]),
+      });
+    }
+    for (const s of [-1, 1] as const) {
+      add({
+        id: `${P}ciws.${tag}_hyd_${s === -1 ? "l" : "r"}`,
+        name_cn: `1130 液压管 ${tag} ${s === -1 ? "左" : "右"}`,
+        name_en: `1130 hydraulic line ${tag} ${s === -1 ? "l" : "r"}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M({ type: "weld", from: [s * 0.6, 0.5, 0.2], to: [s * 0.42, 0.85, -0.2], radius: 0.015 }),
+        material: "cv_rubber",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([0, 0, 0]),
+      });
+      add({
+        id: `${P}ciws.${tag}_fc_cabinet_${s === -1 ? "l" : "r"}`,
+        name_cn: `1130 火控机柜 ${tag} ${s === -1 ? "左" : "右"}`,
+        name_en: `1130 fire control cabinet ${tag} ${s === -1 ? "l" : "r"}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(B(0.25, 0.3, 0.22, [0, 0, 0], 0.006), B(0.18, 0.06, 0.02, [0, 0.05, 0.12], 0.002)),
+        material: "cv_055_console",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([s * 0.62, 0.58, -0.35]),
+      });
+      add({
+        id: `${P}ciws.${tag}_lifting_eye_${s === -1 ? "l" : "r"}`,
+        name_cn: `1130 吊装环 ${tag} ${s === -1 ? "左" : "右"}`,
+        name_en: `1130 lifting eye ${tag} ${s === -1 ? "l" : "r"}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(T(0.06, 0.035, 0.02, [0, 0, 0], 8), C(0.02, 0.08, [0, -0.04, 0], 6)),
+        material: "cv_steel",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([s * 0.38, 0.92, -0.22]),
+      });
+      add({
+        id: `${P}ciws.${tag}_step_${s === -1 ? "l" : "r"}`,
+        name_cn: `1130 炮位踏板 ${tag} ${s === -1 ? "左" : "右"}`,
+        name_en: `1130 gunner step ${tag} ${s === -1 ? "l" : "r"}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(B(0.3, 0.04, 0.16, [0, 0, 0], 0.003)),
+        material: "cv_steel_dark",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([s * 0.55, 0.3, 0.5]),
+      });
+    }
+    for (const [i, x] of [-0.22, 0.22].entries()) {
+      add({
+        id: `${P}ciws.${tag}_case_chute_${i + 1}`,
+        name_cn: `1130 抛壳槽 ${tag} ${i + 1}`,
+        name_en: `1130 case chute ${tag} ${i + 1}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(B(0.18, 0.12, 0.45, [0, 0, 0], 0.006)),
+        material: "cv_steel_dark",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([x, 0.5, -0.6]),
+      });
+    }
+    for (let c = 0; c < 4; c++) {
+      add({
+        id: `${P}ciws.${tag}_cable_${c + 1}`,
+        name_cn: `1130 电缆 ${tag} ${c + 1}`,
+        name_en: `1130 cable ${tag} ${c + 1}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M({ type: "weld", from: [-0.3 + c * 0.2, 0.35, -0.55], to: [-0.35 + c * 0.2, 0.85, -0.2], radius: 0.01 }),
+        material: "cv_rubber",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([0, 0, 0]),
       });
     }
   }
@@ -5602,6 +5874,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     staticOnly("t55-radar-self", "type055.radar.*", "type055.radar.*", "阵面/天线/安装框装配"),
     staticOnly("t55-radar-mast-panel", "type055.radar.mast_panel_*", "type055.super.mast*", "桅身相控阵/电子战面板嵌入综合桅杆表面", 2200),
     staticOnly("t55-radar-mast-ecm", "type055.radar.ecm_*", "type055.super.mast*", "电子战阵面贴装桅杆侧面", 400),
+    staticOnly("t55-radar-tx-mast", "type055.radar.tx_*", "type055.super.mast*", "346B 发射机柜嵌入综合桅杆内部", 900),
     staticOnly("t55-radar-deckhouse", "type055.radar.ew_panel_*", "type055.super.main_block", "电子战大阵面贴装上建侧壁", 1200),
     staticOnly("t55-vls-deck", "type055.vls.*", "type055.deck.*", "VLS 井口/框架与甲板安装", 150),
     staticOnly("t55-vls-self", "type055.vls.*", "type055.vls.*", "井筒/井盖/框架/燃气排导安装"),

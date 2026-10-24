@@ -563,12 +563,21 @@ function StageRuntime() {
         return null;
       }
       if (model.presentationScale) next.root.scale.set(...model.presentationScale);
+      // 只让结构大件投影：1.1 万件小螺栓/铆钉/盖板逐个进 shadow pass 会把 055 拖到 20fps，
+      // 而且它们本身的投影在整舰尺度上不可见。
+      const worldScale = Math.max(Math.abs(next.root.scale.x), Math.abs(next.root.scale.y), Math.abs(next.root.scale.z)) || 1;
       next.root.traverse((object) => {
         if ((object as THREE.Mesh).isMesh) {
-          object.castShadow = true;
+          object.castShadow = false;
           object.receiveShadow = true;
         }
       });
+      for (const handle of next.parts) {
+        if (handle.def.tags?.includes("internal")) continue;
+        if (!handle.geometry.boundingSphere) handle.geometry.computeBoundingSphere();
+        const radius = handle.geometry.boundingSphere?.radius ?? 0;
+        handle.object.castShadow = radius * worldScale > 0.8;
+      }
       // 特效件（tags: fx）默认不可见，由动画在需要时切 visible；否则首帧会先闪一下。
       // 海面/尾流同用 fx 标签（不参与结构检测、不撑大取景），但需要常显。
       for (const handle of next.parts) {
@@ -852,11 +861,25 @@ function StageRuntime() {
     for (const handle of assembled.parts) {
       if (!isInternalPart(modelId, handle)) continue;
       handle.object.layers.set(2);
-      setPickable(handle.object, showInternals);
+      // 仅靠 layer/visible 仍会让 1 万多件参与矩阵与视锥遍历；外部视角把内部件从
+      // 场景树摘下，透视/爆炸/选中内部件时再挂回原父节点。
+      if (!showInternals) {
+        const parent = handle.object.parent;
+        if (parent) {
+          handle.object.userData.__internalParent = parent;
+          parent.remove(handle.object);
+        }
+        setPickable(handle.object, false);
+        continue;
+      }
+      const parent = handle.object.userData.__internalParent as THREE.Object3D | undefined;
+      if (parent && handle.object.parent !== parent) parent.add(handle.object);
+      handle.object.visible = true;
+      setPickable(handle.object, true);
       for (const variant of Object.values(handle.damageObjects)) {
         if (!variant) continue;
         variant.layers.set(2);
-        setPickable(variant, showInternals);
+        setPickable(variant, true);
       }
     }
   }, [assembled, modelId, camera, views.xray, views.explode, buildIndex, selectedPart, cameraMode]);
