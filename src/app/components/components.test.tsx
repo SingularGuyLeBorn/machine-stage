@@ -48,6 +48,7 @@ const resetStore = () => {
       shadow: true,
       rain: false,
       thermal: false,
+      sea: true,
     },
     layout: {
       left: { width: 272, open: true },
@@ -103,6 +104,18 @@ describe("ModelList", () => {
     const j20 = screen.getByText("歼-20").closest("button")!;
     expect(j20.disabled).toBe(true);
   });
+
+  it("分类标签只显示对应类别的模型", () => {
+    render(<ModelList />);
+    fireEvent.click(screen.getByRole("tab", { name: /坦克/ }));
+    expect(screen.getByText("虎式坦克 Tiger I")).toBeDefined();
+    expect(screen.queryByText("AK-47 突击步枪")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: /舰船/ }));
+    expect(screen.getByText("福建舰 · 电磁弹射航母")).toBeDefined();
+    expect(screen.queryByText("虎式坦克 Tiger I")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: /全部/ }));
+    expect(screen.getByText("AK-47 突击步枪")).toBeDefined();
+  });
 });
 
 describe("PartTree", () => {
@@ -116,33 +129,35 @@ describe("PartTree", () => {
     expect(screen.getByText("测试总成")).toBeDefined();
   });
 
-  it("总成默认折叠，点总成才展开；点击零件 → 选中", () => {
+  it("总成默认展开第一层；点 L 分组展开零件；点击零件 → 选中", () => {
     render(<PartTree />);
     openTree();
     expect(screen.getByText("3 个注册零件")).toBeDefined();
-    expect(screen.queryByText("立柱")).toBeNull();
     const head = screen.getByText("测试总成").closest("button")!;
-    expect(head.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(head);
-    expect(screen.getByText("立柱")).toBeDefined();
     expect(head.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.queryByText("立柱")).toBeNull();
+    document.querySelectorAll(".tree__group-head--layer").forEach((element) => fireEvent.click(element));
+    expect(screen.getByText("立柱")).toBeDefined();
     fireEvent.click(screen.getByText("立柱").closest("button")!);
     expect(useStageStore.getState().selectedPart).toBe("test.frame.pillar");
     expect(screen.getByText("×2")).toBeDefined();
   });
 
-  it("再次点击总成后零件隐藏", () => {
+  it("点总成折叠后零件隐藏，再点恢复展开", () => {
     render(<PartTree />);
     openTree();
-    fireEvent.click(screen.getByText("测试总成"));
-    fireEvent.click(screen.getByText("测试总成"));
+    const head = screen.getByText("测试总成").closest("button")!;
+    fireEvent.click(head);
+    expect(head.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByText("立柱")).toBeNull();
+    fireEvent.click(head);
+    expect(head.getAttribute("aria-expanded")).toBe("true");
   });
 
   it("点零件 → 选中 + 打开单件隔离小视图", () => {
     render(<PartTree />);
     openTree();
-    fireEvent.click(screen.getByText("测试总成"));
+    document.querySelectorAll(".tree__group-head--layer").forEach((element) => fireEvent.click(element));
     fireEvent.click(screen.getByText("立柱").closest("button")!);
     expect(useStageStore.getState().selectedPart).toBe("test.frame.pillar");
     expect(useStageStore.getState().isolation).toEqual({ kind: "part", partId: "test.frame.pillar" });

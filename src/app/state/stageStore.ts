@@ -38,6 +38,8 @@ export interface FocusRequest {
   nonce: number;
   /** true = 同时回到初始方位角（重置视角）。 */
   resetAngle?: boolean;
+  /** true = 直接切到取景位，不做飞行动画（模型切换时避免相机穿过船体）。 */
+  instant?: boolean;
 }
 
 export interface StageStats {
@@ -129,6 +131,7 @@ const VIEWS_DEFAULT: Record<ViewKey, boolean> = {
   shadow: true,
   rain: false,
   thermal: false,
+  sea: true,
 };
 
 interface StageState {
@@ -170,6 +173,10 @@ interface StageState {
   scanPhase: ScanPhase;
   scanKind: "static" | "sweep" | null;
   scanMs: number | null;
+  /** 大型模型首帧着色器编译中（DOM 层显示加载提示）。 */
+  shaderWarming: boolean;
+  /** 切换到新模型、主线程同步装配中（DOM 层先于重活绘制，避免看起来卡死）。 */
+  assembling: boolean;
 
   views: Record<ViewKey, boolean>;
   layout: PanelLayout;
@@ -229,10 +236,12 @@ interface StageState {
   /** 切换模型变体（同一模型的不同版本：原型 / 机械拆解版）。 */
   setVariant(variantId: string): void;
   requestFocus(partId: string): void;
-  focusPoint(center: [number, number, number], radius?: number, resetAngle?: boolean): void;
+  focusPoint(center: [number, number, number], radius?: number, resetAngle?: boolean, instant?: boolean): void;
   setHome(center: [number, number, number], radius: number): void;
-  requestViewReset(): void;
+  requestViewReset(instant?: boolean): void;
   runScan(kind: "static" | "sweep"): void;
+  setShaderWarming(warming: boolean): void;
+  setAssembling(assembling: boolean): void;
   setNotice(notice: string | null): void;
   /** 记录运行故障（错误面板数据源）。 */
   reportFault(input: { scope: string; message: string; stack?: string }): void;
@@ -317,6 +326,8 @@ export const useStageStore = create<StageState>((set, get) => ({
   scanPhase: "idle",
   scanKind: null,
   scanMs: null,
+  shaderWarming: false,
+  assembling: false,
 
   views: { ...VIEWS_DEFAULT },
   layout: {
@@ -426,9 +437,11 @@ export const useStageStore = create<StageState>((set, get) => ({
       if (clamped <= 0) assembled.setBuildThreshold(-1);
       else if (clamped >= orders.length) assembled.setBuildThreshold(null);
       else assembled.setBuildThreshold(orders[clamped - 1]);
-      // 特效件（tags: fx）不跟构建滑杆显示，只由动画在击发窗口内点亮
+      // 特效件（tags: fx）不跟构建滑杆显示，只由动画在击发窗口内点亮；海面/尾流常显
       for (const handle of assembled.parts) {
-        if (handle.def.tags?.includes("fx")) handle.object.visible = false;
+        if (handle.def.tags?.includes("fx") && !handle.def.id.startsWith("carrier.sea.")) {
+          handle.object.visible = false;
+        }
       }
     }
     set((state) => {
@@ -590,15 +603,15 @@ export const useStageStore = create<StageState>((set, get) => ({
     get().focusPoint([center.x, center.y, center.z], Math.max(size.length() * 0.5, 0.18));
   },
 
-  focusPoint: (center, radius = 0.8, resetAngle = false) =>
-    set((state) => ({ focus: { center, radius, nonce: (state.focus?.nonce ?? 0) + 1, resetAngle } })),
+  focusPoint: (center, radius = 0.8, resetAngle = false, instant = false) =>
+    set((state) => ({ focus: { center, radius, nonce: (state.focus?.nonce ?? 0) + 1, resetAngle, instant } })),
 
   setHome: (center, radius) => set({ home: { center, radius } }),
 
-  requestViewReset: () => {
+  requestViewReset: (instant = false) => {
     const { home } = get();
     if (!home) return;
-    get().focusPoint(home.center, home.radius, true);
+    get().focusPoint(home.center, home.radius, true, instant);
   },
 
   runScan: (kind) => {
@@ -764,6 +777,8 @@ export const useStageStore = create<StageState>((set, get) => ({
     }, 0);
   },
 
+  setShaderWarming: (warming) => set({ shaderWarming: warming }),
+  setAssembling: (assembling) => set({ assembling }),
   setNotice: (notice) => set({ notice }),
 
   reportFault: ({ scope, message, stack }) => set({ fault: { scope, message, stack, at: Date.now() } }),

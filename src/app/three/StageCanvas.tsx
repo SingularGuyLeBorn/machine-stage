@@ -20,8 +20,10 @@ import { Weather } from "./Weather";
 import { setArmourWet } from "@/three/parts/kernel/armourSurface";
 import { TigerVfx } from "./vfx/TigerVfx";
 import { MbtVfx } from "./vfx/MbtVfx";
+import { Type055Vfx } from "./vfx/Type055Vfx";
+import { BridgeSkybox, CommandExterior, CommandScreens } from "./vfx/CommandScreens";
 import { applyTigerLidPose, effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
-import { firstPersonView, type CameraMode } from "./viewpoints";
+import { firstPersonView, type CameraMode, isCarrierInteriorMode } from "./viewpoints";
 import { setAk47Mode } from "@/three/parts/models/ak47/motion";
 import { setM249Mode } from "@/three/parts/models/m249/motion";
 import { setM2hbMode } from "@/three/parts/models/m2hb/motion";
@@ -51,6 +53,17 @@ function motionPartsOf(model: StageModel): ReadonlySet<string> | undefined {
   return set;
 }
 
+const originalRaycasts = new WeakMap<THREE.Object3D, THREE.Object3D["raycast"]>();
+function setPickable(object: THREE.Object3D, pickable: boolean): void {
+  if (pickable) {
+    const original = originalRaycasts.get(object);
+    if (original) object.raycast = original;
+  } else if (!originalRaycasts.has(object)) {
+    originalRaycasts.set(object, object.raycast);
+    object.raycast = () => {};
+  }
+}
+
 const MODEL_CACHE_LIMIT = 3;
 interface CachedBuild {
   assembled: AssembledModel;
@@ -63,46 +76,247 @@ interface CachedBuild {
 }
 
 export function StageCanvas() {
+  const heavy = useStageStore((state) => state.modelId === "carrier");
   return (
-    <Canvas
-      shadows
-      dpr={[1, 1.5]}
-      camera={{ position: [4.6, 3.4, 5.2], fov: 34, near: 0.05, far: 200 }}
-      gl={{
-        antialias: true,
-        toneMapping: THREE.ACESFilmicToneMapping,
-        // QA 时允许 canvas.toDataURL() 直接读像素，绕开 headless 合成器的残影。
-        preserveDrawingBuffer: qaNoFx,
-      }}
-      onCreated={({ gl }) => {
-        // 摄影棚 HDRI 本身亮度很高；ACES + 1.0 曝光会把烤蓝钢压成纯白。
-        gl.toneMappingExposure = 0.9;
-      }}
-    >
-      <color attach="background" args={["#dce0e6"]} />
-      <Suspense fallback={null}>
-        <Studio />
-      </Suspense>
-      <StageRuntime />
-      <TigerVfx />
-      <MbtVfx />
-      <CameraRig />
-      {!qaNoFx && <StageEffects />}
-    </Canvas>
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <Canvas
+        shadows
+        dpr={heavy ? [0.9, 1.1] : [1, 1.5]}
+        camera={{ position: [4.6, 3.4, 5.2], fov: 34, near: 0.05, far: 4000 }}
+        gl={{
+          antialias: true,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          // QA 时允许 canvas.toDataURL() 直接读像素，绕开 headless 合成器的残影。
+          preserveDrawingBuffer: qaNoFx,
+        }}
+        onCreated={({ gl }) => {
+          // 摄影棚 HDRI 本身亮度很高；ACES + 1.0 曝光会把烤蓝钢压成纯白。
+          gl.toneMappingExposure = 0.9;
+        }}
+      >
+        <color attach="background" args={["#e9ecf0"]} />
+        <Suspense fallback={null}>
+          <Studio />
+        </Suspense>
+        <StageFog />
+        <StageRuntime />
+        <TigerVfx />
+        <MbtVfx />
+        <Type055Vfx />
+        <CommandScreens />
+        <CommandExterior />
+        <BridgeSkybox />
+        <CameraRig />
+        <CarrierCameraFloor />
+        {!qaNoFx && <StageEffects />}
+      </Canvas>
+      <WarmupOverlay />
+    </div>
   );
 }
 
-/** Studio 环境：真实 HDRI 环境反射 + 定向硬光/阴影。
- *
- *  金属的识别度来自「它反射到了什么」。程序化 Lightformer 只能给几块纯色
- *  亮斑，反射在枪管上仍像塑料；这里换成 Poly Haven 的 CC0 摄影棚 HDRI
- *  （studio_small_08_1k.hdr），柔光箱、暗部、地面明暗分界都是真实拍摄的，
- *  金属表面才能出现连续、带方向的高光。定向光只负责阴影和轮廓，不负责
- *  主导反射。 */
+/** 重模型加载提示：装配与着色器编译期间用 DOM 层盖住画面，避免低端 GPU 看起来像卡死/黑屏。 */
+function WarmupOverlay() {
+  const assembling = useStageStore((state) => state.assembling);
+  const warming = useStageStore((state) => state.shaderWarming);
+  const heavy = useStageStore((state) => state.modelId === "carrier");
+  if (!assembling && !warming) return null;
+  const title = assembling ? "正在装配模型…" : "舰体着色器编译中…";
+  const hint = assembling
+    ? heavy
+      ? "福建舰 5 千余件 / 300 万三角面 · 首次切换要数秒，完成后自动进入"
+      : "正在构建零件几何，请稍候"
+    : "首次加载 300 万三角面，低端 GPU 需要数秒";
+  return (
+    <div
+      className="stage-loading"
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 6,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(12, 20, 28, 0.34)",
+        color: "#eef6fb",
+        font: "500 14px/1.6 'Microsoft YaHei', sans-serif",
+        letterSpacing: "0.05em",
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        style={{
+          padding: "14px 22px",
+          borderRadius: 10,
+          border: "1px solid rgba(160, 200, 220, 0.28)",
+          background: "rgba(8, 16, 22, 0.72)",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: 15, marginBottom: 4 }}>{title}</div>
+        <div style={{ opacity: 0.7, fontSize: 12 }}>{hint}</div>
+      </div>
+    </div>
+  );
+}
+
+/** 座舱第一人称：隐藏座舱盖玻璃，避免从内部看到一整面反射罩。 */
+function CockpitCanopyVisibility() {
+  const assembled = useStageStore((state) => state.assembled);
+  const cameraMode = useStageStore((state) => state.cameraMode);
+  useEffect(() => {
+    const canopy = assembled?.getPart("carrier.aircraft.canopy");
+    if (!canopy) return;
+    canopy.object.visible = cameraMode !== "cockpit";
+    return () => {
+      canopy.object.visible = true;
+    };
+  }, [assembled, cameraMode]);
+  return null;
+}
+
+function InteriorFillLight() {
+  const cameraMode = useStageStore((state) => state.cameraMode);
+  const modelId = useStageStore((state) => state.modelId);
+  if (!isCarrierInteriorMode(cameraMode)) return null;
+  // 舱内是封闭空间，主光/HDRI 被围壁遮挡；进入内部视角时补一层柔和环境光。
+  // 机舱里还有大量金属转子，单靠环境光会发黑，再补一盏舱顶点光。
+  return (
+    <>
+      <ambientLight
+        intensity={cameraMode === "engine_room" ? 0.85 : cameraMode === "bridge" || cameraMode === "cic" ? 0.5 : 1.05}
+        color="#eaf5ff"
+      />
+      {cameraMode === "engine_room" ? (
+        <>
+          <pointLight position={[0, 9.2, -34]} intensity={2.3} distance={24} decay={1.35} color="#dbe9f5" />
+          <pointLight position={[-6.2, 8.1, -27]} intensity={1.6} distance={12} decay={1.3} color="#e6f1fa" />
+          <pointLight position={[-4.2, 8.1, -35]} intensity={1.4} distance={12} decay={1.3} color="#e6f1fa" />
+          <pointLight position={[5.2, 8.1, -40]} intensity={1.4} distance={12} decay={1.3} color="#e6f1fa" />
+        </>
+      ) : null}
+      {cameraMode === "cic" ? (
+        modelId === "carrier" ? (
+          <>
+            <pointLight position={[24.9, 41.6, -36.0]} intensity={2.4} distance={9} decay={1.35} color="#d4e2ea" />
+            <pointLight position={[24.9, 41.6, -42.0]} intensity={2.1} distance={9} decay={1.35} color="#d4e2ea" />
+            <pointLight position={[24.9, 41.2, -34.6]} intensity={1.4} distance={6} decay={1.45} color="#5ed6d6" />
+          </>
+        ) : (
+          <>
+            <pointLight position={[0, 20.75, 13.5]} intensity={1.8} distance={11} decay={1.35} color="#c7dee8" />
+            <pointLight position={[0, 20.75, 21.5]} intensity={1.6} distance={11} decay={1.35} color="#c7dee8" />
+            <pointLight position={[0, 20.4, 26.3]} intensity={1.2} distance={7} decay={1.45} color="#5ed6d6" />
+            <pointLight position={[0, 19.4, 10.5]} intensity={0.7} distance={8} decay={1.5} color="#4f8f9f" />
+          </>
+        )
+      ) : null}
+      {cameraMode === "crew" || cameraMode === "crew_berth" || cameraMode === "crew_mess" ? (
+        modelId === "carrier" ? (
+          <>
+            <pointLight position={[0, 13.3, 63]} intensity={2.0} distance={10} decay={1.35} color="#e8dfcf" />
+            <pointLight position={[-4.2, 13.0, 42]} intensity={1.7} distance={8} decay={1.4} color="#d9e4e8" />
+            <pointLight position={[-4.2, 13.0, 58]} intensity={1.7} distance={8} decay={1.4} color="#e8dfcf" />
+            <pointLight position={[-4.2, 13.0, 78]} intensity={1.6} distance={8} decay={1.4} color="#d9e4e8" />
+            <pointLight position={[4.2, 13.0, 40]} intensity={1.8} distance={8} decay={1.4} color="#e8dfcf" />
+            <pointLight position={[4.2, 13.0, 55]} intensity={1.7} distance={8} decay={1.4} color="#d9e4e8" />
+            <pointLight position={[4.2, 13.0, 70]} intensity={1.9} distance={8} decay={1.4} color="#e8f1f5" />
+            <pointLight position={[4.2, 13.0, 86]} intensity={1.6} distance={8} decay={1.4} color="#e8dfcf" />
+          </>
+        ) : (
+          <>
+            <pointLight position={[0, 4.4, 5.6]} intensity={1.0} distance={9} decay={1.3} color="#dfe9ee" />
+            <pointLight position={[0, 4.4, 0]} intensity={0.9} distance={9} decay={1.3} color="#d9e4e8" />
+            <pointLight position={[0, 4.4, -5.6]} intensity={1.0} distance={9} decay={1.3} color="#dfe9ee" />
+            <pointLight position={[-2.8, 4.35, -6.4]} intensity={2.1} distance={7} decay={1.3} color="#e8dfcf" />
+            <pointLight position={[-2.8, 4.35, -2.0]} intensity={1.8} distance={7} decay={1.3} color="#d9e4e8" />
+            <pointLight position={[-2.8, 4.35, 2.2]} intensity={1.6} distance={7} decay={1.3} color="#e8dfcf" />
+            <pointLight position={[-2.8, 4.35, 6.4]} intensity={1.5} distance={7} decay={1.3} color="#d9e4e8" />
+            <pointLight position={[2.8, 4.35, -6.2]} intensity={1.25} distance={7} decay={1.3} color="#f4ecdc" />
+            <pointLight position={[2.8, 4.35, -2.0]} intensity={1.5} distance={7} decay={1.3} color="#e8f1f5" />
+            <pointLight position={[2.8, 4.35, 2.0]} intensity={1.5} distance={7} decay={1.3} color="#e8f1f5" />
+            <pointLight position={[2.8, 4.35, 6.2]} intensity={1.7} distance={7} decay={1.3} color="#e8dfcf" />
+          </>
+        )
+      ) : null}
+      {cameraMode === "workshop" ? (
+        modelId === "carrier" ? (
+          <>
+            <pointLight position={[-13.0, 28.0, -62.0]} intensity={2.2} distance={14} decay={1.35} color="#e8f1f5" />
+            <pointLight position={[-18.0, 28.0, -66.0]} intensity={2.0} distance={14} decay={1.4} color="#f0e7d6" />
+            <pointLight position={[-18.0, 26.0, -60.0]} intensity={1.6} distance={12} decay={1.4} color="#d9e4e8" />
+            <pointLight position={[-15.5, 24.5, -70.0]} intensity={1.4} distance={11} decay={1.4} color="#e8f1f5" />
+          </>
+        ) : (
+          <>
+            <pointLight position={[7.0, 7.1, -27]} intensity={1.6} distance={10} decay={1.35} color="#e8f1f5" />
+            <pointLight position={[6.0, 7.1, -31]} intensity={1.4} distance={10} decay={1.4} color="#f0e7d6" />
+            <pointLight position={[7.5, 6.6, -33]} intensity={1.2} distance={8} decay={1.4} color="#d9e4e8" />
+          </>
+        )
+      ) : null}
+      {cameraMode === "magazine" ? (
+        <>
+          <pointLight position={[-8.0, 15.5, -14.0]} intensity={2.2} distance={16} decay={1.35} color="#e8f1f5" />
+          <pointLight position={[-10.0, 15.5, -36.0]} intensity={2.0} distance={18} decay={1.4} color="#f0e7d6" />
+          <pointLight position={[-6.0, 15.0, -55.0]} intensity={1.8} distance={16} decay={1.4} color="#d9e4e8" />
+        </>
+      ) : null}
+      {cameraMode === "bridge" ? (
+        modelId === "carrier" ? (
+          <>
+            <pointLight position={[24.9, 46.9, -36.0]} intensity={2.4} distance={8} decay={1.35} color="#f2ecdf" />
+            <pointLight position={[24.9, 46.9, -42.0]} intensity={2.2} distance={8} decay={1.35} color="#dcebf2" />
+            <pointLight position={[24.9, 46.5, -33.5]} intensity={2.0} distance={10} decay={1.3} color="#e8f3f8" />
+          </>
+        ) : (
+          <>
+            <pointLight position={[0, 25.9, 27]} intensity={1.7} distance={12} decay={1.4} color="#f0eadc" />
+            <pointLight position={[0, 23.7, 31.6]} intensity={1.3} distance={9} decay={1.4} color="#cfe4ee" />
+            <pointLight position={[0, 24.4, 39]} intensity={2.2} distance={18} decay={1.3} color="#e6f1f6" />
+          </>
+        )
+      ) : null}
+    </>
+  );
+}
+
+// 外部视角下舰桥/情报中心必须能透过玻璃看到舱内。舱室是封闭体，主光进不去，
+// 这里常驻两盏低功率点光（带距离衰减，不影响舰体外观），不再用海景贴图背板遮丑。
+function CommandCabinShowcaseLight() {
+  const cameraMode = useStageStore((state) => state.cameraMode);
+  const modelId = useStageStore((state) => state.modelId);
+  if (isCarrierInteriorMode(cameraMode)) return null;
+  if (modelId === "carrier") {
+    return (
+      <>
+        <pointLight position={[24.9, 48.1, -38.2]} intensity={2.6} distance={7} decay={1.35} color="#f4ecdd" />
+        <pointLight position={[24.9, 48.1, -41.8]} intensity={2.2} distance={7} decay={1.35} color="#dcebf2" />
+        <pointLight position={[24.9, 41.4, -36.2]} intensity={1.6} distance={7} decay={1.4} color="#dcebf2" />
+      </>
+    );
+  }
+  if (modelId === "type055") {
+    return (
+      <>
+        <pointLight position={[-2.0, 23.2, 28.0]} intensity={1.5} distance={11} decay={1.35} color="#f0eadc" />
+        <pointLight position={[2.0, 23.2, 28.0]} intensity={1.5} distance={11} decay={1.35} color="#dcebf2" />
+        <pointLight position={[0, 20.9, 18.0]} intensity={1.3} distance={12} decay={1.35} color="#dcebf2" />
+      </>
+    );
+  }
+  return null;
+}
+
 function Studio() {
   return (
     <>
-      <ambientLight intensity={0.1} />
+      <ambientLight intensity={0.12} />
+      <hemisphereLight args={["#dfe7ef", "#1b2025", 0.2]} />
+      <InteriorFillLight />
+      <CommandCabinShowcaseLight />
+      <CockpitCanopyVisibility />
       <directionalLight
         castShadow
         position={[5.5, 8.5, 4.5]}
@@ -150,6 +364,23 @@ function TopFill() {
   return null;
 }
 
+/** 航母海面铺到千米级，远处用与背景同色的大气雾把海面矩形边缘化开，形成海天线。 */
+function StageFog() {
+  const scene = useThree((state) => state.scene);
+  const modelId = useStageStore((state) => state.modelId);
+  useEffect(() => {
+    if (modelId !== "carrier") {
+      scene.fog = null;
+      return;
+    }
+    scene.fog = new THREE.Fog("#e9ecf0", 620, 2200);
+    return () => {
+      scene.fog = null;
+    };
+  }, [scene, modelId]);
+  return null;
+}
+
 /** 环境反射总强度（three r163+ 的 Scene.environmentIntensity）。 */
 function SceneEnvIntensity({ value }: { value: number }) {
   const scene = useThree((state) => state.scene);
@@ -161,9 +392,12 @@ function SceneEnvIntensity({ value }: { value: number }) {
 
 function StageEffects() {
   const xray = useStageStore((state) => state.views.xray);
-  // 透视时物体大量重叠，AO/Bloom 意义不大且会放大混合开销；直接走默认帧缓冲。
+  // 透视/局部透视时物体大量重叠，AO/Bloom 意义不大且会放大混合开销；
+  // 航母是万件、500 万三角面：EffectComposer 的场景 Pass 在本机会输出黑帧，
+  // 直接走默认帧缓冲，同时省掉 Bloom/Vignette 的全屏开销。
   const localXray = useStageStore((state) => state.views.localXray);
-  if (xray || localXray) return null;
+  const heavy = useStageStore((state) => state.modelId === "carrier");
+  if (xray || localXray || heavy) return null;
   return (
     <EffectComposer multisampling={4}>
       <Bloom luminanceThreshold={0.95} luminanceSmoothing={0.25} intensity={0.3} mipmapBlur />
@@ -188,6 +422,7 @@ function StageRuntime() {
   const buildIndex = useStageStore((state) => state.buildIndex);
   const selectedPart = useStageStore((state) => state.selectedPart);
   const damageSeed = useStageStore((state) => state.damageSeed);
+  const cameraMode = useStageStore((state) => state.cameraMode);
   const camera = useThree((state) => state.camera);
   const gl = useThree((state) => state.gl);
   const rootScene = useThree((state) => state.scene);
@@ -215,7 +450,10 @@ function StageRuntime() {
     // 变体优先：有 variants 时用选中的那个（原型 / 机械拆解版）
     const variant = model.variants?.find((item) => item.id === variantId) ?? model.variants?.[0];
     const source = variant?.registry ?? model.registry;
-    if (!source) return;
+    if (!source) {
+      useStageStore.getState().setAssembling(false);
+      return;
+    }
     const store = useStageStore.getState();
     const key = `${modelId}|${variantId}|${damageSeed}|${worn ? "worn" : "new"}|${JSON.stringify(overrides)}`;
     const previousKey = currentKeyRef.current;
@@ -223,18 +461,30 @@ function StageRuntime() {
     setBuildError(null);
 
     const warmShaders = (target: AssembledModel) => {
-      const warm = () => {
-        if (useStageStore.getState().assembled !== target) return;
-        gl.compileAsync(rootScene, camera).catch(() => {});
+      const store = useStageStore.getState();
+      store.setShaderWarming(true);
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
         const cached = cache.get(key);
         if (cached) cached.warmed = true;
+        if (useStageStore.getState().assembled === target) {
+          useStageStore.getState().setShaderWarming(false);
+        }
       };
-      // 在首帧/交互之后再异步预热隐藏的 FX/内部件材质，避免点动作时才编译着色器。
-      if (typeof window.requestIdleCallback === "function") {
-        window.requestIdleCallback(warm, { timeout: 1500 });
-      } else {
-        window.setTimeout(warm, 160);
-      }
+      const warm = () => {
+        if (useStageStore.getState().assembled !== target) {
+          finish();
+          return;
+        }
+        // compileAsync 会一次性编译全部可见/隐藏材质；DOM 提示层先绘制，再开始编译。
+        void gl.compileAsync(rootScene, camera).catch(() => {}).finally(() => window.setTimeout(finish, 140));
+      };
+      // 先让加载提示完成一帧绘制，再开始编译，避免低端 GPU 看起来像直接卡死。
+      window.setTimeout(warm, 80);
+      // 兜底：驱动异常/编译 Promise 不返回时不把提示层永久留在画面上。
+      window.setTimeout(finish, 12000);
     };
 
     const mount = (
@@ -242,10 +492,12 @@ function StageRuntime() {
       stats: { parts: number; triangles: number },
       home: { center: [number, number, number]; radius: number } | null,
       floor: { y: number; footprint: number } | null,
+      warm = true,
     ) => {
       seqRef.current += 1;
       setScene({ assembled: target, seq: seqRef.current });
       store.setStats(stats);
+      store.setAssembling(false);
       // 重建/复用都保留当前构建进度（改参数不该把玩家从 L2 拉回整车）
       store.setBuildIndex(store.buildIndex);
       store.attach(target);
@@ -255,13 +507,17 @@ function StageRuntime() {
         if (store.preserveViewOnRebuild) {
           useStageStore.setState({ preserveViewOnRebuild: false });
         } else {
-          store.requestViewReset();
+          // 模型切换直接切到取景位：航母与坦克的尺度差上百倍，飞行动画会让相机穿过船体。
+          store.requestViewReset(true);
         }
       }
       clockRef.current = 0;
       lastStateRef.current = null;
       currentKeyRef.current = key;
-      warmShaders(target);
+      // 小模型（测试台/枪械）不需要整场景 compileAsync：它们首帧本来就不慢，
+      // 反而会让“着色器编译中”提示无故停留十几秒。缓存已预热的模型也不重复编译。
+      if (warm && stats.parts >= 1000) warmShaders(target);
+      else store.setShaderWarming(false);
     };
 
     const cleanupFor = (target: AssembledModel) => () => {
@@ -281,7 +537,7 @@ function StageRuntime() {
       cached.assembled.root.position.set(0, 0, 0);
       cached.assembled.root.rotation.set(0, 0, 0);
       cached.assembled.root.updateMatrixWorld(true);
-      mount(cached.assembled, cached.stats, cached.home, cached.floor);
+      mount(cached.assembled, cached.stats, cached.home, cached.floor, !cached.warmed);
       console.log(`[perf] 缓存命中 ${model.title}（${cache.size} 个模型）`);
       return cleanupFor(cached.assembled);
     }
@@ -293,105 +549,133 @@ function StageRuntime() {
     const errors = validateRegistry(registry).filter((issue) => issue.level === "error");
     if (errors.length > 0) {
       setBuildError(formatIssues(errors));
+      useStageStore.getState().setAssembling(false);
       useStageStore.getState().setNotice(`注册表校验未通过：${errors.length} 个错误`);
       return;
     }
     // 装配可能抛（常量拼写、kit 参数、几何自检……）。这里必须捕获：
     // effect 里抛出的异常会冒泡到 React，没有边界就是整页白屏。
-    let library: ReturnType<typeof createMaterialLibrary>;
-    let next: AssembledModel;
-    const tMat = performance.now();
-    try {
-      library = createMaterialLibrary(registry.materials);
-      if (worn) {
-        for (const material of Object.values(library.materials)) {
-          material.color.multiplyScalar(0.55);
-          material.roughness = Math.min(1, material.roughness + 0.18);
-          material.envMapIntensity = Math.max(0.4, material.envMapIntensity - 0.6);
+    const runBuild = (): AssembledModel | null => {
+      let library: ReturnType<typeof createMaterialLibrary>;
+      let next: AssembledModel;
+      const tMat = performance.now();
+      try {
+        library = createMaterialLibrary(registry.materials);
+        if (worn) {
+          for (const material of Object.values(library.materials)) {
+            material.color.multiplyScalar(0.55);
+            material.roughness = Math.min(1, material.roughness + 0.18);
+            material.envMapIntensity = Math.max(0.4, material.envMapIntensity - 0.6);
+          }
         }
+        const tBuild = performance.now();
+        next = buildModel(registry, {
+          builders: model.builders,
+          materials: library.materials,
+          instanceLayouts: variant?.layouts ?? model.layouts,
+          warnMissingLayout: false,
+        });
+        console.log(
+          `[perf] 材质库 ${Math.round(tBuild - tMat)}ms · 装配 ${Math.round(performance.now() - tBuild)}ms`,
+        );
+      } catch (error) {
+        useStageStore.getState().setAssembling(false);
+        useStageStore.getState().reportFault(faultFromError(`装配 ${model.title}`, error));
+        return null;
       }
-      const tBuild = performance.now();
-      next = buildModel(registry, {
-        builders: model.builders,
-        materials: library.materials,
-        instanceLayouts: variant?.layouts ?? model.layouts,
-        warnMissingLayout: false,
+      if (model.presentationScale) next.root.scale.set(...model.presentationScale);
+      // 只让结构大件投影：1.1 万件小螺栓/铆钉/盖板逐个进 shadow pass 会把 055 拖到 20fps，
+      // 而且它们本身的投影在整舰尺度上不可见。
+      const worldScale = Math.max(Math.abs(next.root.scale.x), Math.abs(next.root.scale.y), Math.abs(next.root.scale.z)) || 1;
+      next.root.traverse((object) => {
+        if ((object as THREE.Mesh).isMesh) {
+          object.castShadow = false;
+          object.receiveShadow = true;
+        }
       });
-      console.log(
-        `[perf] 材质库 ${Math.round(tBuild - tMat)}ms · 装配 ${Math.round(performance.now() - tBuild)}ms`,
-      );
-    } catch (error) {
-      useStageStore.getState().reportFault(faultFromError(`装配 ${model.title}`, error));
-      return;
-    }
-    if (model.presentationScale) next.root.scale.set(...model.presentationScale);
-    next.root.traverse((object) => {
-      if ((object as THREE.Mesh).isMesh) {
-        object.castShadow = true;
-        object.receiveShadow = true;
+      for (const handle of next.parts) {
+        if (handle.def.tags?.includes("internal")) continue;
+        if (!handle.geometry.boundingSphere) handle.geometry.computeBoundingSphere();
+        const radius = handle.geometry.boundingSphere?.radius ?? 0;
+        handle.object.castShadow = radius * worldScale > 0.8;
       }
-    });
-    // 特效件（tags: fx）默认不可见，由动画在需要时切 visible；否则首帧会先闪一下。
-    for (const handle of next.parts) {
-      if (handle.def.tags?.includes("fx")) handle.object.visible = false;
-    }
-    let triangles = 0;
-    for (const handle of next.parts) {
-      const geometry = handle.geometry;
-      const count = geometry.index ? geometry.index.count / 3 : geometry.getAttribute("position").count / 3;
-      triangles += count * (handle.instanced ? handle.instances.length : 1);
-    }
-    // 全车体包围盒 → 复位视角基准 + 地面锚点（排除 fx 特效件，避免炮口焰把取景拉远）
-    const bounds = new THREE.Box3();
-    for (const handle of next.parts) {
-      if (handle.def.tags?.includes("fx")) continue;
-      bounds.union(next.partBounds(handle, new THREE.Box3()));
-    }
-    let home: CachedBuild["home"] = null;
-    let floor: CachedBuild["floor"] = null;
-    if (!bounds.isEmpty()) {
-      const frame = model.framingBounds?.(next) ?? bounds;
-      const center = frame.getCenter(new THREE.Vector3());
-      const frameSize = frame.getSize(new THREE.Vector3());
-      const size = bounds.getSize(new THREE.Vector3());
-      home = {
-        center: [center.x, center.y, center.z],
-        radius: Math.max(frameSize.length() * 0.5, 0.5),
-      };
-      floor = { y: bounds.min.y, footprint: Math.max(size.x, size.z) };
-    }
-    const stats = { parts: next.parts.length, triangles: Math.round(triangles) };
-    cache.set(key, {
-      assembled: next,
-      library,
-      stats,
-      home,
-      floor,
-      lastUsed: performance.now(),
-      warmed: false,
-    });
-    // 只淘汰既不是正在显示、也不是刚装配的缓存项。
-    while (cache.size > MODEL_CACHE_LIMIT) {
-      let victimKey: string | null = null;
-      let oldest = Infinity;
-      for (const [candidateKey, entry] of cache) {
-        if (candidateKey === key || candidateKey === previousKey) continue;
-        if (entry.lastUsed < oldest) {
-          oldest = entry.lastUsed;
-          victimKey = candidateKey;
+      // 特效件（tags: fx）默认不可见，由动画在需要时切 visible；否则首帧会先闪一下。
+      // 海面/尾流同用 fx 标签（不参与结构检测、不撑大取景），但需要常显。
+      for (const handle of next.parts) {
+        if (handle.def.tags?.includes("fx") && !handle.def.id.startsWith("carrier.sea.")) {
+          handle.object.visible = false;
         }
       }
-      if (!victimKey) break;
-      const victim = cache.get(victimKey)!;
-      cache.delete(victimKey);
-      applyXray(victim.assembled, false);
-      clearPose(victim.assembled);
-      victim.assembled.dispose();
-      victim.library.dispose();
-      console.log(`[perf] 缓存淘汰 ${victimKey}`);
+      let triangles = 0;
+      for (const handle of next.parts) {
+        const geometry = handle.geometry;
+        const count = geometry.index ? geometry.index.count / 3 : geometry.getAttribute("position").count / 3;
+        triangles += count * (handle.instanced ? handle.instances.length : 1);
+      }
+      // 全车体包围盒 → 复位视角基准 + 地面锚点（排除 fx 特效件，避免炮口焰把取景拉远）
+      const bounds = new THREE.Box3();
+      for (const handle of next.parts) {
+        if (handle.def.tags?.includes("fx")) continue;
+        bounds.union(next.partBounds(handle, new THREE.Box3()));
+      }
+      let home: CachedBuild["home"] = null;
+      let floor: CachedBuild["floor"] = null;
+      if (!bounds.isEmpty()) {
+        // 取景/地面/阴影都在世界空间计算：presentationScale 把编辑尺度换算成米。
+        const presentation = model.presentationScale ?? [1, 1, 1];
+        const scaleMatrix = new THREE.Matrix4().makeScale(presentation[0], presentation[1], presentation[2]);
+        const frame = (model.framingBounds?.(next) ?? bounds).clone().applyMatrix4(scaleMatrix);
+        const worldBounds = bounds.clone().applyMatrix4(scaleMatrix);
+        const center = frame.getCenter(new THREE.Vector3());
+        const frameSize = frame.getSize(new THREE.Vector3());
+        const size = worldBounds.getSize(new THREE.Vector3());
+        home = {
+          center: [center.x, center.y, center.z],
+          radius: Math.max(frameSize.length() * 0.5, 0.5),
+        };
+        floor = { y: worldBounds.min.y, footprint: Math.max(size.x, size.z) };
+      }
+      const stats = { parts: next.parts.length, triangles: Math.round(triangles) };
+      cache.set(key, { assembled: next, library, stats, home, floor, lastUsed: performance.now(), warmed: false });
+      // 只淘汰既不是正在显示、也不是刚装配的缓存项。
+      while (cache.size > MODEL_CACHE_LIMIT) {
+        let victimKey: string | null = null;
+        let oldest = Infinity;
+        for (const [candidateKey, entry] of cache) {
+          if (candidateKey === key || candidateKey === previousKey) continue;
+          if (entry.lastUsed < oldest) {
+            oldest = entry.lastUsed;
+            victimKey = candidateKey;
+          }
+        }
+        if (!victimKey) break;
+        const victim = cache.get(victimKey)!;
+        cache.delete(victimKey);
+        applyXray(victim.assembled, false);
+        clearPose(victim.assembled);
+        victim.assembled.dispose();
+        victim.library.dispose();
+        console.log(`[perf] 缓存淘汰 ${victimKey}`);
+      }
+      mount(next, stats, home, floor);
+      return next;
+    };
+
+    // 大型模型先让加载提示绘制一帧、再开始同步装配，避免切换时整页无响应。
+    // 5000+ 件的装配约 1-2s，提示层提前出现比装配完再提示更有意义。
+    if (source.parts.length >= 1000) {
+      store.setAssembling(true);
+      let built: AssembledModel | null = null;
+      const timer = window.setTimeout(() => {
+        built = runBuild();
+      }, 140);
+      return () => {
+        window.clearTimeout(timer);
+        if (built) cleanupFor(built)();
+      };
     }
-    mount(next, stats, home, floor);
-    return cleanupFor(next);
+    const built = runBuild();
+    return built ? cleanupFor(built) : undefined;
   }, [modelId, variantId, rebuildToken, overrides, damageSeed, worn, gl, rootScene, camera]);
 
   // 组件卸载时释放所有缓存模型；模型切换时只是缓存/复用，不立即销毁。
@@ -409,6 +693,40 @@ function StageRuntime() {
   }, []);
 
   // ---- 每帧纪律 ----
+  // 舰载机换成 fight-stage 的 j20.ts 原模型：仅浏览器运行时挂载（j20 需要 canvas 贴图），
+  // 旧 J-15 零件保留为碰撞代理/零件树但不再渲染。动态 import 让非航母模型不加载这份代码。
+  useEffect(() => {
+    if (!assembled || modelId !== "carrier") return;
+    let disposeMount: (() => void) | undefined;
+    let cancelled = false;
+    import("@/three/parts/models/carrier/j20Mount")
+      .then(({ mountCarrierJ20 }) => {
+        if (!cancelled) disposeMount = mountCarrierJ20(assembled);
+      })
+      .catch((error) => console.warn("J20 挂载失败，保留原舰载机", error));
+    return () => {
+      cancelled = true;
+      disposeMount?.();
+    };
+  }, [assembled, modelId]);
+
+  // 舰员换成真正的人形蒙皮模型（Quaternius CC0，运行时挂载）；旧方块人已从注册表移除。
+  useEffect(() => {
+    if (!assembled || (modelId !== "type055" && modelId !== "carrier")) return;
+    let disposeMount: (() => void) | undefined;
+    let cancelled = false;
+    import("@/app/three/crewMount")
+      .then(({ mountCrewFigures }) => {
+        if (cancelled) return;
+        disposeMount = mountCrewFigures(assembled, modelId as "type055" | "carrier");
+      })
+      .catch((error) => console.warn("舰员人物挂载失败", error));
+    return () => {
+      cancelled = true;
+      disposeMount?.();
+    };
+  }, [assembled, modelId]);
+
   // AK-47 / M249 射击模式跟随状态机（单发/连发/停机）
   const machineState = useStageStore((state) => state.machineState);
   const currentModelId = useStageStore((state) => state.modelId);
@@ -499,6 +817,23 @@ function StageRuntime() {
     };
   }, [assembled, views.xray, views.localXray, views.internalsOnly, modelId, selectedXray, gl]);
 
+  // ---- 海面开关：海面/白浪/艏浪/尾流统一显隐；关掉后可绕到舰体下方检查 ----
+  // 进入舰内视角时也必须隐藏：海面是无限大平面，会穿进弹药库/生活区等水下舱室。
+  useEffect(() => {
+    if (!assembled) return;
+    const showSea = views.sea && !isCarrierInteriorMode(cameraMode);
+    for (const handle of assembled.parts) {
+      if (!handle.partId.startsWith("carrier.sea.")) continue;
+      handle.object.visible = showSea;
+      setPickable(handle.object, showSea);
+      for (const variant of Object.values(handle.damageObjects)) {
+        if (!variant) continue;
+        variant.visible = showSea;
+        setPickable(variant, showSea);
+      }
+    }
+  }, [assembled, views.sea, cameraMode, rebuildToken]);
+
   const damage = useStageStore((state) => state.damage);
   useEffect(() => {
     if (!assembled) return;
@@ -577,10 +912,32 @@ function StageRuntime() {
       views.localXray ||
       views.explode ||
       buildIndex < buildOrdersOf(modelId).length ||
-      selectedInternal;
+      selectedInternal ||
+      // 舰内第一人称（舰桥/情报中心/机舱/反应堆/弹药库/机库）必须看到舱内部件。
+      (modelId === "carrier" && isCarrierInteriorMode(cameraMode));
     camera.layers.enable(0);
     camera.layers.disable(2);
     applyInternalVisibility(modelId, assembled, showInternals, views.internalsOnly);
+    // 航母内部件一万余件：外部视角仅靠 layer 仍会参与矩阵/视锥遍历，
+    // 这里把内部件从场景树摘下；透视、爆炸、选中内部件或进入舱内视角时挂回。
+    if (modelId === "carrier") {
+      for (const handle of assembled.parts) {
+        if (!isInternalPart("carrier", handle)) continue;
+        if (!showInternals) {
+          const parent = handle.object.parent;
+          if (parent) {
+            handle.object.userData.__internalParent = parent;
+            parent.remove(handle.object);
+          }
+          setPickable(handle.object, false);
+          continue;
+        }
+        const parent = handle.object.userData.__internalParent as THREE.Object3D | undefined;
+        if (parent && handle.object.parent !== parent) parent.add(handle.object);
+        handle.object.visible = true;
+        setPickable(handle.object, true);
+      }
+    }
   }, [
     assembled,
     modelId,
@@ -591,6 +948,7 @@ function StageRuntime() {
     views.explode,
     buildIndex,
     selectedPart,
+    cameraMode,
   ]);
 
   // QA 钩子：开发模式或 ?qa=1 时暴露只读场景引用，用于自动化截图/录屏/相机机位。
@@ -656,19 +1014,21 @@ function StageRuntime() {
 
   if (!assembled && !buildError) return null;
 
+  // 网格随模型尺度（航母 316m / 坦克 8m）调整，避免大舰下网格细得看不见。
+  const gridSpan = Math.max(40, (stageFloor?.footprint ?? 1.2) * 1.4);
   return (
     <>
       {views.grid ? (
         <Grid
           position={[0, (stageFloor?.y ?? 0) - 0.004, 0]}
-          args={[40, 40]}
-          cellSize={0.25}
+          args={[gridSpan, gridSpan]}
+          cellSize={gridSpan / 160}
           cellThickness={0.5}
           cellColor="#d3d9e1"
-          sectionSize={1}
+          sectionSize={gridSpan / 16}
           sectionThickness={1}
           sectionColor="#bcc4cf"
-          fadeDistance={26}
+          fadeDistance={gridSpan * 0.65}
           fadeStrength={1.2}
           followCamera={false}
           raycast={() => null}
@@ -684,6 +1044,7 @@ function StageRuntime() {
           onFocus={(partId) => useStageStore.getState().requestFocus(partId)}
         />
       ) : null}
+      <PartIsolationVisibility />
       {assembled && views.shadow ? (
         <ContactShadow
           key={`shadow:${scene?.seq ?? 0}`}
@@ -715,6 +1076,33 @@ function StageRuntime() {
 }
 
 /** 装配体对象：object 每份装配体唯一，key 变化时整体重挂（R3F 的 primitive 不会替换 object）。 */
+/**
+ * 单件隔离：主视口只保留被隔离的零件。此前“隔离查看”只在右下小窗显示，
+ * 舰体/机匣仍会挡住内部零件，导致点开燃机零件看不到。
+ */
+function PartIsolationVisibility() {
+  const assembled = useStageStore((state) => state.assembled);
+  const modelId = useStageStore((state) => state.modelId);
+  const isolation = useStageStore((state) => state.isolation);
+  const partId = isolation?.kind === "part" ? isolation.partId : null;
+
+  useEffect(() => {
+    if (!assembled || assembled.root.name !== modelId || !partId) return;
+    const previous = new Map<(typeof assembled.parts)[number], boolean>();
+    for (const handle of assembled.parts) {
+      previous.set(handle, handle.object.visible);
+      handle.object.visible = false;
+    }
+    const target = assembled.getPart(partId);
+    if (target) target.object.visible = previous.get(target) ?? true;
+    return () => {
+      for (const [handle, visible] of previous) handle.object.visible = visible;
+    };
+  }, [assembled, modelId, partId]);
+
+  return null;
+}
+
 function AssembledObject({
   assembled,
   onSelect,
@@ -778,15 +1166,61 @@ function ContactShadow({ y, scale }: { y: number; scale: number }) {
   );
 }
 
+/** 航母外部视角护栏：防止拖动/平移把相机压到海面下或舰体内部造成黑屏。 */
+function CarrierCameraFloor() {
+  const modelId = useStageStore((state) => state.modelId);
+  const cameraMode = useStageStore((state) => state.cameraMode);
+  const camera = useThree((state) => state.camera);
+  const seaOn = useStageStore((state) => state.views.sea);
+  const controls = useThree((state) => state.controls) as
+    | { target: THREE.Vector3; update: () => void }
+    | null;
+  useFrame(() => {
+    if (modelId !== "carrier" || cameraMode !== "orbit" || !controls) return;
+    let changed = false;
+    // 海面可见时把相机压在水面以上；关掉海面后允许降到舰底以下做完整 360° 检查。
+    const floorY = seaOn ? 24 : 2;
+    if (camera.position.y < floorY) {
+      camera.position.y = floorY;
+      changed = true;
+    }
+    if (controls.target.y < floorY) {
+      controls.target.y = floorY;
+      changed = true;
+    }
+    if (controls.target.y > 120) {
+      controls.target.y = 120;
+      changed = true;
+    }
+    const maxTargetXZ = 220;
+    if (Math.abs(controls.target.x) > maxTargetXZ) {
+      controls.target.x = Math.sign(controls.target.x) * maxTargetXZ;
+      changed = true;
+    }
+    if (Math.abs(controls.target.z) > maxTargetXZ) {
+      controls.target.z = Math.sign(controls.target.z) * maxTargetXZ;
+      changed = true;
+    }
+    if (changed) controls.update();
+  });
+  return null;
+}
+
 /** 相机聚焦：零件树 / 穿模报告点击 → 平滑飞行；重置视角 → 回到初始方位。
  *  第一人称（潜望镜）时接管相机：关掉 OrbitControls，眼点由 viewpoints 从零件包围盒派生；
  *  退出时先记住的自由视角原路飞回，不把人甩到别的方位。 */
 function CameraRig() {
+  const modelId = useStageStore((state) => state.modelId);
   const camera = useThree((state) => state.camera);
+  const gl = useThree((state) => state.gl);
   const controls = useThree((state) => state.controls) as
-    { target: THREE.Vector3; update: () => void; enabled: boolean } | null | undefined;
+    | { target: THREE.Vector3; update: () => void; enabled: boolean; maxDistance?: number; minDistance?: number }
+    | null
+    | undefined;
   const focus = useStageStore((state) => state.focus);
   const cameraMode = useStageStore((state) => state.cameraMode);
+  const setCameraMode = useStageStore((state) => state.setCameraMode);
+  const machineState = useStageStore((state) => state.machineState);
   const assembled = useStageStore((state) => state.assembled);
   const flight = useRef<{
     fromPosition: THREE.Vector3;
@@ -807,7 +1241,72 @@ function CameraRig() {
   const previousMode = useRef<CameraMode>("orbit");
   /** 第一人称视线目标（平滑用）。 */
   const lookTarget = useRef(new THREE.Vector3(0, 0.8, 0));
+  const look = useRef({ yaw: 0, pitch: 0, dragging: false, x: 0, y: 0, zoom: 1 });
   const perspective = camera as THREE.PerspectiveCamera;
+
+  useEffect(() => {
+    look.current.yaw = 0;
+    look.current.pitch = 0;
+    look.current.dragging = false;
+    look.current.zoom = 1;
+    // 进入机库内部视角就切到机库作业状态（防火门打开），从任意视角直接切过来都生效。
+    if (cameraMode === "hangar" && useStageStore.getState().machineState !== "hangar") {
+      useStageStore.getState().setMachineState("hangar");
+    }
+  }, [cameraMode]);
+
+  // 点「弹射/拦阻闭环」后自动切到跟拍，完整看到滑行、弹射、爬升、进近、拦阻。
+  const previousMachineState = useRef(machineState);
+  useEffect(() => {
+    if (
+      machineState === "flight_ops" &&
+      previousMachineState.current !== "flight_ops" &&
+      assembled?.getNode("CV_Aircraft")
+    ) {
+      setCameraMode("flight");
+    }
+    previousMachineState.current = machineState;
+  }, [machineState, assembled, setCameraMode]);
+
+  // 舰船内部第一人称：鼠标拖拽环视（舰桥里能转头看海图桌/座椅/侧窗）。
+  useEffect(() => {
+    if (!isCarrierInteriorMode(cameraMode)) return;
+    const el = gl.domElement;
+    const down = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      look.current.dragging = true;
+      look.current.x = event.clientX;
+      look.current.y = event.clientY;
+    };
+    const move = (event: PointerEvent) => {
+      if (!look.current.dragging) return;
+      const dx = event.clientX - look.current.x;
+      const dy = event.clientY - look.current.y;
+      look.current.x = event.clientX;
+      look.current.y = event.clientY;
+      look.current.yaw -= dx * 0.005;
+      // 与自由视角一致：往下拖 = 往下看（之前的符号是反的）。
+      look.current.pitch = THREE.MathUtils.clamp(look.current.pitch + dy * 0.004, -1.25, 1.25);
+    };
+    const up = () => {
+      look.current.dragging = false;
+    };
+    const wheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const factor = Math.exp(event.deltaY * 0.0011);
+      look.current.zoom = THREE.MathUtils.clamp(look.current.zoom * factor, 0.45, 2.6);
+    };
+    el.addEventListener("pointerdown", down);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    el.addEventListener("wheel", wheel, { passive: false });
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      el.removeEventListener("wheel", wheel);
+    };
+  }, [cameraMode, gl]);
 
   // 模式切换：进第一人称存下自由视角并交出控制权；回自由视角把相机交还 OrbitControls。
   useEffect(() => {
@@ -856,12 +1355,37 @@ function CameraRig() {
       : new THREE.Vector3().subVectors(camera.position, currentTarget);
     if (direction.lengthSq() < 1e-8) direction.copy(HOME_DIRECTION);
     direction.normalize();
-    const fov = (camera as THREE.PerspectiveCamera).fov ?? 34;
+    // 航母这类百米级包围球若沿用 34° 视场，复位距离会拉到 ~700m，首帧容易落在背景穹顶之外。
+    // 大模型重置时切到 56° 取景，把复位距离压到 ~410m，既装得下全舰也不会黑屏。
+    const baseFov = (camera as THREE.PerspectiveCamera).fov ?? 34;
+    const fov = focus.radius > 60 ? Math.max(baseFov, 56) : baseFov;
+    if ((camera as THREE.PerspectiveCamera).fov !== fov) {
+      (camera as THREE.PerspectiveCamera).fov = fov;
+      (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
+    }
     // 1.15 ≈ 让包围球填满 ~85% 视锥（1.65 会把整机拉得又小又远，像展示柜角落里的玩具）
     const distance = Math.max(0.35, (focus.radius * 1.15) / Math.tan(THREE.MathUtils.degToRad(fov / 2)));
+    const toPosition = target.clone().addScaledVector(direction, distance);
+    // 航母真实尺度 316m：远裁剪面/轨道缩放上限按取景半径扩展，否则整舰会被裁掉。
+    const far = Math.max(200, distance + focus.radius * 4);
+    if (perspective.far < far) {
+      perspective.far = far;
+      perspective.updateProjectionMatrix();
+    }
+    const maxDistance = Math.max(200, distance * 20);
+    if (controls.maxDistance !== undefined) controls.maxDistance = maxDistance;
+    if (controls.minDistance !== undefined) controls.minDistance = Math.max(0.1, focus.radius * 0.01);
+    if (focus.instant) {
+      camera.position.copy(toPosition);
+      controls.target.copy(target);
+      controls.update();
+      flight.current = null;
+      useStageStore.setState({ focus: null });
+      return;
+    }
     flight.current = {
       fromPosition: camera.position.clone(),
-      toPosition: target.clone().addScaledVector(direction, distance),
+      toPosition,
       fromTarget: currentTarget,
       toTarget: target,
       fromFov: fov,
@@ -872,14 +1396,47 @@ function CameraRig() {
   }, [focus, camera, controls, cameraMode]);
 
   useFrame((_state, delta) => {
+    // —— 跟拍舰载机：以 CV_Aircraft 节点位姿为基准，完整覆盖弹射/拦阻闭环 ——
+    if (cameraMode === "flight" && assembled) {
+      const node = assembled.getNode("CV_Aircraft");
+      if (node) {
+        const targetPos = node.getWorldPosition(new THREE.Vector3());
+        const rotation = node.getWorldQuaternion(new THREE.Quaternion());
+        const desiredPosition = targetPos
+          .clone()
+          .add(new THREE.Vector3(0, 12, -34).applyQuaternion(rotation));
+        const desiredTarget = targetPos
+          .clone()
+          .add(new THREE.Vector3(0, 2.4, 8).applyQuaternion(rotation));
+        const k = 1 - Math.exp(-4.5 * delta);
+        camera.position.lerp(desiredPosition, k);
+        lookTarget.current.lerp(desiredTarget, k);
+        const targetFov = 52;
+        if (Math.abs(perspective.fov - targetFov) > 1e-3) {
+          perspective.fov += (targetFov - perspective.fov) * k;
+          perspective.updateProjectionMatrix();
+        }
+        camera.lookAt(lookTarget.current);
+        return;
+      }
+    }
+
     // —— 第一人称：眼点由零件包围盒派生（已是世界空间），窄视场，平滑跟随 ——
     const view = firstPersonView(cameraMode, assembled);
     if (view) {
       const k = 1 - Math.exp(-12 * delta);
       camera.position.lerp(view.position, k);
-      lookTarget.current.lerp(view.target, k);
-      if (Math.abs(perspective.fov - view.fov) > 1e-3) {
-        perspective.fov += (view.fov - perspective.fov) * k;
+      const baseDir = view.target.clone().sub(view.position).normalize();
+      const rotation = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(look.current.pitch, look.current.yaw, 0, "YXZ"),
+      );
+      baseDir.applyQuaternion(rotation);
+      const distance = Math.max(1, view.target.distanceTo(view.position));
+      const desiredTarget = view.position.clone().addScaledVector(baseDir, distance);
+      lookTarget.current.lerp(desiredTarget, k);
+      const targetFov = THREE.MathUtils.clamp(view.fov * look.current.zoom, 18, 100);
+      if (Math.abs(perspective.fov - targetFov) > 1e-3) {
+        perspective.fov += (targetFov - perspective.fov) * k;
         perspective.updateProjectionMatrix();
       }
       camera.lookAt(lookTarget.current);
@@ -903,14 +1460,17 @@ function CameraRig() {
   });
 
   const target = useMemo(() => new THREE.Vector3(0, 0.8, 0), []);
+  const seaOn = useStageStore((state) => state.views.sea);
   return (
     <OrbitControls
       makeDefault
       target={target}
       enableDamping
       dampingFactor={0.12}
-      minDistance={0.5}
-      maxDistance={40}
+      minDistance={0.1}
+      maxDistance={2000}
+      minPolarAngle={modelId === "carrier" ? 0.02 : 0.04}
+      maxPolarAngle={modelId === "carrier" ? (seaOn ? 1.55 : Math.PI - 0.06) : Math.PI / 2 - 0.015}
     />
   );
 }

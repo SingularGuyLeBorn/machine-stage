@@ -88,6 +88,15 @@ import {
   type38Registry,
 } from "@/three/parts/models/guns7/type38/registry";
 import { T38_MOTION_PARTS, animateType38 } from "@/three/parts/models/guns7/type38/motion";
+import { makeCarrierRegistry, CARRIER_LAYOUTS, carrierBuilders } from "@/three/parts/models/carrier/registry";
+import { makeType055Registry, makeType055Layouts, TYPE055_BUILDERS } from "@/three/parts/models/type055/registry";
+import { animateType055, TYPE055_ANIMATED_STATES, TYPE055_STATE_LABELS } from "@/three/parts/models/type055/motion";
+import {
+  animateCarrier,
+  CARRIER_ANIMATED_STATES,
+  CARRIER_STATE_LABELS,
+  carrierBounds,
+} from "@/three/parts/models/carrier/motion";
 
 // ============================================================================
 // catalog —— 展示台可加载的模型清单
@@ -98,7 +107,16 @@ import { T38_MOTION_PARTS, animateType38 } from "@/three/parts/models/guns7/type
 // ============================================================================
 
 export type ViewKey =
-  "explode" | "xray" | "localXray" | "internalsOnly" | "labels" | "grid" | "shadow" | "rain" | "thermal";
+  | "explode"
+  | "xray"
+  | "localXray"
+  | "internalsOnly"
+  | "labels"
+  | "grid"
+  | "shadow"
+  | "rain"
+  | "thermal"
+  | "sea";
 
 export type StageAction =
   | { id: string; group: string; label: string; kind: "energy-boost" }
@@ -110,6 +128,15 @@ export type StageAction =
   | { id: string; group: string; label: string; kind: "variant"; variant: string }
   | { id: string; group: string; label: string; kind: "reset-view" }
   | { id: string; group: string; label: string; kind: "reroll-damage" }
+  | {
+      id: string;
+      group: string;
+      label: string;
+      kind: "focus-node";
+      node: string;
+      offset?: [number, number, number];
+      radius?: number;
+    }
   | { id: string; group: string; label: string; kind: "camera"; mode: CameraMode }
   | { id: string; group: string; label: string; kind: "planned"; note: string };
 
@@ -135,11 +162,25 @@ export interface StageVariant {
   readouts?: (assembled: AssembledModel) => Array<{ label: string; value: string }>;
 }
 
+export type ModelCategory = "ship" | "aircraft" | "armor" | "firearm" | "mech" | "framework";
+
+export const MODEL_CATEGORY_LABELS: Record<ModelCategory, string> = {
+  ship: "舰船",
+  aircraft: "战机",
+  armor: "坦克",
+  firearm: "枪械",
+  mech: "机甲",
+  framework: "框架",
+};
+
+export const MODEL_CATEGORY_ORDER: ModelCategory[] = ["ship", "aircraft", "armor", "firearm", "mech", "framework"];
+
 export interface StageModel {
   /** [OM-FREEPLAY] 连续灯效与可反向合体使用场景时钟，状态内时序由模型管理。 */
   animationClock?: "continuous";
   id: string;
   title: string;
+  category: ModelCategory;
   subtitle: string;
   /** 里程碑标记（左栏卡片角标）。 */
   milestone: string;
@@ -218,6 +259,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "t800",
     title: "T-800 内骨骼",
+    category: "mech",
     subtitle: "M-G：真实网格按蒙皮切分（原型 245 件 / 机械拆解版 3067 件）",
     milestone: "M-G",
     status: "ready",
@@ -273,6 +315,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoemodules",
     title: "金古桥 · 参考图分体",
+    category: "mech",
     subtitle: "四分体 / 佩丹设备舱 / 可动肩肘 / 双天线折线光束",
     milestone: "四模块",
     status: "ready",
@@ -355,6 +398,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "test",
     title: "框架自检台",
+    category: "framework",
     subtitle: "3 零件 · 实例级穿模报告 · M-A 验收",
     milestone: "M-A",
     status: "ready",
@@ -403,6 +447,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "tiger",
     title: "虎式坦克 Tiger I",
+    category: "armor",
     subtitle: "L1–L5 全层 · 主炮闩 / 中空炮管 / 车长塔枪座 · 表面质感",
     milestone: "M-C",
     status: "ready",
@@ -548,6 +593,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "mbt90",
     title: "MBT-90 主战坦克",
+    category: "armor",
     subtitle: "V12 双涡轮 / 液气悬挂 / 转盘自动装弹机 / 复合装甲 + ERA / 120mm 滑膛炮 · 自内向外零件级",
     milestone: "M-D",
     status: "ready",
@@ -622,6 +668,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "ed90",
     title: "ED-90 电驱坦克",
+    category: "armor",
     subtitle: "6×800V 动力电池 / 双电机独立驱动 / SiC 电控 / 快充 + 能量回收 / 静音 · 瞬时扭矩 · 热失控",
     milestone: "M-F",
     status: "ready",
@@ -696,6 +743,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "type38",
     title: "三八式步枪",
+    category: "firearm",
     subtitle: "手动旋转后拉枪机 · 5 发固定弹仓 · 6.5×50mmSR 有坂弹",
     milestone: "G-1",
     status: "ready",
@@ -746,6 +794,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "bison",
     title: "PP-19 野牛冲锋枪",
+    category: "firearm",
     subtitle: "自由枪机 + 30 发螺旋弹筒 + 侧折叠骨架托 · 9×18mm PM",
     milestone: "G-2",
     status: "ready",
@@ -794,6 +843,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "m60",
     title: "M60 通用机枪",
+    category: "firearm",
     subtitle: "7.62×51 NATO · 导气式 + 回转闭锁 · 100 发可散链 · M60 大机盖",
     milestone: "G-4",
     status: "ready",
@@ -843,6 +893,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoe",
     title: "金古桥 King Joe",
+    category: "mech",
     subtitle: "真实网格皮 · 四体分离合体 · 锥销/锁环 · 彩虹胸 · 反重力 · 怪光线",
     milestone: "M-G·R3",
     status: "ready",
@@ -887,6 +938,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoeskin",
     title: "金古桥 King Joe · 真实网格分件",
+    category: "mech",
     // 用户要求隐藏：这是早期 578 源件检查卡，当前展示使用“参考图分体”。
     hidden: true,
     subtitle: "578 源件 · 四段飞船 · 四体分件查看 · 哑光银灰 + 彩虹胸 · 个人参考",
@@ -932,6 +984,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "kingjoewhole",
     title: "金古桥 King Joe · 整体实心（单件）",
+    category: "mech",
     // 用户要求隐藏：这是早期实心对照模型，保留用于几何回归，不再展示入口。
     hidden: true,
     subtitle: "原皮表面 + 内部闭合实心核 + 缝隙补面 · 1 个 partId · 不是中空壳",
@@ -975,6 +1028,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "m2hb",
     title: "M2HB 重机枪",
+    category: "firearm",
     subtitle: "枪管短后坐 + 半自由枪机 · M3 三脚架 + T&E · 重力排壳",
     milestone: "M-D",
     status: "ready",
@@ -1026,6 +1080,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "ak47",
     title: "AK-47 突击步枪",
+    category: "firearm",
     subtitle: "导气式 + 枪机回转闭锁 · 30 发弹匣零件化 · 完整射击循环",
     milestone: "M-E",
     status: "ready",
@@ -1073,6 +1128,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "rpk",
     title: "RPK 轻机枪",
+    category: "firearm",
     subtitle: "590mm 长枪管 + 两脚架 + 固定木托 · 导气式 + 枪机回转闭锁",
     milestone: "G-3",
     status: "ready",
@@ -1121,6 +1177,7 @@ export const CATALOG: StageModel[] = [
   {
     id: "m134",
     title: "M134 加特林",
+    category: "firearm",
     subtitle: "6 管旋转 · 每管独立枪机依次击发 · 外能源电机驱动",
     milestone: "M-G",
     status: "ready",
@@ -1171,8 +1228,124 @@ export const CATALOG: StageModel[] = [
     ],
   },
   {
+    id: "carrier",
+    title: "福建舰 · 电磁弹射航母",
+    category: "ship",
+    subtitle: "1:8 · 电磁弹射 / 拦阻降落 / 相控阵 / 1130 近防 / 核动力",
+    milestone: "CV-1",
+    status: "ready",
+    registry: makeCarrierRegistry(),
+    layouts: CARRIER_LAYOUTS,
+    builders: carrierBuilders,
+    animate: animateCarrier,
+    framingBounds: carrierBounds,
+    // 编辑数据是 1:8；场景统一为 1 单位 = 1 米：40×7.9=316m，9.6×7.9≈76m。
+    presentationScale: [7.9, 7.9, 7.9],
+    animatedStates: [...CARRIER_ANIMATED_STATES],
+    cameras: ["orbit", "bridge", "cic", "crew", "crew_berth", "crew_mess", "workshop", "fuel", "engine_room", "reactor_room", "magazine", "hangar", "cockpit", "flight"],
+    states: [
+      ...CARRIER_STATE_LABELS.map((state) => ({ id: state.id as string, label: state.label, hint: state.hint })),
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "cv-engine", group: "动力", label: "动力运转", kind: "machine-state", state: "engine" },
+      { id: "cv-flight", group: "航空", label: "弹射/拦阻闭环", kind: "machine-state", state: "flight_ops" },
+      { id: "cv-hangar", group: "机库", label: "机库作业", kind: "machine-state", state: "hangar" },
+      { id: "cv-ciws", group: "武器", label: "近防拦截", kind: "machine-state", state: "ciws" },
+      { id: "cv-idle", group: "机构", label: "系泊检查", kind: "machine-state", state: "idle" },
+      { id: "cv-cam-bridge", group: "内部视角", label: "航海舰桥", kind: "camera", mode: "bridge" },
+      { id: "cv-cam-cic", group: "内部视角", label: "战斗情报中心", kind: "camera", mode: "cic" },
+      { id: "cv-cam-crew", group: "内部视角", label: "生活区走廊", kind: "camera", mode: "crew" },
+      { id: "cv-cam-crew-berth", group: "内部视角", label: "水兵住舱", kind: "camera", mode: "crew_berth" },
+      { id: "cv-cam-crew-mess", group: "内部视角", label: "餐厅/厨房", kind: "camera", mode: "crew_mess" },
+      { id: "cv-cam-workshop", group: "内部视角", label: "维修车间", kind: "camera", mode: "workshop" },
+      { id: "cv-cam-fuel", group: "内部视角", label: "加油作业", kind: "camera", mode: "fuel" },
+      { id: "cv-cam-engine", group: "内部视角", label: "机舱", kind: "camera", mode: "engine_room" },
+      { id: "cv-cam-reactor", group: "内部视角", label: "反应堆舱", kind: "camera", mode: "reactor_room" },
+      { id: "cv-cam-magazine", group: "内部视角", label: "弹药库", kind: "camera", mode: "magazine" },
+      { id: "cv-cam-hangar", group: "内部视角", label: "机库", kind: "camera", mode: "hangar" },
+      { id: "cv-cam-cockpit", group: "内部视角", label: "舰载机座舱", kind: "camera", mode: "cockpit" },
+      { id: "cv-cam-flight", group: "内部视角", label: "跟拍舰载机", kind: "camera", mode: "flight" },
+      { id: "cv-aircraft-closeup", group: "航空", label: "舰载机特写", kind: "focus-node", node: "CV_Aircraft", offset: [0, 4, 0], radius: 14 },
+      { id: "cv-catapult-closeup", group: "航空", label: "电磁弹射器", kind: "focus-node", node: "CV_Shuttle", offset: [0, 5, -3], radius: 22 },
+      { id: "cv-ordnance", group: "武器", label: "甲板挂弹/弹药升降机", kind: "focus-node", node: "CV_OrdnanceStage", offset: [2, 4, 6], radius: 7 },
+      { id: "cv-explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "cv-xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "cv-labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "cv-reset", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "cv-scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "cv-scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    notes: [
+      "福建舰 1:8 展示尺度：舰体 40m、飞行甲板 9.6m；真实约 320m×78m。",
+      "核心闭环：舰载机 30s 循环——折叠翼展开 → 滑行到 2 号弹射位 → 挡焰板升起 → 电磁弹射滑跑 → 离舰爬升 → 航线回转 → 放下尾钩进近 → 钩住第 2 道拦阻索 → 减速停住 → 折叠翼系留。",
+      "动力：压水堆 8 组燃料组件（16 根棒/组件）/控制棒驱动/蒸汽发生器/一回路主泵 → 高低压蒸汽轮机 → 减速齿轮 → 双轴双桨；红区剖面可看堆芯。",
+      "舰岛：三层舰桥 + 四面固定相控阵（8×8 T/R 单元/面）+ 旋转搜索雷达 + 1130 近防炮（11 管/11 枪机）。",
+      "甲板：3 条电磁弹射器（定子/线圈/水冷/飞轮储能）、4 道拦阻索（左右半索+滑轮+液压拦阻机）、2 部舷侧升降机、系留点/边灯/标线。",
+      "电磁弹射可视化：甲板三车道带白边线/铜中心轨/起止线/待发滑梭/挡焰板；甲板下有直线电机隧道、反应轨、水冷主管、变流柜、飞轮储能、脉冲电容和母线铜排。点「电磁弹射器」聚焦，再开「透视」即可看甲板下机构。",
+      "斜角着舰区与弹射器共享同一片飞行甲板：着舰跑道斜穿甲板中后部，腰部 3 号弹射器与着舰区在平面上交叉，这是真实航母的布置；起降按作业阶段错开，并非模型错误。舰艏直通起飞区已前移到着舰区前方，俯视不再出现两条浅灰跑道叠在一起。",
+    ],
+  },
+  {
+    id: "type055",
+    title: "055 型驱逐舰 · 南昌舰",
+    category: "ship",
+    subtitle: "180m · 112 单元 VLS · 346B 四面阵 · 130mm 主炮 · COGAG 四燃双轴",
+    milestone: "DDG-1",
+    status: "ready",
+    registry: makeType055Registry(),
+    layouts: makeType055Layouts(),
+    builders: TYPE055_BUILDERS,
+    animate: animateType055,
+    presentationScale: [1, 1, 1],
+    animatedStates: [...TYPE055_ANIMATED_STATES],
+    cameras: ["orbit", "bridge", "cic", "crew", "crew_berth", "crew_mess", "workshop", "fuel", "engine_room", "hangar", "magazine"],
+    states: [
+      ...TYPE055_STATE_LABELS.map((state) => ({ ...state })),
+      { id: "scanning", label: "穿模扫描", hint: "静态装配 / 动画扫掠检测进行中" },
+    ],
+    actions: [
+      { id: "ddg-engine", group: "动力", label: "COGAG 运转", kind: "machine-state", state: "engine" },
+      { id: "ddg-weapons", group: "武器", label: "主炮/近防跟踪", kind: "machine-state", state: "weapons" },
+      { id: "ddg-ciws-fire", group: "武器", label: "1130 近防拦截", kind: "machine-state", state: "ciws" },
+      { id: "ddg-launch", group: "武器", label: "VLS 齐射", kind: "machine-state", state: "launch" },
+      { id: "ddg-aviation", group: "航空", label: "机库/旋翼作业", kind: "machine-state", state: "aviation" },
+      { id: "ddg-idle", group: "机构", label: "系泊检查", kind: "machine-state", state: "idle" },
+      { id: "ddg-vls", group: "武器", label: "112 单元 VLS", kind: "focus-node", node: "CV_055_VlsHatch", offset: [0, 8, 6], radius: 38 },
+      { id: "ddg-radar", group: "雷达", label: "346B 相控阵", kind: "focus-node", node: "CV_055_Radar", offset: [0, 8, 18], radius: 32 },
+      { id: "ddg-gun", group: "武器", label: "130mm 主炮", kind: "focus-node", node: "CV_055_Gun", offset: [0, 6, 14], radius: 16 },
+      { id: "ddg-ciws", group: "武器", label: "1130 近防炮", kind: "focus-node", node: "CV_055_Ciws_fwd", offset: [0, 4, 12], radius: 9 },
+      { id: "ddg-crew", group: "内部视角", label: "生活区走廊", kind: "camera", mode: "crew" },
+      { id: "ddg-crew-berth", group: "内部视角", label: "水兵住舱", kind: "camera", mode: "crew_berth" },
+      { id: "ddg-crew-mess", group: "内部视角", label: "餐厅/厨房", kind: "camera", mode: "crew_mess" },
+      { id: "ddg-cam-workshop", group: "内部视角", label: "维修车间", kind: "camera", mode: "workshop" },
+      { id: "ddg-cam-fuel", group: "内部视角", label: "加油作业", kind: "camera", mode: "fuel" },
+      { id: "ddg-bow", group: "舰体", label: "艏部球鼻艏", kind: "focus-node", node: "CV_055_Radar", offset: [0, -14, 44], radius: 26 },
+      { id: "explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
+      { id: "xray", group: "展示", label: "透视", kind: "view-toggle", view: "xray" },
+      { id: "labels", group: "展示", label: "零件标注", kind: "view-toggle", view: "labels" },
+      { id: "reset-view", group: "展示", label: "重置视角", kind: "reset-view" },
+      { id: "scan-static", group: "自检", label: "静态重扫", kind: "scan", scanKind: "static" },
+      { id: "scan-sweep", group: "自检", label: "动画扫掠", kind: "scan", scanKind: "sweep" },
+    ],
+    readouts: () => [
+      { label: "舰长", value: "约 180m" },
+      { label: "舷宽", value: "约 20m（水线）" },
+      { label: "吃水", value: "约 6.6m" },
+      { label: "VLS", value: "112 单元 · 850mm × 9m · 冷热共架" },
+      { label: "动力", value: "4×QC-280 28MW / 112MW · 双轴 CPP" },
+      { label: "航空", value: "直-20 ×3（甲板 1 + 机库 2）" },
+    ],
+    notes: [
+      "055 的灵魂是 112 个通用垂直发射单元：前甲板 8×8=64、后部 8×6=48，冷热共架兼容海红旗/鹰击-21。",
+      "346B 四面阵集成在一体化隐身桅杆/上建里；舰体水线以上舷侧内倾 18%，降低雷达反射。",
+      "本版先立舰体/动力/112 VLS/346B/130mm/1130/双机库；直-20 与冷热发射流程在下一轮补齐。",
+    ],
+  },
+  {
     id: "j20",
     title: "歼-20",
+    category: "aircraft",
     subtitle: "M-F：主承力框 + 弹舱滑轨",
     milestone: "M-F",
     status: "planned",

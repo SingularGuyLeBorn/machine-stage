@@ -35,7 +35,9 @@ export type GeometrySpec = (
   | { type: "cylinder"; r: Expr; h: Expr; rTop?: Expr; segments?: number; bevel?: Expr }
   | { type: "tube"; rOuter: Expr; rInner: Expr; h: Expr; segments?: number }
   | { type: "sphere"; r: Expr; segments?: number }
+  | { type: "torus"; radius: Expr; tube: Expr; radialSegments?: number; tubularSegments?: number }
   | { type: "lathe"; profile: [Expr, Expr][]; segments?: number }
+  | { type: "latheZ"; profile: [Expr, Expr][]; segments?: number }
   | { type: "polygon"; points: [Expr, Expr][]; depth: Expr; bevel?: Expr }
   | { type: "rivets"; count: number; spacing: Expr; radius?: Expr }
   | { type: "boltCircle"; count: number; radius: Expr; boltR?: Expr; boltH?: Expr }
@@ -73,6 +75,8 @@ export interface NodeDef {
    * 静态装配检测看到的就是这个姿态，动画在此基础上继续驱动。
    */
   rest_rotation?: ExprVec3;
+  /** 静止缩放（装配单位）；用于同一零件树内按真实比例校正整机/部件。 */
+  scale?: ExprVec3;
   /** 运动类型；缺省表示静态装配分组节点。 */
   motion?: "rotate" | "translate" | "scalar";
   axis?: Axis;

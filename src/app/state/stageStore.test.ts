@@ -67,6 +67,7 @@ const resetStore = () => {
       shadow: true,
       rain: false,
       thermal: false,
+      sea: true,
     },
     layout: {
       left: { width: 272, open: true },
@@ -299,6 +300,7 @@ describe("stageStore 模型切换", () => {
         shadow: false,
         rain: true,
         thermal: true,
+        sea: false,
       },
     });
     useStageStore.getState().setModel("test");
@@ -315,6 +317,7 @@ describe("stageStore 模型切换", () => {
       shadow: true,
       rain: false,
       thermal: false,
+      sea: true,
     });
     expect(state.selectedPart).toBeNull();
     expect(state.buildIndex).toBe(buildOrdersOf("test").length);

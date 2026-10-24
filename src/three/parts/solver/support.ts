@@ -25,6 +25,8 @@ export interface SupportOptions {
   filter?: (handle: PartHandle) => boolean;
   /** 豁免标签（零件 def.tags）：默认 fx / floating。 */
   exemptTags?: string[];
+  /** 不作为支撑来源的零件：用于剔除巨大凹形 AABB（如船壳）造成的假支撑。 */
+  ignoreDonorPartIds?: string[];
 }
 
 export interface SupportReport {
@@ -157,6 +159,7 @@ export function detectUnsupportedParts(
   const bodies = collectBodies(assembled, options);
   // 单件整机没有“同体邻居”，支撑检测的前提不成立；不把它误报为悬空。
   if (bodies.length <= 1) return [];
+  const ignoredDonors = new Set(options.ignoreDonorPartIds ?? []);
   const reports: SupportReport[] = [];
 
   for (let i = 0; i < bodies.length; i++) {
@@ -166,6 +169,7 @@ export function detectUnsupportedParts(
     for (let j = 0; j < bodies.length; j++) {
       if (i === j) continue;
       const candidate = bodies[j]!;
+      if (ignoredDonors.has(candidate.handle.partId)) continue;
       const gap = aabbGap(body.box, candidate.box);
       if (gap < bestGap) {
         bestGap = gap;

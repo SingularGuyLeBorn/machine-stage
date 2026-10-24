@@ -1,5 +1,6 @@
 import { Activity, Info } from "lucide-react";
 import { useMemo } from "react";
+import * as THREE from "three";
 import { findModel, type StageAction } from "../catalog";
 import { useStageStore } from "../state/stageStore";
 
@@ -62,6 +63,15 @@ export function ActionPanel() {
       case "reroll-damage":
         store.rerollDamage();
         break;
+      case "focus-node": {
+        const node = store.assembled?.getNode(action.node);
+        if (!node) break;
+        const p = node.getWorldPosition(new THREE.Vector3());
+        const [ox, oy, oz] = action.offset ?? [0, 0, 0];
+        store.setCameraMode("orbit");
+        store.focusPoint([p.x + ox, p.y + oy, p.z + oz], action.radius ?? 10, true);
+        break;
+      }
       case "camera":
         // 再点一次同一模式 = 回到自由视角（和机构按钮的「再点停机」同一手感）
         store.setCameraMode(store.cameraMode === action.mode ? "orbit" : action.mode);

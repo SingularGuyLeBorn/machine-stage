@@ -17,7 +17,42 @@ import type { AssembledModel, PartHandle } from "@/three/parts";
 // 这样行进 / 受击时车体动了，视角也跟着动。
 // ============================================================================
 
-export type CameraMode = "orbit" | "driver" | "commander";
+export type CameraMode =
+  | "orbit"
+  | "driver"
+  | "commander"
+  | "bridge"
+  | "cic"
+  | "engine_room"
+  | "reactor_room"
+  | "magazine"
+  | "hangar"
+  | "crew"
+  | "crew_berth"
+  | "crew_mess"
+  | "workshop"
+  | "fuel"
+  | "cockpit"
+  | "flight";
+
+export const CARRIER_INTERIOR_MODES = [
+  "bridge",
+  "cic",
+  "engine_room",
+  "reactor_room",
+  "magazine",
+  "hangar",
+  "crew",
+  "crew_berth",
+  "crew_mess",
+  "workshop",
+  "fuel",
+  "cockpit",
+] as const;
+
+export function isCarrierInteriorMode(mode: CameraMode): boolean {
+  return (CARRIER_INTERIOR_MODES as readonly string[]).includes(mode);
+}
 
 export interface FirstPersonView {
   /** 眼点（世界空间；已含车体位姿与炮塔回转）。 */
@@ -66,7 +101,7 @@ export function firstPersonView(
   mode: CameraMode,
   assembled: AssembledModel | null,
 ): FirstPersonView | null {
-  if (mode === "orbit" || !assembled) return null;
+  if (mode === "orbit" || mode === "flight" || !assembled) return null;
   const toWorld = (local: THREE.Vector3) => local.applyMatrix4(assembled.root.matrixWorld);
 
   if (mode === "driver") {
@@ -96,6 +131,42 @@ export function firstPersonView(
     };
   }
 
+  if (mode === "cockpit") {
+    // 座舱空间狭小，零件包围盒容易把眼点推到舱盖/机头上；用机体节点局部坐标
+    // 把眼点放在座椅前方、头枕之前的飞行员眼位，俯看仪表板（座舱盖在进入该视角时隐藏）。
+    const node = assembled.getNode("CV_Aircraft");
+    if (!node) return null;
+    const m = node.matrixWorld;
+    return {
+      position: new THREE.Vector3(0, 0.72, 0.36).applyMatrix4(m),
+      target: new THREE.Vector3(0, 0.648, 0.525).applyMatrix4(m),
+      fov: 66,
+    };
+  }
+
+  if (isCarrierInteriorMode(mode)) {
+    const views = assembled.registry.model === "type055" ? TYPE055_INTERIOR_VIEWS : CARRIER_INTERIOR_VIEWS;
+    const spec = views[mode];
+    if (!spec) return null;
+    const eyeHandle = assembled.getPart(spec.eyePart);
+    const targetHandle = assembled.getPart(spec.targetPart);
+    if (!eyeHandle || !targetHandle) return null;
+    const eyeBox = handleBox(assembled, eyeHandle);
+    const targetBox = handleBox(assembled, targetHandle);
+    if (!eyeBox || !targetBox) return null;
+    const eyeCenter = eyeBox.getCenter(new THREE.Vector3());
+    const eye = new THREE.Vector3(
+      eyeCenter.x + spec.eye[0],
+      eyeBox.max.y + spec.eye[1],
+      eyeCenter.z + spec.eye[2],
+    );
+    return {
+      position: toWorld(eye),
+      target: toWorld(targetBox.getCenter(new THREE.Vector3()).add(new THREE.Vector3(...(spec.targetOffset ?? [0, 0, 0])))),
+      fov: spec.fov,
+    };
+  }
+
   const handle = assembled.getPart(COMMANDER_CUPOLA);
   if (!handle) return null;
   const box = handleBox(assembled, handle);
@@ -109,9 +180,168 @@ export function firstPersonView(
   };
 }
 
+interface CarrierInteriorViewSpec {
+  eyePart: string;
+  eye: [number, number, number];
+  targetPart: string;
+  targetOffset?: [number, number, number];
+  fov: number;
+}
+
+const TYPE055_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec>> = {
+  bridge: {
+    // 站在前显控台后方（不是舰长席 6m 开外）。眼点高于窗台、离玻璃 1.2m，
+    // 向下视线才能越过窗台看到前甲板；否则整片甲板会被窗台挡住。
+    eyePart: "type055.interior.bridge_view_anchor",
+    eye: [0, 0, 0],
+    targetPart: "type055.super.bridge_glass_front",
+    targetOffset: [0, -0.3, 0],
+    fov: 72,
+  },
+  cic: {
+    eyePart: "type055.interior.cic_chart_table",
+    eye: [0, 1.3, 0],
+    targetPart: "type055.interior.cic_screen_c",
+    targetOffset: [0, 0.2, 0],
+    fov: 68,
+  },
+  engine_room: {
+    eyePart: "type055.power.engine_console",
+    eye: [-1.1, -0.35, -1.0],
+    targetPart: "type055.power.gt1_casing",
+    targetOffset: [0, 0.8, -0.5],
+    fov: 70,
+  },
+  hangar: {
+    eyePart: "type055.hangar.door_header",
+    eye: [0, -2.8, 4.0],
+    targetPart: "type055.hangar.z20_hangar_r_cabin_upper",
+    fov: 70,
+  },
+  crew: {
+    eyePart: "type055.interior.crew_corridor_eye",
+    eye: [0, 0, 0],
+    targetPart: "type055.interior.crew_corridor_end",
+    fov: 70,
+  },
+  crew_berth: {
+    eyePart: "type055.interior.crew_berth_eye",
+    eye: [0, 0, 0],
+    targetPart: "type055.interior.crew_berth_target",
+    fov: 74,
+  },
+  crew_mess: {
+    eyePart: "type055.interior.crew_mess_eye",
+    eye: [0, 0, 0],
+    targetPart: "type055.interior.crew_mess_target",
+    fov: 74,
+  },
+  workshop: {
+    eyePart: "type055.power.workshop_eye",
+    eye: [0, 0, 0],
+    targetPart: "type055.power.workshop_target",
+    fov: 68,
+  },
+  fuel: {
+    eyePart: "type055.hangar.fuel_view_eye",
+    eye: [0, 0, 0],
+    targetPart: "type055.hangar.fuel_view_target",
+    fov: 60,
+  },
+  magazine: {
+    eyePart: "type055.gun.magazine",
+    eye: [0, -0.55, 2.2],
+    targetPart: "type055.gun.shell_01",
+    fov: 70,
+  },
+};
+
+const CARRIER_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec>> = {
+  bridge: {
+    eyePart: "carrier.island.bridge_captain_seat_back",
+    eye: [0, 0.16, 0.28],
+    targetPart: "carrier.island.bridge_front_glass_c",
+    fov: 66,
+  },
+  crew: {
+    eyePart: "carrier.crew.corridor_eye",
+    eye: [0, 0, 0],
+    targetPart: "carrier.crew.corridor_end",
+    fov: 72,
+  },
+  crew_berth: {
+    eyePart: "carrier.crew.berth_eye",
+    eye: [0, 0, 0],
+    targetPart: "carrier.crew.berth_target",
+    fov: 74,
+  },
+  crew_mess: {
+    eyePart: "carrier.crew.mess_eye",
+    eye: [0, 0, 0],
+    targetPart: "carrier.crew.mess_target",
+    fov: 74,
+  },
+  workshop: {
+    eyePart: "carrier.hangar.workshop_eye",
+    eye: [0, 0, 0],
+    targetPart: "carrier.hangar.workshop_target",
+    fov: 62,
+  },
+  fuel: {
+    eyePart: "carrier.deck.fuel_view_eye",
+    eye: [0, 0, 0],
+    targetPart: "carrier.aircraft.parked1_fuselage_mid",
+    fov: 62,
+  },
+  cic: {
+    eyePart: "carrier.island.cic_watch_seat_back",
+    eye: [0, 0.32, 1.2],
+    targetPart: "carrier.island.cic_main_screen_c",
+    fov: 66,
+  },
+  engine_room: {
+    eyePart: "carrier.power.engine_view_camera",
+    eye: [0, 0, 0],
+    targetPart: "carrier.power.engine_switchboard",
+    fov: 78,
+  },
+  reactor_room: {
+    eyePart: "carrier.power.reactor_control_seat_back",
+    eye: [0, 0.005, -0.04],
+    targetPart: "carrier.power.vessel_head",
+    targetOffset: [0, -0.5, 0],
+    fov: 62,
+  },
+  magazine: {
+    eyePart: "carrier.hangar.magazine_view_camera",
+    eye: [0, 0, 0],
+    targetPart: "carrier.hangar.magazine_view_target",
+    fov: 55,
+  },
+  hangar: {
+    eyePart: "carrier.hangar.hangar_view_camera",
+    eye: [0, 0, 0],
+    targetPart: "carrier.aircraft.hangarparked1_fuselage_mid",
+    fov: 55,
+  },
+};
+
 /** 视角模式的界面文案（动作按钮与浮层共用）。 */
 export const CAMERA_MODE_LABELS: Record<CameraMode, { label: string; hint: string }> = {
   orbit: { label: "自由视角", hint: "拖动旋转 / 滚轮缩放" },
   driver: { label: "驾驶席视角", hint: "坐在驾驶席看仪表 / 方向盘 / 踏板；再点一次回到自由视角" },
   commander: { label: "车长指挥塔", hint: "随炮塔回转，向前看；再点一次回到自由视角" },
+  bridge: { label: "航海舰桥", hint: "站在舰桥内，鼠标拖动环视舵轮 / 仪表盘 / 海图桌 / 雷达屏 / 侧窗；再点一次退出" },
+  cic: { label: "战斗情报中心", hint: "在 CIC 内，拖动环视战术显控墙 / 双排显控台 / 海图桌 / 通信机柜；再点一次退出" },
+  engine_room: { label: "机舱", hint: "在蒸汽轮机与减速齿轮箱之间，拖动环视管路 / 阀门 / 机舱仪表；再点一次退出" },
+  reactor_room: { label: "反应堆舱", hint: "在反应堆屏蔽舱内，拖动环视压力容器 / 控制棒 / 一回路仪表；再点一次退出" },
+  magazine: { label: "弹药库", hint: "在弹药库内，拖动环视弹药架 / 扬弹机 / 库存显控；再点一次退出" },
+  hangar: { label: "机库", hint: "在机库内，拖动环视停机位 / 维护区 / 机库控制台；再点一次退出" },
+  crew: { label: "生活区走廊", hint: "站在水下生活甲板走廊，两侧是水兵住舱 / 士官舱 / 军官舱 / 餐厅 / 厨房 / 医务室；再点一次退出" },
+  crew_berth: { label: "水兵住舱", hint: "8 人住舱：两层铺 / 个人衣柜 / 床头灯 / 折叠凳，拖动环视；再点一次退出" },
+  crew_mess: { label: "餐厅/厨房", hint: "舰员餐厅与全电厨房：配餐台 / 餐桌 / 电磁灶 / 冷库；再点一次退出" },
+  workshop: { label: "维修车间", hint: "轮机/机加工/备件/损管：车床 / 钻床 / 工具柜 / 备用燃气轮机 / 吊车；再点一次退出" },
+  fuel: { label: "加油作业", hint: "飞行甲板燃油站：加油车 / 软管 / 加油枪 / 接地线，连接到停放舰载机；再点一次退出" },
+  cockpit: { label: "舰载机座舱", hint: "舰载机座舱：平显 / 多功能显示器 / 操纵杆，拖动环视；再点一次退出" },
+  flight: { label: "跟拍舰载机", hint: "跟拍舰载机：完整看滑行 / 弹射 / 爬升 / 进近 / 拦阻；再点一次退出" },
 };

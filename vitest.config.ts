@@ -11,6 +11,10 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.{ts,tsx}"],
+    // 航母 4500+ 件的装配测试内存占用高：单 worker 串行，避免多 worker 触发 V8 Zone OOM。
+    pool: "forks",
+    maxWorkers: 1,
+    minWorkers: 1,
     setupFiles: ["src/test/setup.ts"],
     coverage: {
       provider: "v8",
