@@ -1,4 +1,4 @@
-import { A, B, C, M, S, type CarrierCtx } from "./common";
+import { A, B, C, M, type CarrierCtx } from "./common";
 
 // ============================================================================
 // 福建舰船员生活区（编辑尺度 1:8）
@@ -361,10 +361,10 @@ export function addCarrierCrew(ctx: CarrierCtx): void {
   corr.push(B(0.035, 0.05, 0.03, [-0.06, FLOOR + 0.03, 10.9], 0.002));
   part("corridor_props", "生活区走廊扶手/灭火器/损管柜", M(...corr), "cv_055_console");
   const pipes: Array<Parameters<typeof M>[0]> = [];
-  for (const [dx, y] of [[-0.04, CEIL - 0.02], [0, CEIL - 0.02], [0.04, CEIL - 0.025]] as const) {
-    pipes.push({ type: "weld", from: [dx, y, Z0 + 0.1], to: [dx, y, Z1 - 0.1], radius: 0.003 });
+  for (const [dx, y] of [[-0.035, CEIL - 0.008], [0, CEIL - 0.008], [0.035, CEIL - 0.011]] as const) {
+    pipes.push({ type: "weld", from: [dx, y, Z0 + 0.1], to: [dx, y, Z1 - 0.1], radius: 0.0018 });
   }
-  part("corridor_pipes", "生活区走廊电缆/水管", M(...pipes), "cv_copper");
+  part("corridor_pipes", "生活区走廊电缆/水管", M(...pipes), "cv_steel");
 
   part("wood_furniture", "生活区木纹家具/桌面/床板", M(...wood), "cv_055_wood");
   part("dark_furniture", "生活区金属家具/柜架/屏幕框", M(...dark), "cv_055_console");
@@ -373,54 +373,13 @@ export function addCarrierCrew(ctx: CarrierCtx): void {
   part("screens", "生活区电视/医疗监护屏", M(...screens), "cv_scr_camera");
   part("props", "生活区餐具/书籍/器材/私人物品", M(...props), "cv_steel");
 
-  // ---- 舰员（不同身高/制服/岗位） ----
-  const skin: Array<ReturnType<typeof S>> = [];
-  const boots: Array<ReturnType<typeof B>> = [];
-  const uniforms: Record<string, Array<ReturnType<typeof B>>> = {
-    blue: [], olive: [], white: [], navy: [], red: [],
-  };
-  const person = (x: number, z: number, uniform: keyof typeof uniforms, h = 0.22, cap = false) => {
-    const u = uniforms[uniform]!;
-    const r = h / 0.22;
-    u.push(B(0.05 * r, 0.066 * r, 0.028 * r, [x, FLOOR + 0.14 * r, z], 0.003));
-    u.push(B(0.015 * r, 0.06 * r, 0.018 * r, [x - 0.034 * r, FLOOR + 0.14 * r, z], 0.002));
-    u.push(B(0.015 * r, 0.06 * r, 0.018 * r, [x + 0.034 * r, FLOOR + 0.14 * r, z], 0.002));
-    u.push(B(0.018 * r, 0.1 * r, 0.02 * r, [x - 0.013 * r, FLOOR + 0.06 * r, z], 0.002));
-    u.push(B(0.018 * r, 0.1 * r, 0.02 * r, [x + 0.013 * r, FLOOR + 0.06 * r, z], 0.002));
-    u.push(B(0.052 * r, 0.008 * r, 0.03 * r, [x, FLOOR + 0.11 * r, z], 0.002));
-    u.push(B(0.03 * r, 0.01 * r, 0.03 * r, [x, FLOOR + 0.22 * r, z], 0.003));
-    u.push(B(0.05 * r, 0.008 * r, 0.03 * r, [x, FLOOR + 0.112 * r, z], 0.002));
-    if (cap) u.push(B(0.028 * r, 0.01 * r, 0.028 * r, [x, FLOOR + 0.226 * r, z], 0.002));
-    else u.push(B(0.024 * r, 0.008 * r, 0.024 * r, [x, FLOOR + 0.222 * r, z - 0.002], 0.003));
-    skin.push(S(0.013 * r, [x, FLOOR + 0.205 * r, z], 8));
-    skin.push(S(0.0025 * r, [x - 0.006 * r, FLOOR + 0.207 * r, z + 0.012 * r], 6));
-    skin.push(S(0.0025 * r, [x + 0.006 * r, FLOOR + 0.207 * r, z + 0.012 * r], 6));
-    boots.push(B(0.018 * r, 0.012 * r, 0.033 * r, [x - 0.013 * r, FLOOR + 0.006 * r, z + 0.004 * r], 0.001));
-    boots.push(B(0.018 * r, 0.012 * r, 0.033 * r, [x + 0.013 * r, FLOOR + 0.006 * r, z + 0.004 * r], 0.001));
-  };
-  person(0.2, 5.7, "blue", 0.225, false);
-  person(0.75, 5.55, "white", 0.212, true);
-  person(0.15, 5.3, "blue", 0.23, false);
-  person(0.72, 6.55, "white", 0.208, true);
-  person(0.2, 9.55, "red", 0.215, false);
-  person(-0.65, 7.7, "olive", 0.222, false);
-  person(0.2, 10.7, "navy", 0.228, true);
-  person(-0.55, 10.4, "blue", 0.218, false);
-  person(0.04, 8.45, "navy", 0.218, true);
-  person(-0.5, 5.55, "blue", 0.222, false);
-  for (const [mat, geos] of Object.entries(uniforms)) {
-    if (geos.length) part(`figure_${mat}`, `生活区舰员制服（${mat}）`, M(...geos), mat === "white" ? "cv_apron" : mat === "red" ? "cv_deck_red" : mat === "olive" ? "cv_berth_olive" : mat === "navy" ? "cv_055_seat" : "cv_055_mesh");
-  }
-  part("figure_skin", "生活区舰员头部/手", M(...skin), "cv_skin");
-  part("figure_boots", "生活区舰员靴子", M(...boots), "cv_steel_dark");
-
   // 相机锚点
   const anchors: Array<[string, string, [number, number, number]]> = [
-    ["corridor_eye", "生活区走廊视点", [0, FLOOR + 0.28, 11.2]],
+    ["corridor_eye", "生活区走廊视点", [0, FLOOR + 0.24, 9.7]],
     ["corridor_end", "生活区走廊尽头", [0, FLOOR + 0.2, 4.35]],
     ["berth_eye", "水兵住舱视点", [-0.5, FLOOR + 0.23, 4.27]],
-    ["berth_target", "水兵住舱铺位目标", [-0.5, FLOOR + 0.16, 5.85]],
-    ["mess_eye", "餐厅厨房视点", [0.45, FLOOR + 0.23, 4.27]],
+    ["berth_target", "水兵住舱铺位目标", [-0.5, FLOOR + 0.16, 5.9]],
+    ["mess_eye", "餐厅厨房视点", [0.45, FLOOR + 0.23, 4.78]],
     ["mess_target", "餐厅配餐台目标", [0.55, FLOOR + 0.15, 5.8]],
   ];
   for (const [tag, cn, at] of anchors) {

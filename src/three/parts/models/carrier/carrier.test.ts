@@ -10,6 +10,7 @@ import { HANGAR_DOOR_NODES, AMMO_ELEVATOR_NODE } from "./hangar";
 import { WIRE_NODES, SHUTTLE_NODE, JBD_NODES, ELEVATOR_NODES } from "./flightdeck";
 import { RADAR_NODE, CIWS_NODES } from "./island";
 import { AIRCRAFT_NODE, HOOK_NODE, WING_FOLD_L, WING_FOLD_R } from "./aircraft";
+import { CARRIER_CREW_FIGURES } from "../crewFigures";
 
 // ============================================================================
 // 福建舰验收：3000+ 定义件、自内向外五层、核心弹射/拦阻闭环、零悬空。
@@ -151,12 +152,14 @@ describe("福建舰 · 整机", () => {
       "carrier.crew.berth_eye",
       "carrier.crew.mess_eye",
       "carrier.crew.bunk_curtains",
-      "carrier.crew.figure_skin",
       "carrier.crew.screens",
       "carrier.crew.partition",
     ]) {
       expect(staticIds.has(id), id).toBe(true);
     }
+    expect(CARRIER_CREW_FIGURES.length).toBeGreaterThanOrEqual(8);
+    expect(new Set(CARRIER_CREW_FIGURES.map((f) => f.model)).size).toBeGreaterThanOrEqual(5);
+    expect(new Set(CARRIER_CREW_FIGURES.map((f) => f.palette)).size).toBeGreaterThanOrEqual(5);
     expect(CIWS_NODES).toHaveLength(2);
     for (let ciws = 1; ciws <= 2; ciws++) {
       const tag = String(ciws).padStart(2, "0");

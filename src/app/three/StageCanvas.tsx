@@ -657,6 +657,23 @@ function StageRuntime() {
     };
   }, [assembled, modelId]);
 
+  // 舰员换成真正的人形蒙皮模型（Quaternius CC0，运行时挂载）；旧方块人已从注册表移除。
+  useEffect(() => {
+    if (!assembled || (modelId !== "type055" && modelId !== "carrier")) return;
+    let disposeMount: (() => void) | undefined;
+    let cancelled = false;
+    import("@/app/three/crewMount")
+      .then(({ mountCrewFigures }) => {
+        if (cancelled) return;
+        disposeMount = mountCrewFigures(assembled, modelId as "type055" | "carrier");
+      })
+      .catch((error) => console.warn("舰员人物挂载失败", error));
+    return () => {
+      cancelled = true;
+      disposeMount?.();
+    };
+  }, [assembled, modelId]);
+
   // AK-47 / M249 射击模式跟随状态机（单发/连发/停机）
   const machineState = useStageStore((state) => state.machineState);
   const currentModelId = useStageStore((state) => state.modelId);
