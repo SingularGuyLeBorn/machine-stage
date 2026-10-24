@@ -30,10 +30,12 @@ const workerScope = self as unknown as {
   postMessage: (data: unknown) => void;
 };
 
-workerScope.onmessage = (event) => {
-  const { modelId, variantId, overrides, kind, state, buildIndex, damageSeed, shardIndex, shardCount } = event.data;
+workerScope.onmessage = async (event) => {
+  const { modelId, variantId, overrides, kind, state, buildIndex, damageSeed, shardIndex, shardCount } =
+    event.data;
   try {
     const model = findModel(modelId);
+    await model.prepare?.(new AbortController().signal, () => {});
     const variant = model.variants?.find((item) => item.id === variantId) ?? model.variants?.[0];
     const source = variant?.registry ?? model.registry;
     if (!source) throw new Error(`模型 ${modelId} 没有注册表`);
@@ -51,8 +53,13 @@ workerScope.onmessage = (event) => {
     model.animate?.(built, 0);
     const orders = [...new Set(registry.parts.map((part) => part.build_order))].sort((a, b) => a - b);
     const threshold =
-      buildIndex >= orders.length ? null : buildIndex <= 0 ? Number.NEGATIVE_INFINITY : orders[buildIndex - 1];
-    const filter = threshold === null ? undefined : (handle: { buildOrder: number }) => handle.buildOrder <= threshold;
+      buildIndex >= orders.length
+        ? null
+        : buildIndex <= 0
+          ? Number.NEGATIVE_INFINITY
+          : orders[buildIndex - 1];
+    const filter =
+      threshold === null ? undefined : (handle: { buildOrder: number }) => handle.buildOrder <= threshold;
     const pairShard =
       shardCount && shardCount > 1 ? { index: shardIndex ?? 0, count: shardCount } : undefined;
     const started = performance.now();

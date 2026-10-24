@@ -6,1363 +6,3293 @@ import type {
   ModelRegistry,
   PartDefinition,
 } from "../../registry/types";
-import { Euler, Quaternion, Vector3 } from "three";
-
+import { Euler, Matrix4, Quaternion, Vector3 } from "three";
+import { createHmtRestPose } from "./restPose";
+import { shellPoint, shellNormal } from "./geometry";
+import { machinedIds } from "./machined";
+import { resolveSpec } from "../../assembler/geometry";
+import { resolveConstants } from "../../registry/expression";
+type V3 = [number, number, number];
+type Loop = number[][];
+interface ShellOptions {
+  dual?: boolean;
+  rotation?: V3;
+  material?: string;
+  holes?: Loop[];
+  thickness?: number;
+  rise?: number;
+  slope?: number;
+  fold?: number;
+  width?: number;
+  bulges?: number[][];
+  corner?: number;
+  bevel?: number;
+  pins?: Loop;
+  latches?: Loop;
+  rim?: number;
+  liner?: boolean;
+  direction?: V3;
+  layer?: BuildLayer;
+  form?: string;
+  edge?: number;
+}
 /**
- * HMT 双足机器人 · Vitaly Bulgarov 的 2-xm-robotdesign 方案。
- * 造型依据：用户指定的 15.jpg；13–18 正背面与小腿；robot3 中同前缀的白色版本。
- * 白色版本仅辅助读曲面、开窗和分件，颜色按用户指定的深灰 / 红色版本。
- * [OM-FREEPLAY] 图中没有标尺：2.4m 是展示归一化尺度，非真实规格；所有尺寸均为图像比例估算。
- * 肩宽约 .90m、胸宽 .63m、腰宽 .22m、头高 .25m、髋高 1.23m、膝高 .68m。
- * 不采用文章中另一台 Method-2 的四米尺寸，不包含制造公差或运动学承诺。
+ * Vitaly Bulgarov / HMT 2-xm-robotdesign，用户指定深灰红色版本。
+ * 直接形体依据：22 正面、23–28 深灰全身，2/4/5/6 头部白模，10/11 胸背，
+ * 12–17 腰腿、19–21 手部；尺寸以这些视图的比例重建。
+ * [OM-FREEPLAY] 2.4m 仅为无标尺图片的归一化展示尺度，内部被遮挡的走线沿可见接口连接。
  */
-export function makeHmtRegistry(): ModelRegistry {
-  const constants: Record<string, Expr> = { HEIGHT: 2.4 };
-  const parts: PartDefinition[] = [];
-  let serial = 0;
-  const source = "用户提供的 2-xm-robotdesign 同款图像；尺寸为比例估算";
-  // 数据写入常量表：几何和装配共用同一来源，界面不保存第二套尺寸。
-  function parameter(key: string, value: number): string {
-    const dimensionless = /_G_SEGMENTS$|_G_PARAMS_(SLOPE|FOLD|TURNS)$|_[RE]_\d$/.test(key);
-    constants[key] = dimensionless ? value.toFixed(9) : `(${value.toFixed(9)})*HEIGHT/2.4`;
-    return key;
-  }
-  function parameters(key: string, value: unknown): KitParam {
-    if (typeof value === "number") return parameter(key, value);
-    if (Array.isArray(value)) return value.map((v, i) => parameters(`${key}_${i}`, v));
+export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegistry {
+  const constants: Record<string, Expr> = { HEIGHT: 2.4 },
+    parts: PartDefinition[] = [];
+  let order = 0;
+  const restPose = createHmtRestPose();
+  const shellSurfaces = new Map<
+    string,
+    {
+      params: Record<string, unknown>;
+      position: V3;
+      rotation: V3;
+    }
+  >();
+  const source = "Vitaly Bulgarov / HMT，用户提供 2-xm-robotdesign 同款多视图；比例测绘";
+  function param(key: string, value: unknown): KitParam {
+    if (typeof value === "number") {
+      const dimensionless = /_SEGMENTS$|_(SLOPE|FOLD|TURNS)$|_[RE]_\d$/.test(key);
+      constants[key] = dimensionless ? value.toFixed(9) : "(" + value.toFixed(9) + ")*HEIGHT/2.4";
+      return key;
+    }
+    if (Array.isArray(value)) return value.map((v, i) => param(key + "_" + i, v));
     if (value && typeof value === "object")
       return Object.fromEntries(
-        Object.entries(value).map(([k, v]) => [k, parameters(`${key}_${k.toUpperCase()}`, v)]),
+        Object.entries(value).map(([k, v]) => [k, param(key + "_" + k.toUpperCase(), v)]),
       );
     return value as string | boolean;
   }
   function add(
     assembly: string,
     id: string,
-    cn: string,
-    layer: BuildLayer,
+    name: string,
     geometry: GeometrySpec,
-    position: number[],
-    material: string,
+    pos: V3,
+    material = "armor",
     dual = false,
-    rotation = [0, 0, 0],
-    direction = [0, 0, 1],
-  ): void {
-    const key = `${assembly}_${id}`.toUpperCase();
-    const geometryParams = parameters(`${key}_G`, geometry) as unknown as GeometrySpec;
-    // segments 是构造器的整数配置，也由同一解析入口读取。
-    parts.push({
-      id: `hmt.${assembly}.${id}`,
-      name_cn: cn,
-      name_en: id.replaceAll("_", " "),
-      assembly,
-      build_layer: layer,
-      build_order: ++serial + 100,
-      geometry: geometryParams,
-      material,
-      dual,
-      mate: {
-        type: "absolute",
-        position: parameters(`${key}_P`, position) as [Expr, Expr, Expr],
-        rotation: parameters(`${key}_R`, rotation) as [Expr, Expr, Expr],
-      },
-      explode: {
-        direction: parameters(`${key}_E`, direction) as [Expr, Expr, Expr],
-        distance: parameter(`${key}_D`, layer <= 2 ? 0 : 0.11 + layer * 0.045),
-      },
-      source,
-    });
-  }
-  function panel(
-    assembly: string,
-    id: string,
-    cn: string,
-    outline: number[][],
-    pos: number[],
-    options: {
-      dual?: boolean;
-      holes?: number[][][];
-      material?: string;
-      rise?: number;
-      slope?: number;
-      fold?: number;
-      ridgeWidth?: number;
-      rotation?: number[];
-      layer?: BuildLayer;
-      thickness?: number;
-      direction?: number[];
-    } = {},
-  ): void {
-    add(
-      assembly,
-      id,
-      cn,
-      options.layer ?? 4,
-      {
+    rotation: V3 = [0, 0, 0],
+    layer: BuildLayer = 4,
+    direction: V3 = [0, 0, 1],
+    alreadyPosed = false,
+  ) {
+    const originalId = id;
+    id = id.replaceAll("-", "neg").replaceAll(".", "p");
+    const key = (assembly + "_" + id).toUpperCase();
+    if (geometry.type === "cylinder") {
+      geometry = {
         type: "kit",
-        kit: "hmt_panel",
+        kit: "hmt_turn",
         params: {
-          outline,
-          holes: options.holes ?? [],
-          thickness: options.thickness ?? 0.009,
-          bevel: 0.0012,
-          rise: options.rise ?? 0.012,
-          slope: options.slope ?? 0,
-          fold: options.fold ?? 0,
-          width: options.ridgeWidth ?? Math.max(...outline.map(([x]) => Math.abs(x))),
+          r: geometry.r,
+          h: geometry.h,
+          segments: geometry.segments ?? 96,
+          bevel: geometry.bevel ?? 0,
         },
-      },
-      pos,
-      options.material ?? "armor",
-      options.dual,
-      options.rotation,
-      options.direction,
-    );
-    // [OM-FREEPLAY] 图中紧固点密度可见但数量不能逐个量定；每块大护板取三个边缘点。
-    // 位姿由护甲同一折面函数求出，避免悬空螺钉或用穿模把螺钉压进护板。
-    if ((options.layer ?? 4) >= 4) {
-      const rotation = new Euler(
-        ...((options.rotation ?? [0, 0, 0]).map((v) => (v * Math.PI) / 180) as [number, number, number]),
-      );
-      const q = new Quaternion().setFromEuler(rotation);
-      const width = options.ridgeWidth ?? Math.max(...outline.map(([x]) => Math.abs(x)));
-      const inside = (x: number, y: number, loop: number[][]) => {
-        let yes = false;
-        for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
-          const a = loop[i],
-            b = loop[j];
-          if (a[1] > y !== b[1] > y && x < ((b[0] - a[0]) * (y - a[1])) / (b[1] - a[1]) + a[0]) yes = !yes;
-        }
-        return yes;
       };
-      for (const [index, vertex] of [
-        outline[0],
-        outline[Math.floor(outline.length / 3)],
-        outline[Math.floor((outline.length * 2) / 3)],
-      ].entries()) {
-        const [x, y] = vertex.map((v) => v * 0.82);
-        if (!inside(x, y, outline) || (options.holes ?? []).some((h) => inside(x, y, h))) continue;
-        const rise = options.rise ?? 0.012,
-          slope = options.slope ?? 0,
-          fold = options.fold ?? 0;
-        const normal = new Vector3(
-          (Math.sign(x) * rise) / width,
-          -slope - Math.sign(y) * fold,
-          1,
-        ).normalize();
-        const surface = new Vector3(
+    }
+    const shape = param(key + "_G", geometry) as unknown as GeometrySpec;
+    for (const side of dual ? [1, -1] : [1]) {
+      const suffix = dual ? (side === 1 ? "_l" : "_r") : "";
+      const partKey = key + suffix.toUpperCase();
+      const position = new Vector3(pos[0] * side, pos[1], pos[2]);
+      const q = new Quaternion().setFromEuler(
+        new Euler(
+          (rotation[0] * Math.PI) / 180,
+          (rotation[1] * side * Math.PI) / 180,
+          (rotation[2] * side * Math.PI) / 180,
+        ),
+      );
+      const matrix = alreadyPosed ? new Matrix4() : restPose.matrix(assembly, originalId, side, pos[1]);
+      const placed = matrix.clone().multiply(new Matrix4().compose(position, q, new Vector3(1, 1, 1)));
+      placed.decompose(position, q, new Vector3());
+      const angles = new Euler().setFromQuaternion(q);
+      const outward = new Vector3(direction[0] * side, direction[1], direction[2]).transformDirection(matrix);
+      parts.push({
+        id: "hmt." + assembly + "." + id + suffix,
+        name_cn: name,
+        name_en: id.replaceAll("_", " "),
+        assembly,
+        build_layer: layer,
+        build_order: ++order,
+        geometry: side === -1 ? { ...shape, mirror: "x" } : shape,
+        material,
+        mate: {
+          type: "absolute",
+          position: param(partKey + "_P", position.toArray()) as [Expr, Expr, Expr],
+          rotation: param(
+            partKey + "_R",
+            [angles.x, angles.y, angles.z].map((v) => (v * 180) / Math.PI),
+          ) as [Expr, Expr, Expr],
+        },
+        explode: {
+          direction: param(partKey + "_E", outward.toArray()) as [Expr, Expr, Expr],
+          distance: param(partKey + "_D", layer <= 2 ? 0.035 : 0.15 + layer * 0.038) as Expr,
+        },
+        source,
+      });
+    }
+  }
+
+  // 接线和斜撑从承接壳的实际曲面取锚点，避免收腰、抬颌后仍使用旧的空间端点。
+  function shellAnchor(key: string, x: number, y: number, depth: number): V3 {
+    const surface = shellSurfaces.get(key);
+    if (!surface) throw new Error("缺少承接壳：" + key);
+    return shellPoint(surface.params, x, y, depth)
+      .applyEuler(new Euler(...(surface.rotation.map((v) => (v * Math.PI) / 180) as V3)))
+      .add(new Vector3(...surface.position))
+      .toArray() as V3;
+  }
+  function bolt(a: string, id: string, pos: V3, rotation: V3 = [0, 0, 0], dual = false, r = 0.0032) {
+    add(
+      a,
+      id,
+      "内六角沉孔紧固件",
+      { type: "kit", kit: "hmt_bolt", params: { radius: r } },
+      pos,
+      "fastener",
+      dual,
+      rotation,
+      5,
+    );
+  }
+  function shell(a: string, id: string, name: string, outline: Loop, pos: V3, o: ShellOptions = {}) {
+    if (a === "chest" && id === "carapace") {
+      // 收短胸骨上下端，给锁骨层与下肋层留出真实台阶，而非一块竖长面板。
+      const chestProfile = (loop: Loop) =>
+        loop.map(([x, y]) => [
           x,
-          y,
-          (options.thickness ?? 0.009) + rise * (1 - Math.abs(x) / width) + y * slope + Math.abs(y) * fold,
-        );
-        surface
-          .addScaledVector(normal, 0.00115)
-          .applyQuaternion(q)
-          .add(new Vector3(...(pos as [number, number, number])));
-        normal.applyQuaternion(q);
-        const e = new Euler().setFromQuaternion(
-          new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), normal),
-        );
-        cylinder(
-          assembly,
-          `${id}_stud_${index}`,
-          "护板表面紧固件",
-          surface.toArray(),
-          0.0026,
-          0.002,
-          "fastener",
-          options.dual,
-          [e.x, e.y, e.z].map((v) => (v * 180) / Math.PI),
-          5,
+          y > 0.05 ? 0.05 + (y - 0.05) * 0.6 : y < -0.09 ? -0.09 + (y + 0.09) * 0.5 : y,
+        ]);
+      outline = chestProfile(outline);
+      o = { ...o, holes: o.holes?.map(chestProfile), pins: o.pins ? chestProfile(o.pins) : undefined };
+    }
+    if (a === "back" && ["carapace", "scapular_plate"].includes(id)) o = { ...o, form: "back" };
+    // 白模的下半脸短于额颅；下颌、颊框和鼻梁连同孔与螺钉一起收短。
+    if (a === "head" && ["jaw", "cheek", "face_bridge"].includes(id)) {
+      const lowerFace = (loop: Loop) => loop.map(([x, y]) => [x, y * 0.75]);
+      outline = lowerFace(outline);
+      o = { ...o, holes: o.holes?.map(lowerFace), pins: o.pins ? lowerFace(o.pins) : undefined };
+    }
+    // 腰椎外壳、开窗和紧固件一起收窄，保留三节独立结构。
+    if (a === "waist") {
+      const narrow = (loop: Loop) => loop.map(([x, y]) => [x * 0.7, y * 0.66]);
+      outline = narrow(outline);
+      pos = [pos[0] * 0.7, pos[1], pos[2]];
+      o = {
+        ...o,
+        width: o.width === undefined ? undefined : o.width * 0.7,
+        holes: o.holes?.map(narrow),
+        pins: o.pins ? narrow(o.pins) : undefined,
+      };
+    }
+    if (a === "shoulder" && id === "outer_shell") {
+      const taper = (loop: Loop) => loop.map(([x, y]) => [x * 0.82, y * 0.85]);
+      outline = taper(outline);
+      o = { ...o, holes: o.holes?.map(taper), pins: o.pins ? taper(o.pins) : undefined };
+    }
+    if (a === "arms" && ["upper_shell", "upper_rear"].includes(id)) {
+      // 肩甲不加宽；上臂近端连同孔、安装点加厚展开，向肘端收束。
+      const shoulderVolume = (loop: Loop) =>
+        loop.map(([x, y]) => [
+          x * (1.08 + 0.12 * Math.max(0, Math.min(1, (y + 0.14) / 0.275))),
+          y > 0 ? y * 1.1 : y,
+        ]);
+      outline = shoulderVolume(outline);
+      o = {
+        ...o,
+        form: "limb",
+        edge: 0.003,
+        holes: o.holes?.map(shoulderVolume),
+        pins: o.pins ? shoulderVolume(o.pins) : undefined,
+        latches: o.latches ? shoulderVolume(o.latches) : undefined,
+      };
+    }
+    if (a === "legs" && ["thigh", "thigh_back"].includes(id)) {
+      // 大腿中上段收敛，膝上端保持宽度，避免壳体与膝轴之间突然变细。
+      const thighVolume = (loop: Loop) =>
+        loop.map(([x, y]) => [x * (0.88 + 0.12 * Math.max(0, Math.min(1, (-y - 0.08) / 0.14))), y]);
+      outline = thighVolume(outline);
+      o = {
+        ...o,
+        rise: (o.rise ?? 0.035) * 0.84,
+        holes: o.holes?.map(thighVolume),
+        pins: o.pins ? thighVolume(o.pins) : undefined,
+        latches: o.latches ? thighVolume(o.latches) : undefined,
+      };
+    }
+    const width = o.width ?? Math.max(...outline.map((p) => Math.abs(p[0])));
+    const p = {
+      outline,
+      holes: o.holes ?? [],
+      thickness: o.thickness ?? 0.014,
+      bevel: o.bevel ?? 0.0024,
+      corner: o.corner ?? 0.009,
+      rise: o.rise ?? 0.025,
+      slope: o.slope ?? 0,
+      fold: o.fold ?? 0,
+      width,
+      round: 0.007,
+      bulges: o.bulges ?? [],
+      edge: o.edge ?? 0.006,
+      form: o.form ?? "cast",
+      rim: o.rim ?? 0,
+    };
+    shellSurfaces.set(a + "." + id, { params: p, position: pos, rotation: o.rotation ?? [0, 0, 0] });
+    add(
+      a,
+      id,
+      name,
+      { type: "kit", kit: "hmt_shell", params: p },
+      pos,
+      o.material ?? "armor",
+      o.dual,
+      o.rotation,
+      o.layer ?? 4,
+      o.direction,
+    );
+    // 内衬沿同一壳体曲率退后一层，边缘露出红色金属接缝。
+    if (o.liner) {
+      const q = new Quaternion().setFromEuler(
+        new Euler(...((o.rotation ?? [0, 0, 0]).map((v) => (v * Math.PI) / 180) as V3)),
+      );
+      const shift = new Vector3(0, 0, -0.006).applyQuaternion(q).add(new Vector3(...pos));
+      add(
+        a,
+        id + "_lining",
+        name + "红色内衬",
+        {
+          type: "kit",
+          kit: "hmt_shell",
+          params: {
+            ...p,
+            outline,
+            thickness: 0.004,
+            bevel: 0.0008,
+            edge: 0.008,
+          },
+        },
+        shift.toArray(),
+        "redLining",
+        o.dual,
+        o.rotation,
+        3,
+        o.direction,
+      );
+    }
+    const q = new Quaternion().setFromEuler(
+      new Euler(...((o.rotation ?? [0, 0, 0]).map((v) => (v * Math.PI) / 180) as V3)),
+    );
+    for (const [i, [x, y]] of (o.pins ?? []).entries()) {
+      const n = shellNormal(p, x, y);
+      const pt = shellPoint(p, x, y, p.thickness)
+        .addScaledVector(n, 0.00055)
+        .applyQuaternion(q)
+        .add(new Vector3(...pos));
+      n.applyQuaternion(q);
+      const e = new Euler().setFromQuaternion(new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), n));
+      bolt(
+        a,
+        id + "_screw_" + i,
+        pt.toArray(),
+        [e.x, e.y, e.z].map((v) => (v * 180) / Math.PI) as V3,
+        o.dual,
+      );
+    }
+    // 白模上的长孔锁扣随母壳法线安装，孔壁、底座与两端螺钉都是真实分件。
+    for (const [i, [x, y]] of (o.latches ?? []).entries()) {
+      const n = shellNormal(p, x, y);
+      const pt = shellPoint(p, x, y, p.thickness)
+        .addScaledVector(n, 0.0007)
+        .applyQuaternion(q)
+        .add(new Vector3(...pos));
+      const mount = q.clone().multiply(new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), n));
+      const e = new Euler().setFromQuaternion(mount);
+      shell(
+        a,
+        id + "_latch_" + i,
+        "长孔检修锁扣",
+        [
+          [-0.012, -0.004],
+          [-0.009, -0.007],
+          [0.009, -0.007],
+          [0.012, -0.004],
+          [0.012, 0.004],
+          [0.009, 0.007],
+          [-0.009, 0.007],
+          [-0.012, 0.004],
+        ],
+        pt.toArray(),
+        {
+          dual: o.dual,
+          rotation: [e.x, e.y, e.z].map((v) => (v * 180) / Math.PI) as V3,
+          rise: 0,
+          thickness: 0.0024,
+          bevel: 0.0005,
+          corner: 0.001,
+          material: "armor",
+          holes: [
+            [
+              [-0.005, -0.002],
+              [-0.002, -0.002],
+              [-0.001, -0.0035],
+              [0.002, -0.0035],
+              [0.003, -0.002],
+              [0.006, -0.002],
+              [0.006, 0.002],
+              [0.003, 0.002],
+              [0.002, 0.0035],
+              [-0.001, 0.0035],
+              [-0.002, 0.002],
+              [-0.005, 0.002],
+            ],
+          ],
+        },
+      );
+      for (const sign of [-1, 1]) {
+        const screw = new Vector3(sign * 0.009, 0, 0.0026).applyQuaternion(mount).add(pt);
+        bolt(
+          a,
+          id + "_latch_" + i + "_bolt_" + sign,
+          screw.toArray(),
+          [e.x, e.y, e.z].map((v) => (v * 180) / Math.PI) as V3,
+          o.dual,
+          0.0012,
         );
       }
     }
   }
   function link(
-    assembly: string,
+    a: string,
     id: string,
-    cn: string,
-    from: number[],
-    to: number[],
-    radius: number,
-    material = "steel",
-    dual = false,
+    from: V3,
+    to: V3,
+    r = 0.008,
+    mat = "steel",
+    dual = true,
     layer: BuildLayer = 2,
-  ): void {
+  ) {
+    for (const side of dual ? [1, -1] : [1]) {
+      const suffix = dual ? (side === 1 ? "_l" : "_r") : "";
+      add(
+        a,
+        id + suffix,
+        "机械承力连杆",
+        {
+          type: "kit",
+          kit: "hmt_link",
+          params: {
+            from: restPose.point(a, id, from, side).toArray(),
+            to: restPose.point(a, id, to, side).toArray(),
+            radius: r,
+          },
+        },
+        [0, 0, 0],
+        mat,
+        false,
+        [0, 0, 0],
+        layer,
+        [0, 0, 1],
+        true,
+      );
+    }
+  }
+  function cable(a: string, id: string, points: V3[], r = 0.002, mat = "red", dual = true) {
+    for (const side of dual ? [1, -1] : [1]) {
+      const suffix = dual ? (side === 1 ? "_l" : "_r") : "";
+      const baseId = id.replace(/_\d+$/, "");
+      const placed = points.map((p) => restPose.point(a, baseId, p, side).toArray());
+      add(
+        a,
+        id + suffix,
+        "沿机构布置的线束",
+        { type: "kit", kit: "hmt_cable", params: { points: placed, radius: r } },
+        [0, 0, 0],
+        mat,
+        false,
+        [0, 0, 0],
+        3,
+        [0, 0, 1],
+        true,
+      );
+    }
+  }
+  function cyl(
+    a: string,
+    id: string,
+    pos: V3,
+    r: number,
+    h: number,
+    mat = "steel",
+    dual = true,
+    rot: V3 = [0, 0, 90],
+    layer: BuildLayer = 2,
+  ) {
     add(
-      assembly,
+      a,
       id,
-      cn,
+      "车削轴套",
+      { type: "cylinder", r, h, segments: 96, bevel: Math.min(0.0015, h * 0.12) },
+      pos,
+      mat,
+      dual,
+      rot,
       layer,
-      { type: "kit", kit: "hmt_link", params: { from, to, radius } },
+    );
+  }
+  function ring(
+    a: string,
+    id: string,
+    pos: V3,
+    r: number,
+    inner: number,
+    h: number,
+    mat = "steel",
+    dual = true,
+    rot: V3 = [0, 0, 90],
+  ) {
+    add(
+      a,
+      id,
+      "轴承与密封环",
+      { type: "tube", rOuter: r, rInner: inner, h, segments: 128 },
+      pos,
+      mat,
+      dual,
+      rot,
+      2,
+    );
+  }
+  function joint(a: string, id: string, pos: V3, r: number, h: number, dual = true) {
+    const axial = a === "hands" ? 0.36 : a === "feet" && id.startsWith("toe") ? 0.6 : 1;
+    h *= axial;
+    if (a === "shoulder" && id === "bearing")
+      ring(a, id + "_rotor", pos, r * 0.82, r * 0.5, h - 0.0006, "dark", dual);
+    else cyl(a, id + "_rotor", pos, r * 0.82, h - 0.0003, "dark", dual);
+    for (const side of [-1, 1]) {
+      const x = pos[0] + side * (h * 0.5 + 0.0025 * axial);
+      ring(a, id + "_race_" + side, [x, pos[1], pos[2]], r, r * 0.69, 0.005 * axial, "steel", dual);
+      if (a === "shoulder" && id === "bearing")
+        ring(
+          a,
+          id + "_cap_" + side,
+          [x + side * (0.005 * axial), pos[1], pos[2]],
+          r * 0.65,
+          r * 0.5,
+          0.005 * axial,
+          "darkArmor",
+          dual,
+        );
+      else
+        cyl(
+          a,
+          id + "_cap_" + side,
+          [x + side * (0.005 * axial), pos[1], pos[2]],
+          r * 0.65,
+          0.005 * axial,
+          "darkArmor",
+          dual,
+        );
+      ring(
+        a,
+        id + "_polished_" + side,
+        [x + side * (0.0085 * axial + 0.00025), pos[1], pos[2]],
+        r * 0.57,
+        r * 0.51,
+        0.0015 * axial,
+        "chrome",
+        dual,
+      );
+      for (let j = 0; j < 6; j++) {
+        const t = (j / 6) * Math.PI * 2;
+        bolt(
+          a,
+          id + "_bolt_" + side + "_" + j,
+          [x + side * (0.009 * axial), pos[1] + Math.sin(t) * r * 0.84, pos[2] + Math.cos(t) * r * 0.84],
+          [0, side * 90, 0],
+          dual,
+          r * 0.07,
+        );
+      }
+    }
+  }
+  function piston(a: string, id: string, from: V3, to: V3, r = 0.014, dual = true) {
+    for (const side of dual ? [1, -1] : [1]) {
+      const suffix = dual ? (side === 1 ? "_l" : "_r") : "";
+      const start = restPose.point(a, id, from, side),
+        end = restPose.point(a, id, to, side);
+      const delta = end.clone().sub(start),
+        length = delta.length(),
+        axis = delta.clone().normalize();
+      const at = (t: number) =>
+        start
+          .clone()
+          .addScaledVector(axis, t * length)
+          .toArray() as V3;
+      const q = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), axis);
+      const e = new Euler().setFromQuaternion(q);
+      const angles = [e.x, e.y, e.z].map((v) => (v * 180) / Math.PI) as V3;
+      const emit = (
+        tail: string,
+        name: string,
+        geometry: GeometrySpec,
+        position: V3,
+        material: string,
+        rotation: V3 = [0, 0, 0],
+        layer: BuildLayer = 2,
+      ) =>
+        add(
+          a,
+          id + "_" + tail + suffix,
+          name,
+          geometry,
+          position,
+          material,
+          false,
+          rotation,
+          layer,
+          [0, 0, 1],
+          true,
+        );
+      const margin = (r * 0.94) / length;
+      emit(
+        "barrel",
+        "液压缸筒",
+        {
+          type: "kit",
+          kit: "hmt_link",
+          params: {
+            from: at(margin),
+            to: at(0.59),
+            radius: r,
+            innerRadius: r * 0.48 + 0.00022,
+          },
+        },
+        [0, 0, 0],
+        "darkArmor",
+      );
+      emit(
+        "shaft",
+        "抛光活塞杆",
+        { type: "kit", kit: "hmt_link", params: { from: at(0.49), to: at(1 - margin), radius: r * 0.48 } },
+        [0, 0, 0],
+        "chrome",
+      );
+      for (const t of [Math.max(margin + 0.025, 0.12), 0.24, 0.51, 0.58])
+        emit(
+          "collar_" + t.toFixed(4),
+          "缸筒开孔抱箍",
+          { type: "tube", rOuter: r * 1.17, rInner: r + 0.0001, h: 0.004, segments: 96 },
+          at(t),
+          "steel",
+          angles,
+        );
+      for (const [j, t] of [0, 1].entries()) {
+        const center = new Vector3(...at(t));
+        const neutral = j === 0 ? from : to;
+        const axisX = new Vector3(side, 0, 0).transformDirection(restPose.matrix(a, id, side, neutral[1]));
+        const eyeQ = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), axisX);
+        const eyeE = new Euler().setFromQuaternion(eyeQ);
+        const eyeR = [eyeE.x, eyeE.y, eyeE.z].map((v) => (v * 180) / Math.PI) as V3;
+        emit(
+          "eye_" + j + "_pin",
+          "活塞端铰轴",
+          { type: "cylinder", r: r * 0.43, h: r * 1.78, segments: 64, bevel: r * 0.04 },
+          center.toArray(),
+          "dark",
+          eyeR,
+        );
+        emit(
+          "eye_" + j + "_race",
+          "活塞端轴承",
+          { type: "tube", rOuter: r * 0.92, rInner: r * 0.44, h: r * 1.5, segments: 96 },
+          center.toArray(),
+          "steel",
+          eyeR,
+        );
+        for (const sign of [-1, 1]) {
+          const cap = center.clone().addScaledVector(axisX, sign * r * 0.81);
+          const boltQ = new Quaternion().setFromUnitVectors(
+            new Vector3(0, 0, 1),
+            axisX.clone().multiplyScalar(sign),
+          );
+          const boltE = new Euler().setFromQuaternion(boltQ);
+          emit(
+            "eye_" + j + "_bolt_" + sign,
+            "端铰紧固螺钉",
+            { type: "kit", kit: "hmt_bolt", params: { radius: r * 0.33 } },
+            cap.toArray(),
+            "fastener",
+            [boltE.x, boltE.y, boltE.z].map((v) => (v * 180) / Math.PI) as V3,
+            5,
+          );
+        }
+      }
+    }
+  }
+  function spring(a: string, id: string, pos: V3, height: number, r = 0.014, turns = 22) {
+    add(
+      a,
+      id,
+      "精密螺旋回位弹簧",
+      { type: "kit", kit: "hmt_spring", params: { height, radius: r, wire: 0.0018, turns } },
+      pos,
+      "red",
+      true,
+      [0, 0, 0],
+      3,
+    );
+  }
+  function loft(a: string, id: string, rows: number[][], material = "dark", dual = false) {
+    add(
+      a,
+      id,
+      "连续截面包覆壳体",
+      { type: "kit", kit: "hmt_loft", params: { sections: rows } },
       [0, 0, 0],
       material,
       dual,
-    );
-  }
-  function cylinder(
-    assembly: string,
-    id: string,
-    cn: string,
-    pos: number[],
-    radius: number,
-    height: number,
-    material: string,
-    dual = false,
-    rotation = [0, 0, 90],
-    layer: BuildLayer = 2,
-  ): void {
-    add(
-      assembly,
-      id,
-      cn,
-      layer,
-      {
-        type: "cylinder",
-        r: radius,
-        h: height,
-        segments: layer === 5 ? 16 : 32,
-        bevel: layer === 5 ? 0 : 0.001,
-      },
-      pos,
-      material,
-      dual,
-      rotation,
-    );
-  }
-  function spring(assembly: string, id: string, pos: number[], height: number, dual = true): void {
-    add(
-      assembly,
-      id,
-      "窗口内减振弹簧",
-      3,
-      { type: "kit", kit: "hmt_spring", params: { height, radius: 0.013, wire: 0.0024, turns: 18 } },
-      pos,
-      "red",
-      dual,
-    );
-  }
-  function piston(
-    assembly: string,
-    id: string,
-    from: number[],
-    to: number[],
-    radius = 0.013,
-    dual = true,
-  ): void {
-    const mid = from.map((v, i) => v + (to[i] - v) * 0.55);
-    const rodStart = from.map((v, i) => v + (to[i] - v) * 0.552);
-    link(assembly, `${id}_body`, "作动筒缸体", from, mid, radius, "red", dual);
-    link(assembly, `${id}_rod`, "作动筒镀铬杆", rodStart, to, radius * 0.53, "chrome", dual);
-  }
-
-  // L1：承力主轴与各关节中心。主轴和护甲之间保留看得见的空域。
-  link("torso", "spine", "脊柱承力主轴", [0, 1.29, -0.035], [0, 2.08, -0.035], 0.035, "dark", false, 1);
-  link(
-    "torso",
-    "clavicle",
-    "肩部横向承力轴",
-    [0.038, 1.99, -0.025],
-    [0.32, 1.99, -0.025],
-    0.027,
-    "steel",
-    true,
-    1,
-  );
-  add(
-    "shoulder",
-    "bearing",
-    "肩关节轴承",
-    1,
-    { type: "tube", rOuter: 0.059, rInner: 0.029, h: 0.065, segments: 32 },
-    [0.355, 1.99, -0.025],
-    "dark",
-    true,
-    [0, 0, 90],
-  );
-  cylinder("arms", "elbow", "肘关节", [0.432, 1.655, 0], 0.043, 0.073, "dark", true, [0, 0, 90], 1);
-  cylinder("pelvis", "hip", "髋关节", [0.179, 1.235, -0.012], 0.063, 0.075, "dark", true, [0, 0, 90], 1);
-  cylinder("legs", "knee", "膝关节", [0.229, 0.681, 0.018], 0.046, 0.091, "dark", true, [0, 0, 90], 1);
-  cylinder("feet", "ankle", "踝关节", [0.279, 0.159, -0.007], 0.036, 0.082, "dark", true, [0, 0, 90], 1);
-
-  // L2：骨架、关节环、活塞。闭合车削件与护板分别可选。
-  link(
-    "torso",
-    "abdominal_bridge",
-    "胸腰斜向承力支架",
-    [0.045, 1.62, -0.061],
-    [0.125, 1.735, -0.061],
-    0.015,
-    "dark",
-    true,
-  );
-  link("arms", "humerus", "上臂骨架", [0.375, 1.925, -0.025], [0.427, 1.703, 0], 0.024, "dark", true);
-  link("arms", "radius", "前臂承力杆", [0.437, 1.608, -0.015], [0.44, 1.24, 0.035], 0.018, "dark", true);
-  link("legs", "femur", "大腿承力杆", [0.19, 1.17, -0.012], [0.225, 0.731, 0.018], 0.026, "dark", true);
-  link("legs", "tibia", "胫骨承力杆", [0.235, 0.631, -0.018], [0.275, 0.2, -0.012], 0.022, "dark", true);
-  cylinder("arms", "wrist", "腕部轴套", [0.441, 1.211, 0.035], 0.027, 0.048, "steel", true, [0, 0, 0]);
-  cylinder("shoulder", "cap", "肩轴端盖", [0.392, 1.99, -0.025], 0.044, 0.008, "steel", true);
-  cylinder("arms", "elbow_cap", "肘轴端盖", [0.473, 1.655, 0], 0.03, 0.006, "chrome", true);
-  cylinder("legs", "knee_cap", "膝轴端盖", [0.278, 0.681, 0.018], 0.031, 0.006, "steel", true);
-  cylinder("feet", "ankle_cap", "踝轴端盖", [0.324, 0.159, -0.007], 0.025, 0.006, "steel", true);
-  piston("shoulder", "diagonal", [0.19, 1.95, 0.055], [0.31, 2.027, 0.044]);
-  piston("arms", "upper_actuator", [0.454, 1.905, -0.012], [0.46, 1.717, -0.012], 0.011);
-  piston("arms", "fore_actuator", [0.405, 1.584, 0.025], [0.405, 1.36, 0.025], 0.01);
-  piston("legs", "thigh_actuator", [0.145, 1.123, 0.018], [0.17, 0.773, 0.018], 0.016);
-  piston("legs", "knee_rear", [0.248, 0.805, -0.048], [0.258, 0.606, -0.053], 0.01);
-  piston("torso", "waist_actuator", [0.105, 1.36, -0.015], [0.095, 1.663, -0.015], 0.014);
-  piston("pelvis", "hip_tie", [0.065, 1.31, 0.022], [0.144, 1.211, 0.06], 0.012);
-  piston("head", "neck_tie", [0.051, 2.072, -0.005], [0.038, 2.187, -0.008], 0.009);
-
-  // 三节脊椎是独立腹部模块，后方也保留关节，不填成整块腹甲。
-  // [OM-FREEPLAY] 背部腰椎作动筒的安装耳被护板遮挡，补成与下节腰椎相接的短支座。
-  link(
-    "waist",
-    "actuator_mount",
-    "腰部作动筒安装支座",
-    [0.0615, 1.393, -0.015],
-    [0.089, 1.393, -0.015],
-    0.004,
-    "steel",
-    true,
-  );
-  for (let i = 0; i < 3; i++) {
-    const y = 1.393 + i * 0.09;
-    add(
-      "waist",
-      `vertebra_${i}`,
-      "腰椎节段轴承",
+      [0, 0, 0],
       2,
-      { type: "tube", rOuter: 0.061, rInner: 0.036, h: 0.052, segments: 32 },
-      [0, y, -0.035],
-      "steel",
-    );
-    panel(
-      "waist",
-      `shield_${i}`,
-      "腹部独立节甲",
-      [
-        [-0.065, -0.031],
-        [-0.074, 0.019],
-        [-0.044, 0.038],
-        [0.044, 0.038],
-        [0.074, 0.019],
-        [0.065, -0.031],
-        [0, -0.044],
-      ],
-      [0, y, 0.035],
-      {
-        material: "darkArmor",
-        rise: 0.018,
-        holes: [
-          [
-            [-0.042, -0.014],
-            [-0.045, 0.012],
-            [-0.025, 0.017],
-            [-0.03, -0.013],
-          ],
-          [
-            [0.042, -0.014],
-            [0.045, 0.012],
-            [0.025, 0.017],
-            [0.03, -0.013],
-          ],
-        ],
-      },
     );
   }
 
-  // 胸部：中央脊甲 + 两翼带孔胸甲 + 腋下斜肋。窗口有厚度和内壁。
-  const chestSurface = { rise: 0.055, slope: 0.035, fold: -0.19, ridgeWidth: 0.291 };
-  panel(
-    "chest",
-    "sternum",
-    "中央胸骨护甲",
+  // 胸背空间骨架，关节与活塞占据护甲背面的真实深度。
+  cable(
+    "torso",
+    "abdominal_harness",
     [
-      [-0.048, 0.175],
-      [0.048, 0.175],
-      [0.045, 0.063],
-      [0.071, -0.011],
-      [0.035, -0.13],
-      [0, -0.155],
-      [-0.035, -0.13],
-      [-0.071, -0.011],
-      [-0.045, 0.063],
+      [0, 1.3, -0.045],
+      [0, 1.39, -0.045],
+      [0, 1.481, -0.045],
+      [0, 1.572, -0.045],
+      [0, 1.7, -0.045],
+      [0, 2.06, -0.045],
     ],
-    [0, 1.875, 0.102],
-    chestSurface,
+    0.033,
+    "dark",
+    false,
   );
-  panel(
-    "chest",
-    "pectoral",
-    "胸部开窗侧翼",
-    [
-      [0.052, 0.17],
-      [0.067, 0.175],
-      [0.091, 0.119],
-      [0.241, 0.056],
-      [0.291, 0.004],
-      [0.262, -0.049],
-      [0.205, -0.105],
-      [0.085, -0.08],
-      [0.075, -0.012],
-      [0.05, 0.062],
-    ],
-    [0, 1.875, 0.102],
-    {
-      ...chestSurface,
-      dual: true,
-      holes: [
-        [
-          [0.103, 0.092],
-          [0.204, 0.045],
-          [0.154, -0.002],
-          [0.095, 0.026],
-        ],
-      ],
-    },
-  );
-  panel(
-    "chest",
-    "lower_shell",
-    "胸廓下缘护甲",
-    [
-      [-0.084, -0.085],
-      [-0.195, -0.11],
-      [-0.19, -0.166],
-      [-0.087, -0.218],
-      [0, -0.224],
-      [0.087, -0.218],
-      [0.19, -0.166],
-      [0.195, -0.11],
-      [0.084, -0.085],
-      [0.04, -0.137],
-      [0, -0.163],
-      [-0.04, -0.137],
-    ],
-    [0, 1.875, 0.102],
-    chestSurface,
-  );
-  panel(
-    "chest",
-    "under_rib",
-    "腋下黑色支架",
-    [
-      [-0.04, 0.1],
-      [0.044, 0.07],
-      [0.025, -0.075],
-      [-0.021, -0.09],
-    ],
-    [0.208, 1.816, 0.008],
-    { dual: true, material: "dark", rise: 0.012, rotation: [0, 52, -16], layer: 2 },
-  );
-  panel(
-    "chest",
-    "collar",
-    "颈部开窗领甲",
-    [
-      [-0.054, 0.082],
-      [0.006, 0.117],
-      [0.049, 0.016],
-      [0.101, -0.038],
-      [0.042, -0.063],
-      [-0.033, -0.013],
-    ],
-    [0.103, 2.018, 0.045],
-    {
-      dual: true,
-      rise: 0.018,
-      rotation: [0, 23, -8],
-      holes: [
-        [
-          [-0.018, 0.033],
-          [0.014, 0.055],
-          [0.039, 0.002],
-          [0.002, -0.014],
-        ],
-      ],
-    },
-  );
-  panel(
-    "back",
-    "scapula",
-    "背部肩胛护板",
-    [
-      [-0.068, 0.143],
-      [0.091, 0.119],
-      [0.153, 0.042],
-      [0.129, -0.047],
-      [0.035, -0.116],
-      [-0.042, -0.09],
-    ],
-    [0.18, 1.891, -0.1],
-    {
-      dual: true,
-      rotation: [0, 180, 0],
-      rise: 0.039,
-      holes: [
-        [
-          [-0.013, 0.09],
-          [0.064, 0.079],
-          [0.051, 0.03],
-          [0.007, 0.035],
-        ],
-      ],
-      direction: [0, 0, -1],
-    },
-  );
-  panel(
-    "back",
-    "spinal_cover",
-    "背部中央龙骨护板",
-    [
-      [-0.058, 0.095],
-      [0.058, 0.095],
-      [0.076, -0.029],
-      [0.026, -0.143],
-      [0, -0.175],
-      [-0.026, -0.143],
-      [-0.076, -0.029],
-    ],
-    [0, 1.827, -0.14],
-    {
-      rotation: [0, 180, 0],
-      rise: 0.028,
-      holes: [
-        [
-          [-0.019, -0.056],
-          [0.019, -0.056],
-          [0.014, -0.105],
-          [-0.014, -0.105],
-        ],
-      ],
-      direction: [0, 0, -1],
-    },
-  );
-  for (let i = 0; i < 3; i++) {
+  link("torso", "clavicle", [0.035, 1.99, -0.025], [0.343, 1.985, -0.012], 0.026, "dark", true, 1);
+  joint("shoulder", "bearing", [0.355, 1.985, -0.012], 0.066, 0.074);
+  joint("arms", "elbow", [0.434, 1.644, 0.002], 0.043, 0.075);
+  joint("pelvis", "hip", [0.166, 1.221, -0.014], 0.065, 0.084);
+  joint("legs", "knee", [0.218, 0.679, 0.008], 0.048, 0.088);
+  joint("feet", "ankle", [0.265, 0.156, -0.017], 0.036, 0.074);
+  link("arms", "humerus", [0.369, 1.91, -0.018], [0.429, 1.69, 0], 0.029, "dark", true, 1);
+  link("arms", "radius", [0.438, 1.6, 0], [0.455, 1.231, 0.023], 0.02, "dark", true, 1);
+  link("legs", "femur", [0.17, 1.17, -0.023], [0.214, 0.731, 0.008], 0.027, "dark", true, 1);
+  link("legs", "tibia", [0.223, 0.628, -0.01], [0.262, 0.201, -0.02], 0.024, "dark", true, 1);
+  for (let i = 0; i < 4; i++) {
     link(
       "torso",
-      `rib_${i}`,
-      "胸廓斜支撑",
-      [0.057, 1.715 + i * 0.069, -0.031],
-      [0.223, 1.79 + i * 0.062, -0.035],
+      "rib_" + i,
+      [0.037, 1.708 + i * 0.065, -0.045],
+      [0.235, 1.77 + i * 0.06, -0.02],
+      0.012,
+      "darkArmor",
+    );
+    link(
+      "torso",
+      "rear_rib_" + i,
+      [0.037, 1.708 + i * 0.065, -0.055],
+      [0.229, 1.77 + i * 0.06, -0.091],
       0.009,
       "steel",
-      true,
     );
   }
-  // 肩甲是中间高、外侧落的罩壳，与胸翼和上臂之间留关节窗口。
-  panel(
-    "chest",
-    "flank",
-    "胸腔侧面包覆",
-    [
-      [-0.08, 0.12],
-      [0.053, 0.115],
-      [0.073, 0.032],
-      [0.04, -0.13],
-      [-0.027, -0.153],
-      [-0.062, -0.045],
-    ],
-    [0.253, 1.826, -0.026],
-    {
-      dual: true,
-      rotation: [0, 90, -13],
-      rise: 0.022,
-      holes: [
-        [
-          [-0.032, 0.055],
-          [0.028, 0.055],
-          [0.019, -0.018],
-          [-0.019, -0.055],
-        ],
-      ],
-      direction: [1, 0, 0],
-    },
-  );
-  panel(
-    "shoulder",
-    "pauldron",
-    "肩部折面罩甲",
-    [
-      [-0.096, 0.033],
-      [-0.043, 0.074],
-      [0.045, 0.057],
-      [0.095, -0.054],
-      [0.042, -0.065],
-      [-0.069, -0.017],
-    ],
-    [0.361, 2.057, 0.048],
-    {
-      dual: true,
-      rise: 0.052,
-      slope: 0.26,
-      holes: [
-        [
-          [-0.045, 0.032],
-          [0.018, 0.028],
-          [0.045, 0.006],
-          [-0.015, 0.012],
-        ],
-      ],
-      direction: [0, 1, 0.4],
-    },
-  );
-  panel(
-    "shoulder",
-    "rear_shell",
-    "肩后罩甲",
-    [
-      [-0.075, 0.034],
-      [-0.03, 0.064],
-      [0.052, 0.044],
-      [0.084, -0.055],
-      [0.024, -0.065],
-      [-0.066, -0.018],
-    ],
-    [0.366, 2.05, -0.087],
-    { dual: true, rise: 0.031, rotation: [0, 180, 0], direction: [0, 1, -0.5] },
-  );
-  link(
-    "shoulder",
-    "red_brace",
-    "肩下红色拉杆",
-    [0.29, 1.932, 0.039],
-    [0.405, 1.932, 0.045],
-    0.008,
-    "red",
-    true,
-  );
-  panel(
-    "shoulder",
-    "outer_shell",
-    "肩外侧包边",
-    [
-      [-0.063, 0.025],
-      [-0.035, 0.075],
-      [0.042, 0.055],
-      [0.065, -0.031],
-      [0.035, -0.059],
-      [-0.044, -0.051],
-    ],
-    [0.435, 2.037, -0.015],
-    { dual: true, rotation: [0, 90, 0], rise: 0.013, direction: [1, 1, 0] },
-  );
-
-  // 上臂及前臂：长开窗看见内部活塞，侧壁与背罩独立。
-  panel(
-    "arms",
-    "upper_shell",
-    "上臂前罩",
-    [
-      [-0.035, 0.122],
-      [0.032, 0.105],
-      [0.059, 0.024],
-      [0.03, -0.111],
-      [-0.031, -0.129],
-      [-0.054, -0.038],
-    ],
-    [0.413, 1.803, 0.052],
-    {
-      dual: true,
-      rise: 0.019,
-      holes: [
-        [
-          [-0.021, 0.056],
-          [0.012, 0.043],
-          [0.027, -0.051],
-          [-0.012, -0.069],
-        ],
-      ],
-    },
-  );
-  panel(
-    "arms",
-    "upper_rear",
-    "上臂后罩",
-    [
-      [-0.03, 0.116],
-      [0.03, 0.1],
-      [0.043, 0.005],
-      [0.022, -0.11],
-      [-0.028, -0.115],
-      [-0.04, -0.02],
-    ],
-    [0.412, 1.803, -0.066],
-    { dual: true, rise: 0.017, rotation: [0, 180, 0], direction: [0, 0, -1] },
-  );
-  panel(
-    "arms",
-    "fore_shell",
-    "前臂开窗框架",
-    [
-      [-0.045, 0.166],
-      [0.035, 0.15],
-      [0.056, 0.065],
-      [0.029, -0.178],
-      [-0.026, -0.187],
-      [-0.053, -0.065],
-    ],
-    [0.441, 1.421, 0.061],
-    {
-      dual: true,
-      rise: 0.018,
-      holes: [
-        [
-          [-0.029, 0.111],
-          [0.024, 0.09],
-          [0.02, -0.045],
-          [-0.016, -0.011],
-        ],
-        [
-          [-0.009, -0.064],
-          [0.015, -0.08],
-          [0.012, -0.148],
-          [-0.015, -0.153],
-        ],
-      ],
-    },
-  );
-  panel(
-    "arms",
-    "fore_back",
-    "前臂背罩",
-    [
-      [-0.035, 0.152],
-      [0.031, 0.13],
-      [0.044, 0.045],
-      [0.022, -0.177],
-      [-0.025, -0.176],
-      [-0.043, -0.025],
-    ],
-    [0.446, 1.421, -0.05],
-    {
-      dual: true,
-      rise: 0.018,
-      rotation: [0, 180, 0],
-      holes: [
-        [
-          [-0.018, 0.07],
-          [0.022, 0.048],
-          [0.014, -0.061],
-          [-0.015, -0.091],
-        ],
-      ],
-      direction: [0, 0, -1],
-    },
-  );
-  spring("arms", "upper_spring", [0.413, 1.803, 0.047], 0.129);
-  panel(
-    "arms",
-    "upper_side",
-    "上臂外侧护板",
-    [
-      [-0.042, 0.108],
-      [0.038, 0.108],
-      [0.05, 0.034],
-      [0.027, -0.113],
-      [-0.025, -0.113],
-      [-0.044, -0.027],
-    ],
-    [0.469, 1.808, -0.004],
-    {
-      dual: true,
-      rotation: [0, 90, -7],
-      rise: 0.008,
-      holes: [
-        [
-          [-0.016, 0.057],
-          [0.022, 0.047],
-          [0.013, -0.055],
-          [-0.014, -0.064],
-        ],
-      ],
-      direction: [1, 0, 0],
-    },
-  );
-  panel(
-    "arms",
-    "fore_side",
-    "前臂外侧纵梁",
-    [
-      [-0.038, 0.137],
-      [0.039, 0.126],
-      [0.046, 0.048],
-      [0.024, -0.16],
-      [-0.026, -0.168],
-      [-0.04, -0.02],
-    ],
-    [0.483, 1.425, 0.013],
-    {
-      dual: true,
-      rotation: [0, 90, 0],
-      rise: 0.006,
-      holes: [
-        [
-          [-0.017, 0.08],
-          [0.02, 0.067],
-          [0.009, -0.081],
-          [-0.013, -0.107],
-        ],
-      ],
-      direction: [1, 0, 0],
-    },
-  );
-  // 骨盆在腰下向两侧挑起，裆甲与髋关节分开。
-  panel(
-    "pelvis",
-    "iliac",
-    "髂骨开窗护框",
-    [
-      [-0.07, 0.026],
-      [0.035, 0.069],
-      [0.091, 0.026],
-      [0.071, -0.053],
-      [-0.015, -0.031],
-      [-0.066, -0.013],
-    ],
-    [0.109, 1.324, 0.057],
-    {
-      dual: true,
-      rise: 0.022,
-      holes: [
-        [
-          [-0.031, 0.014],
-          [0.027, 0.044],
-          [0.051, 0.012],
-          [0.01, -0.012],
-        ],
-      ],
-    },
-  );
-  panel(
-    "pelvis",
-    "codpiece",
-    "中央盆骨护甲",
-    [
-      [-0.065, 0.048],
-      [0, 0.021],
-      [0.065, 0.048],
-      [0.044, -0.077],
-      [0, -0.106],
-      [-0.044, -0.077],
-    ],
-    [0, 1.267, 0.092],
-    { rise: 0.035 },
-  );
-  panel(
-    "pelvis",
-    "rear_bridge",
-    "后骨盆开窗框架",
-    [
-      [-0.166, 0.016],
-      [-0.119, 0.064],
-      [0, 0.02],
-      [0.119, 0.064],
-      [0.166, 0.016],
-      [0.112, -0.041],
-      [0.025, -0.027],
-      [0, -0.084],
-      [-0.025, -0.027],
-      [-0.112, -0.041],
-    ],
-    [0, 1.304, -0.085],
-    {
-      rotation: [0, 180, 0],
-      rise: 0.013,
-      holes: [
-        [
-          [-0.109, 0.027],
-          [-0.048, 0.006],
-          [-0.113, -0.014],
-        ],
-        [
-          [0.109, 0.027],
-          [0.048, 0.006],
-          [0.113, -0.014],
-        ],
-      ],
-      direction: [0, 0, -1],
-    },
-  );
-
-  // 大腿外侧是承重斜面，前方长窗与上部梯形窗不连成一块黑贴纸。
-  panel(
-    "legs",
-    "thigh_front",
-    "大腿开窗前甲",
-    [
-      [-0.067, 0.228],
-      [-0.035, 0.253],
-      [0.021, 0.229],
-      [0.064, 0.107],
-      [0.055, -0.065],
-      [0.022, -0.237],
-      [-0.031, -0.228],
-      [-0.055, -0.118],
-      [-0.081, 0.067],
-    ],
-    [0.216, 0.981, 0.052],
-    {
-      dual: true,
-      rise: 0.033,
-      holes: [
-        [
-          [-0.034, 0.201],
-          [-0.007, 0.192],
-          [0.009, 0.116],
-          [-0.025, 0.108],
-        ],
-        [
-          [-0.035, 0.023],
-          [0.018, -0.011],
-          [0.008, -0.154],
-          [-0.022, -0.176],
-        ],
-      ],
-    },
-  );
-  panel(
-    "legs",
-    "thigh_side",
-    "大腿外侧包覆甲",
-    [
-      [-0.047, 0.205],
-      [0.018, 0.22],
-      [0.06, 0.101],
-      [0.037, -0.186],
-      [-0.025, -0.218],
-      [-0.049, -0.032],
-    ],
-    [0.284, 0.988, -0.006],
-    { dual: true, rotation: [0, 88, 0], rise: 0.018 },
-  );
-  panel(
-    "legs",
-    "thigh_back",
-    "大腿后侧分件",
-    [
-      [-0.049, 0.209],
-      [0.032, 0.221],
-      [0.058, 0.058],
-      [0.022, -0.186],
-      [-0.033, -0.205],
-      [-0.061, 0.034],
-    ],
-    [0.213, 0.986, -0.074],
-    {
-      dual: true,
-      rotation: [0, 180, 0],
-      rise: 0.021,
-      holes: [
-        [
-          [-0.025, 0.094],
-          [0.023, 0.092],
-          [0.015, -0.098],
-          [-0.018, -0.136],
-        ],
-      ],
-      direction: [0, 0, -1],
-    },
-  );
-  panel(
-    "legs",
-    "patella",
-    "独立膝部护甲",
-    [
-      [-0.051, 0.04],
-      [0.034, 0.044],
-      [0.045, -0.012],
-      [0.019, -0.049],
-      [-0.032, -0.038],
-    ],
-    [0.228, 0.694, 0.067],
-    { dual: true, rise: 0.02 },
-  );
-  // 小腿下窄、上段外鼓；窗口露出红簧；踝部三角口贯通。
-  panel(
-    "legs",
-    "shin_front",
-    "小腿前甲与弹簧窗",
-    [
-      [-0.04, 0.229],
-      [0.028, 0.228],
-      [0.059, 0.115],
-      [0.046, 0.015],
-      [0.014, -0.214],
-      [-0.027, -0.229],
-      [-0.055, -0.065],
-      [-0.065, 0.1],
-    ],
-    [0.258, 0.403, 0.056],
-    {
-      dual: true,
-      rise: 0.027,
-      holes: [
-        [
-          [-0.026, 0.114],
-          [0.02, 0.077],
-          [0.014, -0.068],
-          [-0.007, -0.108],
-          [-0.028, -0.044],
-        ],
-        [
-          [-0.019, -0.163],
-          [0.007, -0.147],
-          [0.008, -0.194],
-          [-0.014, -0.202],
-        ],
-      ],
-    },
-  );
-  panel(
-    "legs",
-    "calf_back",
-    "小腿后罩",
-    [
-      [-0.041, 0.217],
-      [0.031, 0.221],
-      [0.058, 0.103],
-      [0.035, -0.067],
-      [0.018, -0.216],
-      [-0.028, -0.224],
-      [-0.052, -0.024],
-    ],
-    [0.256, 0.425, -0.068],
-    {
-      dual: true,
-      rise: 0.024,
-      rotation: [0, 180, 0],
-      holes: [
-        [
-          [-0.027, 0.1],
-          [0.022, 0.071],
-          [0.01, -0.088],
-          [-0.014, -0.121],
-        ],
-      ],
-      direction: [0, 0, -1],
-    },
-  );
-  spring("legs", "calf_spring", [0.258, 0.43, 0.035], 0.179);
-  spring("legs", "thigh_spring", [0.202, 0.92, 0.06], 0.19);
-  // 脚跟 + 三根独立脚趾；每趾有承力骨、趾面和红色回位机构。
-  panel(
-    "feet",
-    "heel",
-    "脚跟承重壳",
-    [
-      [-0.06, -0.025],
-      [-0.05, 0.055],
-      [0, 0.079],
-      [0.052, 0.049],
-      [0.065, -0.022],
-    ],
-    [0.279, 0.04, -0.061],
-    { dual: true, rise: 0.013, thickness: 0.045 },
-  );
-  for (let i = 0; i < 3; i++) {
-    const x = 0.279 + (i - 1) * 0.048;
-    const length = i === 1 ? 0.208 : 0.185;
-    link("feet", `toe_core_${i}`, "脚趾承力梁", [x, 0.054, 0.002], [x, 0.037, length], 0.011, "dark", true);
-    // 旋转后原面板 y 轴成为脚掌纵向，表面朝上。
-    panel(
-      "feet",
-      `toe_${i}`,
-      "分趾上护板",
+  piston("shoulder", "diagonal", [0.167, 1.941, 0.05], [0.302, 2.025, 0.02], 0.013);
+  // 侧背参考中的第二组肩带执行器，沿肩胛后方布置，不侵占胸前开窗。
+  piston("shoulder", "scapular_return", [0.25, 1.986, -0.073], [0.365, 1.918, -0.12], 0.008);
+  // [OM-FREEPLAY] 遮挡处的肋架检修座按可见肋骨走向布置；孔、螺钉与线束端子分别成件。
+  for (let level = 0; level < 4; level++) {
+    const y = 1.766 + level * 0.052;
+    const x = 0.125 + level * 0.014;
+    shell(
+      "torso",
+      "rib_bracket_" + level,
+      "肋架开窗检修座",
       [
-        [-0.017, -0.082],
-        [-0.021, 0.049],
-        [-0.013, 0.102],
-        [0.013, 0.102],
-        [0.021, 0.049],
-        [0.017, -0.082],
+        [-0.018, -0.02],
+        [0.019, -0.014],
+        [0.024, 0.018],
+        [-0.012, 0.024],
       ],
-      [x, 0.078, 0.1],
+      [x, y, 0.039],
       {
         dual: true,
-        rotation: [-90, 0, 0],
-        rise: 0.008,
+        layer: 2,
+        rise: 0.003,
+        thickness: 0.004,
+        bevel: 0.0007,
+        corner: 0.0015,
+        material: "darkArmor",
         holes: [
           [
-            [-0.007, -0.047],
-            [0.007, -0.047],
-            [0.007, 0.035],
-            [-0.007, 0.047],
+            [-0.007, -0.008],
+            [0.009, -0.006],
+            [0.012, 0.01],
+            [-0.006, 0.013],
           ],
         ],
-        direction: [0, 1, 0.3],
+        pins: [
+          [-0.011, -0.013],
+          [0.014, -0.008],
+          [0.017, 0.015],
+          [-0.008, 0.018],
+        ],
       },
     );
-    piston("feet", `toe_return_${i}`, [x, 0.071, 0.018], [x, 0.071, 0.145], 0.005);
-  }
-  // 手掌、拇指和四指各有独立指骨；不把手做成拳头块。
-  panel(
-    "hands",
-    "palm",
-    "机械掌背",
-    [
-      [-0.039, 0.047],
-      [0.035, 0.048],
-      [0.044, -0.014],
-      [0.026, -0.049],
-      [-0.034, -0.044],
-      [-0.047, 0.008],
-    ],
-    [0.445, 1.132, 0.059],
-    {
-      dual: true,
-      rise: 0.013,
-      holes: [
+    for (let strand = 0; strand < 3; strand++) {
+      const offsetY = strand * 0.006 - (level === 3 ? 0.028 : 0);
+      // 三根信号线分层绕过斜肋，端部直接进入端子，避免回钩截断相邻线束。
+      const behindRib = level === 3 && strand < 2;
+      const wireZ = 0.045 + strand * 0.004 - (behindRib ? 0.018 : 0);
+      cable(
+        "torso",
+        "rib_signal_" + level + "_" + strand,
         [
-          [-0.02, 0.022],
-          [0.019, 0.025],
-          [0.024, -0.018],
-          [-0.018, -0.022],
+          [0.045, y - 0.02 + offsetY, wireZ - 0.001],
+          [0.09, y + 0.005 + offsetY, wireZ + 0.005],
+          [x + 0.008, y + 0.011 + offsetY, wireZ + 0.007],
+          [x + 0.021, y + 0.011 + offsetY, wireZ],
         ],
-      ],
-    },
-  );
-  panel(
-    "hands",
-    "palm_back",
-    "掌心支承",
-    [
-      [-0.035, 0.036],
-      [0.033, 0.035],
-      [0.033, -0.036],
-      [-0.031, -0.033],
-    ],
-    [0.445, 1.14, 0.004],
-    { dual: true, material: "dark", rise: 0.006, rotation: [0, 180, 0], layer: 2 },
-  );
-  for (let finger = 0; finger < 4; finger++) {
-    const x = 0.412 + finger * 0.022;
-    const y = 1.095 - Math.abs(finger - 1.5) * 0.008;
-    const points = [
-      [x, y, 0.032],
-      [x, y - 0.038, 0.046],
-      [x, y - 0.064, 0.068],
-      [x, y - 0.068, 0.092],
-    ];
-    for (let j = 0; j < 3; j++) {
-      const a = points[j],
-        b = points[j + 1];
-      const length = Math.hypot(...b.map((v, k) => v - a[k]));
-      const from = a.map((v, k) => v + ((b[k] - v) * 0.0095) / length);
-      const to = b.map((v, k) => v - ((v - a[k]) * (j === 2 ? 0.001 : 0.0095)) / length);
-      link("hands", `finger_${finger}_${j}`, "独立指节", from, to, 0.0075, "steel", true, 3);
-      cylinder(
-        "hands",
-        `knuckle_${finger}_${j}`,
-        "指节转轴",
-        points[j],
-        0.009,
-        0.018,
-        "dark",
+        0.0013,
+        strand === 0 ? "red" : "dark",
+      );
+      cyl(
+        "torso",
+        "rib_terminal_" + level + "_" + strand,
+        [x + 0.021, y + 0.011 + offsetY, wireZ + (behindRib ? -0.007 : 0.007)],
+        0.0026,
+        0.014,
+        "steel",
         true,
-        [0, 0, 90],
+        [90, 0, 0],
         3,
       );
     }
+  }
+  piston("arms", "upper_drive", [0.463, 1.904, -0.025], [0.47, 1.697, -0.02], 0.013);
+  piston("arms", "fore_drive", [0.405, 1.589, 0.029], [0.426, 1.302, 0.035], 0.012);
+  piston("legs", "hip_drive", [0.119, 1.187, -0.012], [0.162, 0.904, 0.013], 0.019);
+  piston("legs", "knee_drive", [0.236, 0.854, -0.022], [0.25, 0.598, -0.018], 0.014);
+  piston("waist", "lateral_drive", [0.074, 1.365, -0.014], [0.065, 1.656, -0.016], 0.0125);
+  piston("pelvis", "hip_oblique", [0.052, 1.298, 0.023], [0.137, 1.207, 0.047], 0.014);
+  // 三节腹部呈柔性机械椎体，前罩、轴承、后部连接耳分别成件。
+  for (let i = 0; i < 3; i++) {
+    const y = 1.39 + i * 0.091;
+    ring("waist", "disc_" + i, [0, y, -0.037], 0.0504, 0.034, 0.068, "dark", false, [0, 0, 0]);
+    ring("waist", "disc_rim_" + i, [0, y + 0.035, -0.037], 0.0504, 0.034, 0.005, "steel", false, [0, 0, 0]);
+    shell(
+      "waist",
+      "vertebra_" + i,
+      "独立腰椎铸造壳",
+      [
+        [-0.064, -0.033],
+        [-0.077, 0.014],
+        [-0.053, 0.039],
+        [0.053, 0.039],
+        [0.077, 0.014],
+        [0.064, -0.033],
+        [0.02, -0.043],
+        [-0.02, -0.043],
+      ],
+      [0, y, 0.015],
+      {
+        rise: 0.025,
+        width: 0.08,
+        corner: 0.012,
+        bulges: [[0, 0, 0.026, 0.03, -0.013]],
+        material: "darkArmor",
+        holes: [
+          [
+            [-0.052, -0.018],
+            [-0.05, 0.016],
+            [-0.033, 0.024],
+            [-0.027, 0],
+            [-0.035, -0.021],
+          ],
+          [
+            [0.052, -0.018],
+            [0.05, 0.016],
+            [0.033, 0.024],
+            [0.027, 0],
+            [0.035, -0.021],
+          ],
+        ],
+        pins: [
+          [-0.019, 0.021],
+          [0.019, 0.021],
+          [-0.018, -0.019],
+          [0.018, -0.019],
+        ],
+      },
+    );
+    shell(
+      "waist",
+      "rear_link_" + i,
+      "腰椎背侧耳板",
+      [
+        [-0.058, -0.025],
+        [-0.066, 0.018],
+        [0, 0.034],
+        [0.066, 0.018],
+        [0.058, -0.025],
+        [0, -0.034],
+      ],
+      // 中节向后错开、上下节少量过渡；用背甲轮廓显出已有腰弧，不再增加关节转角。
+      [0, y, -0.096 - [0.002, 0.012, 0.003][i]],
+      {
+        rise: 0.018,
+        rotation: [0, 180, 0],
+        material: "steel",
+        holes: [
+          [
+            [-0.02, -0.012],
+            [0.02, -0.012],
+            [0.02, 0.012],
+            [-0.02, 0.012],
+          ],
+        ],
+        direction: [0, 0, -1],
+      },
+    );
+  }
+  // 参考 12/14 的腹部：窄腰由分节铰耳、双侧斜撑与后侧线束组成，空处仍然透空。
+  // [OM-FREEPLAY] 被护甲遮挡的导线端子按可见连接方向补齐，数量为重建选择。
+  for (let i = 0; i < 3; i++) {
+    const y = 1.39 + i * 0.091;
+    joint("waist", "vertebra_" + i + "_hinge", [0.069, y - 0.008, -0.047], 0.013, 0.012);
+    shell(
+      "waist",
+      "vertebra_" + i + "_clevis",
+      "腰椎侧向开槽铰耳",
+      [
+        [-0.016, -0.036],
+        [-0.022, 0.026],
+        [-0.011, 0.038],
+        [0.014, 0.03],
+        [0.02, -0.028],
+        [0.008, -0.038],
+      ],
+      [0.06, y, -0.035],
+      {
+        dual: true,
+        rotation: [0, 90, -5],
+        rise: 0.005,
+        thickness: 0.005,
+        bevel: 0.0009,
+        holes: [
+          [
+            [-0.006, -0.02],
+            [-0.008, 0.018],
+            [0.007, 0.02],
+            [0.008, -0.018],
+          ],
+        ],
+        material: "darkArmor",
+        layer: 2,
+      },
+    );
+    for (let j = 0; j < 4; j++) {
+      const z = -0.068 - j * 0.006;
+      link(
+        "waist",
+        "vertebra_" + i + "_rear_web_" + j,
+        [0.028, y - 0.026, z],
+        [0.046, y + 0.025, z],
+        0.0028,
+        "darkArmor",
+      );
+      bolt(
+        "waist",
+        "vertebra_" + i + "_terminal_" + j,
+        [0.038, y - 0.02 + j * 0.013, -0.118],
+        [0, 180, 0],
+        true,
+        0.0018,
+      );
+    }
+    if (i < 2) {
+      piston("waist", "intervertebral_" + i, [0.059, y + 0.022, -0.078], [0.061, y + 0.071, -0.079], 0.0045);
+      link(
+        "waist",
+        "oblique_front_" + i,
+        shellAnchor("waist.vertebra_" + i, 0.044, 0.018, 0.026),
+        shellAnchor("waist.vertebra_" + (i + 1), 0.04, -0.02, 0.026),
+        0.006,
+        "darkArmor",
+      );
+      link(
+        "waist",
+        "oblique_back_" + i,
+        shellAnchor("waist.rear_link_" + i, -0.029, 0.016, 0.016),
+        shellAnchor("waist.rear_link_" + (i + 1), -0.029, -0.016, 0.016),
+        0.005,
+        "darkArmor",
+      );
+    }
+  }
+  for (let i = 0; i < 6; i++) {
+    const x = 0.039 + i * 0.0038;
+    cable(
+      "waist",
+      "spinal_bus_" + i,
+      [
+        [x, 1.345, -0.18],
+        [x, 1.393, -0.13],
+        [x, 1.478, -0.132],
+        [x, 1.567, -0.13],
+        [x, 1.627, -0.071],
+      ],
+      0.00125,
+      i % 3 === 0 ? "red" : "dark",
+    );
+  }
+  // 胸廓开窗内有斜向肋、执行器和接线端，避免只有一根中央柱。
+  for (let i = 0; i < 5; i++) {
+    const y = 1.741 + i * 0.043;
     link(
-      "hands",
-      `tendon_${finger}`,
-      "掌背指伸肌杆",
-      [x, 1.165, 0.084],
-      [x, y + 0.009, 0.084],
-      0.003,
-      "chrome",
+      "torso",
+      "diagonal_web_" + i,
+      [0.058, y - 0.024, 0.005],
+      [0.197, y + 0.041, 0.065],
+      0.0058,
+      "darkArmor",
+    );
+    link(
+      "torso",
+      "rib_lower_" + i,
+      [0.071, y - 0.035, -0.056],
+      [0.21, y + 0.019, -0.041],
+      0.0045,
+      "darkArmor",
+    );
+    cyl("torso", "rib_pin_" + i, [0.197, y + 0.041, 0.065], 0.008, 0.014, "steel");
+    bolt("torso", "rib_lock_" + i, [0.206, y + 0.041, 0.065], [0, 90, 0], true, 0.0028);
+    cable(
+      "torso",
+      "rib_wire_" + i,
+      [
+        [0.055, y, -0.018],
+        [0.117, y + 0.018, 0.015],
+        [0.176, y + 0.025, 0.049],
+      ],
+      0.0015,
+      i % 2 ? "red" : "dark",
+    );
+  }
+  piston("torso", "scapula_actuator", [0.072, 1.784, -0.075], [0.221, 1.959, -0.065], 0.009);
+  piston("torso", "pectoral_actuator", [0.062, 1.811, 0.009], [0.185, 1.967, -0.044], 0.008);
+  // [OM-FREEPLAY] 胸背空腔内的驱动模块按相邻两根后肋之间的空间布置，散热片与支座分别成件。
+  for (let level = 0; level < 3; level++) {
+    const y = 1.774 + level * 0.0621875;
+    add(
+      "torso",
+      "driver_body_" + level,
+      "肋间驱动模块",
+      { type: "box", w: 0.028, h: 0.036, d: 0.009, bevel: 0.001 },
+      [0.145, y, -0.093],
+      "darkArmor",
       true,
+      [0, 0, 0],
+      2,
+    );
+    link(
+      "torso",
+      "driver_mount_" + level,
+      [0.145, y - 0.014, -0.091],
+      [0.145, 1.742875 + level * 0.0621875, -0.07525],
+      0.003,
+      "steel",
+      true,
+      2,
+    );
+    for (let socket = 0; socket < 4; socket++) {
+      const x = 0.135 + socket * 0.0066;
+      cyl(
+        "torso",
+        "driver_socket_" + level + "_" + socket,
+        [x, y + 0.02, -0.093],
+        0.0023,
+        0.006,
+        "steel",
+        true,
+        [0, 0, 0],
+        3,
+      );
+      ring(
+        "torso",
+        "driver_socket_seal_" + level + "_" + socket,
+        [x, y + 0.023, -0.093],
+        0.0028,
+        0.0024,
+        0.0012,
+        "red",
+        true,
+        [0, 0, 0],
+      );
+    }
+    add(
+      "torso",
+      "driver_clamp_" + level,
+      "驱动模块压线盖",
+      { type: "box", w: 0.025, h: 0.002, d: 0.004, bevel: 0.0003 },
+      [0.145, y + 0.0175, -0.0997],
+      "darkArmor",
+      true,
+      [0, 0, 0],
+      3,
+    );
+    for (let fin = 0; fin < 10; fin++) {
+      add(
+        "torso",
+        "driver_fin_" + level + "_" + fin,
+        "独立散热鳍片",
+        { type: "box", w: 0.025, h: 0.0012, d: 0.009, bevel: 0.0002 },
+        [0.145, y + (fin - 4.5) * 0.0034, -0.1015],
+        "steel",
+        true,
+        [0, 0, 0],
+        3,
+      );
+    }
+    for (const side of [-1, 1]) {
+      bolt(
+        "torso",
+        "driver_fastener_" + level + "_" + side,
+        [0.145 + side * 0.009, y - 0.015, -0.098],
+        [0, 180, 0],
+        true,
+        0.0016,
+      );
+    }
+  }
+  for (let i = 0; i < 5; i++) {
+    ring(
+      "shoulder",
+      "servo_lamination_" + i,
+      [0.273 + i * 0.0045, 1.989, -0.012],
+      0.035,
+      0.0265,
+      0.002,
+      "darkArmor",
+    );
+  }
+  // 胸骨底壳承接领甲；左右主胸板另设安装层，横向展开并向下收束。
+  shell(
+    "chest",
+    "carapace",
+    "连续胸骨与双翼胸甲",
+    [
+      [0, 0.153],
+      [0.05, 0.178],
+      [0.09, 0.189],
+      [0.095, 0.124],
+      [0.165, 0.095],
+      [0.213, 0.054],
+      [0.243, 0.015],
+      [0.254, -0.018],
+      [0.235, -0.066],
+      [0.182, -0.084],
+      [0.125, -0.11],
+      [0.088, -0.149],
+      [0.07, -0.16],
+      [0, -0.17],
+      [-0.07, -0.16],
+      [-0.088, -0.149],
+      [-0.125, -0.11],
+      [-0.182, -0.084],
+      [-0.235, -0.066],
+      [-0.254, -0.018],
+      [-0.243, 0.015],
+      [-0.213, 0.054],
+      [-0.165, 0.095],
+      [-0.095, 0.124],
+      [-0.09, 0.189],
+      [-0.05, 0.178],
+    ],
+    [0, 1.863, 0.062],
+    {
+      rise: 0.097,
+      form: "chest",
+      rim: 0.003,
+      width: 0.26,
+      fold: -0.14,
+      slope: 0.11,
+      thickness: 0.019,
+      bevel: 0.0038,
+      corner: 0.006,
+      liner: true,
+      bulges: [
+        [0.17, -0.025, 0.11, 0.055, 0.043],
+        [-0.17, -0.025, 0.11, 0.055, 0.043],
+        [0, -0.09, 0.045, 0.12, 0.027],
+      ],
+      holes: [
+        [
+          [0.067, 0.14],
+          [0.075, 0.15],
+          [0.077, 0.111],
+          [0.18, 0.05],
+          [0.1, 0.012],
+          [0.062, 0.029],
+        ],
+        [
+          [-0.067, 0.14],
+          [-0.075, 0.15],
+          [-0.077, 0.111],
+          [-0.18, 0.05],
+          [-0.1, 0.012],
+          [-0.062, 0.029],
+        ],
+        [
+          [0.08, -0.075],
+          [0.104, -0.045],
+          [0.14, -0.059],
+          [0.105, -0.095],
+        ],
+        [
+          [-0.08, -0.075],
+          [-0.104, -0.045],
+          [-0.14, -0.059],
+          [-0.105, -0.095],
+        ],
+      ],
+      pins: [
+        [-0.039, 0.151],
+        [0.039, 0.151],
+        [-0.038, 0.102],
+        [0.038, 0.102],
+        [-0.033, -0.111],
+        [0.033, -0.111],
+      ],
+    },
+  );
+  shell(
+    "chest",
+    "pectoral_plate",
+    "左右主胸板与下缘翻边",
+    [
+      [0.062, 0.008],
+      [0.183, 0.045],
+      [0.238, 0.011],
+      [0.248, -0.019],
+      [0.23, -0.06],
+      [0.178, -0.079],
+      [0.123, -0.105],
+      [0.076, -0.139],
+      [0.058, -0.111],
+      [0.052, -0.035],
+    ],
+    [0, 1.863, 0.082],
+    {
+      dual: true,
+      form: "chest",
+      width: 0.26,
+      rise: 0.097,
+      thickness: 0.008,
+      bevel: 0.0015,
+      corner: 0.003,
+      edge: 0.003,
+      pins: [[0.209, -0.052]],
+    },
+  );
+  shell(
+    "chest",
+    "lower_sternum",
+    "胸廓下缘收束护甲",
+    [
+      [-0.073, 0.06],
+      [-0.12, 0.019],
+      [-0.068, -0.045],
+      [0, -0.067],
+      [0.068, -0.045],
+      [0.12, 0.019],
+      [0.073, 0.06],
+      [0, 0.038],
+    ],
+    [0, 1.735, 0.075],
+    {
+      rise: 0.033,
+      fold: -0.23,
+      corner: 0.008,
+      latches: [
+        [-0.058, 0.026],
+        [0.058, 0.026],
+      ],
+      pins: [
+        [-0.08, -0.025],
+        [0.08, -0.025],
+      ],
+      liner: true,
+    },
+  );
+  shell(
+    "chest",
+    "flank",
+    "胸廓侧面回包",
+    [
+      [-0.074, 0.125],
+      [0.04, 0.12],
+      [0.074, 0.032],
+      [0.052, -0.099],
+      [-0.005, -0.15],
+      [-0.065, -0.04],
+    ],
+    [0.225, 1.815, -0.01],
+    {
+      dual: true,
+      rotation: [0, 64, -16],
+      rise: 0.034,
+      holes: [
+        [
+          [-0.03, 0.056],
+          [0.028, 0.05],
+          [0.022, -0.02],
+          [-0.019, -0.05],
+        ],
+      ],
+      pins: [
+        [-0.045, 0.084],
+        [0.038, -0.064],
+      ],
+      liner: true,
+      direction: [1, 0, 0],
+    },
+  );
+  shell(
+    "chest",
+    "collar",
+    "颈根开窗领甲",
+    [
+      [-0.041, 0.063],
+      [-0.005, 0.093],
+      [0.052, 0.043],
+      [0.118, -0.014],
+      [0.117, -0.051],
+      [0.055, -0.071],
+      [-0.022, -0.018],
+    ],
+    [0.095, 2.027, 0.023],
+    {
+      dual: true,
+      form: "collar",
+      rim: 0.0025,
+      rise: 0.033,
+      rotation: [0, 27, 0],
+      fold: -0.18,
+      holes: [
+        [
+          [-0.014, 0.022],
+          [0.016, 0.035],
+          [0.063, -0.003],
+          [0.027, -0.034],
+          [-0.009, -0.018],
+        ],
+      ],
+      pins: [[0.076, -0.026]],
+      latches: [[0.004, 0.058]],
+      liner: true,
+    },
+  );
+  shell(
+    "chest",
+    "neck_front",
+    "中央锁骨六边窗",
+    [
+      [-0.063, -0.022],
+      [-0.063, 0.019],
+      [0, 0.05],
+      [0.063, 0.019],
+      [0.063, -0.022],
+      [0, -0.05],
+    ],
+    [0, 2.038, 0.054],
+    {
+      rise: 0.009,
+      holes: [
+        [
+          [-0.035, 0.007],
+          [0, 0.024],
+          [0.035, 0.007],
+          [0.03, -0.018],
+          [0, -0.03],
+          [-0.03, -0.018],
+        ],
+      ],
+      bevel: 0.0015,
+    },
+  );
+  shell(
+    "back",
+    "carapace",
+    "肩胛与背部中央复合壳",
+    [
+      [0, 0.196],
+      [0.1, 0.155],
+      [0.223, 0.106],
+      [0.275, 0.041],
+      [0.26, -0.06],
+      [0.205, -0.14],
+      [0.096, -0.203],
+      [0, -0.232],
+      [-0.096, -0.203],
+      [-0.205, -0.14],
+      [-0.26, -0.06],
+      [-0.275, 0.041],
+      [-0.223, 0.106],
+      [-0.1, 0.155],
+    ],
+    [0, 1.86, -0.095],
+    {
+      rotation: [0, 180, 0],
+      rise: 0.065,
+      fold: -0.12,
+      liner: true,
+      direction: [0, 0, -1],
+      bulges: [
+        [0.15, 0.025, 0.1, 0.056, 0.034],
+        [-0.15, 0.025, 0.1, 0.056, 0.034],
+      ],
+      holes: [
+        [
+          [0.048, 0.156],
+          [0.096, 0.136],
+          [0.139, 0.08],
+          [0.063, 0.074],
+        ],
+        [
+          [-0.048, 0.156],
+          [-0.096, 0.136],
+          [-0.139, 0.08],
+          [-0.063, 0.074],
+        ],
+        [
+          [0.151, -0.038],
+          [0.206, -0.018],
+          [0.191, -0.08],
+          [0.142, -0.102],
+        ],
+        [
+          [-0.151, -0.038],
+          [-0.206, -0.018],
+          [-0.191, -0.08],
+          [-0.142, -0.102],
+        ],
+        [
+          [-0.028, -0.144],
+          [0.028, -0.144],
+          [0.016, -0.19],
+          [-0.016, -0.19],
+        ],
+      ],
+      pins: [
+        [-0.1, 0.029],
+        [0.1, 0.029],
+        [-0.043, -0.075],
+        [0.043, -0.075],
+      ],
+    },
+  );
+  shell(
+    "back",
+    "scapular_plate",
+    "肩胛独立叠板",
+    [
+      [0.044, 0.061],
+      [0.15, 0.098],
+      [0.242, 0.041],
+      [0.241, -0.018],
+      [0.185, -0.04],
+      [0.084, -0.016],
+      [0.038, 0.014],
+    ],
+    [0, 1.86, -0.118],
+    {
+      dual: true,
+      rotation: [0, 180, 0],
+      width: 0.275,
+      rise: 0.065,
+      fold: -0.12,
+      thickness: 0.008,
+      bevel: 0.0015,
+      corner: 0.003,
+      edge: 0.003,
+      bulges: [
+        [0.15, 0.025, 0.1, 0.056, 0.034],
+        [-0.15, 0.025, 0.1, 0.056, 0.034],
+      ],
+      direction: [0, 0, -1],
+    },
+  );
+  shell(
+    "back",
+    "lumbar_transition",
+    "背甲下缘脊柱过渡板",
+    [
+      [-0.085, 0.028],
+      [-0.055, 0.065],
+      [0, 0.04],
+      [0.055, 0.065],
+      [0.085, 0.028],
+      [0.047, -0.033],
+      [0, -0.071],
+      [-0.047, -0.033],
+    ],
+    [0, 1.664, -0.09],
+    {
+      rotation: [0, 180, 0],
+      rise: 0.019,
+      fold: -0.12,
+      thickness: 0.009,
+      bevel: 0.0015,
+      corner: 0.004,
+      direction: [0, 0, -1],
+    },
+  );
+  // 参考 02/10：内侧尖端、前部隆起、顶孔和后缘属于同一个连续肩罩。
+  shell(
+    "shoulder",
+    "pauldron",
+    "连续回包肩罩",
+    [
+      [-0.118, -0.043],
+      [-0.078, -0.128],
+      [-0.027, -0.181],
+      [0.075, -0.18],
+      [0.111, -0.235],
+      [0.114, 0.235],
+      [0.074, 0.208],
+      [-0.027, 0.178],
+      [-0.082, 0.111],
+      [-0.118, 0.04],
+    ],
+    [0.36, 2.015, -0.009],
+    {
+      dual: true,
+      form: "shoulder",
+      width: 0.118,
+      thickness: 0.013,
+      bevel: 0.0022,
+      corner: 0.012,
+      latches: [[-0.005, 0.097]],
+      holes: [
+        [
+          [-0.055, 0.025],
+          [0.035, 0.025],
+          [0.061, 0.058],
+          [-0.004, 0.05],
+        ],
+        [
+          [-0.069, 0.113],
+          [-0.015, 0.129],
+          [0.034, 0.15],
+          [-0.023, 0.154],
+        ],
+        [
+          [-0.036, -0.037],
+          [0.036, -0.035],
+          [0.052, -0.064],
+          [-0.012, -0.066],
+        ],
+      ],
+      pins: [
+        [0.082, 0.205],
+        [0.055, 0.181],
+        [0.082, -0.136],
+        [0.04, 0.12],
+        [-0.04, 0.1],
+        [0.09, 0.17],
+      ],
+      direction: [1, 1, 0.4],
+    },
+  );
+  shell(
+    "shoulder",
+    "outer_shell",
+    "肩罩外侧收口",
+    [
+      [-0.066, -0.055],
+      [-0.078, 0.021],
+      [-0.04, 0.073],
+      [0.034, 0.075],
+      [0.082, 0.018],
+      [0.055, -0.072],
+      [0.009, -0.091],
+    ],
+    [0.476, 1.967, -0.009],
+    {
+      dual: true,
+      rotation: [0, 90, 0],
+      rise: 0.004,
+      thickness: 0.008,
+      bevel: 0.0014,
+      liner: true,
+      holes: [
+        [
+          [-0.049, 0.022],
+          [-0.028, 0.052],
+          [0.027, 0.055],
+          [0.057, 0.011],
+          [0.034, -0.048],
+          [-0.004, -0.055],
+        ],
+      ],
+      pins: [
+        [0.045, -0.025],
+        [-0.049, -0.019],
+      ],
+      direction: [1, 0, 0],
+    },
+  );
+  // 红色嵌条沿肩甲外表面铺设，不再用粗杆穿壳后留下两个三角残端。
+  cable(
+    "shoulder",
+    "red_crossbar",
+    [
+      shellAnchor("shoulder.pauldron", -0.055, 0.084, 0.0142),
+      shellAnchor("shoulder.pauldron", -0.005, 0.088, 0.0142),
+      shellAnchor("shoulder.pauldron", 0.048, 0.088, 0.0142),
+    ],
+    0.0016,
+    "red",
+  );
+  // 手臂护甲：不规则骨架窗口与起伏的实体边梁。
+  const upper = [
+    [-0.041, 0.135],
+    [0.027, 0.115],
+    [0.064, 0.052],
+    [0.061, 0.003],
+    [0.033, -0.131],
+    [-0.037, -0.14],
+    [-0.065, -0.048],
+    [-0.067, 0.027],
+  ];
+  shell("arms", "upper_shell", "上臂起伏开窗壳", upper, [0.412, 1.799, 0.022], {
+    dual: true,
+    rim: 0.002,
+    rise: 0.039,
+    fold: -0.09,
+    corner: 0.011,
+    bulges: [[-0.023, 0.059, 0.036, 0.051, 0.022]],
+    latches: [[-0.043, -0.092]],
+    liner: true,
+    holes: [
+      [
+        [-0.008, 0.07],
+        [0.037, 0.024],
+        [0.019, -0.064],
+        [-0.026, -0.09],
+        [-0.036, -0.052],
+      ],
+      [
+        [-0.032, -0.102],
+        [-0.01, -0.097],
+        [-0.013, -0.119],
+        [-0.034, -0.12],
+      ],
+    ],
+    pins: [
+      [-0.041, 0.06],
+      [0.039, -0.084],
+    ],
+  });
+  shell("arms", "upper_rear", "上臂背侧护甲", upper, [0.412, 1.799, -0.059], {
+    dual: true,
+    rotation: [0, 180, 0],
+    rise: 0.029,
+    liner: true,
+    holes: [
+      [
+        [-0.02, 0.062],
+        [0.024, 0.039],
+        [0.023, -0.056],
+        [-0.023, -0.086],
+      ],
+    ],
+    direction: [0, 0, -1],
+  });
+  const fore = [
+    [-0.044, 0.18],
+    [0.027, 0.162],
+    [0.063, 0.087],
+    [0.048, 0.002],
+    [0.026, -0.183],
+    [-0.025, -0.195],
+    [-0.047, -0.159],
+    [-0.067, -0.04],
+    [-0.07, 0.064],
+  ];
+  const foreHoles = [
+    [
+      [-0.037, 0.102],
+      [-0.015, 0.073],
+      [-0.02, -0.021],
+      [-0.043, -0.061],
+      [-0.051, -0.019],
+    ],
+    [
+      [0.012, 0.073],
+      [0.043, 0.065],
+      [0.032, -0.062],
+      [0.004, -0.021],
+    ],
+    [
+      [-0.009, -0.121],
+      [0.012, -0.133],
+      [0.012, -0.164],
+      [-0.012, -0.165],
+    ],
+  ];
+  shell("arms", "fore_shell", "前臂交叉开窗壳", fore, [0.445, 1.418, 0.036], {
+    dual: true,
+    rim: 0.002,
+    rise: 0.032,
+    fold: -0.07,
+    latches: [[0.013, 0.118]],
+    bulges: [
+      [-0.01, 0.118, 0.04, 0.04, 0.02],
+      [0, -0.08, 0.03, 0.04, 0.014],
+    ],
+    liner: true,
+    holes: foreHoles,
+    pins: [
+      [-0.014, 0.143],
+      [0.013, 0.125],
+      [-0.011, -0.092],
+      [-0.012, -0.178],
+    ],
+  });
+  shell("arms", "fore_back", "前臂后部回包壳", fore, [0.446, 1.418, -0.045], {
+    dual: true,
+    rotation: [0, 180, 0],
+    rise: 0.029,
+    holes: foreHoles,
+    liner: true,
+    direction: [0, 0, -1],
+  });
+  shell(
+    "arms",
+    "fore_side",
+    "前臂外侧空间梁",
+    [
+      [-0.045, 0.145],
+      [0.039, 0.118],
+      [0.051, 0.043],
+      [0.028, -0.153],
+      [-0.026, -0.175],
+      [-0.048, -0.023],
+    ],
+    [0.486, 1.424, -0.004],
+    {
+      dual: true,
+      rotation: [0, 90, 0],
+      rise: 0.015,
+      holes: [
+        [
+          [-0.022, 0.079],
+          [0.019, 0.068],
+          [0.014, -0.071],
+          [-0.02, -0.11],
+        ],
+      ],
+      direction: [1, 0, 0],
+    },
+  );
+  for (let j = 0; j < 2; j++)
+    cable(
+      "arms",
+      "upper_cable_" + j,
+      [
+        [0.383 + j * 0.006, 1.915, 0.028],
+        [0.377 + j * 0.006, 1.848, 0.045],
+        [0.393 + j * 0.006, 1.755, 0.044],
+        [0.417 + j * 0.006, 1.69, 0.024],
+      ],
+      0.0022,
+    );
+  spring("arms", "upper_spring", [0.427, 1.794, 0.037], 0.142, 0.012, 25);
+  // 腰胯外轮廓：上挑髂骨、横向开窗支架、中央长裆壳。
+  shell(
+    "pelvis",
+    "girdle",
+    "骨盆开窗横梁",
+    [
+      [-0.212, -0.016],
+      [-0.204, 0.055],
+      [-0.135, 0.078],
+      [-0.061, 0.025],
+      [0, 0.003],
+      [0.061, 0.025],
+      [0.135, 0.078],
+      [0.204, 0.055],
+      [0.212, -0.016],
+      [0.145, -0.043],
+      [0.075, -0.065],
+      [0, -0.104],
+      [-0.075, -0.065],
+      [-0.145, -0.043],
+    ],
+    [0, 1.307, 0.035],
+    {
+      rise: 0.055,
+      width: 0.22,
+      fold: -0.09,
+      liner: true,
+      holes: [
+        [
+          [0.087, 0.02],
+          [0.143, 0.046],
+          [0.177, 0.012],
+          [0.125, -0.018],
+        ],
+        [
+          [-0.087, 0.02],
+          [-0.143, 0.046],
+          [-0.177, 0.012],
+          [-0.125, -0.018],
+        ],
+        [
+          [0.026, -0.032],
+          [0.063, -0.013],
+          [0.074, -0.034],
+          [0.032, -0.067],
+        ],
+        [
+          [-0.026, -0.032],
+          [-0.063, -0.013],
+          [-0.074, -0.034],
+          [-0.032, -0.067],
+        ],
+      ],
+      pins: [
+        [-0.176, 0.031],
+        [0.176, 0.031],
+        [-0.106, -0.022],
+        [0.106, -0.022],
+      ],
+    },
+  );
+  shell(
+    "pelvis",
+    "crotch",
+    "中央骨盆下护甲",
+    [
+      [-0.078, 0.04],
+      [0.078, 0.04],
+      [0.064, -0.04],
+      [0.032, -0.126],
+      [0, -0.143],
+      [-0.032, -0.126],
+      [-0.064, -0.04],
+    ],
+    [0, 1.233, 0.05],
+    {
+      rise: 0.048,
+      fold: -0.14,
+      liner: true,
+      pins: [
+        [-0.05, 0.017],
+        [0.05, 0.017],
+      ],
+    },
+  );
+  shell(
+    "pelvis",
+    "iliac_spur",
+    "髂骨上挑侧翼",
+    [
+      [-0.061, -0.012],
+      [-0.037, 0.095],
+      [0, 0.047],
+      [0.056, 0.004],
+      [0.049, -0.021],
+    ],
+    [0.147, 1.31, -0.015],
+    {
+      dual: true,
+      rotation: [0, 44, 0],
+      rise: 0.024,
+      liner: true,
+      holes: [
+        [
+          [-0.023, 0.045],
+          [0.003, 0.016],
+          [0.018, 0.004],
+          [-0.02, 0.009],
+        ],
+      ],
+      direction: [1, 0, 0],
+    },
+  );
+  shell(
+    "pelvis",
+    "rear",
+    "骨盆背面框架",
+    [
+      [-0.2, 0.029],
+      [-0.16, 0.077],
+      [-0.063, 0.02],
+      [0, 0.04],
+      [0.063, 0.02],
+      [0.16, 0.077],
+      [0.2, 0.029],
+      [0.14, -0.038],
+      [0.04, -0.083],
+      [0, -0.11],
+      [-0.04, -0.083],
+      [-0.14, -0.038],
+    ],
+    [0, 1.298, -0.098],
+    {
+      rise: 0.035,
+      rotation: [0, 180, 0],
+      liner: true,
+      holes: [
+        [
+          [-0.14, 0.026],
+          [-0.07, 0.003],
+          [-0.112, -0.023],
+        ],
+        [
+          [0.14, 0.026],
+          [0.07, 0.003],
+          [0.112, -0.023],
+        ],
+      ],
+      direction: [0, 0, -1],
+    },
+  );
+  // 大腿具有宽实心外侧肌腹、上端窗口及内侧细长缝，不是细长平框。
+  const thigh = [
+    [-0.047, 0.239],
+    [0.002, 0.268],
+    [0.057, 0.245],
+    [0.099, 0.142],
+    [0.1, 0.038],
+    [0.071, -0.075],
+    [0.04, -0.218],
+    [0.012, -0.249],
+    [-0.046, -0.224],
+    [-0.069, -0.173],
+    [-0.06, -0.064],
+    [-0.103, 0.06],
+    [-0.097, 0.156],
+  ];
+  const thighHoles = [
+    [
+      [0.008, 0.225],
+      [0.044, 0.206],
+      [0.052, 0.158],
+      [0.022, 0.116],
+      [-0.009, 0.146],
+    ],
+    [
+      [-0.046, 0.014],
+      [-0.008, -0.031],
+      [-0.013, -0.159],
+      [-0.041, -0.183],
+      [-0.049, -0.1],
+    ],
+  ];
+  thighHoles.push([
+    [-0.079, 0.154],
+    [-0.047, 0.145],
+    [-0.052, 0.065],
+    [-0.071, 0.094],
+  ]);
+  shell("legs", "thigh", "大腿扭转铸造护甲", thigh, [0.197, 0.946, 0.038], {
+    dual: true,
+    rim: 0.0025,
+    form: "limb",
+    rise: 0.044,
+    fold: -0.045,
+    slope: 0.017,
+    liner: true,
+    latches: [[0.006, -0.024]],
+    bulges: [
+      [0.037, 0.06, 0.057, 0.1, 0.033],
+      [-0.028, -0.196, 0.045, 0.029, 0.02],
+    ],
+    holes: thighHoles,
+    pins: [
+      [0.073, 0.09],
+      [0.055, 0.006],
+      [-0.047, -0.202],
+      [0.026, -0.209],
+    ],
+    direction: [0.5, 0, 1],
+  });
+  shell("legs", "thigh_back", "大腿后部肌腹罩壳", thigh, [0.198, 0.946, -0.074], {
+    dual: true,
+    form: "limb",
+    rise: 0.035,
+    rotation: [0, 180, 0],
+    holes: thighHoles,
+    liner: true,
+    direction: [0, 0, -1],
+  });
+  shell(
+    "legs",
+    "thigh_side",
+    "大腿外侧连体壳",
+    [
+      [-0.061, 0.21],
+      [0.044, 0.206],
+      [0.071, 0.108],
+      [0.06, -0.037],
+      [0.031, -0.201],
+      [-0.039, -0.204],
+      [-0.069, -0.048],
+    ],
+    [0.258, 0.952, -0.018],
+    {
+      dual: true,
+      rotation: [0, 76, -8],
+      rise: 0.026,
+      holes: [
+        [
+          [-0.019, -0.041],
+          [0.022, -0.063],
+          [0.014, -0.15],
+          [-0.023, -0.174],
+        ],
+      ],
+      liner: true,
+      direction: [1, 0, 0],
+    },
+  );
+  shell(
+    "legs",
+    "knee_shield",
+    "膝部多面护罩",
+    [
+      [-0.061, 0.071],
+      [0.057, 0.071],
+      [0.068, 0.009],
+      [0.04, -0.055],
+      [0, -0.07],
+      [-0.044, -0.056],
+      [-0.068, 0.009],
+    ],
+    [0.219, 0.699, 0.042],
+    {
+      dual: true,
+      rise: 0.042,
+      fold: -0.19,
+      holes: [
+        [
+          [-0.017, -0.025],
+          [0.017, -0.025],
+          [0, -0.048],
+        ],
+      ],
+      pins: [
+        [-0.041, 0.016],
+        [0.04, 0.016],
+      ],
+    },
+  );
+  const calf = [
+    [-0.036, 0.233],
+    [0.03, 0.233],
+    [0.057, 0.157],
+    [0.069, 0.066],
+    [0.046, -0.031],
+    [0.028, -0.164],
+    [0.046, -0.225],
+    [0.015, -0.249],
+    [-0.034, -0.236],
+    [-0.049, -0.177],
+    [-0.069, -0.058],
+    [-0.074, 0.064],
+    [-0.061, 0.154],
+  ];
+  const calfHoles = [
+    [
+      [0.006, 0.142],
+      [0.04, 0.071],
+      [0.027, -0.033],
+      [-0.009, -0.117],
+      [-0.028, -0.073],
+      [-0.023, 0.032],
+    ],
+    [
+      [-0.028, 0.151],
+      [-0.006, 0.19],
+      [0.008, 0.147],
+      [-0.013, 0.103],
+    ],
+    [
+      [-0.009, -0.176],
+      [0.019, -0.185],
+      [0.023, -0.216],
+      [-0.015, -0.214],
+    ],
+  ];
+  calfHoles[0] = calfHoles[0].map(([x, y]) => [0.013 + (x - 0.006) * 0.88, y]);
+  shell("legs", "shin", "胫骨扭转开窗护甲", calf, [0.247, 0.416, 0.023], {
+    dual: true,
+    rim: 0.002,
+    form: "shin",
+    rise: 0.035,
+    slope: 0.03,
+    fold: -0.06,
+    liner: true,
+    bulges: [[-0.031, 0.043, 0.032, 0.087, 0.024]],
+    holes: calfHoles,
+    pins: [
+      [-0.043, 0.067],
+      [-0.03, -0.146],
+      [0.017, -0.229],
+    ],
+  });
+  shell("legs", "calf_back", "小腿后部回包壳", calf, [0.248, 0.416, -0.067], {
+    dual: true,
+    form: "shin",
+    rise: 0.03,
+    rotation: [0, 180, 0],
+    holes: calfHoles,
+    liner: true,
+    direction: [0, 0, -1],
+  });
+  shell(
+    "legs",
+    "shin_side",
+    "胫骨外侧包边",
+    [
+      [-0.044, 0.2],
+      [0.04, 0.176],
+      [0.057, 0.067],
+      [0.025, -0.193],
+      [-0.029, -0.217],
+      [-0.055, -0.031],
+    ],
+    [0.283, 0.417, -0.019],
+    {
+      dual: true,
+      rotation: [0, 90, 0],
+      rise: 0.018,
+      holes: [
+        [
+          [-0.024, 0.084],
+          [0.028, 0.039],
+          [0.012, -0.098],
+          [-0.018, -0.133],
+        ],
+      ],
+      liner: true,
+      direction: [1, 0, 0],
+    },
+  );
+  spring("legs", "thigh_spring", [0.199, 0.925, 0.048], 0.19, 0.013, 28);
+  spring("legs", "calf_spring", [0.248, 0.43, 0.033], 0.19, 0.013, 28);
+  for (let i = 0; i < 3; i++) {
+    cable(
+      "legs",
+      "thigh_cable_" + i,
+      [
+        [0.146 + i * 0.005, 1.12, 0.015],
+        [0.132 + i * 0.005, 1.017, 0.044],
+        [0.157 + i * 0.005, 0.885, 0.05],
+        [0.191 + i * 0.005, 0.767, 0.025],
+      ],
+      0.002,
+    );
+    cable(
+      "legs",
+      "shin_cable_" + i,
+      [
+        [0.229 + i * 0.005, 0.603, -0.002],
+        [0.207 + i * 0.005, 0.514, 0.014],
+        [0.214 + i * 0.005, 0.365, 0.017],
+        [0.259 + i * 0.005, 0.226, -0.003],
+      ],
+      0.0018,
+    );
+  }
+  // 足背为向踝部上升的楔形壳；三趾有独立关节、侧梁、趾尖及底部承重垫。
+  shell(
+    "feet",
+    "instep",
+    "脚背空间框架",
+    [
+      [-0.069, -0.06],
+      [-0.062, 0.015],
+      [-0.041, 0.069],
+      [-0.04, 0.005],
+      [0.039, 0.005],
+      [0.043, 0.069],
+      [0.068, 0.016],
+      [0.078, -0.053],
+      [0.043, -0.089],
+      [-0.038, -0.084],
+    ],
+    [0.265, 0.083, 0.032],
+    {
+      dual: true,
+      rise: 0.03,
+      rotation: [-55, 0, 0],
+      holes: [
+        [
+          [-0.029, -0.02],
+          [-0.023, -0.006],
+          [0.019, -0.006],
+          [0.034, -0.018],
+        ],
+      ],
+      pins: [
+        [-0.045, -0.046],
+        [0.049, -0.043],
+      ],
+      liner: true,
+    },
+  );
+  shell(
+    "feet",
+    "heel",
+    "后跟承重壳",
+    [
+      [-0.061, -0.034],
+      [-0.059, 0.043],
+      [-0.026, 0.07],
+      [0.035, 0.064],
+      [0.065, 0.013],
+      [0.059, -0.038],
+    ],
+    [0.265, 0.047, -0.059],
+    {
+      dual: true,
+      rise: 0.019,
+      thickness: 0.028,
+      rotation: [0, 180, 0],
+      direction: [0, 0, -1],
+      pins: [
+        [-0.04, 0.011],
+        [0.035, 0.011],
+      ],
+    },
+  );
+  for (const offset of [-0.043, 0.043]) {
+    shell(
+      "feet",
+      "heel_fork_" + offset,
+      "踝后跟连接叉板",
+      [
+        [-0.052, -0.039],
+        [-0.048, 0.064],
+        [-0.022, 0.091],
+        [0.016, 0.088],
+        [0.046, -0.01],
+        [0.022, -0.043],
+      ],
+      [0.265 + offset, 0.064, -0.031],
+      {
+        dual: true,
+        rotation: [0, 90, 0],
+        thickness: 0.012,
+        rise: 0.006,
+        corner: 0.004,
+        material: "darkArmor",
+        holes: [
+          [
+            [-0.023, -0.017],
+            [-0.019, 0.046],
+            [0.004, 0.055],
+            [0.021, -0.014],
+          ],
+        ],
+        pins: [
+          [-0.035, -0.026],
+          [0.003, 0.074],
+        ],
+        direction: [Math.sign(offset), 0, 0],
+      },
+    );
+  }
+  shell(
+    "feet",
+    "side_arch",
+    "脚部外侧承力三角框",
+    [
+      [-0.173, -0.048],
+      [-0.139, -0.018],
+      [-0.02, 0.084],
+      [0.043, 0.047],
+      [0.071, -0.047],
+      [0.045, -0.058],
+    ],
+    [0.326, 0.065, 0],
+    {
+      dual: true,
+      rotation: [0, 90, 0],
+      rise: 0.002,
+      thickness: 0.007,
+      bevel: 0.0012,
+      corner: 0.004,
+      holes: [
+        [
+          [-0.13, -0.032],
+          [-0.022, 0.055],
+          [0.027, 0.028],
+          [0.044, -0.032],
+        ],
+      ],
+      pins: [
+        [-0.139, -0.036],
+        [0.048, -0.032],
+      ],
+      direction: [1, 0, 0],
+    },
+  );
+  for (let i = 0; i < 3; i++) {
+    const x = 0.265 + (i - 1) * 0.043,
+      end = 0.18 - (i === 1 ? 0 : 0.018);
+    joint("feet", "toe_joint_" + i, [x, 0.043, 0.065], 0.018, 0.032);
+    link("feet", "toe_rear_core_" + i, [x, 0.039, 0.02], [x, 0.041, 0.0465], 0.009, "dark", true);
+    link("feet", "toe_core_" + i, [x, 0.041, 0.0835], [x, 0.018, end], 0.007, "dark", true);
+    shell(
+      "feet",
+      "toe_" + i,
+      "独立趾甲与承力楔",
+      [
+        [-0.018, -0.066],
+        [-0.022, 0.023],
+        [-0.012, 0.073],
+        [0.012, 0.073],
+        [0.021, 0.023],
+        [0.018, -0.066],
+      ],
+      [x, 0.022, 0.117],
+      {
+        dual: true,
+        rotation: [-90, 0, 0],
+        rise: 0.014,
+        slope: 0.1,
+        thickness: 0.009,
+        corner: 0.004,
+        bevel: 0.0013,
+        holes: [
+          [
+            [-0.007, -0.033],
+            [0.007, -0.033],
+            [0.007, 0.017],
+            [-0.007, 0.034],
+          ],
+        ],
+        pins: [[0, 0.052]],
+        direction: [0, 1, 0.5],
+      },
+    );
+    add(
+      "feet",
+      "toe_pad_" + i,
+      "脚趾下部承重垫",
+      { type: "box", w: 0.036, h: 0.012, d: 0.098, bevel: 0.002 },
+      [x, 0.006, 0.135],
+      "dark",
+      true,
+      [0, 0, 0],
+      2,
+    );
+    piston("feet", "toe_tendon_" + i, [x, 0.09, 0.014], [x, 0.035, 0.143], 0.0048);
+  }
+  add(
+    "feet",
+    "heel_pad",
+    "后跟承重底面",
+    { type: "box", w: 0.118, h: 0.012, d: 0.055, bevel: 0.002 },
+    [0.265, 0.006, -0.067],
+    "dark",
+    true,
+    [0, 0, 0],
+    2,
+  );
+  // 手指三节骨架和独立侧护板，指尖自然内卷；掌背三角大窗。
+  cyl("hands", "wrist", [0.452, 1.207, 0.021], 0.03, 0.045, "dark", true, [0, 0, 0]);
+  ring("hands", "wrist_rim", [0.452, 1.23, 0.021], 0.031, 0.021, 0.005, "chrome", true, [0, 0, 0]);
+  // 掌背窗口能看到腕部两根倾斜液压杆，与指骨牵引分开。
+  piston("hands", "wrist_ulnar", [0.425, 1.217, 0.033], [0.413, 1.159, 0.026], 0.0038);
+  piston("hands", "wrist_radial", [0.486, 1.213, 0.032], [0.492, 1.164, 0.025], 0.0038);
+  shell(
+    "hands",
+    "palm",
+    "掌背双窗与斜向中梁",
+    [
+      [-0.049, 0.055],
+      [-0.024, 0.063],
+      [0.005, 0.044],
+      [0.033, 0.051],
+      [0.054, 0.018],
+      [0.05, -0.032],
+      [0.012, -0.062],
+      [-0.036, -0.044],
+      [-0.059, 0.004],
+    ],
+    [0.452, 1.141, 0.043],
+    {
+      dual: true,
+      form: "palm",
+      rim: 0.002,
+      rise: 0.022,
+      slope: 0.04,
+      fold: -0.1,
+      thickness: 0.009,
+      bevel: 0.0015,
+      corner: 0.004,
+      holes: [
+        [
+          [-0.031, 0.039],
+          [-0.015, 0.036],
+          [0.004, -0.036],
+          [-0.027, -0.018],
+          [-0.039, 0.004],
+        ],
+        [
+          [0.009, 0.019],
+          [0.034, 0.023],
+          [0.036, -0.021],
+          [0.016, -0.039],
+        ],
+      ],
+      pins: [
+        [-0.044, 0.007],
+        [0.036, -0.03],
+      ],
+      liner: true,
+    },
+  );
+  shell(
+    "hands",
+    "palm_back",
+    "掌心机构基座",
+    [
+      [-0.037, 0.039],
+      [0.034, 0.037],
+      [0.034, -0.037],
+      [-0.031, -0.043],
+    ],
+    [0.452, 1.139, -0.004],
+    {
+      dual: true,
+      rotation: [0, 180, 0],
+      rise: 0.012,
+      material: "darkArmor",
+      layer: 2,
+    },
+  );
+  // 参考 20：指节向掌心（局部负 Z）逐节内卷，指背仍保持连续长轮廓。
+  for (let finger = 0; finger < 4; finger++) {
+    const x = 0.416 + finger * 0.023,
+      y = 1.099 - Math.abs(finger - 1.5) * 0.007;
+    const fingerLength = [0.95, 1, 0.97, 0.82][finger];
+    const fingerCurl = [0.85, 1, 1.08, 1.13][finger];
+    const pts: V3[] = [
+      [x, y, 0.026],
+      [x, y - 0.047 * fingerLength, 0.026 - 0.007 * fingerLength * fingerCurl],
+      [x, y - 0.084 * fingerLength, 0.026 - 0.03 * fingerLength * fingerCurl],
+      [x, y - 0.108 * fingerLength, 0.026 - 0.06 * fingerLength * fingerCurl],
+    ];
+    for (let j = 0; j < 3; j++) {
+      const a = pts[j],
+        b = pts[j + 1],
+        delta = new Vector3(...b).sub(new Vector3(...a));
+      const axis = delta.clone().normalize();
+      const coreA = new Vector3(...a).addScaledVector(axis, 0.0088).toArray() as V3;
+      const coreB = new Vector3(...b).addScaledVector(axis, -0.0088).toArray() as V3;
+      link("hands", "finger_core_" + finger + "_" + j, coreA, coreB, 0.0063, "dark", true, 3);
+      joint("hands", "knuckle_" + finger + "_" + j, a, 0.0088, 0.017);
+      const orientation = new Quaternion().setFromUnitVectors(
+        new Vector3(0, 1, 0),
+        delta.clone().normalize(),
+      );
+      const center = new Vector3(...a).add(new Vector3(...b)).multiplyScalar(0.5);
+      const half = delta.length() * 0.5 - 0.006;
+      for (const face of [-1, 1]) {
+        const offset = new Vector3(0, 0, face * 0.0095).applyQuaternion(orientation).add(center);
+        const rotation = new Euler().setFromQuaternion(
+          orientation
+            .clone()
+            .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), face < 0 ? Math.PI : 0)),
+        );
+        shell(
+          "hands",
+          "finger_plate_" + finger + "_" + j + "_" + face,
+          "指节盒形开槽护壳",
+          [
+            [-0.009, -half],
+            [-0.0105, half - 0.004],
+            [-0.007, half],
+            [0.007, half],
+            [0.0105, half - 0.004],
+            [0.009, -half],
+          ],
+          offset.toArray(),
+          {
+            dual: true,
+            rotation: [rotation.x, rotation.y, rotation.z].map((v) => (v * 180) / Math.PI) as V3,
+            rise: 0.0015,
+            width: 0.01,
+            corner: 0.001,
+            bevel: 0.0005,
+            thickness: 0.0025,
+            holes: [
+              [
+                [-0.004, -half + 0.005],
+                [0.004, -half + 0.005],
+                [0.004, half - 0.004],
+                [-0.004, half - 0.004],
+              ],
+            ],
+            material: "darkArmor",
+            layer: 3,
+          },
+        );
+      }
+      for (const side of [-1, 1]) {
+        const offset = new Vector3(side * 0.009, 0, 0).applyQuaternion(orientation).add(center);
+        const rotation = new Euler().setFromQuaternion(
+          orientation
+            .clone()
+            .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), (side * Math.PI) / 2)),
+        );
+        shell(
+          "hands",
+          "finger_web_" + finger + "_" + j + "_" + side,
+          "指骨侧面承力耳板",
+          [
+            [-0.008, -half],
+            [-0.009, half],
+            [0.009, half],
+            [0.008, -half],
+          ],
+          offset.toArray(),
+          {
+            dual: true,
+            rotation: [rotation.x, rotation.y, rotation.z].map((v) => (v * 180) / Math.PI) as V3,
+            rise: 0,
+            corner: 0.001,
+            bevel: 0.00035,
+            thickness: 0.002,
+            holes: [
+              [
+                [-0.003, -half + 0.004],
+                [0.003, -half + 0.004],
+                [0.003, half - 0.004],
+                [-0.003, half - 0.004],
+              ],
+            ],
+            material: "darkArmor",
+            layer: 3,
+          },
+        );
+      }
+    }
+    piston("hands", "finger_drive_" + finger, [x, 1.177, 0.031], [x, y + 0.008, 0.032], 0.0038);
+    cable(
+      "hands",
+      "finger_tendon_" + finger,
+      pts.map((point, index) => {
+        const a = new Vector3(...pts[Math.max(0, index - 1)]);
+        const b = new Vector3(...pts[Math.min(pts.length - 1, index + 1)]);
+        const tangent = b.sub(a).normalize();
+        const inside = new Vector3(0, -tangent.z, tangent.y).multiplyScalar(0.0075);
+        return new Vector3(...point)
+          .add(inside)
+          .addScaledVector(tangent, index === pts.length - 1 ? -0.009 : 0)
+          .toArray() as V3;
+      }),
+      0.0011,
+      "red",
+    );
+  }
+  piston("hands", "thumb_drive", [0.412, 1.157, -0.008], [0.39, 1.104, 0.008], 0.006);
+  joint("hands", "thumb_hinge", [0.397, 1.135, 0.028], 0.012, 0.019);
+  link("hands", "thumb_tip", [0.386, 1.115, 0.011], [0.392, 1.083, -0.009], 0.01, "darkArmor", true, 3);
+  shell(
+    "hands",
+    "thumb_plate",
+    "拇指外侧甲",
+    [
+      [-0.013, 0.031],
+      [0.012, 0.024],
+      [0.011, -0.029],
+      [-0.01, -0.029],
+    ],
+    [0.388, 1.104, 0.019],
+    { dual: true, rise: 0.007, corner: 0.004, thickness: 0.006, bevel: 0.001, pins: [[0, 0.01]] },
+  );
+
+  joint("hands", "thumb_hinge_distal", [0.394, 1.074, -0.015], 0.009, 0.014);
+  link("hands", "thumb_distal_core", [0.398, 1.069, -0.022], [0.405, 1.061, -0.035], 0.006, "dark", true, 3);
+  const thumbAxis = new Vector3(0.013, -0.015, -0.023).normalize();
+  const thumbQ = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), thumbAxis);
+  for (const face of [-1, 1]) {
+    const center = new Vector3(0.401, 1.066, -0.027).add(
+      new Vector3(0, 0, face * 0.008).applyQuaternion(thumbQ),
+    );
+    const angles = new Euler().setFromQuaternion(
+      thumbQ
+        .clone()
+        .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), face < 0 ? Math.PI : 0)),
+    );
+    shell(
+      "hands",
+      "thumb_distal_plate_" + face,
+      "拇指末节开窗护壳",
+      [
+        [-0.01, -0.014],
+        [-0.012, 0.014],
+        [0.012, 0.014],
+        [0.01, -0.014],
+      ],
+      center.toArray(),
+      {
+        dual: true,
+        rotation: [angles.x, angles.y, angles.z].map((v) => (v * 180) / Math.PI) as V3,
+        rise: 0.002,
+        thickness: 0.003,
+        bevel: 0.0006,
+        corner: 0.0015,
+        holes: [
+          [
+            [-0.004, -0.008],
+            [0.004, -0.008],
+            [0.004, 0.007],
+            [-0.004, 0.007],
+          ],
+        ],
+        material: "darkArmor",
+        layer: 3,
+      },
+    );
+  }
+
+  // 头部：头顶通风、额骨中央凹口、眉骨、眼窝、独立颊颌与侧面耳轴。
+  cyl("head", "neck", [0, 2.129, -0.031], 0.032, 0.13, "dark", false, [0, 0, 0], 1);
+  ring("head", "neck_seal", [0, 2.183, -0.031], 0.036, 0.0323, 0.012, "chrome", false, [0, 0, 0]);
+  piston("head", "neck_strut", [0.023, 2.075, 0.025], [0.028, 2.199, 0.024], 0.0075);
+  // 支撑杆移到领甲内侧后，两端通过独立支座接回颈柱，保留固定环完整外缘。
+  link(
+    "head",
+    "neck_strut_mount_lower",
+    [0.023, 2.078, 0.019],
+    [0.023, 2.082, -0.008],
+    0.005,
+    "steel",
+    true,
+    2,
+  );
+  link(
+    "head",
+    "neck_strut_mount_upper",
+    [0.028, 2.196, 0.018],
+    [0.027, 2.191, -0.01],
+    0.0045,
+    "steel",
+    true,
+    2,
+  );
+
+  shell(
+    "head",
+    "neck_side",
+    "颈部外侧筋板",
+    [
+      [-0.028, -0.06],
+      [-0.023, 0.063],
+      [0.01, 0.052],
+      [0.028, -0.061],
+    ],
+    [0.044, 2.125, -0.011],
+    {
+      dual: true,
+      rotation: [0, 65, 0],
+      rise: 0.009,
+      holes: [
+        [
+          [-0.012, -0.027],
+          [-0.009, 0.036],
+          [0.006, 0.022],
+          [0.012, -0.031],
+        ],
+      ],
+      material: "darkArmor",
+      layer: 2,
+    },
+  );
+  loft(
+    "head",
+    "cranium",
+    [
+      [2.24, 0.06, 0.054, -0.032],
+      [2.28, 0.081, 0.065, -0.03],
+      [2.335, 0.087, 0.068, -0.029],
+      [2.365, 0.065, 0.055, -0.024],
+      [2.376, 0.028, 0.034, -0.018],
+    ],
+    "armor",
+  );
+  shell(
+    "head",
+    "forehead",
+    "额骨鼻梁连续面甲",
+    [
+      [-0.075, 0.067],
+      [-0.043, 0.097],
+      [0, 0.104],
+      [0.043, 0.097],
+      [0.075, 0.067],
+      [0.087, 0.012],
+      [0.073, -0.014],
+      [0.057, -0.026],
+      [0.073, -0.038],
+      [0.041, -0.05],
+      [0.023, -0.058],
+      [0.012, -0.041],
+      [-0.012, -0.041],
+      [-0.023, -0.058],
+      [-0.041, -0.05],
+      [-0.073, -0.038],
+      [-0.057, -0.026],
+      [-0.073, -0.014],
+      [-0.087, 0.012],
+    ],
+    [0, 2.289, 0.036],
+    {
+      form: "face",
+      rim: 0.0015,
+      rise: 0.03,
+      width: 0.087,
+      thickness: 0.008,
+      bevel: 0.0012,
+      corner: 0.004,
+      holes: [
+        [
+          [-0.016, 0.043],
+          [-0.022, 0.061],
+          [0, 0.077],
+          [0.022, 0.061],
+          [0.016, 0.043],
+        ],
+        [
+          [0.031, 0.079],
+          [0.063, 0.07],
+          [0.075, 0.046],
+          [0.058, 0.055],
+        ],
+        [
+          [-0.031, 0.079],
+          [-0.063, 0.07],
+          [-0.075, 0.046],
+          [-0.058, 0.055],
+        ],
+      ],
+      pins: [
+        [-0.065, 0.027],
+        [0.065, 0.027],
+        [-0.066, 0.002],
+        [0.066, 0.002],
+      ],
+      liner: true,
+    },
+  );
+  shell(
+    "head",
+    "face_bridge",
+    "面部折面鼻梁",
+    [
+      [-0.027, 0.022],
+      [-0.015, 0.04],
+      [0.015, 0.04],
+      [0.027, 0.022],
+      [0.022, -0.027],
+      [0, -0.055],
+      [-0.022, -0.027],
+    ],
+    [0, 2.268, 0.045],
+    {
+      rise: 0.012,
+      fold: -0.18,
+      corner: 0.002,
+      thickness: 0.007,
+      bevel: 0.001,
+      material: "darkArmor",
+      pins: [[0, -0.027]],
+    },
+  );
+  shell(
+    "head",
+    "brow",
+    "眼窝上沿独立眉骨",
+    [
+      [-0.025, 0.006],
+      [-0.013, 0.014],
+      [0.023, 0.016],
+      [0.034, 0.003],
+      [0.021, -0.008],
+      [-0.014, -0.007],
+    ],
+    [0.044, 2.26, 0.067],
+    {
+      dual: true,
+      rotation: [0, 18, 0],
+      rise: 0.012,
+      slope: 0.08,
+      corner: 0.0018,
+      thickness: 0.006,
+      bevel: 0.0008,
+      material: "darkArmor",
+    },
+  );
+  shell(
+    "head",
+    "malar",
+    "眼下颧骨折板",
+    [
+      [-0.025, 0.011],
+      [0.019, 0.012],
+      [0.025, -0.002],
+      [0.002, -0.041],
+      [-0.019, -0.026],
+    ],
+    [0.044, 2.247, 0.076],
+    {
+      dual: true,
+      rotation: [0, 24, -6],
+      rise: 0.014,
+      fold: -0.19,
+      corner: 0.002,
+      thickness: 0.007,
+      bevel: 0.001,
+      material: "armor",
+      pins: [[0.012, -0.005]],
+    },
+  );
+  const foreheadSurface = shellSurfaces.get("head.forehead")!;
+  const insetNormal = shellNormal(foreheadSurface.params, 0.035, 0.056);
+  const insetPosition = shellPoint(
+    foreheadSurface.params,
+    0.035,
+    0.056,
+    Number(foreheadSurface.params.thickness),
+  )
+    .addScaledVector(insetNormal, 0.0007)
+    .add(new Vector3(...foreheadSurface.position));
+  const insetRotation = new Euler().setFromQuaternion(
+    new Quaternion()
+      .setFromUnitVectors(new Vector3(0, 0, 1), insetNormal)
+      .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), (-28 * Math.PI) / 180)),
+  );
+  shell(
+    "head",
+    "forehead_inset",
+    "额角斜置检修盖",
+    [
+      [-0.012, -0.017],
+      [-0.016, 0.01],
+      [-0.008, 0.018],
+      [0.012, 0.018],
+      [0.014, -0.012],
+    ],
+    insetPosition.toArray(),
+    {
+      dual: true,
+      rotation: [insetRotation.x, insetRotation.y, insetRotation.z].map((v) => (v * 180) / Math.PI) as V3,
+      rise: 0.003,
+      corner: 0.001,
+      thickness: 0.004,
+      bevel: 0.0007,
+      material: "darkArmor",
+      holes: [
+        [
+          [-0.003, -0.011],
+          [0.003, -0.011],
+          [0.005, -0.008],
+          [0.005, -0.004],
+          [0.002, -0.002],
+          [0.002, 0.002],
+          [0.005, 0.004],
+          [0.005, 0.008],
+          [0.003, 0.011],
+          [-0.003, 0.011],
+          [-0.005, 0.008],
+          [-0.005, 0.004],
+          [-0.002, 0.002],
+          [-0.002, -0.002],
+          [-0.005, -0.004],
+          [-0.005, -0.008],
+        ],
+      ],
+      pins: [[0.009, 0.013]],
+    },
+  );
+  shell(
+    "head",
+    "temple",
+    "颞骨侧面分区壳",
+    [
+      [-0.035, 0.043],
+      [0.008, 0.056],
+      [0.041, 0.027],
+      [0.035, -0.02],
+      [0.004, -0.043],
+      [-0.036, -0.019],
+    ],
+    [0.074, 2.313, -0.019],
+    {
+      dual: true,
+      rotation: [0, 75, 0],
+      rise: 0.012,
+      fold: -0.14,
+      corner: 0.003,
+      thickness: 0.006,
+      bevel: 0.001,
+      pins: [
+        [-0.022, 0.026],
+        [0.022, 0.013],
+        [-0.009, -0.027],
+      ],
+      direction: [1, 0, 0],
+    },
+  );
+  // 参考 04 的两枚侧颅传感器嵌在颞甲上，安装方向从母壳曲面求取。
+  const templeSurface = shellSurfaces.get("head.temple")!;
+  const templeRotation = new Quaternion().setFromEuler(
+    new Euler(...(templeSurface.rotation.map((v) => (v * Math.PI) / 180) as V3)),
+  );
+  for (const [sensor, [x, y]] of [
+    [-0.014, 0.006],
+    [0.018, -0.015],
+  ].entries()) {
+    const normal = shellNormal(templeSurface.params, x, y);
+    const position = shellPoint(templeSurface.params, x, y, Number(templeSurface.params.thickness))
+      .addScaledVector(normal, 0.0008)
+      .applyQuaternion(templeRotation)
+      .add(new Vector3(...templeSurface.position));
+    const mount = templeRotation
+      .clone()
+      .multiply(new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), normal));
+    const angles = new Euler().setFromQuaternion(mount);
+    const rotation = [angles.x, angles.y, angles.z].map((v) => (v * 180) / Math.PI) as V3;
+    shell(
+      "head",
+      "temple_sensor_" + sensor,
+      "侧颅传感器嵌框",
+      [
+        [-0.013, -0.013],
+        [-0.015, 0.006],
+        [-0.004, 0.015],
+        [0.012, 0.009],
+        [0.014, -0.008],
+        [0.003, -0.015],
+      ],
+      position.toArray(),
+      {
+        dual: true,
+        rotation,
+        rise: 0,
+        thickness: 0.0028,
+        bevel: 0.0006,
+        corner: 0.0013,
+        material: "darkArmor",
+        holes: [
+          [
+            [-0.006, -0.007],
+            [0.006, -0.007],
+            [0.008, 0],
+            [0.005, 0.007],
+            [-0.005, 0.007],
+            [-0.008, 0],
+          ],
+        ],
+        pins: [
+          [-0.01, 0.006],
+          [0.009, -0.009],
+        ],
+      },
+    );
+    const axisAngles = new Euler().setFromQuaternion(
+      mount.clone().multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), Math.PI / 2)),
+    );
+    const axisRotation = [axisAngles.x, axisAngles.y, axisAngles.z].map((v) => (v * 180) / Math.PI) as V3;
+    for (let ringIndex = 0; ringIndex < 3; ringIndex++) {
+      const center = new Vector3(0, 0, 0.001 + ringIndex * 0.0014).applyQuaternion(mount).add(position);
+      ring(
+        "head",
+        "temple_optics_ring_" + sensor + "_" + ringIndex,
+        center.toArray(),
+        0.0067 - ringIndex * 0.0012,
+        0.0054 - ringIndex * 0.0012,
+        0.0011,
+        ringIndex === 1 ? "steel" : "dark",
+        true,
+        axisRotation,
+      );
+    }
+    const center = new Vector3(0, 0, 0.004).applyQuaternion(mount).add(position);
+    cyl(
+      "head",
+      "temple_optics_core_" + sensor,
+      center.toArray(),
+      0.0027,
+      0.0012,
+      "dark",
+      true,
+      axisRotation,
       3,
     );
   }
-  link(
-    "hands",
-    "thumb_base",
-    "拇指基节",
-    [0.399, 1.147, 0.033],
-    [0.382, 1.131, 0.05],
-    0.011,
-    "steel",
-    true,
-    3,
-  );
-  link(
-    "hands",
-    "thumb_tip",
-    "拇指末节",
-    [0.382, 1.124, 0.06],
-    [0.389, 1.088, 0.083],
-    0.009,
-    "steel",
-    true,
-    3,
-  );
-
-  // 头部依据白模近景：后脑体积、前额下切、两颊独立、尖下颌和颈部空隙。
-  cylinder("head", "neck", "颈部中心轴", [0, 2.136, -0.025], 0.027, 0.1, "dark", false, [0, 0, 0], 1);
-  add(
-    "head",
-    "cranium",
-    "后脑与顶壳",
-    4,
-    {
-      type: "kit",
-      kit: "hmt_loft",
-      params: {
-        sections: [
-          [2.245, 0.059, 0.056, -0.026],
-          [2.3, 0.082, 0.066, -0.026],
-          [2.355, 0.086, 0.067, -0.024],
-          [2.389, 0.052, 0.049, -0.018],
-          [2.4, 0.016, 0.022, -0.01],
-        ],
-      },
-    },
-    [0, 0, 0],
-    "armor",
-    false,
-    [0, 0, 0],
-    [0, 1, -0.5],
-  );
-  panel(
-    "head",
-    "brow",
-    "中央面甲与眉脊",
-    [
-      [-0.071, 0.076],
-      [-0.037, 0.099],
-      [0.037, 0.099],
-      [0.071, 0.076],
-      [0.082, 0.011],
-      [0.049, -0.027],
-      [0.019, -0.049],
-      [0, -0.075],
-      [-0.019, -0.049],
-      [-0.049, -0.027],
-      [-0.082, 0.011],
-    ],
-    [0, 2.285, 0.044],
-    {
-      rise: 0.041,
-      holes: [
-        [
-          [-0.052, 0.062],
-          [-0.03, 0.072],
-          [-0.02, 0.047],
-          [-0.044, 0.033],
-        ],
-        [
-          [0.052, 0.062],
-          [0.03, 0.072],
-          [0.02, 0.047],
-          [0.044, 0.033],
-        ],
-      ],
-      slope: -0.04,
-    },
-  );
-  panel(
-    "head",
-    "cheek",
-    "独立颊甲",
-    [
-      [-0.017, 0.034],
-      [0.023, 0.016],
-      [0.019, -0.039],
-      [-0.013, -0.05],
-      [-0.03, -0.019],
-    ],
-    [0.061, 2.213, 0.042],
-    {
-      dual: true,
-      rise: 0.01,
-      rotation: [0, 25, 0],
-      holes: [
-        [
-          [-0.009, 0.011],
-          [0.01, 0.001],
-          [0.008, -0.02],
-          [-0.007, -0.021],
-        ],
-      ],
-    },
-  );
-  panel(
+  shell(
     "head",
     "jaw",
-    "下颌中央护板",
+    "下颌尖形护甲",
     [
-      [-0.015, 0.044],
-      [0.015, 0.044],
-      [0.019, 0.002],
-      [0.051, -0.02],
-      [0.032, -0.052],
-      [0, -0.063],
-      [-0.032, -0.052],
-      [-0.051, -0.02],
-      [-0.019, 0.002],
+      [-0.012, 0.041],
+      [0.012, 0.041],
+      [0.021, 0.004],
+      [0.055, 0.035],
+      [0.063, 0.013],
+      [0.035, -0.05],
+      [0, -0.069],
+      [-0.035, -0.05],
+      [-0.063, 0.013],
+      [-0.055, 0.035],
+      [-0.021, 0.004],
     ],
-    [0, 2.198, 0.091],
-    { rise: 0.025 },
+    [0, 2.232, 0.071],
+    {
+      form: "jaw",
+      rise: 0.027,
+      slope: 0.02,
+      fold: -0.12,
+      thickness: 0.009,
+      bevel: 0.0017,
+      corner: 0.004,
+      holes: [
+        [
+          [0.027, -0.005],
+          [0.044, 0.013],
+          [0.035, -0.022],
+          [0.023, -0.035],
+        ],
+        [
+          [-0.027, -0.005],
+          [-0.044, 0.013],
+          [-0.035, -0.022],
+          [-0.023, -0.035],
+        ],
+      ],
+      pins: [
+        [-0.019, -0.049],
+        [0.019, -0.049],
+      ],
+      liner: true,
+    },
   );
-  cylinder("head", "jaw_hinge", "下颌侧轴", [0.065, 2.218, -0.006], 0.014, 0.014, "red", true);
-  link(
+  shell(
     "head",
-    "jaw_tendon",
-    "颊部外露连杆",
-    [0.077, 2.258, 0.007],
-    [0.078, 2.19, 0.012],
-    0.004,
+    "cheek",
+    "颊骨独立框架",
+    [
+      [-0.018, 0.036],
+      [0.022, 0.018],
+      [0.027, -0.026],
+      [0.002, -0.052],
+      [-0.023, -0.039],
+      [-0.033, 0.003],
+    ],
+    [0.065, 2.24, 0.025],
+    {
+      dual: true,
+      rotation: [0, 65, 0],
+      rise: 0.015,
+      thickness: 0.008,
+      bevel: 0.0013,
+      corner: 0.004,
+      holes: [
+        [
+          [-0.013, 0.011],
+          [0.009, 0.003],
+          [0.008, -0.024],
+          [-0.011, -0.027],
+        ],
+      ],
+      liner: true,
+      pins: [[0.012, -0.036]],
+    },
+  );
+  joint("head", "ear", [0.069, 2.264, -0.025], 0.015, 0.014);
+  cable(
+    "head",
+    "jaw_wire",
+    [
+      [0.075, 2.273, -0.014],
+      [0.08, 2.243, 0.008],
+      [0.071, 2.226, 0.024],
+      shellAnchor("head.jaw", 0.039, -0.0225, 0.003),
+    ],
+    0.0021,
+  );
+  cable(
+    "head",
+    "jaw_wire_lower",
+    [[0.078, 2.264, -0.039], [0.073, 2.232, -0.02], shellAnchor("head.jaw", 0.028, -0.03525, 0.003)],
+    0.0016,
     "red",
-    true,
-    3,
   );
-  add(
+  shell(
     "head",
-    "optic",
-    "暖白视觉传感器",
-    5,
-    { type: "box", w: 0.015, h: 0.006, d: 0.005, bevel: 0.001 },
-    [0.061, 2.272, 0.082],
-    "optic",
-    true,
-    [0, 15, -12],
+    "occipital",
+    "后脑分区装甲",
+    [
+      [-0.063, 0.059],
+      [0, 0.084],
+      [0.063, 0.059],
+      [0.078, 0.003],
+      [0.044, -0.058],
+      [0, -0.081],
+      [-0.044, -0.058],
+      [-0.078, 0.003],
+    ],
+    [0, 2.307, -0.076],
+    {
+      form: "occipital",
+      rotation: [0, 180, 0],
+      rise: 0.02,
+      holes: [
+        [
+          [-0.046, 0.011],
+          [-0.025, 0.028],
+          [-0.009, 0.011],
+          [-0.021, -0.007],
+        ],
+        [
+          [0.046, 0.011],
+          [0.025, 0.028],
+          [0.009, 0.011],
+          [0.021, -0.007],
+        ],
+      ],
+      pins: [[0, -0.033]],
+      direction: [0, 0, -1],
+    },
   );
-  for (let i = 0; i < 4; i++) {
+  for (const side of [-1, 1]) {
     add(
       "head",
-      `crown_vent_${i}`,
-      "头顶散热缝",
+      "optic_" + side,
+      "暖色眼部传感器",
+      { type: "box", w: 0.013, h: 0.0055, d: 0.005, bevel: 0.001 },
+      [side * 0.055, 2.279, 0.072],
+      "optic",
+      false,
+      [0, side * 18, side * 12],
       5,
-      { type: "box", w: 0.032, h: 0.002, d: 0.004, bevel: 0.0005 },
-      [0, 2.395 - i * 0.003, -0.025 + i * 0.012],
-      "dark",
+    );
+    for (let i = 0; i < 3; i++)
+      add(
+        "head",
+        "optic_lens_" + side + "_" + i,
+        "独立视觉光学单元",
+        { type: "box", w: 0.002, h: 0.0036, d: 0.001, bevel: 0.0003 },
+        [side * 0.055 + (i - 1) * 0.003, 2.279, 0.076],
+        "opticCore",
+        false,
+        [0, side * 18, side * 12],
+        5,
+      );
+    for (let i = 0; i < 11; i++) {
+      add(
+        "head",
+        "cheek_vent_" + side + "_" + i,
+        "面甲微型散热孔",
+        { type: "box", w: 0.004, h: 0.0008, d: 0.001, bevel: 0.0002 },
+        [side * (0.053 - i * 0.00045), 2.274 + i * 0.0028, 0.043 - i * 0.0007],
+        "dark",
+        false,
+        [0, side * 19, side * 12],
+        5,
+      );
+    }
+  }
+  // 白模顶壳为三列狭缝，不是贴在表面的深色条纹。
+  const crownSlots: Loop[] = [];
+  for (let row = 0; row < 10; row++)
+    for (let column = 0; column < 3; column++) {
+      const x = (column - 1) * 0.014,
+        y = -0.022 + row * 0.0045;
+      crownSlots.push([
+        [x - 0.0048, y - 0.001],
+        [x + 0.0048, y - 0.001],
+        [x + 0.0048, y + 0.001],
+        [x - 0.0048, y + 0.001],
+      ]);
+    }
+  shell(
+    "head",
+    "crown",
+    "头顶三列实体通风孔",
+    [
+      [-0.071, -0.032],
+      [-0.077, -0.018],
+      [-0.062, 0.051],
+      [-0.026, 0.064],
+      [0.026, 0.064],
+      [0.062, 0.051],
+      [0.077, -0.018],
+      [0.071, -0.032],
+    ],
+    [0, 2.382, -0.025],
+    {
+      form: "crown",
+      width: 0.08,
+      rotation: [-90, 0, 0],
+      rise: 0.016,
+      thickness: 0.004,
+      bevel: 0.0003,
+      corner: 0.001,
+      holes: crownSlots,
+      material: "armor",
+      direction: [0, 1, 0],
+    },
+  );
+
+  // 关节后的电缆按多视图可见起终点布置；弧线连接而非悬空直杆。
+  for (let i = 0; i < 4; i++) {
+    cable(
+      "shoulder",
+      "harness_" + i,
+      [
+        [0.13 + i * 0.008, 1.962, -0.115],
+        [0.145 + i * 0.008, 1.972 + i * 0.004, -0.142],
+        [0.288 + i * 0.008, 1.998 + i * 0.004, -0.145],
+        [0.368 + i * 0.008, 1.952, -0.146 - i * 0.005],
+        [0.408 + i * 0.008, 1.904, -0.11],
+      ],
+      0.0018,
+      i % 2 ? "dark" : "red",
+    );
+    cyl(
+      "torso",
+      "shoulder_harness_socket_" + i,
+      [0.13 + i * 0.008, 1.962, -0.116],
+      0.0035,
+      0.008,
+      "darkArmor",
+      true,
+      [90, 0, 0],
+      2,
+    );
+    cyl(
+      "arms",
+      "upper_harness_socket_" + i,
+      [0.408 + i * 0.008, 1.904, -0.11],
+      0.0025,
+      0.012,
+      "darkArmor",
+      true,
+      [90, 0, 0],
+      2,
+    );
+    cable(
+      "torso",
+      "abdominal_harness_" + i,
+      [
+        [0.2 + i * 0.0075, 1.799, -0.018],
+        [0.142 + i * 0.0075, 1.708, 0.018],
+        [0.1 + i * 0.0075, 1.644, -0.1],
+        [0.082 + i * 0.0075, 1.396, -0.105],
+      ],
+      0.0021,
+      i % 2 ? "dark" : "red",
     );
   }
-  // 自内向外排序，所有实例沿用展示台的构建、隔离和拆解管道。
+  // 腰侧线束末端进入分线座，座体由连接耳承接到腰椎，保留插接活动余量。
+  add(
+    "waist",
+    "lower_bus_socket",
+    "腰侧线束分线座",
+    { type: "box", w: 0.045, h: 0.018, d: 0.018, bevel: 0.001 },
+    [0.093, 1.399, -0.105],
+    "darkArmor",
+    true,
+    [0, 0, 0],
+    2,
+  );
+  link(
+    "waist",
+    "lower_bus_mount",
+    shellAnchor("waist.rear_link_0", -0.029, 0.005, 0.016),
+    [0.077, 1.399, -0.105],
+    0.0045,
+    "steel",
+    true,
+    2,
+  );
+  add(
+    "waist",
+    "spinal_bus_socket",
+    "脊柱线束下端插接座",
+    { type: "box", w: 0.031, h: 0.015, d: 0.015, bevel: 0.001 },
+    [0.049, 1.347, -0.18],
+    "darkArmor",
+    true,
+    [0, 0, 0],
+    2,
+  );
+  link(
+    "waist",
+    "spinal_bus_mount",
+    shellAnchor("pelvis.rear", -0.07, 0.02, 0.014),
+    [0.064, 1.347, -0.18],
+    0.004,
+    "steel",
+    true,
+    2,
+  );
   parts.sort((a, b) => a.build_layer - b.build_layer || a.build_order - b.build_order);
-  parts.forEach((p, i) => {
-    p.build_order = i + 100;
-  });
+  if (options.machined !== false) {
+    const baselineConstants = resolveConstants({ ...constants, HEIGHT: 2.4 });
+    for (const part of parts) {
+      if (machinedIds.has(part.id))
+        part.geometry = {
+          type: "kit",
+          kit: "hmt_machined",
+          params: {
+            id: part.id,
+            scale: "HEIGHT/2.4",
+            sourceJson: JSON.stringify(resolveSpec(part.geometry, baselineConstants)),
+          },
+        };
+    }
+  }
+  parts.forEach((p, i) => (p.build_order = i + 100));
   const names: Record<string, string> = {
+    head: "头颈",
     torso: "胸廓承力骨架",
-    waist: "三节腰椎",
-    chest: "前胸护甲",
-    back: "背部护甲",
-    shoulder: "肩部关节与罩甲",
+    chest: "胸骨与胸翼",
+    back: "背甲",
+    shoulder: "肩关节与罩壳",
+    waist: "三节机械腰椎",
+    pelvis: "骨盆",
     arms: "双臂",
     hands: "机械手",
-    pelvis: "骨盆",
     legs: "双腿",
     feet: "踝与分趾脚",
-    head: "头颈",
   };
   return {
     model: "hmt",
     title: "HMT · 双足机器人",
-    source_notes: source + "；2.4m 仅为展示尺度。",
+    source_notes: source + "；2.4m 仅为展示尺度",
     constants,
     assemblies: Object.entries(names).map(([id, name_cn]) => ({
       id,
@@ -1374,25 +3304,46 @@ export function makeHmtRegistry(): ModelRegistry {
     parts,
     materials: {
       armor: {
-        base: "#464d50",
-        metalness: 0.62,
-        roughness: 0.4,
+        base: "#454648",
+        metalness: 1,
+        roughness: 0.78,
         preset: "none",
-        clearcoat: 0.25,
-        clearcoatRoughness: 0.3,
+        clearcoat: 0,
+        pbr: "brushed",
+        pbrColor: false,
+        normalScale: 0.025,
+        repeat: [24, 24],
       },
-      darkArmor: { base: "#22272a", metalness: 0.72, roughness: 0.42, preset: "none" },
-      dark: { base: "#14191c", metalness: 0.72, roughness: 0.43, preset: "none" },
-      steel: { base: "#687174", metalness: 0.88, roughness: 0.32, preset: "none" },
-      chrome: { base: "#bec7ca", metalness: 0.96, roughness: 0.21, preset: "none" },
-      red: { base: "#80252c", metalness: 0.75, roughness: 0.35, preset: "none", clearcoat: 0.25 },
-      fastener: { base: "#939da0", metalness: 0.94, roughness: 0.22, preset: "none" },
+      darkArmor: {
+        base: "#303234",
+        metalness: 1,
+        roughness: 0.72,
+        preset: "none",
+        pbr: "brushed",
+        pbrColor: false,
+        normalScale: 0.025,
+        repeat: [24, 24],
+      },
+      dark: { base: "#1e2021", metalness: 0.92, roughness: 0.31, preset: "none" },
+      steel: { base: "#626567", metalness: 1, roughness: 0.23, preset: "none" },
+      chrome: { base: "#a0a5a8", metalness: 1, roughness: 0.15, preset: "none" },
+      red: { base: "#b31b24", metalness: 0.94, roughness: 0.24, preset: "none" },
+      redLining: { base: "#391114", metalness: 1, roughness: 0.32, preset: "none" },
+      fastener: { base: "#888e94", metalness: 1, roughness: 0.19, preset: "none" },
       optic: {
-        base: "#ffe9cf",
+        base: "#f53e19",
         metalness: 0.2,
         roughness: 0.2,
-        emissive: "#ffd5ab",
+        emissive: "#ff3a15",
         emissiveIntensity: 1.8,
+        preset: "none",
+      },
+      opticCore: {
+        base: "#ffe7c3",
+        metalness: 0.1,
+        roughness: 0.12,
+        emissive: "#fff3dd",
+        emissiveIntensity: 3,
         preset: "none",
       },
     },

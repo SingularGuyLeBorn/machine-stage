@@ -40,7 +40,8 @@ export function getBVH(geometry: THREE.BufferGeometry): MeshBVH {
   let bvh = bvhCache.get(geometry);
   if (!bvh) {
     if (!geometry.boundingBox) geometry.computeBoundingBox();
-    bvh = new MeshBVH(geometry);
+    // 离线发布的拾取树与检测共用，避免重建时重排索引使已有拾取树失效。
+    bvh = geometry.boundsTree instanceof MeshBVH ? geometry.boundsTree : new MeshBVH(geometry);
     bvhCache.set(geometry, bvh);
   }
   return bvh;
@@ -157,7 +158,13 @@ function samplePoints(geometry: THREE.BufferGeometry, budget = 900): THREE.Vecto
     points.push(a.clone().add(b).multiplyScalar(0.5));
     points.push(b.clone().add(c).multiplyScalar(0.5));
     points.push(c.clone().add(a).multiplyScalar(0.5));
-    points.push(a.clone().add(b).add(c).multiplyScalar(1 / 3));
+    points.push(
+      a
+        .clone()
+        .add(b)
+        .add(c)
+        .multiplyScalar(1 / 3),
+    );
   }
   return points;
 }

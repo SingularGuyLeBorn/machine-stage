@@ -395,7 +395,11 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
     }
     // 各向异性材质（拉丝钢）需要稳定的切线基：给几何补一份安全 tangent。
     // 否则 three 用 UV 导数重建切线，UV 退化的三角形会产生 NaN → 金属发黑。
-    if (!item.def.materialGroups?.length && (material as THREE.MeshPhysicalMaterial).anisotropy > 0) {
+    if (
+      !item.def.materialGroups?.length &&
+      (material as THREE.MeshPhysicalMaterial).anisotropy > 0 &&
+      !geometry.hasAttribute("tangent")
+    ) {
       computeTangentsSafe(geometry);
     }
     const count = item.def.instances ?? 1;
@@ -412,9 +416,7 @@ export function buildModel(registry: ModelRegistry, options: BuildOptions = {}):
     const instances: AssembledInstance[] = [];
     let handle: PartHandle;
     if (item.def.damage && count > 1) {
-      throw new Error(
-        `assembler：零件 "${item.id}" 是实例件（${count}），战损变体需要拆成单实例零件`,
-      );
+      throw new Error(`assembler：零件 "${item.id}" 是实例件（${count}），战损变体需要拆成单实例零件`);
     }
 
     if (count > 1) {

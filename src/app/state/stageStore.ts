@@ -665,8 +665,11 @@ export const useStageStore = create<StageState>((set, get) => ({
         model.variants?.find((item) => item.id === variantId)?.registry ?? model.registry;
       const definitionCount = activeRegistry?.parts.length ?? 0;
       // 大模型按候选对拆片；每片重建一次模型 + 独立 BVH，8 片在 16 核上摊得开。
+      // 完整二进制资产已经带 BVH，只建一份检测副本，避免八份高密度模型挤占内存。
       const shardCount =
-        kind === "static" && definitionCount >= 500 ? Math.min(8, Math.max(1, cores - 1)) : 1;
+        kind === "static" && definitionCount >= 500 && !model.prepare
+          ? Math.min(8, Math.max(1, cores - 1))
+          : 1;
       const reports: ClippingReport[] = [];
       const started = performance.now();
       let pending = shardCount;

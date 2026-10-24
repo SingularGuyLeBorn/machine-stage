@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
+import { MeshBVH } from "three-mesh-bvh";
 import { buildModel } from "../assembler/assembler";
 import { makeTestRegistry, testKitLayouts } from "../registry/testKit";
 import { detectStatic, detectSweep, getBVH } from "./detect";
@@ -124,6 +125,14 @@ describe("solver/detect 动画扫掠检测", () => {
 });
 
 describe("solver/getBVH", () => {
+  it("复用离线拾取树，检测不能重排它对应的原始索引", () => {
+    const geometry = new THREE.SphereGeometry(1, 24, 16);
+    const indices = Array.from(geometry.index!.array);
+    geometry.boundsTree = new MeshBVH(geometry, { indirect: true });
+    expect(getBVH(geometry)).toBe(geometry.boundsTree);
+    expect(Array.from(geometry.index!.array)).toEqual(indices);
+    geometry.dispose();
+  });
   it("同一几何只构建一次 BVH", () => {
     const geometry = new THREE.BoxGeometry(1, 1, 1);
     const first = getBVH(geometry);

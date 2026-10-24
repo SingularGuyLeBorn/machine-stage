@@ -5,8 +5,7 @@ import {
   type InstanceLayout,
   type ModelRegistry,
 } from "@/three/parts";
-import { makeHmtRegistry } from "@/three/parts/models/hmt/registry";
-import { hmtBuilders } from "@/three/parts/models/hmt/geometry";
+import { hmtRuntimeRegistry, hmtRuntimeBuilders, prepareHmt } from "@/three/parts/models/hmt/runtime";
 import type { GeometryBuilder } from "@/three/parts/assembler/geometry";
 import type { DamageState } from "@/three/parts";
 import { makeTigerLayouts, makeTigerRegistry, tigerBuilders } from "@/three/parts/models/tiger/registry";
@@ -68,27 +67,15 @@ import {
   bisonRegistry,
 } from "@/three/parts/models/guns7/bison/registry";
 import { BISON_MOTION_PARTS, animateBison } from "@/three/parts/models/guns7/bison/motion";
-import {
-  makeRpkRegistry,
-  makeRpkLayouts,
-  RPK_BUILDERS,
-} from "@/three/parts/models/guns7/rpk/registry";
+import { makeRpkRegistry, makeRpkLayouts, RPK_BUILDERS } from "@/three/parts/models/guns7/rpk/registry";
 import { RPK_MOTION_PARTS, animateRpk } from "@/three/parts/models/guns7/rpk/motion";
-import {
-  M60_BUILDERS,
-  makeM60Layouts,
-  makeM60Registry,
-} from "@/three/parts/models/guns7/m60/registry";
+import { M60_BUILDERS, makeM60Layouts, makeM60Registry } from "@/three/parts/models/guns7/m60/registry";
 import { M60_MOTION_PARTS, animateM60 } from "@/three/parts/models/guns7/m60/motion";
 import { M2HB_BUILDERS, makeM2hbLayouts, makeM2hbRegistry } from "@/three/parts/models/m2hb/registry";
 import { M2HB_MOTION_PARTS, animateM2hb } from "@/three/parts/models/m2hb/motion";
 import { M134_BUILDERS, makeM134Layouts, makeM134Registry } from "@/three/parts/models/m134/registry";
 import { M134_MOTION_PARTS, animateM134 } from "@/three/parts/models/m134/motion";
-import {
-  type38Builders,
-  type38Layouts,
-  type38Registry,
-} from "@/three/parts/models/guns7/type38/registry";
+import { type38Builders, type38Layouts, type38Registry } from "@/three/parts/models/guns7/type38/registry";
 import { T38_MOTION_PARTS, animateType38 } from "@/three/parts/models/guns7/type38/motion";
 
 // ============================================================================
@@ -154,6 +141,8 @@ export interface StageModel {
   variants?: StageVariant[];
   /** 模型自定义几何 kit 构造器（如发动机 borePlate/siameseBlock 等）。 */
   builders?: Record<string, GeometryBuilder>;
+  /** 完整预计算几何的可取消加载；准备完成后才进入同一个装配器。 */
+  prepare?: (signal: AbortSignal, progress: (fraction: number) => void) => Promise<void>;
   /** 动画：只驱动节点，每帧调用前框架已 resetNodes。t 为秒；state 为当前机器状态。 */
   animate?: (
     assembled: AssembledModel,
@@ -223,8 +212,9 @@ export const CATALOG: StageModel[] = [
     subtitle: "Bulgarov · 人形头 / 三节腰椎 / 开窗护甲 / 分趾脚",
     milestone: "参考重建",
     status: "ready",
-    registry: makeHmtRegistry(),
-    builders: hmtBuilders,
+    registry: hmtRuntimeRegistry,
+    builders: hmtRuntimeBuilders,
+    prepare: prepareHmt,
     states: [{ id: "idle", label: "站立展示", hint: "旋转查看外形，选中零件可隔离与拆解" }],
     actions: [
       { id: "hmt-explode", group: "展示", label: "爆炸视图", kind: "view-toggle", view: "explode" },
@@ -733,11 +723,7 @@ export const CATALOG: StageModel[] = [
     builders: type38Builders,
     motionParts: T38_MOTION_PARTS,
     animate: (assembled, seconds, state) => {
-      animateType38(
-        assembled,
-        seconds,
-        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
-      );
+      animateType38(assembled, seconds, state === "running" ? "auto" : state === "semi" ? "semi" : "idle");
     },
     readouts: () => [
       { label: "自动原理", value: "手动旋转后拉枪机" },
@@ -783,11 +769,7 @@ export const CATALOG: StageModel[] = [
     builders: BISON_BUILDERS,
     motionParts: BISON_MOTION_PARTS,
     animate: (assembled, seconds, state) => {
-      animateBison(
-        assembled,
-        seconds,
-        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
-      );
+      animateBison(assembled, seconds, state === "running" ? "auto" : state === "semi" ? "semi" : "idle");
     },
     readouts: () => [
       { label: "自动原理", value: "自由枪机（无导气/无回转闭锁）" },
@@ -831,11 +813,7 @@ export const CATALOG: StageModel[] = [
     builders: M60_BUILDERS,
     motionParts: M60_MOTION_PARTS,
     animate: (assembled, seconds, state) => {
-      animateM60(
-        assembled,
-        seconds,
-        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
-      );
+      animateM60(assembled, seconds, state === "running" ? "auto" : state === "semi" ? "semi" : "idle");
     },
     readouts: () => [
       { label: "自动原理", value: "导气式（长行程活塞）" },
@@ -1012,11 +990,7 @@ export const CATALOG: StageModel[] = [
     builders: M2HB_BUILDERS,
     motionParts: M2HB_MOTION_PARTS,
     animate: (assembled, seconds, state) => {
-      animateM2hb(
-        assembled,
-        seconds,
-        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
-      );
+      animateM2hb(assembled, seconds, state === "running" ? "auto" : state === "semi" ? "semi" : "idle");
     },
     readouts: () => [
       { label: "自动原理", value: "枪管短后坐 + 半自由枪机" },
@@ -1063,11 +1037,7 @@ export const CATALOG: StageModel[] = [
     builders: AK47_G7_BUILDERS,
     motionParts: AK47_G7_MOTION_PARTS,
     animate: (assembled, seconds, state) => {
-      animateAk47G7(
-        assembled,
-        seconds,
-        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
-      );
+      animateAk47G7(assembled, seconds, state === "running" ? "auto" : state === "semi" ? "semi" : "idle");
     },
     readouts: () => [
       { label: "自动原理", value: "导气式（活塞长行程）" },
@@ -1110,11 +1080,7 @@ export const CATALOG: StageModel[] = [
     builders: RPK_BUILDERS,
     motionParts: RPK_MOTION_PARTS,
     animate: (assembled, seconds, state) => {
-      animateRpk(
-        assembled,
-        seconds,
-        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
-      );
+      animateRpk(assembled, seconds, state === "running" ? "auto" : state === "semi" ? "semi" : "idle");
     },
     readouts: () => [
       { label: "自动原理", value: "导气式 + 双凸笋回转闭锁（AK 派生）" },
@@ -1158,11 +1124,7 @@ export const CATALOG: StageModel[] = [
     builders: M134_BUILDERS,
     motionParts: M134_MOTION_PARTS,
     animate: (assembled, seconds, state) => {
-      animateM134(
-        assembled,
-        seconds,
-        state === "running" ? "auto" : state === "semi" ? "semi" : "idle",
-      );
+      animateM134(assembled, seconds, state === "running" ? "auto" : state === "semi" ? "semi" : "idle");
     },
     readouts: () => [
       { label: "自动原理", value: "转管式（外能源电机）" },
