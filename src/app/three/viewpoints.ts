@@ -180,18 +180,18 @@ interface CarrierInteriorViewSpec {
 
 const TYPE055_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec>> = {
   bridge: {
-    eyePart: "type055.interior.console_bridge_3",
-    eye: [0, 0.55, 0],
-    targetPart: "type055.gun.turret",
-    targetOffset: [0, 8, 40],
-    fov: 62,
+    eyePart: "type055.interior.bridge_captain_seat_back",
+    eye: [0, 0.05, 0.25],
+    targetPart: "type055.interior.bridge_dashboard",
+    targetOffset: [0, 0.55, 0],
+    fov: 70,
   },
   cic: {
-    eyePart: "type055.interior.console_cic_5",
+    eyePart: "type055.interior.cic_chart_table",
     eye: [0, 0.8, 0],
-    targetPart: "type055.interior.screen_cic_5",
-    targetOffset: [0, 0, -6],
-    fov: 66,
+    targetPart: "type055.interior.cic_screen_c",
+    targetOffset: [0, 0, 0],
+    fov: 70,
   },
   engine_room: {
     eyePart: "type055.power.engine_console",

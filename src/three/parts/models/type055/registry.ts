@@ -421,7 +421,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     assembly: "superstructure",
     build_layer: 4,
     geometry: M(B(6.8, 2.3, 0.05, [0, 0, 0], 0.004)),
-    material: "cv_bridge_glass",
+    material: "cv_055_bridge_glass",
     mate: A([0, DECK + 9.6, 33.04], [-12.8, 0, 0]),
   });
   for (const side of [-1, 1] as const) {
@@ -2761,6 +2761,63 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     });
   }
 
+  // ---------------- 艉封板细节与轴包套 ----------------
+  add({
+    id: `${P}hull.transom_ribs`,
+    name_cn: "艉封板竖向加强筋 ×6",
+    name_en: "transom stiffeners ×6",
+    assembly: "hull",
+    build_layer: 2,
+    geometry: M(
+      ...[-5.6, -3.36, -1.12, 1.12, 3.36, 5.6].map((x) => B(0.14, 4.2, 0.12, [x, 10.0, -90.04], 0.006)),
+      B(11.4, 0.18, 0.14, [0, 12.4, -90.04], 0.006),
+      B(11.4, 0.18, 0.14, [0, 7.8, -90.04], 0.006),
+    ),
+    material: "cv_055_hull",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}hull.transom_doors`,
+    name_cn: "艉封板水密门 ×2",
+    name_en: "transom watertight doors ×2",
+    assembly: "hull",
+    build_layer: 3,
+    geometry: M(
+      B(0.92, 1.8, 0.08, [-2.4, 9.0, -90.08], 0.01),
+      B(0.92, 1.8, 0.08, [2.4, 9.0, -90.08], 0.01),
+      B(0.1, 0.1, 0.05, [-2.4, 9.0, -90.14], 0.004),
+      B(0.1, 0.1, 0.05, [2.4, 9.0, -90.14], 0.004),
+    ),
+    material: "cv_hull_dark",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}hull.transom_hatch`,
+    name_cn: "艉部拖曳声呐/检修口",
+    name_en: "transom towed-array hatch",
+    assembly: "hull",
+    build_layer: 3,
+    geometry: M(
+      { type: "weld", from: [0, 0, 0], to: [0, 0, 0.12], radius: 0.58 },
+      C(0.58, 0.12, [0, 0, 0.04], 22),
+      C(0.44, 0.06, [0, 0, 0.11], 22),
+    ),
+    material: "cv_055_fitting",
+    mate: A([0, 10.6, -90.1], [90, 0, 0]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}hull.shaft_bossing_${side === -1 ? "l" : "r"}`,
+      name_cn: `轴包套 ${side === -1 ? "左" : "右"}`,
+      name_en: `shaft bossing ${side === -1 ? "l" : "r"}`,
+      assembly: "hull",
+      build_layer: 2,
+      geometry: M(C(0.85, 3.2, [0, 0, 0], 20), C(0.62, 0.6, [0, 0, 1.7], 18)),
+      material: "cv_antifouling",
+      mate: A([side * T55.SHAFT_X, 4.0, -88.2], [90, 0, 0]),
+    });
+  }
+
   // ---------------- 舰桥/CIC/机舱内部 ----------------
   const consoleAt = (x: number, y: number, z: number, tag: string) => {
     add({
@@ -2769,7 +2826,15 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       name_en: `console ${tag}`,
       assembly: "interior",
       build_layer: 2,
-      geometry: M(B(1.4, 0.9, 0.8, [0, 0, 0], 0.02), B(1.3, 0.06, 0.7, [0, 0.5, -0.05], 0.006), B(0.9, 0.5, 0.06, [0, 0.75, -0.3], 0.004)),
+      geometry: M(
+        B(1.4, 0.9, 0.8, [0, 0, 0], 0.02),
+        B(1.3, 0.06, 0.7, [0, 0.5, -0.05], 0.006),
+        B(1.0, 0.54, 0.07, [0, 0.78, -0.34], 0.004),
+        B(0.55, 0.03, 0.22, [0, 0.54, 0.1], 0.004),
+        B(0.72, 0.04, 0.02, [0, 0.1, 0.41], 0.002),
+        B(0.72, 0.04, 0.02, [0, 0.0, 0.41], 0.002),
+        B(0.72, 0.04, 0.02, [0, -0.1, 0.41], 0.002),
+      ),
       material: "cv_hull_dark",
       mate: A([x, y, z]),
     });
@@ -2779,29 +2844,34 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       name_en: `screen ${tag}`,
       assembly: "interior",
       build_layer: 2,
-      geometry: M(B(0.9, 0.48, 0.03, [0, 0, 0], 0.002)),
-      material: "cv_screen",
-      mate: A([x, y + 0.75, z - 0.28]),
+      geometry: M(B(0.9, 0.46, 0.03, [0, 0, 0], 0.002)),
+      material: Number(tag.split("_").pop()) % 2 === 0 ? "cv_mfd" : "cv_screen",
+      mate: A([x, y + 0.75, z - 0.43]),
     });
   };
   for (let i = 0; i < 6; i++) consoleAt(-4.6 + i * 1.8, DECK + 7.9, 27, `bridge_${i + 1}`);
-  for (let i = 0; i < 8; i++) consoleAt(-5.0 + (i % 4) * 2.5, DECK + 5.2, 14 + Math.floor(i / 4) * 4, `cic_${i + 1}`);
+  // CIC 双排 5 座战位，全部落在实体基座上，面向艏部主显控墙。
+  for (let row = 0; row < 2; row++) {
+    for (let i = 0; i < 5; i++) {
+      consoleAt(-4.0 + i * 2.0, DECK + 5.2, 13.5 + row * 4.0, `cic_${row * 5 + i + 1}`);
+    }
+  }
   const seatSpots: Array<[number, number, number]> = [];
-  for (const [i, x] of [-3.0, -1.0, 1.0, 3.0].entries()) seatSpots.push([x, DECK + 7.42, 27.6 + (i % 2) * 0.1]);
-  for (const z of [15, 19]) for (const x of [-5.0, -2.5, 0, 2.5]) seatSpots.push([x, DECK + 4.72, z]);
+  for (const [i, x] of [-3.0, -1.0, 1.0, 3.0].entries()) seatSpots.push([x, DECK + 7.42, 26.1 + (i % 2) * 0.1]);
+  for (const z of [12.65, 16.65]) for (const x of [-4.0, -2.0, 0, 2.0, 4.0]) seatSpots.push([x, DECK + 4.72, z]);
   ctx.layout("type055.seats", ({ index }) => {
     const [x, y, z] = seatSpots[index]!;
     return new THREE.Matrix4().makeTranslation(x, y, z);
   });
   add({
     id: `${P}interior.seats`,
-    name_cn: "舰桥/CIC 座椅 ×12",
-    name_en: "bridge/CIC seats ×12",
+    name_cn: `舰桥/CIC 座椅 ×${seatSpots.length}`,
+    name_en: `bridge/CIC seats ×${seatSpots.length}`,
     assembly: "interior",
     build_layer: 2,
     geometry: M(B(0.55, 0.12, 0.5, [0, 0.4, 0], 0.02), B(0.55, 0.72, 0.12, [0, 0.78, -0.22], 0.02), B(0.08, 0.42, 0.08, [0, 0.16, 0], 0.006)),
     material: "cv_upholstery",
-    instances: 12,
+    instances: seatSpots.length,
     indexed: true,
     instance_layout: "type055.seats",
     mate: A([0, 0, 0]),
@@ -2846,9 +2916,410 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     name_en: "CIC floor",
     assembly: "interior",
     build_layer: 2,
-    geometry: M(B(11.0, 0.12, 20, [0, 0, 0], 0.01)),
-    material: "cv_deck_plate",
+    geometry: M(B(10.2, 0.12, 18.0, [0, 0, 0], 0.01)),
+    material: "cv_upholstery",
     mate: A([0, DECK + 4.7, 18]),
+  });
+
+  // ---------------- 舰桥内部：天花板/灯带/舰长椅/操舵/海图桌 ----------------
+  add({
+    id: `${P}interior.bridge_ceiling`,
+    name_cn: "舰桥天花板",
+    name_en: "bridge ceiling",
+    assembly: "interior",
+    build_layer: 2,
+    geometry: M(B(9.2, 0.1, 14.2, [0, 0, 0], 0.01), B(9.0, 0.06, 0.16, [0, -0.07, -5.2], 0.006), B(9.0, 0.06, 0.16, [0, -0.07, 5.2], 0.006)),
+    material: "cv_hull_dark",
+    mate: A([0, DECK + 12.6, 26]),
+  });
+  add({
+    id: `${P}interior.bridge_lights`,
+    name_cn: "舰桥顶灯带 ×3",
+    name_en: "bridge ceiling lights ×3",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      B(1.6, 0.04, 0.3, [0, 0, -4.2], 0.004),
+      B(1.6, 0.04, 0.3, [0, 0, 0], 0.004),
+      B(1.6, 0.04, 0.3, [0, 0, 4.2], 0.004),
+    ),
+    material: "cv_055_lamp",
+    mate: A([0, DECK + 12.54, 26]),
+  });
+  add({
+    id: `${P}interior.bridge_dais`,
+    name_cn: "舰长指挥台基座",
+    name_en: "captain dais",
+    assembly: "interior",
+    build_layer: 2,
+    geometry: M(B(2.4, 0.18, 1.8, [0, 0, 0], 0.02), B(2.2, 0.06, 1.6, [0, 0.12, 0], 0.01)),
+    material: "cv_deck_plate",
+    mate: A([0, DECK + 7.5, 24.2]),
+  });
+  add({
+    id: `${P}interior.bridge_captain_chair`,
+    name_cn: "舰长椅",
+    name_en: "captain chair",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      C(0.16, 0.5, [0, 0.28, 0], 12),
+      B(0.75, 0.18, 0.7, [0, 0.58, 0], 0.03),
+      B(0.75, 0.9, 0.16, [0, 1.04, -0.32], 0.03),
+      B(0.48, 0.26, 0.16, [0, 1.6, -0.32], 0.03),
+      B(0.08, 0.32, 0.52, [-0.4, 0.78, 0], 0.02),
+      B(0.08, 0.32, 0.52, [0.4, 0.78, 0], 0.02),
+    ),
+    material: "cv_upholstery",
+    mate: A([0, DECK + 7.68, 24.2]),
+  });
+  add({
+    id: `${P}interior.bridge_captain_seat_back`,
+    name_cn: "舰长椅靠背（内部视角定位）",
+    name_en: "captain seat back",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(B(0.48, 0.26, 0.16, [0, 0, 0], 0.02)),
+    material: "cv_upholstery",
+    mate: A([0, DECK + 9.28, 23.88]),
+  });
+  add({
+    id: `${P}interior.bridge_helm`,
+    name_cn: "操舵台",
+    name_en: "helmsman console",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      B(0.9, 0.85, 0.55, [0, 0, 0], 0.03),
+      B(1.0, 0.06, 0.35, [0, 0.44, -0.2], 0.01),
+      C(0.24, 0.05, [0, 0.52, -0.25], 16),
+      B(0.1, 0.28, 0.1, [0.28, 0.65, -0.25], 0.006),
+      B(0.1, 0.28, 0.1, [0.44, 0.65, -0.25], 0.006),
+    ),
+    material: "cv_hull_dark",
+    mate: A([0, DECK + 7.93, 30.6]),
+  });
+  add({
+    id: `${P}interior.bridge_side_console_l`,
+    name_cn: "舰桥左舷侧显控台",
+    name_en: "bridge port side console",
+    assembly: "interior",
+    build_layer: 2,
+    geometry: M(B(0.7, 1.0, 2.6, [0, 0, 0], 0.03), B(0.66, 0.44, 0.05, [0, 0.35, 0.55], 0.004), B(0.66, 0.44, 0.05, [0, 0.35, -0.55], 0.004)),
+    material: "cv_hull_dark",
+    mate: A([-3.95, DECK + 8.0, 28.6]),
+  });
+  add({
+    id: `${P}interior.bridge_side_console_r`,
+    name_cn: "舰桥右舷侧显控台",
+    name_en: "bridge starboard side console",
+    assembly: "interior",
+    build_layer: 2,
+    geometry: M(B(0.7, 1.0, 2.6, [0, 0, 0], 0.03), B(0.66, 0.44, 0.05, [0, 0.35, 0.55], 0.004), B(0.66, 0.44, 0.05, [0, 0.35, -0.55], 0.004)),
+    material: "cv_hull_dark",
+    mate: A([3.95, DECK + 8.0, 28.6]),
+  });
+  add({
+    id: `${P}interior.bridge_side_screens`,
+    name_cn: "舰桥侧显控屏 ×4",
+    name_en: "bridge side screens ×4",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      B(0.6, 0.4, 0.03, [-3.95, DECK + 8.35, 29.15], 0.002),
+      B(0.6, 0.4, 0.03, [-3.95, DECK + 8.35, 28.05], 0.002),
+      B(0.6, 0.4, 0.03, [3.95, DECK + 8.35, 29.15], 0.002),
+      B(0.6, 0.4, 0.03, [3.95, DECK + 8.35, 28.05], 0.002),
+    ),
+    material: "cv_screen",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}interior.bridge_chart_table`,
+    name_cn: "舰桥海图桌",
+    name_en: "bridge chart table",
+    assembly: "interior",
+    build_layer: 2,
+    geometry: M(B(1.5, 0.9, 0.95, [0, 0, 0], 0.02), B(1.55, 0.06, 1.0, [0, 0.48, 0], 0.01), B(0.08, 0.12, 0.08, [0, 0.55, 0.4], 0.004)),
+    material: "cv_hull_dark",
+    mate: A([-3.15, DECK + 7.85, 24.4]),
+  });
+  add({
+    id: `${P}interior.bridge_chart`,
+    name_cn: "舰桥海图",
+    name_en: "bridge chart",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(B(1.3, 0.02, 0.8, [0, 0, 0], 0.002)),
+    material: "cv_chart",
+    mate: A([-3.15, DECK + 8.36, 24.4]),
+  });
+  add({
+    id: `${P}interior.bridge_rear_door`,
+    name_cn: "舰桥后门",
+    name_en: "bridge rear door",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(B(0.95, 1.95, 0.08, [0, 0, 0], 0.01), B(0.12, 0.12, 0.1, [0.28, 0, -0.06], 0.004)),
+    material: "cv_hull_dark",
+    mate: A([0, DECK + 8.55, 18.62]),
+  });
+  add({
+    id: `${P}interior.bridge_aisle`,
+    name_cn: "舰桥中央通道地毯",
+    name_en: "bridge aisle carpet",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(B(2.0, 0.02, 8.0, [0, 0, 0], 0.004)),
+    material: "cv_upholstery",
+    mate: A([0, DECK + 7.47, 25.5]),
+  });
+  add({
+    id: `${P}interior.bridge_overhead`,
+    name_cn: "舰桥顶部仪表板",
+    name_en: "bridge overhead panel",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      B(5.2, 0.16, 1.4, [0, 0, 0], 0.02),
+      B(0.1, 0.5, 0.1, [-2.4, 0.32, -0.5], 0.006),
+      B(0.1, 0.5, 0.1, [2.4, 0.32, -0.5], 0.006),
+      B(0.9, 0.34, 0.04, [-1.5, -0.08, -0.72], 0.002),
+      B(0.9, 0.34, 0.04, [0, -0.08, -0.72], 0.002),
+      B(0.9, 0.34, 0.04, [1.5, -0.08, -0.72], 0.002),
+    ),
+    material: "cv_hull_dark",
+    mate: A([0, DECK + 11.6, 29.4]),
+  });
+
+  // ---------------- CIC 内部：实体基座 + 围壁 + 主显控墙 + 战位 ----------------
+  add({
+    id: `${P}interior.cic_foundation`,
+    name_cn: "CIC 实体基座（封住下方空腔）",
+    name_en: "CIC solid foundation",
+    assembly: "interior",
+    build_layer: 1,
+    geometry: M(B(10.6, 4.7, 18.4, [0, 0, 0], 0.02), B(0.16, 0.18, 18.4, [-5.2, 2.3, 0], 0.01), B(0.16, 0.18, 18.4, [5.2, 2.3, 0], 0.01)),
+    material: "cv_hull_dark",
+    mate: A([0, DECK + 2.35, 18]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}interior.cic_wall_${side === -1 ? "l" : "r"}`,
+      name_cn: `CIC 围壁 ${side === -1 ? "左" : "右"}`,
+      name_en: `CIC bulkhead ${side === -1 ? "l" : "r"}`,
+      assembly: "interior",
+      build_layer: 2,
+      geometry: M(B(0.12, 2.3, 18.2, [0, 0, 0], 0.01), B(0.06, 0.08, 17.8, [side * 0.07, 0.55, 0], 0.004)),
+      material: "cv_hull_dark",
+      mate: A([side * 5.1, DECK + 6.15, 18]),
+    });
+  }
+  add({
+    id: `${P}interior.cic_wall_fwd`,
+    name_cn: "CIC 前围壁/主显控墙",
+    name_en: "CIC forward bulkhead",
+    assembly: "interior",
+    build_layer: 2,
+    geometry: M(B(10.2, 2.3, 0.12, [0, 0, 0], 0.01), B(9.0, 1.9, 0.16, [0, 0.02, -0.06], 0.01)),
+    material: "cv_hull_dark",
+    mate: A([0, DECK + 6.15, 27.0]),
+  });
+  add({
+    id: `${P}interior.cic_wall_aft`,
+    name_cn: "CIC 后围壁",
+    name_en: "CIC aft bulkhead",
+    assembly: "interior",
+    build_layer: 2,
+    geometry: M(B(10.2, 2.3, 0.12, [0, 0, 0], 0.01)),
+    material: "cv_hull_dark",
+    mate: A([0, DECK + 6.15, 9.0]),
+  });
+  add({
+    id: `${P}interior.cic_ceiling`,
+    name_cn: "CIC 天花板",
+    name_en: "CIC ceiling",
+    assembly: "interior",
+    build_layer: 2,
+    geometry: M(
+      B(10.2, 0.1, 18.2, [0, 0, 0], 0.01),
+      B(9.7, 0.06, 0.16, [0, -0.08, -6], 0.006),
+      B(9.7, 0.06, 0.16, [0, -0.08, 0], 0.006),
+      B(9.7, 0.06, 0.16, [0, -0.08, 6], 0.006),
+      ...[-9, -6, -3, 0, 3, 6, 9].map((z) => B(10.0, 0.08, 0.14, [0, -0.06, z], 0.006)),
+    ),
+    material: "cv_hull_dark",
+    mate: A([0, DECK + 7.3, 18]),
+  });
+  add({
+    id: `${P}interior.cic_lights`,
+    name_cn: "CIC 顶灯带 ×6",
+    name_en: "CIC ceiling lights ×6",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      ...[-6, 0, 6].flatMap((z) => [
+        B(1.4, 0.04, 0.28, [-2.6, 0, z], 0.004),
+        B(1.4, 0.04, 0.28, [2.6, 0, z], 0.004),
+      ]),
+    ),
+    material: "cv_055_lamp",
+    mate: A([0, DECK + 7.24, 18]),
+  });
+  add({
+    id: `${P}interior.cic_main_screen_frame`,
+    name_cn: "CIC 主显控墙框",
+    name_en: "CIC main screen frame",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(B(8.8, 1.9, 0.16, [0, 0, 0], 0.02), B(2.7, 1.5, 0.08, [-2.9, 0, -0.1], 0.01), B(2.7, 1.5, 0.08, [0, 0, -0.1], 0.01), B(2.7, 1.5, 0.08, [2.9, 0, -0.1], 0.01)),
+    material: "cv_055_fitting",
+    mate: A([0, DECK + 6.2, 27.0]),
+  });
+  for (const [tag, x, mat] of [
+    ["l", -2.9, "cv_mfd"],
+    ["c", 0, "cv_screen"],
+    ["r", 2.9, "cv_mfd"],
+  ] as const) {
+    add({
+      id: `${P}interior.cic_screen_${tag}`,
+      name_cn: `CIC 主显控屏 ${tag}`,
+      name_en: `CIC main screen ${tag}`,
+      assembly: "interior",
+      build_layer: 3,
+      geometry: M(B(2.55, 1.36, 0.04, [0, 0, 0], 0.002)),
+      material: mat,
+      mate: A([x, DECK + 6.2, 26.88]),
+    });
+  }
+  add({
+    id: `${P}interior.cic_chart_table`,
+    name_cn: "CIC 海图桌/指挥台",
+    name_en: "CIC chart table",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      B(1.8, 0.92, 1.2, [0, 0, 0], 0.03),
+      B(1.9, 0.06, 1.3, [0, 0.5, 0], 0.01),
+      B(1.5, 0.02, 0.95, [0, 0.55, 0], 0.002),
+      B(0.08, 0.12, 0.08, [0, 0.62, 0.5], 0.004),
+    ),
+    material: "cv_hull_dark",
+    mate: A([0, DECK + 5.0, 10.8]),
+  });
+  add({
+    id: `${P}interior.cic_chart`,
+    name_cn: "CIC 海图",
+    name_en: "CIC chart",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(B(1.42, 0.015, 0.88, [0, 0, 0], 0.002)),
+    material: "cv_chart",
+    mate: A([0, DECK + 5.56, 10.8]),
+  });
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}interior.cic_rack_${side === -1 ? "l" : "r"}`,
+      name_cn: `CIC 通信/战术机柜 ${side === -1 ? "左" : "右"}`,
+      name_en: `CIC equipment rack ${side === -1 ? "l" : "r"}`,
+      assembly: "interior",
+      build_layer: 3,
+      geometry: M(B(0.48, 1.8, 3.0, [0, 0, 0], 0.02), B(0.4, 0.5, 0.05, [0, 0.35, -1.1], 0.004), B(0.4, 0.5, 0.05, [0, -0.35, -1.1], 0.004)),
+      material: "cv_hull_dark",
+      mate: A([side * 4.95, DECK + 5.95, 21.5]),
+    });
+    add({
+      id: `${P}interior.cic_tray_${side === -1 ? "l" : "r"}`,
+      name_cn: `CIC 电缆桥架 ${side === -1 ? "左" : "右"}`,
+      name_en: `CIC cable tray ${side === -1 ? "l" : "r"}`,
+      assembly: "interior",
+      build_layer: 3,
+      geometry: M(B(0.32, 0.08, 16.0, [0, 0, 0], 0.004), B(0.03, 0.12, 16.0, [-0.14, 0.05, 0], 0.004), B(0.03, 0.12, 16.0, [0.14, 0.05, 0], 0.004)),
+      material: "cv_steel_dark",
+      mate: A([side * 5.02, DECK + 7.05, 18]),
+    });
+  }
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}interior.cic_rack_front_${side === -1 ? "l" : "r"}`,
+      name_cn: `CIC 前部战位机柜 ${side === -1 ? "左" : "右"}`,
+      name_en: `CIC forward rack ${side === -1 ? "l" : "r"}`,
+      assembly: "interior",
+      build_layer: 3,
+      geometry: M(
+        B(0.42, 1.65, 2.2, [0, 0, 0], 0.02),
+        B(0.03, 0.36, 1.6, [side * -0.23, 0.2, 0], 0.002),
+        B(0.03, 0.08, 0.08, [side * -0.23, -0.45, -0.7], 0.002),
+        B(0.03, 0.08, 0.08, [side * -0.23, -0.45, -0.45], 0.002),
+      ),
+      material: "cv_hull_dark",
+      mate: A([side * 4.92, DECK + 5.85, 12.8]),
+    });
+  }
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}interior.cic_side_display_${side === -1 ? "l" : "r"}`,
+      name_cn: `CIC 侧壁战术屏 ${side === -1 ? "左" : "右"}`,
+      name_en: `CIC side display ${side === -1 ? "l" : "r"}`,
+      assembly: "interior",
+      build_layer: 3,
+      geometry: M(
+        B(0.05, 1.0, 1.8, [0, 0, 0], 0.002),
+        B(0.03, 1.2, 2.0, [side * -0.05, 0, 0], 0.002),
+        B(0.03, 0.3, 0.3, [side * -0.06, 0.5, 1.2], 0.004),
+      ),
+      material: "cv_mfd",
+      mate: A([side * 5.03, DECK + 6.3, 18]),
+    });
+  }
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}interior.cic_duct_${side === -1 ? "l" : "r"}`,
+      name_cn: `CIC 顶部通风/电缆管槽 ${side === -1 ? "左" : "右"}`,
+      name_en: `CIC overhead duct ${side === -1 ? "l" : "r"}`,
+      assembly: "interior",
+      build_layer: 3,
+      geometry: M(
+        B(1.0, 0.4, 14.0, [0, 0, 0], 0.02),
+        B(0.06, 0.22, 0.06, [0, 0.3, -5.5], 0.004),
+        B(0.06, 0.22, 0.06, [0, 0.3, 0], 0.004),
+        B(0.06, 0.22, 0.06, [0, 0.3, 5.5], 0.004),
+      ),
+      material: "cv_steel_dark",
+      mate: A([side * 4.2, DECK + 6.95, 18]),
+    });
+    add({
+      id: `${P}interior.cic_wall_ribs_${side === -1 ? "l" : "r"}`,
+      name_cn: `CIC 围壁竖向加强筋 ${side === -1 ? "左" : "右"}`,
+      name_en: `CIC wall ribs ${side === -1 ? "l" : "r"}`,
+      assembly: "interior",
+      build_layer: 3,
+      geometry: M(
+        ...[-7, -3.5, 0, 3.5, 7].map((z) => B(0.07, 2.2, 0.14, [0, 0, z], 0.006)),
+      ),
+      material: "cv_steel_dark",
+      mate: A([side * 5.03, DECK + 6.15, 18]),
+    });
+  }
+  add({
+    id: `${P}interior.cic_aisle`,
+    name_cn: "CIC 中央通道",
+    name_en: "CIC aisle",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(B(2.2, 0.02, 12.0, [0, 0, 0], 0.004)),
+    material: "cv_upholstery",
+    mate: A([0, DECK + 4.78, 18.5]),
+  });
+  add({
+    id: `${P}interior.cic_door`,
+    name_cn: "CIC 后门",
+    name_en: "CIC aft door",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(B(0.95, 1.95, 0.08, [0, 0, 0], 0.01), B(0.12, 0.12, 0.1, [0.28, 0, 0.06], 0.004)),
+    material: "cv_hull_dark",
+    mate: A([-3.8, DECK + 5.75, 8.98]),
   });
 
   // ---------------- 表面：锚/救生/舷号 ----------------
@@ -2931,7 +3402,8 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     staticOnly("t55-power-hull", "type055.power.*", "type055.hull.*", "燃气轮机/齿轮箱/轴系与舰体安装", 1200),
     staticOnly("t55-power-self", "type055.power.*", "type055.power.*", "COGAG 机组/齿轮箱/轴系/桨舵装配"),
     staticOnly("t55-interior-hull", "type055.interior.*", "type055.hull.*", "舱室设备与舰体安装"),
-    staticOnly("t55-interior-super", "type055.interior.*", "type055.super.*", "舰桥/CIC 设备与上建安装", 1500),
+    staticOnly("t55-interior-super", "type055.interior.*", "type055.super.*", "舰桥/CIC 设备与上建安装", 3000),
+    staticOnly("t55-interior-radar", "type055.interior.*", "type055.radar.bridge_face_*", "舰桥内顶板与舰桥正面阵面安装框", 1500),
     staticOnly("t55-interior-self", "type055.interior.*", "type055.interior.*", "显控台/地板/座椅装配"),
     staticOnly("t55-gun-deck", "type055.gun.*", "type055.deck.*", "主炮炮座/弹药库与甲板安装", 400),
     staticOnly("t55-gun-hull", "type055.gun.*", "type055.hull.*", "扬弹机/弹药库与舰体安装", 700),

@@ -52,9 +52,13 @@ function loft(ringYsAt: (z: number) => number[], cap: boolean, openSeams: number
       center.multiplyScalar(1 / ring.length);
       const ci = positions.length / 3;
       positions.push(center.x, center.y, center.z);
-      for (let j = 0; j < ring.length - 1; j++) {
-        if (forward) indices.push(ci, base + j + 1, base + j);
-        else indices.push(ci, base + j, base + j + 1);
+      // 必须包含 last→first 的闭合边，否则封板顶部会留一个三角洞
+      //（水线处的艉封板会直接漏水）。
+      for (let j = 0; j < ring.length; j++) {
+        const a = base + j;
+        const b = base + ((j + 1) % ring.length);
+        if (forward) indices.push(ci, b, a);
+        else indices.push(ci, a, b);
       }
     };
     addCap(0, false);

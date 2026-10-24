@@ -36,6 +36,7 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_smoke: { base: "#383c3d", metalness: 0.0, roughness: 0.98, preset: "none", opacity: 0.38, depthWrite: false, doubleSided: true, envMapIntensity: 0.05 },
   cv_glass: { base: "#1b2b34", metalness: 0.5, roughness: 0.06, preset: "none", envMapIntensity: 1.9 },
   cv_bridge_glass: { base: "#b8d2dc", metalness: 0.1, roughness: 0.04, preset: "none", envMapIntensity: 1.2, opacity: 0.09, depthWrite: false, doubleSided: true },
+  cv_055_bridge_glass: { base: "#7f9aa4", metalness: 0.14, roughness: 0.06, preset: "none", envMapIntensity: 1.0, opacity: 0.3, depthWrite: false, doubleSided: true },
   cv_canopy: { base: "#9fc3cf", metalness: 0.12, roughness: 0.05, preset: "none", envMapIntensity: 1.2, opacity: 0.22, depthWrite: false, doubleSided: true },
   cv_gauge_face: { base: "#0b1215", metalness: 0.08, roughness: 0.62, preset: "none", envMapIntensity: 0.35 },
   cv_gauge_mark: { base: "#d7e4e8", metalness: 0.05, roughness: 0.5, preset: "none", envMapIntensity: 0.5 },

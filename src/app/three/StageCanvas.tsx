@@ -204,6 +204,16 @@ function InteriorFillLight() {
           <pointLight position={[5.2, 8.1, -40]} intensity={1.4} distance={12} decay={1.3} color="#e6f1fa" />
         </>
       ) : null}
+      {cameraMode === "cic" ? (
+        <>
+          <pointLight position={[0, 20.9, 13.5]} intensity={1.2} distance={12} decay={1.45} color="#bcd7e2" />
+          <pointLight position={[0, 20.9, 21.5]} intensity={1.1} distance={12} decay={1.45} color="#bcd7e2" />
+          <pointLight position={[0, 20.3, 26.2]} intensity={0.7} distance={8} decay={1.5} color="#4fd0d0" />
+        </>
+      ) : null}
+      {cameraMode === "bridge" ? (
+        <pointLight position={[0, 25.9, 27]} intensity={1.3} distance={13} decay={1.45} color="#dbe9f2" />
+      ) : null}
     </>
   );
 }
