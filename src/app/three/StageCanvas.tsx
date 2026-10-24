@@ -19,6 +19,7 @@ import { Weather } from "./Weather";
 import { setArmourWet } from "@/three/parts/kernel/armourSurface";
 import { TigerVfx } from "./vfx/TigerVfx";
 import { MbtVfx } from "./vfx/MbtVfx";
+import { Type055Vfx } from "./vfx/Type055Vfx";
 import { applyTigerLidPose, effectiveLidOpen, lidAt } from "@/three/parts/models/tiger/lids";
 import { firstPersonView, type CameraMode, isCarrierInteriorMode } from "./viewpoints";
 import { setAk47Mode } from "@/three/parts/models/ak47/motion";
@@ -88,6 +89,7 @@ export function StageCanvas() {
         <StageRuntime />
         <TigerVfx />
         <MbtVfx />
+        <Type055Vfx />
         <CameraRig />
         <CarrierCameraFloor />
         <StageEffects />
@@ -776,6 +778,7 @@ function StageRuntime() {
           onFocus={(partId) => useStageStore.getState().requestFocus(partId)}
         />
       ) : null}
+      <PartIsolationVisibility />
       {assembled && views.shadow ? (
         <ContactShadow
           key={`shadow:${scene?.seq ?? 0}`}
@@ -807,6 +810,33 @@ function StageRuntime() {
 }
 
 /** 装配体对象：object 每份装配体唯一，key 变化时整体重挂（R3F 的 primitive 不会替换 object）。 */
+/**
+ * 单件隔离：主视口只保留被隔离的零件。此前“隔离查看”只在右下小窗显示，
+ * 舰体/机匣仍会挡住内部零件，导致点开燃机零件看不到。
+ */
+function PartIsolationVisibility() {
+  const assembled = useStageStore((state) => state.assembled);
+  const modelId = useStageStore((state) => state.modelId);
+  const isolation = useStageStore((state) => state.isolation);
+  const partId = isolation?.kind === "part" ? isolation.partId : null;
+
+  useEffect(() => {
+    if (!assembled || assembled.root.name !== modelId || !partId) return;
+    const previous = new Map<(typeof assembled.parts)[number], boolean>();
+    for (const handle of assembled.parts) {
+      previous.set(handle, handle.object.visible);
+      handle.object.visible = false;
+    }
+    const target = assembled.getPart(partId);
+    if (target) target.object.visible = previous.get(target) ?? true;
+    return () => {
+      for (const [handle, visible] of previous) handle.object.visible = visible;
+    };
+  }, [assembled, modelId, partId]);
+
+  return null;
+}
+
 function AssembledObject({
   assembled,
   onSelect,

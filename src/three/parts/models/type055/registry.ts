@@ -1295,13 +1295,13 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
   });
   add({
     id: `${P}vls.hatch`,
-    name_cn: "通用垂发井盖 ×106（另 6 格为动态井盖）",
-    name_en: "VLS hatch ×106",
+    name_cn: `通用垂发井盖 ×${staticCells.length}（另 ${VLS_HEROES.length} 格为动态井盖）`,
+    name_en: `VLS hatch ×${staticCells.length}`,
     assembly: "vls",
     build_layer: 4,
     geometry: { type: "kit", kit: "type055VlsHatch" },
     material: "cv_vls_hatch",
-    instances: 106,
+    instances: staticCells.length,
     indexed: true,
     instance_layout: "type055.vlsHatch",
     mate: A([0, 0, 0]),
@@ -1525,6 +1525,19 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
         mate: A([0, -1.2, 0]),
         tags: ["fx"],
       });
+      add({
+        id: `${P}vls.glider_core_${tag}`,
+        name_cn: `鹰击-21 滑翔体尾焰白芯 ${tag}`,
+        name_en: `YJ-21 glider plume core ${tag}`,
+        assembly: "vls",
+        build_layer: 5,
+        geometry: { type: "kit", kit: "type055VlsFlame" },
+        material: "cv_flame_core",
+        node: gliderNode,
+        mate: A([0, -1.2, 0]),
+        scale: [0.52, 0.62, 0.52],
+        tags: ["fx"],
+      });
     } else {
       add({
         id: `${P}vls.fins_${tag}`,
@@ -1571,6 +1584,32 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       material: "cv_flame",
       node: missileNode,
       mate: A([0, -half, 0]),
+      tags: ["fx"],
+    });
+    add({
+      id: `${P}vls.flame_core_${tag}`,
+      name_cn: `${spec.label} 尾焰白芯 ${tag}`,
+      name_en: `${spec.label} plume core ${tag}`,
+      assembly: "vls",
+      build_layer: 5,
+      geometry: { type: "kit", kit: "type055VlsFlame" },
+      material: "cv_flame_core",
+      node: missileNode,
+      mate: A([0, -half, 0]),
+      scale: [0.52, 0.62, 0.52],
+      tags: ["fx"],
+    });
+    add({
+      id: `${P}vls.trail_${tag}`,
+      name_cn: `${spec.label} 尾迹 ${tag}`,
+      name_en: `${spec.label} smoke trail ${tag}`,
+      assembly: "vls",
+      build_layer: 5,
+      geometry: { type: "kit", kit: "type055VlsFlame" },
+      material: "cv_missile_trail",
+      node: missileNode,
+      mate: A([0, -half, 0]),
+      scale: [1.9, 3.4, 1.9],
       tags: ["fx"],
     });
     const gasNode = `CV_055_VlsGas_${tag}`;
@@ -1771,7 +1810,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
   });
 
   // ---------------- 近防/导弹 ----------------
-  for (const [tag, z, y] of [["fwd", 35, DECK + 7.7], ["aft", -58, DECK + 6.7]] as const) {
+  for (const [tag, z, y] of [["fwd", 37.2, DECK + 7.85], ["aft", -58, DECK + 6.75]] as const) {
     ctx.node({ name: `CV_055_Ciws_${tag}`, parent: "root", pivot: [0, y, z], motion: "rotate", axis: "y", rest_rotation: [0, tag === "aft" ? 180 : 0, 0], note: `1130 近防 ${tag}` });
     add({
       id: `${P}ciws.${tag}_base`,
@@ -1779,7 +1818,10 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       name_en: `CIWS base ${tag}`,
       assembly: "weapons",
       build_layer: 4,
-      geometry: M(C(0.9, 0.5, [0, 0, 0], 20), B(1.9, 0.16, 1.9, [0, -0.25, 0], 0.01)),
+      geometry: M(
+        C(1.05, 0.55, [0, 0, 0], 20),
+        B(2.3, 0.18, 2.3, [0, -0.28, 0], 0.01),
+      ),
       material: "cv_steel_dark",
       mate: A([0, y - 0.15, z]),
     });
@@ -1789,7 +1831,12 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       name_en: `CIWS turret ${tag}`,
       assembly: "weapons",
       build_layer: 4,
-      geometry: M(C(0.75, 0.9, [0, 0, 0], 20), B(0.9, 0.6, 1.1, [0, 0.4, 0.1], 0.03), S(0.38, [0, 0.9, -0.25], 20)),
+      geometry: M(
+        C(0.9, 1.05, [0, 0, 0], 20),
+        B(1.1, 0.7, 1.3, [0, 0.48, 0.12], 0.03),
+        S(0.45, [0, 1.03, -0.3], 20),
+        B(0.5, 0.3, 0.55, [0, 0.15, -0.72], 0.02),
+      ),
       material: "cv_055_hull",
       node: `CV_055_Ciws_${tag}`,
       mate: A([0, 0.45, 0]),
@@ -1797,9 +1844,9 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     const barrels: Array<Parameters<typeof M>[0]> = [];
     for (let b = 0; b < 11; b++) {
       const a = (b / 11) * Math.PI * 2;
-      const x = Math.cos(a) * 0.16;
-      const y = Math.sin(a) * 0.16;
-      barrels.push({ type: "weld", from: [x, y, 0], to: [x, y, 1.7], radius: 0.035 });
+      const x = Math.cos(a) * 0.19;
+      const y = Math.sin(a) * 0.19;
+      barrels.push({ type: "weld", from: [x, y, 0], to: [x, y, 2.05], radius: 0.04 });
     }
     add({
       id: `${P}ciws.${tag}_barrels`,
@@ -1807,7 +1854,11 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       name_en: `1130 barrels ${tag}`,
       assembly: "weapons",
       build_layer: 4,
-      geometry: M(...barrels, C(0.22, 0.3, [0, 0, 0.45], 16)),
+      geometry: M(
+        ...barrels,
+        C(0.27, 0.34, [0, 0, 0.5], 16),
+        C(0.3, 0.12, [0, 0, 1.92], 16),
+      ),
       material: "cv_steel_dark",
       node: `CV_055_Ciws_${tag}`,
       mate: A([0, 0.8, 0]),

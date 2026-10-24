@@ -1,10 +1,10 @@
 import type { AssembledModel } from "../../assembler/assembler";
-import { MISSILES, VLS_HEROES, missileRestY } from "./vls";
+import { MISSILES, VLS, VLS_HEROES, missileRestY } from "./vls";
 
 // ============================================================================
 // models/type055/motion —— 055 状态动画
 // idle 系泊（雷达慢转）/ engine COGAG 双桨+雷达 / weapons 主炮旋回+近防跟踪
-// launch VLS 冷发射：井盖开启 → 弹射出筒 → 点火尾焰 → 收缩离场
+// launch VLS 冷/热齐射：逐格开盖 → 弹射出筒/筒内点火 → 分弹种弹道离场
 // ============================================================================
 
 const GUN_NODE = "CV_055_Gun";
@@ -19,9 +19,8 @@ const PAD_MAIN_ROTOR = "CV_055_Z20_pad_MainRotor";
 const PAD_TAIL_ROTOR = "CV_055_Z20_pad_TailRotor";
 const GT_ROTORS = ["CV_055_GT1_Rotor", "CV_055_GT2_Rotor", "CV_055_GT3_Rotor", "CV_055_GT4_Rotor"] as const;
 
-const LAUNCH_CYCLE = 11.0;
-const LAUNCH_STAGGER = 0.5;
-const LAUNCH_RISE = 34;
+const LAUNCH_CYCLE = 19.5;
+const LAUNCH_STAGGER = 0.42;
 
 const smooth = (v: number) => {
   const u = Math.max(0, Math.min(1, v));
@@ -39,40 +38,80 @@ function animateLaunch(assembled: AssembledModel, t: number, active: boolean): v
     const fins = assembled.getPart(isYj21 ? `type055.vls.fins_booster_${tag}` : `type055.vls.fins_${tag}`);
     const gliderFins = isYj21 ? assembled.getPart(`type055.vls.fins_glider_${tag}`) : undefined;
     const flame = assembled.getPart(`type055.vls.flame_${tag}`);
+    const flameCore = assembled.getPart(`type055.vls.flame_core_${tag}`);
+    const trail = assembled.getPart(`type055.vls.trail_${tag}`);
     const gliderFlame = isYj21 ? assembled.getPart(`type055.vls.glider_flame_${tag}`) : undefined;
+    const gliderCore = isYj21 ? assembled.getPart(`type055.vls.glider_core_${tag}`) : undefined;
     if (!lid || !missile) continue;
 
     const local = active
       ? (((t - index * LAUNCH_STAGGER) % LAUNCH_CYCLE) + LAUNCH_CYCLE) % LAUNCH_CYCLE
       : 0;
-    // 055 开盖约 95°、约 2.3s；燃气团先在甲板扩散，再让导弹出筒。
-    const open =
-      active ? smooth(clamp01((local - 0.15) / 2.3)) * (1 - smooth(clamp01((local - 7.6) / 0.8))) : 0;
+    const start = spec.launch === "cold" ? 2.5 : 2.3;
+    const ejectTime = 0.85;
+    const flight = hero.type === "yj21" ? 6.6 : hero.type === "yj18" ? 5.6 : 5.2;
+    const total = start + ejectTime + flight;
+    const baseX = -((VLS.COLS - 1) * VLS.PITCH) / 2 + hero.col * VLS.PITCH;
+    const baseZ = (hero.bank === "fwd" ? VLS.FWD_Z : VLS.AFT_Z) + hero.row * VLS.PITCH;
+    const restY = missileRestY(hero.type);
+
+    // 055 开盖约 95°、约 2.3s；导弹离场后井盖再合上，下一轮重新打开。
+    const open = active
+      ? smooth(clamp01((local - 0.15) / 2.3)) * (1 - smooth(clamp01((local - (total - 0.7)) / 0.8)))
+      : 0;
     lid.rotation.x = -1.66 * open;
 
-    // 冷发射先由燃气发生器弹射出筒，出筒后点火；热发射在筒内直接点火、加速更快。
-    const start = spec.launch === "cold" ? 2.5 : 2.3;
-    const riseTime = 3.2;
-    const visible = active && local > start + 0.1 && local < 6.8;
-    const rise = active ? LAUNCH_RISE * Math.pow(clamp01((local - start) / riseTime), 2) : 0;
-    const shrink = active ? 1 - smooth(clamp01((local - 6.0) / 0.6)) : 0;
-    missile.position.y = missileRestY(hero.type) + rise;
+    const visible = active && local > start + 0.05 && local < total;
+    const e = clamp01((local - start) / ejectTime);
+    const p = clamp01((local - start - ejectTime) / flight);
+    const side = hero.col < 3.5 ? -1 : 1;
+    const out = 14 + Math.abs(hero.col - 3.5) * 4;
+
+    // 三类弹的弹道分开：防空弹向舷外爬升，反舰弹压低掠海，高超弹高抛滑翔。
+    let dx = 0;
+    let dy = 0;
+    let dz = 0;
+    let pitch = 0;
+    if (hero.type === "hhq9b") {
+      dy = 12 * smooth(e) + 55 * (1 - Math.pow(1 - p, 3));
+      dx = side * out * smooth(p);
+      dz = 45 * Math.pow(p, 1.5);
+      pitch = 1.02 * smooth(clamp01(p * 1.5));
+    } else if (hero.type === "yj18") {
+      dy = 10 * smooth(e) + 24 * smooth(clamp01(p * 3)) - 16 * smooth(clamp01((p - 0.35) / 0.65));
+      dx = side * out * 0.8 * smooth(p);
+      dz = 110 * Math.pow(p, 0.9);
+      pitch = 1.35 * smooth(clamp01(p * 2.2));
+    } else {
+      dy = 14 * smooth(e) + 105 * smooth(p);
+      dx = side * out * smooth(p);
+      dz = 70 * Math.pow(p, 1.4);
+      pitch = 0.55 * smooth(clamp01(p * 1.3));
+    }
+
+    const shrink = visible ? 1 - smooth(clamp01((local - (total - 0.6)) / 0.6)) : 0;
+    missile.position.set(baseX + (visible ? dx : 0), restY + (visible ? dy : 0), baseZ + (visible ? dz : 0));
+    missile.rotation.set(visible ? pitch : 0, visible ? side * 0.1 * smooth(p) : 0, 0);
     missile.scale.setScalar(visible ? Math.max(0, shrink) : 0);
-    const deployed = visible && local > start + (spec.launch === "hot" ? 0.6 : 1.1);
+
+    const deployed = visible && local > start + (spec.launch === "hot" ? 0.5 : 0.75);
     if (fins) fins.object.scale.setScalar(deployed ? 1 : 0.001);
     if (gliderFins) gliderFins.object.scale.setScalar(deployed ? 1 : 0.001);
-    if (flame) {
-      const ignite = spec.launch === "hot" ? start + 0.1 : start + 2.0;
-      flame.object.visible = visible && local > ignite;
-    }
+
+    const ignite = spec.launch === "hot" ? start + 0.12 : start + 0.75;
+    const burning = visible && local > ignite;
+    if (flame) flame.object.visible = burning;
+    if (flameCore) flameCore.object.visible = burning;
+    if (trail) trail.object.visible = burning && local > ignite + 0.15;
+
     const glider = isYj21 ? assembled.getNode(`CV_055_VlsGlider_${tag}`) : undefined;
     if (glider) {
-      const sep = visible ? 6.0 * smooth(clamp01((local - (start + 1.8)) / 1.4)) : 0;
+      const sep = visible ? 8 * smooth(clamp01((local - (start + 2.2)) / 1.4)) : 0;
       glider.position.y = sep;
     }
-    if (gliderFlame) {
-      gliderFlame.object.visible = visible && local > start + 2.2;
-    }
+    if (gliderFlame) gliderFlame.object.visible = burning && local > start + 2.3;
+    if (gliderCore) gliderCore.object.visible = burning && local > start + 2.3;
+
     const gas = assembled.getNode(`CV_055_VlsGas_${tag}`);
     if (gas) {
       const gasStart = spec.launch === "hot" ? start - 0.25 : 0.4;
@@ -134,6 +173,6 @@ export const TYPE055_STATE_LABELS = [
   { id: "idle", label: "系泊检查", hint: "雷达慢转；主炮/近防归零，双桨静止，VLS 井盖闭锁" },
   { id: "engine", label: "COGAG 动力运转", hint: "四台燃气轮机并车，双轴双桨转动，导航雷达加速" },
   { id: "weapons", label: "主炮/近防跟踪", hint: "130mm 炮塔旋回俯仰，前后 1130 近防随动跟踪" },
-  { id: "launch", label: "VLS 冷发射", hint: "首尾 6 格井盖开启，导弹冷弹射出筒、点火后离场" },
+  { id: "launch", label: "VLS 冷/热齐射", hint: "首尾各 8 格错峰开盖，防空/反舰/高超按各自弹道离场" },
   { id: "aviation", label: "航空作业", hint: "双机库卷帘门升起，甲板直-20 主/尾旋翼运转" },
 ] as const;

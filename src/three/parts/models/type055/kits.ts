@@ -241,7 +241,22 @@ export const type055HullNumber: GeometryBuilder = () => {
     geometry.translate(x, 0, 0);
     return geometry;
   });
-  return merge([baseline, ...parts]);
+  const geometry = merge([baseline, ...parts]);
+  // 同一套字形贴到两舷时，右舷读向会变成镜像；先把几何沿 X 镜像，
+  // 再翻转三角形绕序，保证两舷从外看都是正的“101”。
+  geometry.scale(-1, 1, 1);
+  const position = geometry.getAttribute("position");
+  const swap = (a: number, b: number) => {
+    const ax = position.getX(a);
+    const ay = position.getY(a);
+    const az = position.getZ(a);
+    position.setXYZ(a, position.getX(b), position.getY(b), position.getZ(b));
+    position.setXYZ(b, ax, ay, az);
+  };
+  for (let i = 0; i < position.count; i += 3) swap(i + 1, i + 2);
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
+  return geometry;
 };
 
 /** 通用垂发井盖：盖板 + 加强筋 + 锁钩。 */

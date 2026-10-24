@@ -80,15 +80,31 @@ export interface HeroCell {
   type: MissileType;
 }
 
-/** 首尾各 3 格做成动态井：冷/热发射各展示一次真实弹形。 */
-export const VLS_HEROES: HeroCell[] = [
-  { tag: "fwd_2", bank: "fwd", row: 7, col: 2, type: "hhq9b" },
-  { tag: "fwd_3", bank: "fwd", row: 7, col: 3, type: "yj18" },
-  { tag: "fwd_4", bank: "fwd", row: 7, col: 4, type: "yj21" },
-  { tag: "aft_2", bank: "aft", row: 0, col: 2, type: "hhq9b" },
-  { tag: "aft_3", bank: "aft", row: 0, col: 3, type: "yj18" },
-  { tag: "aft_4", bank: "aft", row: 0, col: 4, type: "yj21" },
+/**
+ * 前/后各一整排 8 格为动态井：按真实混装顺序展示防空/反舰/高超三类弹，
+ * 发射时形成逐格错开的 8 单元齐射，而不是固定 3 格。
+ * 列号与 x 坐标一一对应，便于按列分配弹种与弹道。
+ */
+export const VLS_HERO_TYPES: MissileType[] = [
+  "hhq9b",
+  "yj18",
+  "hhq9b",
+  "yj18",
+  "yj21",
+  "hhq9b",
+  "yj18",
+  "yj21",
 ];
+
+export const VLS_HEROES: HeroCell[] = (["fwd", "aft"] as const).flatMap((bank) =>
+  VLS_HERO_TYPES.map((type, col) => ({
+    tag: `${bank}_${col}`,
+    bank,
+    row: bank === "fwd" ? 7 : 0,
+    col,
+    type,
+  })),
+);
 
 /** 导弹在井内的静止中心高度：弹顶正好落在井口下方 0.2m。 */
 export function missileRestY(type: MissileType): number {

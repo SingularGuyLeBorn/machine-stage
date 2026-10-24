@@ -58,6 +58,8 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_glow: { base: "#7fd8ff", metalness: 0.0, roughness: 0.3, emissive: "#3fb9ff", envMapIntensity: 0.6 },
   cv_055_lamp: { base: "#eef4f6", metalness: 0.0, roughness: 0.45, preset: "primer", emissive: "#d8e6ee", emissiveIntensity: 0.55, envMapIntensity: 0.3 },
   cv_flame: { base: "#ffc27a", metalness: 0.0, roughness: 0.42, preset: "none", emissive: "#ff6a1f", emissiveIntensity: 2.6, opacity: 0.62, depthWrite: false, doubleSided: true, envMapIntensity: 0.2 },
+  cv_flame_core: { base: "#eaf7ff", metalness: 0.0, roughness: 0.3, preset: "none", emissive: "#78d4ff", emissiveIntensity: 2.4, opacity: 0.8, depthWrite: false, doubleSided: true, blending: "additive", envMapIntensity: 0.1 },
+  cv_missile_trail: { base: "#9aa5aa", metalness: 0.0, roughness: 0.98, preset: "none", opacity: 0.2, depthWrite: false, doubleSided: true, envMapIntensity: 0.05 },
   cv_warning: { base: "#d9a62f", metalness: 0.05, roughness: 0.7, emissive: "#4a2c00", envMapIntensity: 0.6 },
   cv_water: { base: "#41636e", metalness: 0.1, roughness: 0.25, preset: "none", envMapIntensity: 1.0 },
   cv_canvas: { base: "#5e6359", metalness: 0.0, roughness: 0.95, preset: "rubber", envMapIntensity: 0.4 },
