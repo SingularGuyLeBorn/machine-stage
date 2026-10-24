@@ -997,6 +997,7 @@ export const CATALOG: StageModel[] = [
     actions: [
       { id: "ddg-engine", group: "动力", label: "COGAG 运转", kind: "machine-state", state: "engine" },
       { id: "ddg-weapons", group: "武器", label: "主炮/近防跟踪", kind: "machine-state", state: "weapons" },
+      { id: "ddg-ciws-fire", group: "武器", label: "1130 近防拦截", kind: "machine-state", state: "ciws" },
       { id: "ddg-launch", group: "武器", label: "VLS 齐射", kind: "machine-state", state: "launch" },
       { id: "ddg-aviation", group: "航空", label: "机库/旋翼作业", kind: "machine-state", state: "aviation" },
       { id: "ddg-idle", group: "机构", label: "系泊检查", kind: "machine-state", state: "idle" },

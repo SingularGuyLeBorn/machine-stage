@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { useStageStore } from "@/app/state/stageStore";
 import { VLS_HEROES } from "@/three/parts/models/type055/vls";
+import { type055CiwsAim } from "@/three/parts/models/type055/motion";
 
 // ============================================================================
 // Type055Vfx —— 导弹终端爆炸（照片级 flipbook）
@@ -19,6 +20,9 @@ const ATLAS_COLS = 6;
 const ATLAS_ROWS = 4;
 const ATLAS_FRAMES = 24;
 const BURST_LIFE = 1.6;
+const TRACER_POOL = 140;
+const TRACER_SPEED = 420;
+const TRACER_STREAK = 12;
 
 const BURST_SCALE: Record<string, number> = { hhq9b: 17, yj18: 22, yj21: 28 };
 const BURST_TINT: Record<string, [number, number, number]> = {
@@ -32,6 +36,15 @@ interface Burst {
   life: number;
   scale: number;
   active: boolean;
+}
+
+interface Tracer {
+  live: boolean;
+  age: number;
+  life: number;
+  speed: number;
+  from: THREE.Vector3;
+  dir: THREE.Vector3;
 }
 
 interface Assets {
@@ -163,6 +176,104 @@ export function Type055Vfx() {
   const spawned = useRef(new Set<string>());
   const world = useMemo(() => new THREE.Vector3(), []);
 
+  const tracerGeo = useMemo(() => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(TRACER_POOL * 6), 3));
+    return geometry;
+  }, []);
+  const tracerMat = useMemo(
+    () =>
+      new THREE.LineBasicMaterial({
+        color: "#ff9d32",
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false,
+      }),
+    [],
+  );
+  const tracerHeadGeo = useMemo(() => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(TRACER_POOL * 3), 3));
+    return geometry;
+  }, []);
+  const tracerHeadMat = useMemo(
+    () =>
+      new THREE.PointsMaterial({
+        size: 1.9,
+        sizeAttenuation: true,
+        color: "#ffd58a",
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    [],
+  );
+  const tracers = useRef<Tracer[]>(
+    Array.from({ length: TRACER_POOL }, () => ({
+      live: false,
+      age: 0,
+      life: 1,
+      speed: TRACER_SPEED,
+      from: new THREE.Vector3(),
+      dir: new THREE.Vector3(0, 0, 1),
+    })),
+  );
+  const tracerNext = useRef(0);
+  const stateClock = useRef({ state: "", start: 0 });
+  const fireTimer = useRef({ fwd: 0, aft: 0 });
+  const impactTimer = useRef({ fwd: 0, aft: 0 });
+  const muzzleFlashes = useRef<Array<THREE.Mesh | null>>([]);
+  const tempMuzzle = useMemo(() => new THREE.Vector3(), []);
+  const tempTarget = useMemo(() => new THREE.Vector3(), []);
+  const tempDir = useMemo(() => new THREE.Vector3(), []);
+  useEffect(() => () => {
+    tracerGeo.dispose();
+    tracerMat.dispose();
+    tracerHeadGeo.dispose();
+    tracerHeadMat.dispose();
+  }, [tracerGeo, tracerMat, tracerHeadGeo, tracerHeadMat]);
+
+  const spawnBurst = (
+    position: THREE.Vector3,
+    scale: number,
+    tint: [number, number, number],
+    life = BURST_LIFE,
+  ) => {
+    const slot = nextSlot.current % POOL;
+    nextSlot.current += 1;
+    const burst = bursts.current[slot]!;
+    burst.age = 0;
+    burst.life = life;
+    burst.scale = scale;
+    burst.active = true;
+    const group = groups.current[slot];
+    if (group) {
+      group.position.copy(position);
+      group.visible = true;
+    }
+    materials[slot]?.uniforms.uTint!.value.setRGB(tint[0], tint[1], tint[2]);
+    const posAttr = sparkGeo.getAttribute("position") as THREE.BufferAttribute;
+    const colorAttr = sparkGeo.getAttribute("color") as THREE.BufferAttribute;
+    const start = slot * 30;
+    for (let j = 0; j < 30; j++) {
+      const spark = sparks.current[start + j]!;
+      const a = Math.random() * Math.PI * 2;
+      const b = Math.acos(2 * Math.random() - 1);
+      const speed = 18 + Math.random() * 42;
+      spark.live = true;
+      spark.age = 0;
+      spark.life = 0.5 + Math.random() * 0.6;
+      spark.vx = Math.sin(b) * Math.cos(a) * speed;
+      spark.vy = Math.abs(Math.cos(b)) * speed * 0.9 + 6;
+      spark.vz = Math.sin(b) * Math.sin(a) * speed;
+      posAttr.setXYZ(start + j, position.x, position.y, position.z);
+      colorAttr.setXYZ(start + j, tint[0], tint[1], tint[2]);
+    }
+    posAttr.needsUpdate = true;
+    colorAttr.needsUpdate = true;
+  };
+
   useFrame((state, delta) => {
     const dt = Math.min(0.05, delta);
     const launch = modelId === "type055" && machineState === "launch" && assembled;
@@ -178,47 +289,88 @@ export function Type055Vfx() {
         if (scale > 0.8) spawned.current.delete(hero.tag);
         if (prev > 0.4 && scale <= 0.4 && scale > 0.001 && !spawned.current.has(hero.tag)) {
           spawned.current.add(hero.tag);
-          const slot = nextSlot.current % POOL;
-          nextSlot.current += 1;
           posNode.getWorldPosition(world);
-          const burst = bursts.current[slot]!;
-          burst.age = 0;
-          burst.life = BURST_LIFE;
-          burst.scale = BURST_SCALE[hero.type] ?? 18;
-          burst.active = true;
-          const group = groups.current[slot];
-          if (group) {
-            group.position.copy(world);
-            group.visible = true;
-          }
-          const mat = materials[slot];
-          const tint = BURST_TINT[hero.type] ?? [1.35, 0.82, 0.55];
-          mat?.uniforms.uTint!.value.setRGB(tint[0], tint[1], tint[2]);
-          const position = sparkGeo.getAttribute("position") as THREE.BufferAttribute;
-          const color = sparkGeo.getAttribute("color") as THREE.BufferAttribute;
-          const start = slot * 30;
-          for (let j = 0; j < 30; j++) {
-            const spark = sparks.current[start + j]!;
-            const a = Math.random() * Math.PI * 2;
-            const b = Math.acos(2 * Math.random() - 1);
-            const speed = 18 + Math.random() * 42;
-            spark.live = true;
-            spark.age = 0;
-            spark.life = 0.5 + Math.random() * 0.6;
-            spark.vx = Math.sin(b) * Math.cos(a) * speed;
-            spark.vy = Math.abs(Math.cos(b)) * speed * 0.9 + 6;
-            spark.vz = Math.sin(b) * Math.sin(a) * speed;
-            position.setXYZ(start + j, world.x, world.y, world.z);
-            color.setXYZ(start + j, tint[0], tint[1], tint[2]);
-          }
-          position.needsUpdate = true;
-          color.needsUpdate = true;
+          spawnBurst(world, BURST_SCALE[hero.type] ?? 18, BURST_TINT[hero.type] ?? [1.35, 0.82, 0.55]);
         }
         prevScale.current.set(hero.tag, scale);
       }
     } else {
       prevScale.current.clear();
       spawned.current.clear();
+    }
+
+    if (stateClock.current.state !== machineState) {
+      stateClock.current = { state: machineState, start: state.clock.elapsedTime };
+    }
+    const stateTime = state.clock.elapsedTime - stateClock.current.start;
+    const ciwsFiring = modelId === "type055" && machineState === "ciws" && assembled;
+    if (ciwsFiring && assembled) {
+      for (const tag of ["fwd", "aft"] as const) {
+        const node = assembled.getNode(`CV_055_Ciws_${tag}`);
+        if (!node) continue;
+        node.updateWorldMatrix(true, false);
+        tempMuzzle.set(0, 0.8, 2.35);
+        node.localToWorld(tempMuzzle);
+        const aim = type055CiwsAim(tag, stateTime);
+        tempTarget.set(aim[0], aim[1], aim[2]);
+        tempDir.copy(tempTarget).sub(tempMuzzle).normalize();
+        fireTimer.current[tag] += dt;
+        while (fireTimer.current[tag] >= 0.055) {
+          fireTimer.current[tag] -= 0.055;
+          const tracer = tracers.current[tracerNext.current % TRACER_POOL]!;
+          tracerNext.current += 1;
+          tracer.live = true;
+          tracer.age = 0;
+          tracer.speed = TRACER_SPEED;
+          tracer.life = Math.max(0.08, tempMuzzle.distanceTo(tempTarget) / TRACER_SPEED);
+          tracer.from.copy(tempMuzzle);
+          tracer.dir.copy(tempDir);
+        }
+        impactTimer.current[tag] += dt;
+        if (impactTimer.current[tag] >= 0.32) {
+          impactTimer.current[tag] = 0;
+          spawnBurst(tempTarget, 4.2, [2.1, 1.0, 0.45], 0.55);
+        }
+        const flash = muzzleFlashes.current[tag === "fwd" ? 0 : 1];
+        if (flash) {
+          flash.position.copy(tempMuzzle);
+          flash.visible = true;
+          const pulse = 0.6 + Math.random() * 0.8;
+          flash.scale.setScalar(pulse);
+          (flash.material as THREE.MeshBasicMaterial).opacity = 0.65 + Math.random() * 0.35;
+        }
+      }
+    } else {
+      fireTimer.current.fwd = 0;
+      fireTimer.current.aft = 0;
+      impactTimer.current.fwd = 0;
+      impactTimer.current.aft = 0;
+      for (const flash of muzzleFlashes.current) if (flash) flash.visible = false;
+    }
+
+    {
+      const attr = tracerGeo.getAttribute("position") as THREE.BufferAttribute;
+      const headAttr = tracerHeadGeo.getAttribute("position") as THREE.BufferAttribute;
+      for (let i = 0; i < TRACER_POOL; i++) {
+        const tracer = tracers.current[i]!;
+        if (tracer.live) {
+          tracer.age += dt;
+          if (tracer.age >= tracer.life) tracer.live = false;
+        }
+        if (tracer.live) {
+          const head = tempMuzzle.copy(tracer.from).addScaledVector(tracer.dir, tracer.age * tracer.speed);
+          const tail = tempTarget.copy(head).addScaledVector(tracer.dir, -TRACER_STREAK);
+          attr.setXYZ(i * 2, tail.x, tail.y, tail.z);
+          attr.setXYZ(i * 2 + 1, head.x, head.y, head.z);
+          headAttr.setXYZ(i, head.x, head.y, head.z);
+        } else {
+          attr.setXYZ(i * 2, 0, -1000, 0);
+          attr.setXYZ(i * 2 + 1, 0, -1000, 0);
+          headAttr.setXYZ(i, 0, -1000, 0);
+        }
+      }
+      attr.needsUpdate = true;
+      headAttr.needsUpdate = true;
     }
 
     let newest: Burst | null = null;
@@ -290,7 +442,7 @@ export function Type055Vfx() {
     if (light.current) {
       if (newest) {
         const fade = Math.pow(1 - newest.age / newest.life, 3);
-        light.current.intensity = 90 * fade;
+        light.current.intensity = 90 * fade * Math.min(1, newest.scale / 18);
         light.current.position.copy(groups.current[bursts.current.indexOf(newest)]?.position ?? light.current.position);
       } else {
         light.current.intensity = 0;
@@ -339,6 +491,27 @@ export function Type055Vfx() {
         </group>
       ))}
       <points geometry={sparkGeo} material={sparkMat} frustumCulled={false} renderOrder={41} />
+      <lineSegments geometry={tracerGeo} material={tracerMat} frustumCulled={false} renderOrder={42} />
+      <points geometry={tracerHeadGeo} material={tracerHeadMat} frustumCulled={false} renderOrder={42} />
+      {[0, 1].map((i) => (
+        <mesh
+          key={i}
+          ref={(node) => {
+            muzzleFlashes.current[i] = node;
+          }}
+          visible={false}
+          renderOrder={43}
+        >
+          <sphereGeometry args={[0.5, 12, 10]} />
+          <meshBasicMaterial
+            color="#ffd27a"
+            transparent
+            opacity={0.9}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+          />
+        </mesh>
+      ))}
       <pointLight ref={light} intensity={0} distance={320} decay={1.7} color="#ffb066" />
     </group>
   );

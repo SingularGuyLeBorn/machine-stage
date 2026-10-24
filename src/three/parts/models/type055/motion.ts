@@ -28,6 +28,12 @@ const smooth = (v: number) => {
 };
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
+/** 1130 近防炮的虚拟空中目标（演示用，距离经过缩放，便于同视口观察弹道）。 */
+export function type055CiwsAim(tag: "fwd" | "aft", t: number): [number, number, number] {
+  if (tag === "fwd") return [Math.sin(t * 0.33) * 30, 29 + Math.sin(t * 0.8) * 4, 155];
+  return [Math.sin(t * 0.28 + 2.1) * 36, 22 + Math.sin(t * 0.9 + 0.7) * 4, -175];
+}
+
 function animateLaunch(assembled: AssembledModel, t: number, active: boolean): void {
   for (const [index, hero] of VLS_HEROES.entries()) {
     const tag = hero.tag;
@@ -127,7 +133,8 @@ function animateLaunch(assembled: AssembledModel, t: number, active: boolean): v
 export function animateType055(assembled: AssembledModel, seconds: number, state = "idle"): void {
   const t = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
   const weapons = state === "weapons";
-  const engine = state === "engine" || weapons;
+  const ciws = state === "ciws";
+  const engine = state === "engine" || weapons || ciws;
   const launch = state === "launch";
   const aviation = state === "aviation";
 
@@ -137,9 +144,15 @@ export function animateType055(assembled: AssembledModel, seconds: number, state
   if (barrel) barrel.rotation.x = -0.08 - (weapons ? 0.22 * smooth((Math.sin(t * 0.5) + 1) / 2) : 0);
 
   const ciwsFwd = assembled.getNode(CIWS_FWD);
-  if (ciwsFwd) ciwsFwd.rotation.y = weapons ? Math.sin(t * 0.9) * 0.55 : 0;
+  if (ciwsFwd) {
+    const aim = type055CiwsAim("fwd", t);
+    ciwsFwd.rotation.y = ciws ? Math.atan2(aim[0], aim[2] - 37.2) : weapons ? Math.sin(t * 0.9) * 0.55 : 0;
+  }
   const ciwsAft = assembled.getNode(CIWS_AFT);
-  if (ciwsAft) ciwsAft.rotation.y = Math.PI + (weapons ? Math.sin(t * 0.8 + 1.4) * 0.55 : 0);
+  if (ciwsAft) {
+    const aim = type055CiwsAim("aft", t);
+    ciwsAft.rotation.y = ciws ? Math.atan2(aim[0], aim[2] + 58) : Math.PI + (weapons ? Math.sin(t * 0.8 + 1.4) * 0.55 : 0);
+  }
 
   const radar = assembled.getNode(RADAR_NODE);
   if (radar) radar.rotation.y = t * (engine ? 2.4 : launch ? 1.4 : 0.7);
@@ -167,12 +180,13 @@ export function animateType055(assembled: AssembledModel, seconds: number, state
   animateLaunch(assembled, t, launch);
 }
 
-export const TYPE055_ANIMATED_STATES = ["engine", "weapons", "launch", "aviation"] as const;
+export const TYPE055_ANIMATED_STATES = ["engine", "weapons", "ciws", "launch", "aviation"] as const;
 
 export const TYPE055_STATE_LABELS = [
   { id: "idle", label: "系泊检查", hint: "雷达慢转；主炮/近防归零，双桨静止，VLS 井盖闭锁" },
   { id: "engine", label: "COGAG 动力运转", hint: "四台燃气轮机并车，双轴双桨转动，导航雷达加速" },
   { id: "weapons", label: "主炮/近防跟踪", hint: "130mm 炮塔旋回俯仰，前后 1130 近防随动跟踪" },
+  { id: "ciws", label: "1130 近防拦截", hint: "前后 1130 自动瞄准空中目标，炮口焰、曳光弹与命中火花" },
   { id: "launch", label: "VLS 冷/热齐射", hint: "首尾各 8 格错峰开盖，防空/反舰/高超按各自弹道离场" },
   { id: "aviation", label: "航空作业", hint: "双机库卷帘门升起，甲板直-20 主/尾旋翼运转" },
 ] as const;
