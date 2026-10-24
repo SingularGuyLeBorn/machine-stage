@@ -748,6 +748,73 @@
   pointer-events: auto;
 }
 
+
+/* 第一人称漫游小地图：右上角俯视图 + 玩家朝向 + 交互点。 */
+.walk-minimap {
+  position: absolute;
+  top: 120px;
+  right: 16px;
+  width: 212px;
+  z-index: 8;
+  padding: 8px 8px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(9, 13, 19, 0.78);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(5px);
+  pointer-events: none;
+  color: rgba(238, 245, 252, 0.92);
+}
+
+.walk-minimap__head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 2px 4px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.walk-minimap__title {
+  color: rgba(232, 240, 248, 0.58);
+  font-size: 10px;
+}
+
+.walk-minimap__area {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.walk-minimap__dir {
+  color: rgba(127, 231, 255, 0.9);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.walk-minimap__svg {
+  display: block;
+  width: 100%;
+  height: 208px;
+  border-radius: 5px;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.04), transparent 62%),
+    rgba(255, 255, 255, 0.025);
+}
+
+.walk-minimap__foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 2px 0;
+  font-size: 10px;
+  color: rgba(225, 235, 244, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
 /* 第一人称漫游 HUD：准星 + 交互提示 + 区域名 + 操作说明 + 切换黑场。 */
 .walk-hud {
   position: absolute;

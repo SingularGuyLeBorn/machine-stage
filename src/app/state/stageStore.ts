@@ -195,6 +195,8 @@ interface StageState {
   walkLocked: boolean;
   /** 第一人称漫游：区域切换淡入淡出中。 */
   walkFading: boolean;
+  /** 第一人称漫游：玩家在编辑坐标里的位置与朝向（供小地图 10Hz 刷新）。 */
+  walkPose: { x: number; z: number; yaw: number };
   /** 战损形态（完好/破损/破碎）：只切预制变体，不影响碰撞与支撑检测。 */
   damage: DamageState;
   /** 随机破口种子：每次「随机破口」+1，重建时由 damage kit 读取。 */
@@ -240,6 +242,7 @@ interface StageState {
   setWalkPrompt(prompt: string | null): void;
   setWalkLocked(locked: boolean): void;
   setWalkFading(fading: boolean): void;
+  setWalkPose(pose: { x: number; z: number; yaw: number }): void;
   setDamage(state: DamageState): void;
   /** 换一组随机破口并切到破碎，触发重建。 */
   rerollDamage(): void;
@@ -355,6 +358,7 @@ export const useStageStore = create<StageState>((set, get) => ({
   walkPrompt: null,
   walkLocked: false,
   walkFading: false,
+  walkPose: { x: 0, z: 0, yaw: 0 },
   damage: "intact",
   damageSeed: 0,
   lidOverrides: {},
@@ -396,6 +400,7 @@ export const useStageStore = create<StageState>((set, get) => ({
       walkPrompt: null,
       walkLocked: false,
       walkFading: false,
+      walkPose: { x: 0, z: 0, yaw: 0 },
       damage: "intact",
       damageSeed: 0,
       lidOverrides: {},
@@ -591,6 +596,7 @@ export const useStageStore = create<StageState>((set, get) => ({
   },
   setWalkLocked: (walkLocked) => set({ walkLocked }),
   setWalkFading: (walkFading) => set({ walkFading }),
+  setWalkPose: (walkPose) => set({ walkPose }),
 
   setDamage: (damage) => set({ damage }),
 

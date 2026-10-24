@@ -1,8 +1,14 @@
 import * as THREE from "three";
 import type { AssembledModel, PartHandle } from "@/three/parts";
-import { CAT_TRACKS, carrierJbdOffset, catPoint, deckTopAt } from "@/three/parts/models/carrier/constants";
+import { CAT_TRACKS, CV, carrierJbdOffset, catPoint, deckTopAt } from "@/three/parts/models/carrier/constants";
 import { deckPlan, hullSurfaceHalfAt } from "@/three/parts/models/carrier/kits";
-import { BARRIER_CONTROL_POS } from "@/three/parts/models/carrier/flightdeck";
+import {
+  BARRIER_CONTROL_POS,
+  BARRIER_NET_CENTER_X,
+  BARRIER_NET_HALF,
+  BARRIER_NET_YAW,
+  BARRIER_NET_Z,
+} from "@/three/parts/models/carrier/flightdeck";
 import {
   HANGAR_CREW_DOOR_NODE,
   HANGAR_CREW_DOOR_POS,
@@ -10,6 +16,10 @@ import {
   HANGAR_ENGINE_DOOR_NODE,
   HANGAR_ENGINE_DOOR_POS,
 } from "@/three/parts/models/carrier/hangar";
+import {
+  LANDING_RUNWAY_POLYGON,
+  TAKEOFF_RUNWAY_POLYGON,
+} from "@/three/parts/models/carrier/runwayPlan";
 
 // ============================================================================
 // app/three/walk —— 第一人称自由行走配置（编辑尺度 1:8，运行时装换成米）
@@ -41,6 +51,8 @@ export interface WalkArea {
   largeObstacles?: boolean;
   /** 该区域的眼高（默认用模型的 eyeHeight）；坐姿舱室/车长塔用更低的眼高。 */
   eyeHeight?: number;
+  /** 小地图上的额外结构：舰岛/跑道/升降机/炮塔等。 */
+  mapFeatures?: WalkMapFeature[];
   spawn: { pos: [number, number, number]; yaw: number; pitch?: number };
 }
 
@@ -58,6 +70,15 @@ export interface WalkInteraction {
   doorNode?: string;
   doorIndex?: number;
   jbdIndex?: number;
+}
+
+export interface WalkMapFeature {
+  kind: "structure" | "runway" | "zone" | "line" | "label";
+  /** x-z 平面折线；或 rect：[minX, minZ, maxX, maxZ]。 */
+  points?: Array<[number, number]>;
+  rect?: [number, number, number, number];
+  label?: string;
+  at?: [number, number];
 }
 
 export interface WalkConfig {
@@ -104,6 +125,66 @@ export function insideDeck(x: number, z: number, margin = DECK_MARGIN): boolean 
   return distanceToPolygon(x, z, DECK_POLYGON) >= margin;
 }
 
+const BARRIER_MAP_RAD = (BARRIER_NET_YAW * Math.PI) / 180;
+const BARRIER_MAP_HX = Math.cos(BARRIER_MAP_RAD) * BARRIER_NET_HALF;
+const BARRIER_MAP_HZ = -Math.sin(BARRIER_MAP_RAD) * BARRIER_NET_HALF;
+
+const CARRIER_DECK_MAP: WalkMapFeature[] = [
+  {
+    kind: "structure",
+    rect: [
+      CV.ISLAND_X - CV.ISLAND_W / 2,
+      CV.ISLAND_Z - CV.ISLAND_L / 2,
+      CV.ISLAND_X + CV.ISLAND_W / 2,
+      CV.ISLAND_Z + CV.ISLAND_L / 2,
+    ],
+    label: "舰岛",
+  },
+  { kind: "runway", points: LANDING_RUNWAY_POLYGON, label: "着舰" },
+  { kind: "runway", points: TAKEOFF_RUNWAY_POLYGON, label: "起飞" },
+  ...CV.ELEVATOR_Z.map((z, index): WalkMapFeature => ({
+    kind: "zone",
+    rect: [
+      CV.ELEVATOR_X - CV.ELEVATOR_W / 2,
+      z - CV.ELEVATOR_L / 2,
+      CV.ELEVATOR_X + CV.ELEVATOR_W / 2,
+      z + CV.ELEVATOR_L / 2,
+    ],
+    label: `升${index + 1}`,
+  })),
+  { kind: "zone", rect: [1.17, -5.72, 2.33, -4.28], label: "弹药升降" },
+  {
+    kind: "line",
+    points: [
+      [BARRIER_NET_CENTER_X - BARRIER_MAP_HX, BARRIER_NET_Z - BARRIER_MAP_HZ],
+      [BARRIER_NET_CENTER_X + BARRIER_MAP_HX, BARRIER_NET_Z + BARRIER_MAP_HZ],
+    ],
+    label: "拦阻网",
+  },
+  { kind: "label", at: [0.5, 19.4], label: "艏" },
+];
+
+const DDG_DECK_MAP: WalkMapFeature[] = [
+  { kind: "structure", rect: [-6.8, 5, 6.8, 39], label: "舰岛" },
+  { kind: "structure", rect: [-6.3, -72, 6.3, -54], label: "机库" },
+  { kind: "structure", rect: [-5.5, -22, 5.5, -4], label: "烟囱" },
+  { kind: "zone", rect: [-4.1, 20, 4.1, 52], label: "VLS" },
+  { kind: "label", at: [0, 78], label: "艏" },
+  { kind: "label", at: [0, -85], label: "艉" },
+];
+
+const TIGER_MAP: WalkMapFeature[] = [
+  { kind: "structure", rect: [-6.44, -1.91, 1.29, 1.91], label: "车体" },
+  { kind: "structure", rect: [-2.2, -0.65, -1.1, 0.65], label: "炮塔" },
+  { kind: "label", at: [-5.6, 0], label: "车头" },
+];
+
+const MBT_MAP: WalkMapFeature[] = [
+  { kind: "structure", rect: [-1.33, -4.03, 1.33, 7.24], label: "车体" },
+  { kind: "structure", rect: [-1.3, -1.48, 1.3, 1.52], label: "炮塔" },
+  { kind: "label", at: [0, 7.8], label: "车头" },
+];
+
 const CARRIER_WALK: WalkConfig = {
   label: "福建舰 · 第一人称漫游",
   spawnArea: "deck",
@@ -114,6 +195,7 @@ const CARRIER_WALK: WalkConfig = {
       label: "飞行甲板",
       floor: deckFloor,
       polygon: DECK_POLYGON,
+      mapFeatures: CARRIER_DECK_MAP,
       spawn: { pos: [1.6, deckFloor(0, -1.0), -1.0], yaw: Math.PI },
     },
     hangar: {
@@ -577,6 +659,7 @@ const TYPE055_WALK: WalkConfig = {
       floor: 15.76,
       rect: [-7.8, 7.8, -82, 74],
       largeObstacles: true,
+      mapFeatures: DDG_DECK_MAP,
       spawn: { pos: [2.5, 15.76, 44], yaw: Math.PI },
     },
     bridge: {
@@ -729,6 +812,7 @@ const TIGER_WALK: WalkConfig = {
       label: "车外",
       floor: -1.1,
       rect: [-8.2, 3.6, -4.6, 4.6],
+      mapFeatures: TIGER_MAP,
       spawn: { pos: [0, -1.1, 4.0], yaw: 0 },
     },
     driver: {
@@ -779,6 +863,7 @@ const MBT_WALK: WalkConfig = {
       label: "车外",
       floor: -0.34,
       rect: [-5.2, 5.2, -6.5, 9.8],
+      mapFeatures: MBT_MAP,
       spawn: { pos: [4.5, -0.34, 3.0], yaw: Math.PI / 2 },
     },
     driver: {

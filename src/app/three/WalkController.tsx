@@ -56,6 +56,7 @@ export function WalkController() {
   const setWalkPrompt = useStageStore((state) => state.setWalkPrompt);
   const setWalkLocked = useStageStore((state) => state.setWalkLocked);
   const setWalkFading = useStageStore((state) => state.setWalkFading);
+  const setWalkPose = useStageStore((state) => state.setWalkPose);
   const camera = useThree((state) => state.camera);
   const gl = useThree((state) => state.gl);
   const isCarrier = assembled?.registry.model === "carrier";
@@ -84,6 +85,7 @@ export function WalkController() {
   const walkDoorCurrent = useRef(new Map<string, number>());
   const lookDrag = useRef({ active: false, x: 0, y: 0 });
   const pointerLocked = useRef(false);
+  const poseClock = useRef(0);
 
   const clearTimers = () => {
     for (const timer of timers.current) window.clearTimeout(timer);
@@ -110,6 +112,7 @@ export function WalkController() {
     }
     obstacles.current = list;
     setWalkArea(nextArea.id);
+    setWalkPose({ x: player.current.x, z: player.current.z, yaw: player.current.yaw });
     lastPrompt.current = null;
     setWalkPrompt(null);
   };
@@ -415,6 +418,12 @@ export function WalkController() {
       light.current.intensity = interior ? 0.45 : 0.22;
     }
     if (ambient.current) ambient.current.intensity = interior ? 0.5 : 0.05;
+    // 小地图 10Hz 位姿；只有 WalkMinimap 订阅 walkPose，不会拖 Viewport 重渲染。
+    poseClock.current += dt;
+    if (poseClock.current >= 0.08) {
+      poseClock.current = 0;
+      setWalkPose({ x: p.x, z: p.z, yaw: p.yaw });
+    }
     // 舱室顶灯：按区域预设沿长轴布灯，让机库/机舱/舰桥真正可读。
     const specs = walkLightsOf(modelId)[p.areaId] ?? [];
     for (let i = 0; i < roomLights.current.length; i++) {

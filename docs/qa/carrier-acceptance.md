@@ -680,10 +680,15 @@ npm run build
 - 车外绕行 + 驾驶席 / 车长塔 / 炮塔顶部三个位置；F 上下车。虎式驾驶席为真实舱内视角；MBT/ED 因为乘员舱净高不足以站立，驾驶/车长使用舱口视角（眼高按坐姿/舱口单独给），仍可环视车内。
 - 证据：`tank-walk-tiger-exterior2.jpeg`、`tank-walk-tiger-driver.jpeg`、`tank-walk-tiger-commander2.jpeg`、`tank-walk-tiger-top.jpeg`、`tank-walk-mbt-exterior2.jpeg`、`tank-walk-mbt-driver2.jpeg`、`tank-walk-mbt-commander2.jpeg`、`tank-walk-mbt-top.jpeg`。
 
+### 第一人称小地图（右上角）
+- 漫游 HUD 右上角新增 SVG 俯视小地图：+Z（舰艏）朝上，显示当前区域轮廓、舰岛/跑道/升降机/拦阻网/炮塔等结构，以及本区域全部交互点；玩家用带朝向的青色箭头表示，最近可交互点加白圈，底部实时显示 `x/z` 坐标与交互点数量。
+- 玩家位姿以 10Hz 写入 `walkPose`，只有小地图订阅，不会让整个 Viewport 跟着重渲染；甲板/舱室/055/坦克/ED90 均有对应地图（坦克车外显示车体、炮塔、车头方向）。
+- 证据：`carrier-walk-minimap-deck.jpeg`、`carrier-walk-minimap-hangar.jpeg`、`carrier-walk-055-minimap.jpeg`、`tank-walk-tiger-minimap.jpeg`；新增 `WalkMinimap.test.tsx` 2 项与地图特征断言。
+
 ### 门禁（2026-10-25 最终）
 - 福建舰：10,249 定义件 / 11,403 实例；注册表校验 0 错；悬空 0、悬空孤岛 0、合并件内部悬空 0；**静态穿模 15,273 报告 / 未豁免 0**。
 - 扫掠：`flight_ops` 30s@2fps 798 / **0**；`hangar` 26 / 0；`engine` 558 / 0；`ciws` 166 / 0。
-- 单元测试：`npx vitest run` **368 通过 / 1 跳过**（55 个文件通过 / 1 跳过）；`npm run build`（tsc --noEmit + vite build）通过。新增 `walk.test.ts` 7 项（福建舰 4 / 055 1 / 坦克 2），航母测试 13 项。
+- 单元测试：`npx vitest run` **371 通过 / 1 跳过**（56 个文件通过 / 1 跳过）；`npm run build`（tsc --noEmit + vite build）通过。新增 `walk.test.ts` 8 项（福建舰 5 / 055 1 / 坦克 2）、`WalkMinimap.test.tsx` 2 项，航母测试 13 项。
 - 055：11,944 件；坦克：虎式 293 件 / MBT 1,299 件（既有门禁不受本轮漫游配置影响）。
 
 ### 已知限制

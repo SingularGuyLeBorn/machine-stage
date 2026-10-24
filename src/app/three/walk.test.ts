@@ -53,6 +53,13 @@ describe("福建舰 · 第一人称漫游配置", () => {
     expect(config.interactions.filter((item) => item.kind === "portal").length).toBeGreaterThanOrEqual(10);
   });
 
+  it("甲板/车外区域带小地图结构特征", () => {
+    expect((config.areas.deck!.mapFeatures ?? []).length).toBeGreaterThan(3);
+    expect((TYPE055_WALK_CONFIG.areas.deck!.mapFeatures ?? []).length).toBeGreaterThan(3);
+    expect((TIGER_WALK_CONFIG.areas.exterior!.mapFeatures ?? []).length).toBeGreaterThan(0);
+    expect((MBT_WALK_CONFIG.areas.exterior!.mapFeatures ?? []).length).toBeGreaterThan(0);
+  });
+
   it("甲板出生高度跟随上翘弧面，室内区域配有补光", () => {
     const deck = config.areas.deck!;
     expect(areaFloorAt(deck, 1.6, -1.0)).toBeLessThan(areaFloorAt(deck, 1.6, 20.4));

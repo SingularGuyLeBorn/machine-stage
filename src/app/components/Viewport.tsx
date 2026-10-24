@@ -23,6 +23,7 @@ import { IsolationView } from "./IsolationView";
 import { PartInfoCard } from "./PartInfoCard";
 import { CAMERA_MODE_LABELS, isCarrierInteriorMode } from "../three/viewpoints";
 import { walkConfigOf } from "../three/walk";
+import { WalkMinimap } from "./WalkMinimap";
 
 // ============================================================================
 // Viewport —— 中栏：3D 视口 + 视口工具条 + 穿模报告抽屉 + 隔离小视图 + 读数图例
@@ -130,6 +131,7 @@ export function Viewport() {
         <div className="walk-hud">
           <div className="walk-hud__crosshair" aria-hidden />
           <div className="walk-hud__area">{walkAreaLabel} · 第一人称漫游</div>
+          <WalkMinimap />
           {walkPrompt ? (
             <div className="walk-hud__prompt" role="status">
               <kbd>F</kbd>
