@@ -13,6 +13,7 @@ import { useStageStore } from "@/app/state/stageStore";
 // ============================================================================
 
 const SCREEN_FILES: Record<string, string> = {
+  cv_scr_ocean: "/screens/ocean-horizon.jpg",
   cv_scr_chart: "/screens/chart.jpg",
   cv_scr_radar: "/screens/radar.jpg",
   cv_scr_tactical: "/screens/tactical.jpg",

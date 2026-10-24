@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import type { GeometryBuilder } from "../../assembler/geometry";
 import { T55, t55DeckHalf, t55DeckY, t55HalfAt, t55StemRake } from "./constants";
 
@@ -1312,6 +1313,8 @@ export const type055CommandChair: GeometryBuilder = (spec) => {
   const parts: THREE.BufferGeometry[] = [];
   const box = (w: number, h: number, d: number, x: number, y: number, z: number) =>
     new THREE.BoxGeometry(w, h, d).translate(x, y, z);
+  const soft = (w: number, h: number, d: number, x: number, y: number, z: number, r = 0.03) =>
+    new RoundedBoxGeometry(w, h, d, 3, r).translate(x, y, z);
   const captain = kind === "captain";
   const helm = kind === "helm";
   const jump = kind === "jump";
@@ -1320,21 +1323,25 @@ export const type055CommandChair: GeometryBuilder = (spec) => {
   const wide = ["bridge_helm", "cic_radar", "cic_tactical"].includes(station);
   const tall = ["bridge_helm", "cic_radar", "cic_tactical", "cic_sonar"].includes(station);
   const width = captain || wide ? 0.62 : 0.54;
-  parts.push(box(width, 0.11, 0.54, 0, 0.52, 0));
-  parts.push(box(width - 0.06, 0.07, 0.25, 0, 0.58, -0.12));
-  parts.push(box(width - 0.06, 0.06, 0.23, 0, 0.575, 0.12));
+  parts.push(soft(width, 0.13, 0.55, 0, 0.52, 0, 0.04));
+  parts.push(soft(width - 0.07, 0.075, 0.26, 0, 0.585, -0.12, 0.03));
+  parts.push(soft(width - 0.07, 0.065, 0.24, 0, 0.578, 0.12, 0.03));
   const backHeight = captain ? 0.82 : tall ? 0.74 : 0.62;
-  const back = new THREE.BoxGeometry(width, backHeight, 0.12);
+  const back = new RoundedBoxGeometry(width, backHeight, 0.13, 3, 0.035);
   back.rotateX(-0.1);
   back.translate(0, captain ? 1.02 : tall ? 0.96 : 0.9, -0.24);
   parts.push(back);
-  parts.push(box(width - 0.08, 0.14, 0.13, 0, 0.7, -0.19));
+  parts.push(soft(width - 0.08, 0.15, 0.14, 0, 0.7, -0.19, 0.03));
+  for (const side of [-1, 1] as const) {
+    parts.push(soft(0.07, backHeight * 0.62, 0.16, side * (width / 2 - 0.02), captain ? 0.96 : tall ? 0.9 : 0.84, -0.25, 0.025));
+    parts.push(soft(0.08, 0.09, 0.42, side * (width / 2 - 0.04), 0.58, 0, 0.025));
+  }
   if (!jump && !noHeadrest) {
-    parts.push(box(0.34, captain ? 0.24 : 0.2, 0.12, 0, captain ? 1.5 : 1.35, -0.29));
+    parts.push(soft(0.34, captain ? 0.24 : 0.2, 0.13, 0, captain ? 1.5 : 1.35, -0.29, 0.035));
   }
   if (!jump && !noArms) {
     for (const side of [-1, 1] as const) {
-      parts.push(box(0.09, 0.05, 0.42, side * (width / 2 + 0.05), 0.73, -0.04));
+      parts.push(soft(0.1, 0.055, 0.44, side * (width / 2 + 0.05), 0.73, -0.04, 0.022));
       parts.push(box(0.04, 0.12, 0.04, side * (width / 2 + 0.02), 0.65, 0.05));
     }
   }

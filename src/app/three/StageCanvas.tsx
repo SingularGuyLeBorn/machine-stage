@@ -194,6 +194,7 @@ function CockpitCanopyVisibility() {
 
 function InteriorFillLight() {
   const cameraMode = useStageStore((state) => state.cameraMode);
+  const modelId = useStageStore((state) => state.modelId);
   if (!isCarrierInteriorMode(cameraMode)) return null;
   // 舱内是封闭空间，主光/HDRI 被围壁遮挡；进入内部视角时补一层柔和环境光。
   // 机舱里还有大量金属转子，单靠环境光会发黑，再补一盏舱顶点光。
@@ -212,19 +213,35 @@ function InteriorFillLight() {
         </>
       ) : null}
       {cameraMode === "cic" ? (
-        <>
-          <pointLight position={[0, 20.75, 13.5]} intensity={1.8} distance={11} decay={1.35} color="#c7dee8" />
-          <pointLight position={[0, 20.75, 21.5]} intensity={1.6} distance={11} decay={1.35} color="#c7dee8" />
-          <pointLight position={[0, 20.4, 26.3]} intensity={1.2} distance={7} decay={1.45} color="#5ed6d6" />
-          <pointLight position={[0, 19.4, 10.5]} intensity={0.7} distance={8} decay={1.5} color="#4f8f9f" />
-        </>
+        modelId === "carrier" ? (
+          <>
+            <pointLight position={[24.9, 41.6, -36.0]} intensity={2.4} distance={9} decay={1.35} color="#d4e2ea" />
+            <pointLight position={[24.9, 41.6, -42.0]} intensity={2.1} distance={9} decay={1.35} color="#d4e2ea" />
+            <pointLight position={[24.9, 41.2, -34.6]} intensity={1.4} distance={6} decay={1.45} color="#5ed6d6" />
+          </>
+        ) : (
+          <>
+            <pointLight position={[0, 20.75, 13.5]} intensity={1.8} distance={11} decay={1.35} color="#c7dee8" />
+            <pointLight position={[0, 20.75, 21.5]} intensity={1.6} distance={11} decay={1.35} color="#c7dee8" />
+            <pointLight position={[0, 20.4, 26.3]} intensity={1.2} distance={7} decay={1.45} color="#5ed6d6" />
+            <pointLight position={[0, 19.4, 10.5]} intensity={0.7} distance={8} decay={1.5} color="#4f8f9f" />
+          </>
+        )
       ) : null}
       {cameraMode === "bridge" ? (
-        <>
-          <pointLight position={[0, 25.9, 27]} intensity={1.7} distance={12} decay={1.4} color="#f0eadc" />
-          <pointLight position={[0, 23.7, 31.6]} intensity={1.3} distance={9} decay={1.4} color="#cfe4ee" />
-          <pointLight position={[0, 24.4, 39]} intensity={2.2} distance={18} decay={1.3} color="#e6f1f6" />
-        </>
+        modelId === "carrier" ? (
+          <>
+            <pointLight position={[24.9, 46.9, -36.0]} intensity={2.4} distance={8} decay={1.35} color="#f2ecdf" />
+            <pointLight position={[24.9, 46.9, -42.0]} intensity={2.2} distance={8} decay={1.35} color="#dcebf2" />
+            <pointLight position={[24.9, 46.5, -33.5]} intensity={2.0} distance={10} decay={1.3} color="#e8f3f8" />
+          </>
+        ) : (
+          <>
+            <pointLight position={[0, 25.9, 27]} intensity={1.7} distance={12} decay={1.4} color="#f0eadc" />
+            <pointLight position={[0, 23.7, 31.6]} intensity={1.3} distance={9} decay={1.4} color="#cfe4ee" />
+            <pointLight position={[0, 24.4, 39]} intensity={2.2} distance={18} decay={1.3} color="#e6f1f6" />
+          </>
+        )
       ) : null}
     </>
   );

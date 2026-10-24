@@ -217,13 +217,13 @@ const TYPE055_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec
 const CARRIER_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec>> = {
   bridge: {
     eyePart: "carrier.island.bridge_captain_seat_back",
-    eye: [0, 0.02, 0.055],
+    eye: [0, 0.16, 0.28],
     targetPart: "carrier.island.bridge_front_glass_c",
-    fov: 63,
+    fov: 66,
   },
   cic: {
     eyePart: "carrier.island.cic_watch_seat_back",
-    eye: [0, 0.14, 0.05],
+    eye: [0, 0.32, 1.2],
     targetPart: "carrier.island.cic_main_screen_c",
     fov: 66,
   },

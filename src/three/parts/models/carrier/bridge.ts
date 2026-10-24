@@ -63,14 +63,14 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
       `wall_lower_${side === -1 ? "p" : "s"}`,
       `舰桥${side === -1 ? "左" : "右"}舷下槛`,
       M(B(0.06, 0.16, len, [0, 0, 0], 0.004)),
-      "cv_hull",
+      "cv_055_acoustic",
       [wx, y + 0.11, z],
     );
     part(
       `wall_header_${side === -1 ? "p" : "s"}`,
       `舰桥${side === -1 ? "左" : "右"}舷上楣`,
       M(B(0.06, 0.21, len, [0, 0, 0], 0.004)),
-      "cv_hull",
+      "cv_055_acoustic",
       [wx, y + 0.635, z],
     );
     for (let w = 0; w < 5; w++) {
@@ -79,7 +79,7 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
         `window_${side === -1 ? "p" : "s"}_${w + 1}`,
         `舰桥${side === -1 ? "左" : "右"}舷窗 ${w + 1}`,
         M(B(0.02, glassH, 0.62, [0, 0, 0], 0.002)),
-        "cv_bridge_glass",
+        "cv_clear_glass",
         [wx, glassY, wz],
       );
     }
@@ -88,7 +88,7 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
         `side_mullion_${side === -1 ? "p" : "s"}_${Math.round((mz + 2.25) * 100)}`,
         `舰桥${side === -1 ? "左" : "右"}舷窗竖梃`,
         M(B(0.06, glassH, 0.06, [0, 0, 0], 0.003)),
-        "cv_steel_dark",
+        "cv_055_console",
         [wx, glassY, z + mz],
       );
     }
@@ -102,14 +102,14 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
   }
 
   // 前壁：3 扇前视窗，中窗作为第一人称目标窗。
-  part(`front_lower`, "舰桥前壁下槛", M(B(width, 0.16, 0.06, [0, 0, 0], 0.004)), "cv_hull", [x, y + 0.11, z + halfL]);
-  part(`front_header`, "舰桥前壁上楣", M(B(width, 0.21, 0.06, [0, 0, 0], 0.004)), "cv_hull", [x, y + 0.635, z + halfL]);
+  part(`front_lower`, "舰桥前壁下槛", M(B(width, 0.16, 0.06, [0, 0, 0], 0.004)), "cv_055_acoustic", [x, y + 0.11, z + halfL]);
+  part(`front_header`, "舰桥前壁上楣", M(B(width, 0.21, 0.06, [0, 0, 0], 0.004)), "cv_055_acoustic", [x, y + 0.635, z + halfL]);
   for (const [tag, gx] of [["p", -0.5], ["c", 0], ["s", 0.5]] as const) {
     part(
       `front_glass_${tag}`,
       tag === "c" ? "舰桥前视窗" : `舰桥前视窗 ${tag}`,
       M(B(0.38, glassH, 0.02, [0, 0, 0], 0.002)),
-      "cv_bridge_glass",
+      "cv_clear_glass",
       [x + gx, glassY, z + halfL + 0.005],
     );
   }
@@ -118,11 +118,23 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
       `front_mullion_${Math.round((gx + 1) * 100)}`,
       "舰桥前窗竖梃",
       M(B(0.06, glassH, 0.06, [0, 0, 0], 0.003)),
-      "cv_steel_dark",
+      "cv_055_console",
       [x + gx, glassY, z + halfL],
     );
   }
   part(`front_sill`, "舰桥前窗内窗台", M(B(width - 0.08, 0.02, 0.1, [0, 0, 0], 0.003)), "cv_steel", [x, sillY, z + halfL - 0.04]);
+
+  // 舰桥视景背板：保证玻璃外有真实海天，而不是白墙/空白背景。
+  part("view_front", "舰桥前视景背板", M(B(width - 0.04, glassH + 0.1, 0.02, [0, 0, 0], 0.002)), "cv_scr_ocean", [x, glassY, z + halfL + 0.075]);
+  for (const side of [-1, 1] as const) {
+    part(
+      `view_side_${side === -1 ? "p" : "s"}`,
+      `舰桥侧视景背板 ${side === -1 ? "左" : "右"}`,
+      M(B(0.02, glassH + 0.1, len - 0.45, [0, 0, 0], 0.002)),
+      "cv_scr_ocean",
+      [x + side * (halfW + 0.045), glassY, z],
+    );
+  }
 
   // 后壁 + 滑动门（关闭状态，门轮/观察窗）。
   const doorX = x + 0.28;
@@ -130,27 +142,27 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
   const doorH = 0.5;
   const leftW = doorX - doorW / 2 - (x - halfW);
   const rightW = x + halfW - (doorX + doorW / 2);
-  part(`rear_wall_l`, "舰桥后壁左段", M(B(leftW, 0.72, 0.06, [0, 0, 0], 0.004)), "cv_hull", [x - halfW + leftW / 2, y + 0.38, z - halfL]);
-  part(`rear_wall_r`, "舰桥后壁右段", M(B(rightW, 0.72, 0.06, [0, 0, 0], 0.004)), "cv_hull", [x + halfW - rightW / 2, y + 0.38, z - halfL]);
-  part(`rear_header`, "舰桥后壁门楣", M(B(doorW, 0.22, 0.06, [0, 0, 0], 0.004)), "cv_hull", [doorX, y + 0.63, z - halfL]);
+  part(`rear_wall_l`, "舰桥后壁左段", M(B(leftW, 0.72, 0.06, [0, 0, 0], 0.004)), "cv_055_acoustic", [x - halfW + leftW / 2, y + 0.38, z - halfL]);
+  part(`rear_wall_r`, "舰桥后壁右段", M(B(rightW, 0.72, 0.06, [0, 0, 0], 0.004)), "cv_055_acoustic", [x + halfW - rightW / 2, y + 0.38, z - halfL]);
+  part(`rear_header`, "舰桥后壁门楣", M(B(doorW, 0.22, 0.06, [0, 0, 0], 0.004)), "cv_055_acoustic", [doorX, y + 0.63, z - halfL]);
   for (const dx of [-1, 1] as const) {
-    part(`door_frame_${dx < 0 ? "l" : "r"}`, "舰桥后门框", M(B(0.04, doorH, 0.08, [0, 0, 0], 0.003)), "cv_steel_dark", [doorX + dx * (doorW / 2 + 0.02), floorY + doorH / 2, z - halfL]);
+    part(`door_frame_${dx < 0 ? "l" : "r"}`, "舰桥后门框", M(B(0.04, doorH, 0.08, [0, 0, 0], 0.003)), "cv_055_console", [doorX + dx * (doorW / 2 + 0.02), floorY + doorH / 2, z - halfL]);
   }
-  part(`door_leaf`, "舰桥后门", M(B(doorW, doorH, 0.03, [0, 0, 0], 0.004)), "cv_steel_dark", [doorX, floorY + doorH / 2, z - halfL + 0.02]);
+  part(`door_leaf`, "舰桥后门", M(B(doorW, doorH, 0.03, [0, 0, 0], 0.004)), "cv_055_console", [doorX, floorY + doorH / 2, z - halfL + 0.02]);
   part(`door_wheel`, "舰桥后门门轮", M({ type: "torus", radius: 0.045, tube: 0.007, radialSegments: 8, tubularSegments: 16 }), "cv_steel", [doorX, floorY + 0.24, z - halfL + 0.04]);
-  part(`door_port`, "舰桥后门观察窗", M(B(0.11, 0.09, 0.01, [0, 0, 0], 0.002)), "cv_bridge_glass", [doorX, floorY + 0.4, z - halfL + 0.04]);
+  part(`door_port`, "舰桥后门观察窗", M(B(0.11, 0.09, 0.01, [0, 0, 0], 0.002)), "cv_clear_glass", [doorX, floorY + 0.4, z - halfL + 0.04]);
 
   // ---- 舱内顶棚/灯带/地板条 ----
   [-1.85, 0, 1.85].forEach((cz, i) => {
-    part(`ceiling_${i + 1}`, `舰桥顶棚板 ${i + 1}`, M(B(width - 0.1, 0.02, 1.7, [0, 0, 0], 0.004)), "cv_hull_dark", [x, floorY + 0.535, z + cz]);
+    part(`ceiling_${i + 1}`, `舰桥顶棚板 ${i + 1}`, M(B(width - 0.1, 0.02, 1.7, [0, 0, 0], 0.004)), "cv_055_ceiling", [x, floorY + 0.535, z + cz]);
   });
   for (const lx of [-0.24, 0.24] as const) {
     part(`ceiling_light_${lx < 0 ? "p" : "s"}`, "舰桥顶灯带", M(B(0.05, 0.012, 3.4, [0, 0, 0], 0.002)), "cv_glow", [x + lx, floorY + 0.525, z]);
   }
-  part(`floor_walk`, "舰桥防滑走道", M(B(0.56, 0.006, len - 0.5, [0, 0, 0], 0.002)), "cv_deck_plate", [x, floorY + 0.004, z]);
+  part(`floor_walk`, "舰桥防滑走道", M(B(0.56, 0.006, len - 0.5, [0, 0, 0], 0.002)), "cv_055_carpet", [x, floorY + 0.004, z]);
 
   // ---- 操舰台 + 仪表盘组 ----
-  part(`helm_console`, "操舰台", M(B(0.6, 0.09, 0.3, [0, 0, 0], 0.008), B(0.6, 0.03, 0.3, [0, 0.055, 0], 0.004)), "cv_steel_dark", [x, floorY + 0.08, z + 1.55]);
+  part(`helm_console`, "操舰台", M(B(0.6, 0.09, 0.3, [0, 0, 0], 0.008), B(0.6, 0.03, 0.3, [0, 0.055, 0], 0.004)), "cv_055_console", [x, floorY + 0.08, z + 1.55]);
   part(`helm_board`, "操舰仪表盘", M(B(0.64, 0.16, 0.035, [0, 0, 0], 0.006)), "cv_gauge_face", [x, floorY + 0.19, z + 1.71]);
   const gaugeSpots = [
     [-0.2, 0.15],
@@ -196,7 +208,7 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
   });
 
   // 舵轮 + 轮柱 + 车钟
-  part(`helm_pedestal`, "舵轮柱", M(C(0.024, 0.12, [0, 0, 0], 14), B(0.1, 0.05, 0.14, [0, 0.04, 0], 0.004)), "cv_steel_dark", [x, floorY + 0.06, z + 1.42]);
+  part(`helm_pedestal`, "舵轮柱", M(C(0.024, 0.12, [0, 0, 0], 14), B(0.1, 0.05, 0.14, [0, 0.04, 0], 0.004)), "cv_055_console", [x, floorY + 0.06, z + 1.42]);
   part(`helm_shaft`, "舵轮轴", M({ type: "weld", from: [0, 0, -0.03], to: [0, 0, 0.03], radius: 0.008 }), "cv_steel", [x, floorY + 0.10, z + 1.395]);
   ctx.node({ name: BRIDGE_HELM_NODE, parent: "root", pivot: [x, floorY + 0.10, z + 1.37], motion: "rotate", axis: "z", note: "舰桥舵轮" });
   {
@@ -216,7 +228,7 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
       mate: A([0, 0, 0]),
     });
   }
-  part(`telegraph_pedestal`, "车钟座", M(C(0.028, 0.16, [0, 0, 0], 14), B(0.12, 0.02, 0.1, [0, 0.1, 0], 0.004)), "cv_steel_dark", [x + 0.26, floorY + 0.11, z + 1.45]);
+  part(`telegraph_pedestal`, "车钟座", M(C(0.028, 0.16, [0, 0, 0], 14), B(0.12, 0.02, 0.1, [0, 0.1, 0], 0.004)), "cv_055_console", [x + 0.26, floorY + 0.11, z + 1.45]);
   ctx.node({ name: BRIDGE_TELEGRAPH_NODE, parent: "root", pivot: [x + 0.26, floorY + 0.18, z + 1.45], motion: "rotate", axis: "z", note: "舰桥车钟" });
   add({
     id: `${P}bridge_telegraph_lever`,
@@ -232,11 +244,11 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
   part(`telegraph_scale`, "车钟刻度", M(...Array.from({ length: 5 }, () => B(0.004, 0.012, 0.002, [0, 0, 0])).map((g, i) => ({ ...g, at: [(i - 2) * 0.022, 0, 0] as [number, number, number] }))), "cv_gauge_mark", [x + 0.26, floorY + 0.15, z + 1.405]);
 
   // 罗经盆
-  part(`binnacle_base`, "罗经盆座", M(C(0.045, 0.08, [0, 0, 0], 16), T(0.05, 0.042, 0.03, [0, 0.05, 0], 16)), "cv_steel_dark", [x - 0.24, floorY + 0.1, z + 1.5]);
+  part(`binnacle_base`, "罗经盆座", M(C(0.045, 0.08, [0, 0, 0], 16), T(0.05, 0.042, 0.03, [0, 0.05, 0], 16)), "cv_055_console", [x - 0.24, floorY + 0.1, z + 1.5]);
   part(`binnacle_dome`, "罗经盆", M(S(0.038, [0, 0, 0], 16)), "cv_glass", [x - 0.24, floorY + 0.17, z + 1.5]);
 
   // ---- 海图桌 ----
-  part(`chart_top`, "海图桌", M(B(0.5, 0.03, 0.36, [0, 0, 0], 0.006)), "cv_steel_dark", [x - 0.3, floorY + 0.15, z - 0.35]);
+  part(`chart_top`, "海图桌", M(B(0.5, 0.03, 0.36, [0, 0, 0], 0.006)), "cv_055_console", [x - 0.3, floorY + 0.15, z - 0.35]);
   for (const [lx, lz] of [[-0.21, -0.2], [0.21, -0.2], [-0.21, 0.2], [0.21, 0.2]] as const) {
     part(`chart_leg_${Math.round((lx + 1) * 100)}_${Math.round((lz + 1) * 100)}`, "海图桌腿", M(C(0.012, 0.15, [0, 0, 0], 10)), "cv_steel", [x - 0.3 + lx, floorY + 0.075, z - 0.35 + lz]);
   }
@@ -254,8 +266,8 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
   part(`chart_divider`, "海图分规", M({ type: "weld", from: [0, 0, 0], to: [0.03, 0.002, 0.07], radius: 0.0025 }, { type: "weld", from: [0, 0, 0], to: [-0.03, 0.002, 0.07], radius: 0.0025 }), "cv_steel", [x - 0.18, floorY + 0.172, z - 0.42]);
 
   // ---- 两侧显控台：雷达屏 + 通信台 ----
-  part(`radar_console`, "雷达显控台", M(B(0.32, 0.12, 0.3, [0, 0, 0], 0.006)), "cv_steel_dark", [x - 0.47, floorY + 0.06, z + 1.55]);
-  part(`radar_board`, "雷达显控屏框", M(B(0.34, 0.24, 0.03, [0, 0, 0], 0.006)), "cv_steel_dark", [x - 0.47, floorY + 0.13, z + 1.71]);
+  part(`radar_console`, "雷达显控台", M(B(0.32, 0.12, 0.3, [0, 0, 0], 0.006)), "cv_055_console", [x - 0.47, floorY + 0.06, z + 1.55]);
+  part(`radar_board`, "雷达显控屏框", M(B(0.34, 0.24, 0.03, [0, 0, 0], 0.006)), "cv_055_console", [x - 0.47, floorY + 0.13, z + 1.71]);
   part(`radar_screen`, "相控阵雷达显示屏", M(B(0.24, 0.16, 0.008, [0, 0, 0], 0.002)), "cv_scr_radar", [x - 0.47, floorY + 0.13, z + 1.686]);
   for (const [ri, rr] of [0.074, 0.05, 0.026].entries()) {
     part(`radar_ring_${ri + 1}`, `雷达距离圈 ${ri + 1}`, M({ type: "torus", radius: rr, tube: 0.0018, radialSegments: 6, tubularSegments: 24 }), "cv_glow", [x - 0.47, floorY + 0.13, z + 1.68]);
@@ -272,8 +284,8 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
     node: BRIDGE_RADAR_SWEEP_NODE,
     mate: A([0, 0, 0]),
   });
-  part(`comms_console`, "通信台", M(B(0.32, 0.12, 0.3, [0, 0, 0], 0.006)), "cv_steel_dark", [x + 0.47, floorY + 0.06, z + 1.55]);
-  part(`comms_board`, "通信显控屏框", M(B(0.34, 0.24, 0.03, [0, 0, 0], 0.006)), "cv_steel_dark", [x + 0.47, floorY + 0.13, z + 1.71]);
+  part(`comms_console`, "通信台", M(B(0.32, 0.12, 0.3, [0, 0, 0], 0.006)), "cv_055_console", [x + 0.47, floorY + 0.06, z + 1.55]);
+  part(`comms_board`, "通信显控屏框", M(B(0.34, 0.24, 0.03, [0, 0, 0], 0.006)), "cv_055_console", [x + 0.47, floorY + 0.13, z + 1.71]);
   part(`comms_screen`, "通信显控屏", M(B(0.22, 0.14, 0.008, [0, 0, 0], 0.002)), "cv_scr_comms", [x + 0.47, floorY + 0.13, z + 1.692]);
   for (let k = 0; k < 6; k++) {
     part(`comms_knob_${k + 1}`, `通信台旋钮 ${k + 1}`, M(C(0.008, 0.016, [0, 0, 0], 10)), "cv_steel", [x + 0.36 + (k % 3) * 0.05, floorY + 0.13, z + 1.58 + Math.floor(k / 3) * 0.05]);
@@ -283,7 +295,7 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
   // ---- 座椅（驾驶/航海/通信） ----
   const seat = (tag: string, sx: number, sz: number, backId?: string) => {
     part(`${tag}_pedestal`, `${tag} 座椅立柱`, M(C(0.026, 0.1, [0, 0, 0], 12)), "cv_steel", [sx, floorY + 0.05, sz]);
-    part(`${tag}_cushion`, `${tag} 坐垫`, M(B(0.14, 0.04, 0.14, [0, 0, 0], 0.006)), "cv_upholstery", [sx, floorY + 0.1, sz]);
+    part(`${tag}_cushion`, `${tag} 坐垫`, M(B(0.14, 0.04, 0.14, [0, 0, 0], 0.006)), "cv_055_seat", [sx, floorY + 0.1, sz]);
     add({
       id: `${P}bridge_${backId ?? `${tag}_back`}`,
       name_cn: `${tag} 靠背`,
@@ -291,12 +303,12 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
       assembly: ASSEMBLY,
       build_layer: 4,
       geometry: M(B(0.14, 0.12, 0.03, [0, 0, 0], 0.006)),
-      material: "cv_upholstery",
+      material: "cv_055_seat",
       mate: A([sx, floorY + 0.17, sz - 0.07]),
     });
-    part(`${tag}_headrest`, `${tag} 头枕`, M(B(0.07, 0.05, 0.03, [0, 0, 0], 0.005)), "cv_upholstery", [sx, floorY + 0.255, sz - 0.07]);
+    part(`${tag}_headrest`, `${tag} 头枕`, M(B(0.07, 0.05, 0.03, [0, 0, 0], 0.005)), "cv_055_seat", [sx, floorY + 0.255, sz - 0.07]);
     for (const ax of [-1, 1] as const) {
-      part(`${tag}_arm_${ax < 0 ? "p" : "s"}`, `${tag} 扶手`, M(B(0.03, 0.02, 0.12, [0, 0, 0], 0.004)), "cv_steel_dark", [sx + ax * 0.085, floorY + 0.17, sz]);
+      part(`${tag}_arm_${ax < 0 ? "p" : "s"}`, `${tag} 扶手`, M(B(0.03, 0.02, 0.12, [0, 0, 0], 0.004)), "cv_055_console", [sx + ax * 0.085, floorY + 0.17, sz]);
     }
   };
   seat("captain", x, z + 0.82, "captain_seat_back");
@@ -314,7 +326,7 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
   for (const side of [-1, 1] as const) {
     const tag = side === -1 ? "p" : "s";
     for (const [idx, dz] of [-0.9, 0.45].entries()) {
-      part(`side_console_${tag}_${idx + 1}`, `两舷备用显控台 ${tag.toUpperCase()}-${idx + 1}`, M(B(0.22, 0.22, 0.55, [0, 0, 0], 0.006), B(0.2, 0.18, 0.04, [0, 0.2, -0.18], 0.004)), "cv_steel_dark", [x + side * 0.6, floorY + 0.12, z - dz]);
+      part(`side_console_${tag}_${idx + 1}`, `两舷备用显控台 ${tag.toUpperCase()}-${idx + 1}`, M(B(0.22, 0.22, 0.55, [0, 0, 0], 0.006), B(0.2, 0.18, 0.04, [0, 0.2, -0.18], 0.004)), "cv_055_console", [x + side * 0.6, floorY + 0.12, z - dz]);
       part(`side_screen_${tag}_${idx + 1}`, `两舷备用显控屏 ${tag.toUpperCase()}-${idx + 1}`, M(B(0.16, 0.1, 0.008, [0, 0, 0], 0.002)), idx === 0 ? "cv_scr_chart" : "cv_scr_camera", [x + side * 0.6, floorY + 0.27, z - dz - 0.18]);
       part(`side_switch_${tag}_${idx + 1}`, `两舷备用开关组 ${tag.toUpperCase()}-${idx + 1}`, M(B(0.016, 0.12, 0.28, [0, 0, 0], 0.003)), "cv_gauge_face", [x + side * 0.6, floorY + 0.295, z - dz + 0.14]);
     }
@@ -323,7 +335,7 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
   for (let a = 0; a < 10; a++) {
     part(`rear_alarm_switch_${a + 1}`, `报警板开关 ${a + 1}`, M(B(0.04, 0.06, 0.018, [0, 0, 0], 0.002), B(0.09, 0.016, 0.02, [0, 0.05, 0], 0.002)), "cv_warning", [x - 0.2 + (a % 5) * 0.12, floorY + 0.31 + Math.floor(a / 5) * 0.14, z - halfL + 0.068]);
   }
-  part(`rear_chart_cabinet`, "舰桥海图柜", M(B(0.45, 0.55, 0.28, [0, 0, 0], 0.008), B(0.45, 0.02, 0.3, [0, 0.18, 0.02], 0.004), B(0.45, 0.02, 0.3, [0, -0.08, 0.02], 0.004)), "cv_steel_dark", [x - 0.45, floorY + 0.275, z - halfL + 0.24]);
+  part(`rear_chart_cabinet`, "舰桥海图柜", M(B(0.45, 0.55, 0.28, [0, 0, 0], 0.008), B(0.45, 0.02, 0.3, [0, 0.18, 0.02], 0.004), B(0.45, 0.02, 0.3, [0, -0.08, 0.02], 0.004)), "cv_055_console", [x - 0.45, floorY + 0.275, z - halfL + 0.24]);
   part(`rear_life_ring`, "舰桥救生圈", M({ type: "torus", radius: 0.075, tube: 0.018, radialSegments: 8, tubularSegments: 20 }), "cv_deck_red", [x + 0.52, floorY + 0.32, z - halfL + 0.055]);
-  part(`binoculars`, "舰桥望远镜", M(C(0.022, 0.09, [0, 0, 0], 10), C(0.022, 0.09, [0.05, 0, 0], 10)), "cv_steel_dark", [x - 0.45, floorY + 0.58, z - halfL + 0.24]);
+  part(`binoculars`, "舰桥望远镜", M(C(0.022, 0.09, [0, 0, 0], 10), C(0.022, 0.09, [0.05, 0, 0], 10)), "cv_055_console", [x - 0.45, floorY + 0.58, z - halfL + 0.24]);
 }
