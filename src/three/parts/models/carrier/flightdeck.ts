@@ -1636,8 +1636,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   }
   // 舰艏舷墙：沿最后 3 段甲板边缘抬起，侧视能看到舰艏上翘而不是平切方盒。
   const bowEdges: Array<{ tag: string; points: Array<[number, number]> }> = [
-    { tag: "p", points: [[-2.15, 17.0], [-1.5, 20.55]] },
-    { tag: "s", points: [[2.2, 17.0], [1.55, 20.55]] },
+    { tag: "p", points: [[-1.95, 17.0], [-1.5, 20.55]] },
+    { tag: "s", points: [[1.95, 17.0], [1.5, 20.55]] },
   ];
   for (const edge of bowEdges) {
     for (let i = 0; i < edge.points.length - 1; i++) {
