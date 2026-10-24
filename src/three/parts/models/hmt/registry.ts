@@ -21,6 +21,7 @@ interface ShellOptions {
   holes?: Loop[];
   thickness?: number;
   rise?: number;
+  innerLift?: number;
   slope?: number;
   fold?: number;
   width?: number;
@@ -37,6 +38,8 @@ interface ShellOptions {
   edge?: number;
   relief?: string;
   segmented?: boolean;
+  /** 外甲的装配落点；反算回所属骨段，保持已确认的骨架姿态。 */
+  placement?: { position: V3; rotation: V3 };
 }
 /**
  * Vitaly Bulgarov / HMT 2-xm-robotdesign，用户指定深灰红色版本。
@@ -229,12 +232,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
                       ? "limb"
                       : undefined;
     o = { ...o, relief: o.relief ?? relief };
-    // 腰骨保持确认姿态，只错开三片外甲，使弯腰后的下两片不互相遮住，顶片露出缸体前方。
-    if (a === "waist" && id === "vertebra_0") pos = [pos[0], pos[1], pos[2] + 0.014];
-    if (a === "waist" && id === "vertebra_1") pos = [pos[0], pos[1] + 0.04, pos[2] + 0.035];
-    if (a === "waist" && id === "vertebra_2") pos = [pos[0], pos[1] + 0.055, pos[2] + 0.065];
-    if (a === "waist" && id === "rear_link_0") pos = [pos[0], pos[1] + 0.024, pos[2] + 0.025];
-    if (a === "legs" && id === "thigh_side") pos = [pos[0] + 0.015, pos[1] + 0.125, pos[2]];
+    if (a === "legs" && id === "thigh_side") pos = [pos[0] + 0.005, pos[1] + 0.125, pos[2]];
     if (a === "chest" && id === "carapace") {
       // 收短胸骨上下端，给锁骨层与下肋层留出真实台阶，而非一块竖长面板。
       const chestProfile = (loop: Loop) =>
@@ -262,6 +260,17 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
         width: o.width === undefined ? undefined : o.width * 0.7,
         holes: o.holes?.map(narrow),
         pins: o.pins ? narrow(o.pins) : undefined,
+      };
+    }
+    if (a === "shoulder" && id === "pauldron") {
+      const shoulderContour = (loop: Loop) => loop.map(([x, y]) => [x * 0.87, y]);
+      outline = shoulderContour(outline);
+      o = {
+        ...o,
+        width: (o.width ?? 0.118) * 0.87,
+        holes: o.holes?.map(shoulderContour),
+        pins: o.pins ? shoulderContour(o.pins) : undefined,
+        latches: o.latches ? shoulderContour(o.latches) : undefined,
       };
     }
     if (a === "shoulder" && id === "outer_shell") {
@@ -299,6 +308,27 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
         latches: o.latches ? thighVolume(o.latches) : undefined,
       };
     }
+    if (o.placement) {
+      const local = restPose
+        .matrix(a, id, 1, pos[1])
+        .clone()
+        .invert()
+        .multiply(
+          new Matrix4().compose(
+            new Vector3(...o.placement.position),
+            new Quaternion().setFromEuler(
+              new Euler(...(o.placement.rotation.map((v) => (v * Math.PI) / 180) as V3)),
+            ),
+            new Vector3(1, 1, 1),
+          ),
+        );
+      const q = new Quaternion(),
+        p = new Vector3();
+      local.decompose(p, q, new Vector3());
+      const e = new Euler().setFromQuaternion(q);
+      pos = p.toArray();
+      o = { ...o, rotation: [e.x, e.y, e.z].map((v) => (v * 180) / Math.PI) as V3 };
+    }
     const width = o.width ?? Math.max(...outline.map((p) => Math.abs(p[0])));
     const p = {
       outline,
@@ -307,6 +337,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       bevel: o.bevel ?? 0.0024,
       corner: o.corner ?? 0.009,
       rise: o.rise ?? 0.025,
+      innerLift: o.innerLift ?? 0,
       slope: o.slope ?? 0,
       fold: o.fold ?? 0,
       width,
@@ -349,9 +380,17 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
             outline:
               a === "arms" && id === "fore_shell"
                 ? outline.map(([x, y]) => [x * 0.94, y > 0.16 ? 0.16 + (y - 0.16) * 0.25 : y])
-                : a === "chest" && id === "collar"
-                  ? outline.map(([x, y]) => [x, Math.min(y, 0.054)])
-                  : outline,
+                : a === "arms" && id === "upper_rear"
+                  ? outline.map(([x, y]) => [x, Math.min(y, 0.12)])
+                  : a === "chest" && id === "collar"
+                    ? outline.map(([x, y]) => [x, Math.min(y, 0.05)])
+                    : a === "hands" && id === "palm"
+                      ? outline.map(([x, y]) => [Math.max(x, -0.055), Math.min(y, 0.046)])
+                      : a === "back" && id === "carapace"
+                        ? outline.map(([x, y]) => [x, Math.max(y, -0.211)])
+                        : a === "legs" && id === "thigh_side"
+                          ? outline.map(([x, y]) => [x * 0.97, y])
+                          : outline,
             thickness: 0.004,
             bevel: 0.0008,
             edge: 0.008,
@@ -778,7 +817,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
   joint("arms", "elbow", [0.434, 1.644, 0.002], 0.043, 0.075);
   joint("pelvis", "hip", [0.166, 1.221, -0.014], 0.065, 0.084);
   joint("legs", "knee", [0.218, 0.679, 0.008], 0.048, 0.088);
-  joint("feet", "ankle", [0.265, 0.156, -0.017], 0.036, 0.074);
+  joint("feet", "ankle", [0.265, 0.156, -0.017], 0.034, 0.074);
   link("arms", "humerus", [0.369, 1.91, -0.018], [0.429, 1.69, 0], 0.029, "dark", true, 1);
   link("arms", "radius", [0.438, 1.6, 0], [0.455, 1.231, 0.023], 0.02, "dark", true, 1);
   link("legs", "femur", [0.17, 1.17, -0.023], [0.214, 0.731, 0.008], 0.027, "dark", true, 1);
@@ -788,7 +827,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       "torso",
       "rib_" + i,
       [0.037, 1.708 + i * 0.065, -0.045],
-      [0.235, 1.77 + i * 0.06, -0.02],
+      [i === 3 ? 0.18 : 0.166 + i * 0.021, 1.77 + i * 0.06, -0.02],
       0.012,
       "darkArmor",
     );
@@ -796,7 +835,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       "torso",
       "rear_rib_" + i,
       [0.037, 1.708 + i * 0.065, -0.055],
-      [0.229, 1.77 + i * 0.06, -0.091],
+      [i === 2 ? 0.186 : 0.157 + i * 0.022, 1.77 + i * 0.06, i === 0 ? -0.055 : -0.091],
       0.009,
       "steel",
     );
@@ -861,7 +900,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       );
     }
   }
-  piston("arms", "upper_drive", [0.463, 1.904, -0.025], [0.47, 1.697, -0.02], 0.013);
+  piston("arms", "upper_drive", [0.463, 1.879, -0.025], [0.47, 1.697, -0.02], 0.013);
   piston("arms", "fore_drive", [0.405, 1.589, 0.029], [0.426, 1.302, 0.035], 0.012);
   piston("legs", "hip_drive", [0.119, 1.187, -0.012], [0.162, 0.904, 0.013], 0.019);
   piston("legs", "knee_drive", [0.197, 0.854, -0.125], [0.211, 0.598, -0.121], 0.01);
@@ -889,82 +928,234 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       "vertebra_" + i,
       "独立腰椎铸造壳",
       [
-        [-0.064, -0.033],
-        [-0.077, 0.014],
-        [-0.053, 0.039],
-        [0.053, 0.039],
-        [0.077, 0.014],
-        [0.064, -0.033],
-        [0.02, -0.043],
-        [-0.02, -0.043],
+        [-0.074, 0.012],
+        [-0.064, 0.048],
+        [-0.027, 0.065],
+        [0.025, 0.065],
+        [0.064, 0.048],
+        [0.076, 0.012],
+        [0.069, -0.042],
+        [0.039, -0.058],
+        [0.018, -0.065],
+        [-0.025, -0.065],
+        [-0.062, -0.054],
       ],
       [0, y, 0.015],
       {
-        rise: 0.025,
+        // 13 号正面三片短甲连续覆盖胸腹到骨盆，不复制内部腰节的大转角。
+        placement: {
+          position: [0.028 + i * 0.005, 1.373 + i * 0.094, 0.104 + i * 0.003],
+          rotation: [-2, 2, -2],
+        },
+        rise: 0.019,
         width: 0.08,
-        corner: 0.012,
-        bulges: [[0, 0, 0.026, 0.03, -0.013]],
+        corner: 0.006,
+        thickness: 0.009,
+        bulges: [[0, 0, 0.026, 0.043, -0.009]],
         material: "darkArmor",
         holes: [
           [
-            [-0.052, -0.018],
-            [-0.05, 0.016],
-            [-0.033, 0.024],
-            [-0.027, 0],
-            [-0.035, -0.021],
+            [-0.051, -0.028],
+            [-0.049, 0.031],
+            [-0.035, 0.04],
+            [-0.028, 0.004],
+            [-0.034, -0.034],
           ],
           [
-            [0.052, -0.018],
-            [0.05, 0.016],
-            [0.033, 0.024],
-            [0.027, 0],
-            [0.035, -0.021],
+            [0.051, -0.028],
+            [0.049, 0.031],
+            [0.035, 0.04],
+            [0.028, 0.004],
+            [0.034, -0.034],
           ],
         ],
         pins: [
-          [-0.019, 0.021],
-          [0.019, 0.021],
-          [-0.018, -0.019],
-          [0.018, -0.019],
+          [-0.018, 0.04],
+          [0.018, 0.04],
+          [-0.018, -0.04],
+          [0.018, -0.04],
         ],
       },
     );
     shell(
       "waist",
       "rear_link_" + i,
-      "腰椎背侧耳板",
+      "腰椎背侧水滴耳板·凹槽甲 A",
       [
-        [-0.034, -0.027],
-        [-0.069, -0.032],
-        [-0.086, -0.016],
-        [-0.083, 0.015],
-        [-0.066, 0.036],
-        [-0.032, 0.022],
-        [0, 0.015],
-        [0.032, 0.022],
-        [0.066, 0.036],
-        [0.083, 0.015],
-        [0.086, -0.016],
-        [0.069, -0.032],
-        [0.034, -0.027],
-        [0, -0.014],
+        [-0.025, -0.007],
+        [-0.05, -0.038],
+        [-0.075, -0.04],
+        [-0.09, -0.015],
+        [-0.087, 0.02],
+        [-0.069, 0.041],
+        [-0.045, 0.037],
+        [-0.022, 0.008],
+        [0.022, 0.008],
+        [0.045, 0.037],
+        [0.069, 0.041],
+        [0.087, 0.02],
+        [0.09, -0.015],
+        [0.075, -0.04],
+        [0.05, -0.038],
+        [0.025, -0.007],
       ],
-      // 中节向后错开、上下节少量过渡；用背甲轮廓显出已有腰弧，不再增加关节转角。
-      [0, y, -0.096 - [0.002, 0.012, 0.003][i]],
+      [0, y, -0.1],
       {
-        rise: 0.022,
-        rotation: [0, 180, 0],
-        material: "armor",
-        holes: [
-          [
-            [-0.02, -0.012],
-            [0.02, -0.012],
-            [0.02, 0.012],
-            [-0.02, 0.012],
+        placement: {
+          position: [
+            0.028 + i * 0.004,
+            1.355 + i * 0.098 - (i === 2 ? 0.012 : 0),
+            -0.112 - [0, 0.012, 0.004][i],
           ],
-        ],
+          rotation: [0, 180, 0],
+        },
+        rise: 0.012,
+        thickness: 0.007,
+        corner: 0.004,
+        bevel: 0.0012,
+        material: "armor",
         direction: [0, 0, -1],
+        pins: [
+          [-0.063, 0],
+          [0.063, 0],
+        ],
       },
+    );
+    for (const side of [-1, 1]) {
+      shell(
+        "waist",
+        "rear_wrap_" + i + (side > 0 ? "_left" : "_right"),
+        "腰背侧翼独立水滴回包甲",
+        [
+          [-0.039, 0.043],
+          [-0.01, 0.068],
+          [0.028, 0.047],
+          [0.045, 0.009],
+          [0.032, -0.044],
+          [0.008, -0.05],
+          [-0.026, -0.041],
+          [-0.043, -0.006],
+        ],
+        [0, y, -0.1],
+        {
+          placement: {
+            position: [0.028 + i * 0.004 + side * 0.082, 1.365 + i * 0.088, -0.1],
+            rotation: [0, side * 132, side * -8],
+          },
+          rise: 0.013,
+          width: 0.046,
+          thickness: 0.006,
+          corner: 0.003,
+          bevel: 0.001,
+          relief: "vertebra",
+          fold: -0.18,
+          material: "darkArmor",
+          direction: [side, 0, -1],
+          bulges: [[0, 0, 0.022, 0.05, 0.008]],
+        },
+      );
+    }
+    if (i < 2) {
+      // A 的上下中央都让出凹口，B 的上下舌伸入凹口；共享节距，留真实分缝。
+      shell(
+        "waist",
+        "rear_link_" + i + "_coupler",
+        "腰椎背侧双舌连接甲 B",
+        [
+          [-0.019, -0.063],
+          [-0.035, -0.036],
+          [-0.045, -0.025],
+          [-0.041, 0.019],
+          [-0.025, 0.042],
+          [-0.017, 0.063],
+          [0.017, 0.063],
+          [0.025, 0.042],
+          [0.041, 0.019],
+          [0.045, -0.025],
+          [0.035, -0.036],
+          [0.019, -0.063],
+        ].map(([x, y]) => [x, y * (i === 1 ? 0.84 : 1)]),
+        [0, y, -0.1],
+        {
+          placement: {
+            position: [0.03 + i * 0.004, 1.404 + i * 0.098 - (i === 1 ? 0.006 : 0), -0.12],
+            rotation: [0, 180, 0],
+          },
+          thickness: 0.006,
+          rise: 0.006,
+          corner: 0.002,
+          bevel: 0.001,
+          edge: 0.002,
+          relief: "vertebra",
+          material: "darkArmor",
+          direction: [0, 0, -1],
+          holes: [
+            [
+              [-0.014, -0.015],
+              [0.014, -0.015],
+              [0.014, 0.016],
+              [-0.014, 0.016],
+            ],
+          ],
+        },
+      );
+    }
+  }
+  // 分段中央脊柱穿过已有轴承内孔，从骨盆座连续接到胸内承力节点。
+  const spineNodes = [
+    new Vector3(0, 1.31, -0.037).applyMatrix4(restPose.pelvis),
+    ...[0, 1, 2].map((i) =>
+      new Vector3(0, 1.39 + i * 0.091, -0.037).applyMatrix4(restPose.waist(1.39 + i * 0.091)),
+    ),
+    new Vector3(0, 1.73, -0.037).applyMatrix4(restPose.chest),
+    new Vector3(0, 2.07, -0.037).applyMatrix4(restPose.chest),
+  ];
+  for (let i = 0; i < spineNodes.length - 1; i++) {
+    const a = spineNodes[i],
+      b = spineNodes[i + 1];
+    link("waist", "spine_core_" + i, a.toArray(), b.toArray(), 0.021, "dark", false, 1, [
+      new Matrix4(),
+      new Matrix4(),
+    ]);
+  }
+  for (let i = 0; i < 3; i++) {
+    const y = 1.39 + i * 0.091,
+      frame = restPose.waist(y);
+    for (const face of ["vertebra_", "rear_link_"]) {
+      for (const side of [-1, 1]) {
+        const rear = face === "rear_link_";
+        const anchor = new Vector3(
+          ...shellAnchor("waist." + face + i, side * (rear ? 0.043 : 0.028), rear ? -0.005 : 0, -0.008),
+        ).applyMatrix4(frame);
+        // 先沿真实锚点方向退出中心轴包络；背甲翻面后 X 方向也随之翻转，不能在轴内交叉。
+        const root = spineNodes[i + 1].clone();
+        root.addScaledVector(anchor.clone().sub(root).normalize(), 0.029);
+        link(
+          "waist",
+          "spine_mount_" + face + i + "_" + side,
+          root.toArray(),
+          anchor.toArray(),
+          0.006,
+          "darkArmor",
+          false,
+          2,
+          [new Matrix4(), new Matrix4()],
+        );
+      }
+    }
+  }
+  // 胸内斜肋、执行器支座的内端共同落到同一条胸椎梁，不再悬在腹部上方。
+  for (let i = 0; i < 5; i++) {
+    const y = 1.741 + i * 0.043;
+    link(
+      "torso",
+      "spine_rib_mount_" + i,
+      [0.014, y, -0.037],
+      [0.058, y - 0.024, 0.005],
+      0.007,
+      "darkArmor",
+      true,
+      2,
     );
   }
   // 参考 12/14 的腹部：窄腰由分节铰耳、双侧斜撑与后侧线束组成，空处仍然透空。
@@ -1033,8 +1224,8 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       link(
         "waist",
         "oblique_front_" + i,
-        shellAnchor("waist.vertebra_" + i, 0.032, 0.018, 0.006),
-        shellAnchor("waist.vertebra_" + (i + 1), 0.03, -0.02, 0.006),
+        shellAnchor("waist.vertebra_" + i, 0.016, 0.018, -0.01),
+        shellAnchor("waist.vertebra_" + (i + 1), 0.016, -0.02, -0.01),
         0.006,
         "darkArmor",
         true,
@@ -1061,7 +1252,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       "torso",
       "diagonal_web_" + i,
       [0.058, y - 0.024, 0.005],
-      [0.197, y + 0.041, 0.065],
+      [i < 2 ? 0.15 + i * 0.012 : 0.197, y + 0.041, 0.065],
       0.0058,
       "darkArmor",
     );
@@ -1069,12 +1260,19 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       "torso",
       "rib_lower_" + i,
       [0.071, y - 0.035, -0.056],
-      [0.21, y + 0.019, -0.041],
+      [i < 2 ? 0.16 + i * 0.012 : 0.21, y + 0.019, -0.041],
       0.0045,
       "darkArmor",
     );
-    cyl("torso", "rib_pin_" + i, [0.197, y + 0.041, 0.065], 0.008, 0.014, "steel");
-    bolt("torso", "rib_lock_" + i, [0.206, y + 0.041, 0.065], [0, 90, 0], true, 0.0028);
+    cyl("torso", "rib_pin_" + i, [i < 2 ? 0.15 + i * 0.012 : 0.197, y + 0.041, 0.065], 0.008, 0.014, "steel");
+    bolt(
+      "torso",
+      "rib_lock_" + i,
+      [i < 2 ? 0.159 + i * 0.012 : 0.206, y + 0.041, 0.065],
+      [0, 90, 0],
+      true,
+      0.0028,
+    );
   }
   piston("torso", "scapula_actuator", [0.072, 1.784, -0.075], [0.221, 1.959, -0.065], 0.009);
   piston("torso", "pectoral_actuator", [0.062, 1.811, 0.009], [0.185, 1.967, -0.044], 0.008);
@@ -1279,10 +1477,11 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       [0.058, -0.111],
       [0.052, -0.035],
     ],
-    [0, 1.863, 0.117],
+    [0, 1.873, 0.117],
     {
       dual: true,
       form: "chest",
+      rotation: [-8, 0, 0],
       width: 0.26,
       rise: 0.097,
       thickness: 0.008,
@@ -1334,10 +1533,10 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       [-0.005, -0.15],
       [-0.065, -0.04],
     ],
-    [0.225, 1.815, -0.01],
+    [0.185, 1.815, -0.01],
     {
       dual: true,
-      rotation: [0, 64, -16],
+      rotation: [0, 64, -40],
       rise: 0.034,
       holes: [
         [
@@ -1368,13 +1567,13 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       [0.055, -0.071],
       [-0.022, -0.018],
     ],
-    [0.095, 2.027, 0.023],
+    [0.095, 2.046, 0.023],
     {
       dual: true,
       form: "collar",
       rim: 0.0025,
       rise: 0.033,
-      rotation: [0, 27, 0],
+      rotation: [-12, 27, -8],
       fold: -0.18,
       holes: [
         [
@@ -1566,6 +1765,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
     {
       dual: true,
       form: "shoulder",
+      innerLift: 0.028,
       width: 0.118,
       thickness: 0.013,
       bevel: 0.0022,
@@ -1615,7 +1815,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       [0.055, -0.072],
       [0.009, -0.091],
     ],
-    [0.476, 1.967, -0.009],
+    [0.465, 1.967, -0.009],
     {
       dual: true,
       rotation: [0, 90, 0],
@@ -1695,14 +1895,23 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
     ],
     direction: [0, 0, -1],
   });
+  const wristHem: Loop = [
+    [-0.047, -0.159],
+    [-0.042, -0.177],
+    [-0.026, -0.2],
+    [-0.015, -0.204],
+    [-0.004, -0.199],
+    [0.013, -0.17],
+    [0.025, -0.168],
+    [0.031, -0.19],
+    [0.041, -0.195],
+  ];
   const fore = [
     [-0.044, 0.18],
     [0.027, 0.162],
     [0.063, 0.087],
     [0.048, 0.002],
-    [0.026, -0.183],
-    [-0.025, -0.195],
-    [-0.047, -0.159],
+    ...wristHem.slice().reverse(),
     [-0.067, -0.04],
     [-0.07, 0.064],
   ];
@@ -1808,11 +2017,28 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
     ],
     [0, 1.307, 0.035],
     {
-      rise: 0.055,
+      rise: 0.066,
       width: 0.22,
-      fold: -0.09,
+      fold: -0.22,
       liner: true,
+      bulges: [
+        [0, -0.095, 0.032, 0.075, 0.019],
+        [0.14, 0.018, 0.065, 0.024, 0.017],
+        [-0.14, 0.018, 0.065, 0.024, 0.017],
+      ],
       holes: [
+        [
+          [-0.027, -0.091],
+          [-0.012, -0.108],
+          [-0.015, -0.167],
+          [-0.028, -0.144],
+        ],
+        [
+          [0.027, -0.091],
+          [0.012, -0.108],
+          [0.015, -0.167],
+          [0.028, -0.144],
+        ],
         [
           [0.087, 0.02],
           [0.143, 0.046],
@@ -1880,11 +2106,11 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
     "骨盆背面框架",
     [
       [-0.218, 0.043],
-      [-0.188, 0.119],
+      [-0.188, 0.149],
       [-0.063, 0.049],
       [0, 0.073],
       [0.063, 0.049],
-      [0.188, 0.119],
+      [0.188, 0.149],
       [0.218, 0.043],
       [0.14, -0.038],
       [0.04, -0.083],
@@ -1894,7 +2120,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
     ],
     [0, 1.298, -0.098],
     {
-      rise: 0.035,
+      rise: 0.045,
       rotation: [0, 180, 0],
       liner: true,
       holes: [
@@ -1912,6 +2138,80 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       direction: [0, 0, -1],
     },
   );
+  // 后高前低的骨盆环带，前后大板以外的两侧也有连续弧面护甲。
+  for (let i = 0; i < 8; i++)
+    add(
+      "pelvis",
+      "circumference_" + i,
+      "骨盆整圈分片环甲 " + (i + 1),
+      {
+        type: "kit",
+        kit: "hmt_cuff",
+        params: {
+          rx: 0.19,
+          rz: 0.145,
+          height: i === 0 || i === 7 ? 0.032 : 0.06,
+          wall: 0.006,
+          hem: 0.006,
+          backLift: 0.045,
+          saddle: 0.055,
+          backRise: 0.032,
+          start_turns: (i * 45 + 0.5) / 360,
+          span_turns: 44 / 360,
+        },
+      },
+      [0, 1.3, -0.015],
+      "darkArmor",
+      false,
+      [0, 0, 0],
+      4,
+      [Math.sin(((i + 0.5) * Math.PI) / 4), 0, Math.cos(((i + 0.5) * Math.PI) / 4)],
+    );
+  // 腰两侧采用斜脊、窄腰和嵌口，与腹前铸造壳、腰背水滴翼区分。
+  for (const side of [-1, 1])
+    for (let i = 0; i < 2; i++)
+      shell(
+        "waist",
+        "lateral_scale_" + i + (side > 0 ? "_left" : "_right"),
+        "腰侧斜脊分片护甲",
+        [
+          [-0.04, 0.055],
+          [-0.013, 0.079],
+          [0.026, 0.063],
+          [0.041, 0.014],
+          [0.023, -0.026],
+          [0.032, -0.065],
+          [0.006, -0.079],
+          [-0.029, -0.055],
+          [-0.02, -0.01],
+          [-0.041, 0.015],
+        ].map(([x, y]) => [x * 2, y * 1.12]),
+        [0, 1.44 + i * 0.11, 0],
+        {
+          placement: {
+            position: [0.03 + side * 0.099, 1.43 + i * 0.11, 0.035],
+            rotation: [-8, side * 88, side * (i ? 8 : -9)],
+          },
+          width: 0.08,
+          rise: 0.01,
+          thickness: 0.006,
+          corner: 0.0025,
+          bevel: 0.001,
+          fold: -0.22,
+          bulges: [[0, 0.005, 0.035, 0.054, 0.014]],
+          material: "armor",
+          direction: [side, 0, 0],
+          holes: [
+            [
+              [-0.012, 0.043],
+              [0.008, 0.045],
+              [0.016, 0.014],
+              [0.005, -0.014],
+              [-0.009, 0.006],
+            ],
+          ].map((loop) => loop.map(([x, y]) => [x * 1.6, y * 1.12])),
+        },
+      );
   // 大腿具有宽实心外侧肌腹、上端窗口及内侧细长缝，不是细长平框。
   const thigh = [
     [-0.047, 0.239],
@@ -2095,6 +2395,22 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       [-0.03, -0.146],
       [0.017, -0.229],
     ],
+  });
+  // 23 号标注的踝内小面是独立嵌入甲，不把它与胫骨大壳焊成一片。
+  const ankleInset = calfHoles[2].map(([x, y]) => [0.004 + (x - 0.004) * 0.73, -0.198 + (y + 0.198) * 0.73]);
+  shell("legs", "shin_ankle_insert", "踝内独立嵌入护甲", ankleInset, [0.247, 0.416, 0.023], {
+    dual: true,
+    width: 0.074,
+    form: "shin",
+    rise: 0.035,
+    slope: 0.03,
+    fold: -0.06,
+    thickness: 0.007,
+    bevel: 0.0008,
+    corner: 0.0015,
+    edge: 0.002,
+    bulges: [[-0.031, 0.043, 0.032, 0.087, 0.024]],
+    material: "darkArmor",
   });
   shell("legs", "calf_back", "小腿后部回包壳", calf, [0.248, 0.416, -0.067], {
     dual: true,
@@ -2404,6 +2720,131 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
       rise: 0.012,
       material: "darkArmor",
       layer: 2,
+    },
+  );
+  // 20 号图的腕口：前后两片沿前臂下缘互补，尺侧、桡侧补成一圈分片回包。
+  // 下缘曲线和上缘曲线来自同一条接缝，间隔容纳倒角与活动间隙。
+  const wristPlacement = (pos: V3, rotation: V3) => {
+    const world = restPose.sides
+      .get(1)!
+      .fore.clone()
+      .multiply(
+        new Matrix4().compose(
+          new Vector3(...pos),
+          new Quaternion().setFromEuler(new Euler(...(rotation.map((v) => (v * Math.PI) / 180) as V3))),
+          new Vector3(1, 1, 1),
+        ),
+      );
+    const q = new Quaternion(),
+      p = new Vector3();
+    world.decompose(p, q, new Vector3());
+    const e = new Euler().setFromQuaternion(q);
+    return { position: p.toArray() as V3, rotation: [e.x, e.y, e.z].map((v) => (v * 180) / Math.PI) as V3 };
+  };
+  for (const face of ["dorsal", "volar"]) {
+    const surface = shellSurfaces.get("arms." + (face === "dorsal" ? "fore_shell_distal" : "fore_back"))!;
+    shell(
+      "hands",
+      "wrist_" + face + "_guard",
+      "腕口凹凸咬合护甲·" + (face === "dorsal" ? "掌背侧" : "掌心侧"),
+      [
+        ...wristHem.map(([x, y]) => [x, y - 0.009]),
+        [0.035, -0.223],
+        [0.016, -0.232],
+        [-0.019, -0.233],
+        [-0.043, -0.22],
+      ],
+      [0.452, 1.207, 0.021],
+      {
+        dual: true,
+        placement: wristPlacement(surface.position, surface.rotation),
+        // 掌背侧向外拱起让出液压杆，咬合边缘仍沿前臂下缘保留。
+        bulges: face === "dorsal" ? [[-0.012, -0.215, 0.065, 0.045, 0.034]] : [],
+        width: 0.07,
+        rise: 0.032,
+        fold: -0.07,
+        thickness: 0.006,
+        bevel: 0.0012,
+        corner: 0.0025,
+        edge: 0.003,
+        material: "armor",
+        relief: "palm",
+        direction: [0, 0, face === "dorsal" ? 1 : -1],
+      },
+    );
+  }
+  // 八块弧形护甲共用腕轴和上下口曲线，每缝 1.6°，连续包覆一整圈。
+  // 四向外侧咬合唇保留前臂接口；下层弧片封住原有侧向空档。
+  for (let i = 0; i < 8; i++) {
+    const placement = wristPlacement([0.452, 1.197, 0.021], [0, 0, 0]);
+    const local = restPose.sides
+      .get(1)!
+      .hand.clone()
+      .invert()
+      .multiply(
+        new Matrix4().compose(
+          new Vector3(...placement.position),
+          new Quaternion().setFromEuler(
+            new Euler(...(placement.rotation.map((v) => (v * Math.PI) / 180) as V3)),
+          ),
+          new Vector3(1, 1, 1),
+        ),
+      );
+    const pos = new Vector3(),
+      q = new Quaternion();
+    local.decompose(pos, q, new Vector3());
+    const e = new Euler().setFromQuaternion(q);
+    add(
+      "hands",
+      "wrist_cuff_" + i,
+      "腕周闭合弧面分片护甲 " + (i + 1),
+      {
+        type: "kit",
+        kit: "hmt_cuff",
+        params: {
+          rx: 0.046,
+          rz: 0.056,
+          height: 0.05,
+          wall: 0.005,
+          hem: 0.009,
+          start_turns: (i * 45 + 0.8) / 360,
+          span_turns: 43.4 / 360,
+        },
+      },
+      pos.toArray() as V3,
+      i % 2 ? "darkArmor" : "armor",
+      true,
+      [e.x, e.y, e.z].map((v) => (v * 180) / Math.PI) as V3,
+      4,
+      [Math.sin(((i + 0.5) * Math.PI) / 4), 0, Math.cos(((i + 0.5) * Math.PI) / 4)],
+    );
+  }
+  // 拇指上方的桡侧翼单独覆盖根关节；与掌背甲保留折缝，末端朝拇指延伸。
+  shell(
+    "hands",
+    "thumb_bridge",
+    "拇指根关节独立桥翼护甲",
+    [
+      [-0.018, 0.025],
+      [0.017, 0.027],
+      [0.027, 0.014],
+      [0.043, 0.004],
+      [0.045, -0.017],
+      [0.018, -0.008],
+      [-0.027, -0.013],
+      [-0.033, 0.004],
+    ],
+    [0.392, 1.174, 0.026],
+    {
+      dual: true,
+      rotation: [0, -48, -20],
+      width: 0.046,
+      rise: 0.009,
+      fold: -0.12,
+      thickness: 0.005,
+      corner: 0.0025,
+      bevel: 0.001,
+      pins: [[-0.016, 0.005]],
     },
   );
   // 参考 20：指节向掌心（局部负 Z）逐节内卷，指背仍保持连续长轮廓。
@@ -3153,23 +3594,37 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
   // 颈根环绕领甲：每片向外折出，前片承接胸骨，侧后片包住颈根，保留抬头间隙。
   for (let i = 0; i < 8; i++) {
     const angle = (i * Math.PI) / 4;
+    const upperProfile = 1 - 0.65 * Math.max(0, Math.cos(angle));
     shell(
       "chest",
       "collar_ring_" + i,
       "环绕颈根的分瓣立领",
       [
-        [-0.025, -0.039],
-        [-0.024, 0.049],
-        [-0.012, 0.058],
-        [0.021, 0.049],
-        [0.025, -0.029],
-        [0.012, -0.048],
-      ],
-      [Math.sin(angle) * 0.064, 2.145, -0.031 + Math.cos(angle) * 0.064],
+        [-0.036, -0.055],
+        [-0.035, 0.071],
+        [-0.017, 0.089],
+        [0.03, 0.078],
+        [0.036, -0.043],
+        [0.017, -0.063],
+      ].map(([x, y]) => [x, y > 0 ? y * upperProfile : i === 0 ? Math.max(y, -0.049) : y]),
+      [Math.sin(angle) * 0.102, 2.12, -0.031 + Math.cos(angle) * 0.102],
       {
         rotation: [0, i * 45, 0],
-        rise: 0.007,
-        fold: -0.08,
+        width: 0.04,
+        rise: 0.013,
+        fold: -0.15,
+        slope: 0.16,
+        holes:
+          i % 2 === 0 && i !== 0
+            ? [
+                [
+                  [-0.011, 0.019],
+                  [0.009, 0.023],
+                  [0.012, 0.052],
+                  [-0.009, 0.061],
+                ],
+              ]
+            : [],
         thickness: 0.006,
         bevel: 0.001,
         corner: 0.003,
@@ -3184,17 +3639,17 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
     "flank_bridge",
     "肩背与肋侧之间的折面回包甲",
     [
-      [-0.042, 0.11],
-      [0.025, 0.096],
+      [-0.042, 0.087],
+      [0.025, 0.087],
       [0.044, 0.023],
       [0.031, -0.069],
       [-0.013, -0.122],
       [-0.038, -0.029],
     ],
-    [0.235, 1.829, -0.079],
+    [0.19, 1.829, -0.079],
     {
       dual: true,
-      rotation: [0, 126, -9],
+      rotation: [0, 126, -36],
       rise: 0.015,
       width: 0.055,
       thickness: 0.008,
@@ -3239,6 +3694,7 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
     "darkArmor",
     true,
     2,
+    [restPose.waist(1.572), restPose.waist(1.572)],
   );
 
   // 内外侧护甲与前后壳围成有层次的包覆，关节轴和活塞行程仍留空。
@@ -3296,12 +3752,38 @@ export function makeHmtRegistry(options: { machined?: boolean } = {}): ModelRegi
     [-0.043, -0.063],
     [-0.057, -0.023],
   ];
+  const forkPiece = (sign: number): Loop => {
+    const level = sign > 0 ? -0.022 : -0.028;
+    const points: Loop = [];
+    for (let i = 0; i < fork.length; i++) {
+      const a = fork[i],
+        b = fork[(i + 1) % fork.length];
+      const insideA = sign * (a[0] - level) >= 0,
+        insideB = sign * (b[0] - level) >= 0;
+      if (insideA) points.push(a);
+      if (insideA !== insideB) {
+        const t = (level - a[0]) / (b[0] - a[0]);
+        points.push([level, a[1] + t * (b[1] - a[1])]);
+      }
+    }
+    return points;
+  };
+  shell("arms", "upper_elbow_return", "肘叉独立错层回包片", forkPiece(-1), [0.434, 1.682, 0.096], {
+    dual: true,
+    rise: 0.01,
+    thickness: 0.007,
+    corner: 0.002,
+    edge: 0.003,
+    width: 0.057,
+    relief: "limb",
+    direction: [0, 0, 1],
+  });
   for (const back of [false, true]) {
     shell(
       "arms",
       "upper_elbow_fork" + (back ? "_back" : ""),
       "肘部凹形双叉护甲",
-      fork,
+      back ? fork : forkPiece(1),
       [0.434, 1.662, back ? -0.063 : 0.07],
       {
         dual: true,

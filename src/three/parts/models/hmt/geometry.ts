@@ -168,7 +168,11 @@ export function shellPoint(p: Record<string, unknown>, x: number, y: number, z =
     const depth =
       ((a * 1.1 - 0.5 * hinge(a - 0.65) - 0.76 * hinge(a - 0.95)) * angle) /
       Math.sqrt(angle * angle + 0.0001);
-    return new T.Vector3(x, centerY + (radius + z) * height, (radius + z) * depth);
+    return new T.Vector3(
+      x,
+      centerY + (radius + z) * height + Number(p.innerLift ?? 0) * (1 - u) ** 3,
+      (radius + z) * depth,
+    );
   }
   const sweep =
     p.form === "limb" || p.form === "shin"
@@ -508,6 +512,77 @@ export const hmtBuilders: Record<string, GeometryBuilder> = {
     const result = mergeGeometries([tube, ...caps]);
     [tube, ...caps].forEach((g) => g.dispose());
     return result;
+  },
+  // 腕甲是带内壁的弧面扇片；相邻片只留窄缝，不能用四块平板代替环绕包覆。
+  hmt_cuff: (spec) => {
+    if (spec.type !== "kit") throw new Error("腕甲需要扇片参数");
+    const p = spec.params!,
+      start = Number(p.start_turns) * Math.PI * 2,
+      span = Number(p.span_turns) * Math.PI * 2,
+      rx = Number(p.rx),
+      rz = Number(p.rz),
+      height = Number(p.height),
+      wall = Number(p.wall),
+      steps = 64;
+    // 截面从内壁上缘绕外侧折脊回到内壁下缘，端口有真实斜面倒角。
+    const section = [
+      [0, 0.94],
+      [0.18, 1],
+      [0.78, 1],
+      [1, 0.93],
+      [1.08, 0.75],
+      [1.5, 0.4],
+      [1.35, 0.15],
+      [0.9, 0.025],
+      [0.22, 0],
+      [0, 0.065],
+    ];
+    const positions: number[] = [],
+      uv: number[] = [],
+      indices: number[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const a = start + (span * i) / steps;
+      // 上口的双凹曲线对接前臂，下口错层包住掌根，完整环绕腕轴。
+      const saddle =
+        Number(p.saddle ?? 0) * (Math.sin(a) ** 2 - 0.5) +
+        Number(p.backRise ?? 0) * Math.max(0, -Math.cos(a));
+      const top =
+          saddle +
+          height * 0.5 +
+          Number(p.hem) * Math.cos(2 * a) +
+          Number(p.backLift ?? 0) * Math.max(0, -Math.cos(a)) * (0.2 + 0.8 * Math.sin(a) ** 2),
+        bottom = saddle - height * 0.5 + Number(p.hem) * 0.3 * Math.cos(2 * a);
+      for (const [r, y] of section) {
+        positions.push(
+          (rx + wall * r) * Math.sin(a),
+          bottom + (top - bottom) * y,
+          (rz + wall * r) * Math.cos(a),
+        );
+        uv.push(i / steps, y);
+      }
+    }
+    const n = section.length;
+    for (let i = 0; i < steps; i++)
+      for (let j = 0; j < n; j++) {
+        const a = i * n + j,
+          b = i * n + ((j + 1) % n),
+          c = a + n,
+          d = b + n;
+        indices.push(a, c, b, b, c, d);
+      }
+    const caps = T.ShapeUtils.triangulateShape(
+      section.map(([r, y]) => new T.Vector2(r, y)),
+      [],
+    );
+    for (const [a, b, c] of caps) indices.push(c, b, a, steps * n + a, steps * n + b, steps * n + c);
+    const g = new T.BufferGeometry();
+    g.setAttribute("position", new T.Float32BufferAttribute(positions, 3));
+    g.setAttribute("uv", new T.Float32BufferAttribute(uv, 2));
+    for (let i = 0; i < indices.length; i += 3)
+      [indices[i + 1], indices[i + 2]] = [indices[i + 2], indices[i + 1]];
+    g.setIndex(indices);
+    g.computeVertexNormals();
+    return g;
   },
   hmt_loft: (spec) => {
     if (spec.type !== "kit") throw new Error("HMT 放样需要 kit 参数");

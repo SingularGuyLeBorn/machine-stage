@@ -8,6 +8,40 @@ import { makeHmtRegistry } from "./registry";
 import { createHmtRestPose } from "./restPose";
 
 describe("HMT 壳体几何", () => {
+  it("腕周弧片有朝外绕序、正体积和贯通内腔", () => {
+    const g = hmtBuilders.hmt_cuff(
+      {
+        type: "kit",
+        kit: "hmt_cuff",
+        params: {
+          rx: 0.046,
+          rz: 0.056,
+          height: 0.05,
+          wall: 0.005,
+          hem: 0.009,
+          start_turns: 0.8 / 360,
+          span_turns: 43.4 / 360,
+        },
+      },
+      { constants: {} },
+    );
+    try {
+      const p = g.getAttribute("position"),
+        ix = g.index!;
+      let volume = 0;
+      for (let i = 0; i < ix.count; i += 3) {
+        const a = new Vector3().fromBufferAttribute(p, ix.getX(i)),
+          b = new Vector3().fromBufferAttribute(p, ix.getX(i + 1)),
+          c = new Vector3().fromBufferAttribute(p, ix.getX(i + 2));
+        volume += a.dot(b.cross(c)) / 6;
+      }
+      expect(volume).toBeGreaterThan(0.00001);
+      for (let i = 0; i < p.count; i++)
+        expect(Math.hypot(p.getX(i) / 0.046, p.getZ(i) / 0.056)).toBeGreaterThanOrEqual(0.99999);
+    } finally {
+      g.dispose();
+    }
+  });
   it("双手指骨在实际装配坐标中向掌心弯曲，末节仍低于根节", () => {
     const registry = makeHmtRegistry({ machined: false });
     const constants = resolveConstants(registry.constants);

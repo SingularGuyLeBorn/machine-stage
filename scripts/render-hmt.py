@@ -3,9 +3,15 @@ requested = next((set(a.split("=",1)[1].split(",")) for a in sys.argv if a.start
 from mathutils import Matrix, Vector
 from pathlib import Path
 root=str(Path(__file__).resolve().parents[1])
-source_dir=Path(next((a.split('=',1)[1] for a in sys.argv if a.startswith('--mesh-dir=')),root+'/qa-out'))
-output_dir=Path(next((a.split('=',1)[1] for a in sys.argv if a.startswith('--output-dir=')),root+'/qa-out'));output_dir.mkdir(parents=True,exist_ok=True)
+def project_path(value):
+ p=Path(value)
+ return p if p.is_absolute() else Path(root)/p
+source_dir=project_path(next((a.split('=',1)[1] for a in sys.argv if a.startswith('--mesh-dir=')),root+'/qa-out'))
+output_dir=project_path(next((a.split('=',1)[1] for a in sys.argv if a.startswith('--output-dir=')),root+'/qa-out'));output_dir.mkdir(parents=True,exist_ok=True)
 meta=json.load(open(source_dir/'hmt-mesh.json',encoding='utf-8'))
+# 对比时固定近景中心，避免零件移动后相机跟着移动，掩盖真实位移。
+camera_dir=next((a.split('=',1)[1] for a in sys.argv if a.startswith('--camera-mesh-dir=')),None)
+camera_meta=json.load(open(project_path(camera_dir)/'hmt-mesh.json',encoding='utf-8')) if camera_dir else meta
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 materials={}
 for name,spec in meta['materials'].items():
@@ -27,6 +33,7 @@ for name,spec in meta['materials'].items():
 f=open(source_dir/'hmt-mesh.bin','rb')
 # glTF/Three Y up → Blender Z up, preserving handedness.
 convert=Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))
+camera_centers={p['id']:convert@Vector(p['matrix'][12:15]) for p in camera_meta['pieces']}
 mesh_cache={}
 for number,p in enumerate(meta['pieces']):
  f.seek(p['offset']);n=p['vertices'];count=p['indices'];v=np.frombuffer(f.read(n*12),dtype='<f4').copy();norm=np.frombuffer(f.read(n*12),dtype='<f4').reshape(-1,3).copy();ind=np.frombuffer(f.read(count*4),dtype='<u4').copy()
@@ -80,9 +87,9 @@ for name,pos in [('front',(0,-7,1.5)),('three-quarter',(3,-7,1.8)),('reference',
  cam.location=pos;cam.rotation_euler=(Vector((0,0,1.18))-cam.location).to_track_quat('-Z','Y').to_euler();scene.render.filepath=str(output_dir/('hmt-'+name+'.png'));bpy.ops.render.render(write_still=True)
 
 # 近景仍使用同一个实际模型，不修图，不替换零件。
-for name,part,scale,offset in [('head','hmt.head.forehead',.45,(.5,-3,.7)),('head-side','hmt.head.forehead',.45,(3,-.7,.5)),('shoulder','hmt.shoulder.pauldron_l',.40,(1,-3,.3)),('waist','hmt.waist.vertebra_1',.53,(1,-3,.12)),('chest','hmt.chest.carapace',.87,(1,-4,.7)),('hand','hmt.hands.palm_l',.34,(.5,-3,.12)),('legs','hmt.legs.thigh_l',1.2,(1,-4,.1)),('head-back','hmt.head.occipital',.34,(.6,3,.35)),('back-detail','hmt.back.carapace',.88,(1,4,.4)),('waist-back','hmt.waist.rear_link_1',.50,(.6,3,.2)),('elbow','hmt.arms.upper_elbow_fork_l',.40,(.7,-3,.2)),('knee-back','hmt.legs.thigh_l',.66,(.8,4,.1))]:
+for name,part,scale,offset in [('head','hmt.head.forehead',.45,(.5,-3,.7)),('head-side','hmt.head.forehead',.45,(3,-.7,.5)),('shoulder','hmt.shoulder.pauldron_l',.40,(1,-3,.3)),('waist','hmt.waist.vertebra_1',.53,(1,-3,.12)),('chest','hmt.chest.carapace',.87,(1,-4,.7)),('collar','hmt.chest.collar_ring_0',.48,(1,-3,.65)),('waist-side','hmt.waist.vertebra_1',.53,(3,-.6,.2)),('hand','hmt.hands.palm_l',.34,(.5,-3,.12)),('hand-back','hmt.hands.palm_l',.34,(.5,3,.12)),('hand-side','hmt.hands.palm_l',.34,(3,.5,.12)),('legs','hmt.legs.thigh_l',1.2,(1,-4,.1)),('head-back','hmt.head.occipital',.34,(.6,3,.35)),('back-detail','hmt.back.carapace',.88,(1,4,.4)),('waist-back','hmt.waist.rear_link_1',.50,(.6,3,.2)),('elbow','hmt.arms.upper_elbow_fork_l',.40,(.7,-3,.2)),('knee-back','hmt.legs.thigh_l',.66,(.8,4,.1))]:
  if requested and name not in requested:continue
- target=bpy.data.objects[part].matrix_world.translation.copy()
+ target=camera_centers[part].copy()
  if name=='legs':target.z-=.30
  if name=='knee-back':target.z-=.25
  cam.data.ortho_scale=scale;cam.location=target+Vector(offset);cam.rotation_euler=(target-cam.location).to_track_quat('-Z','Y').to_euler();scene.render.filepath=str(output_dir/('hmt-'+name+'.png'));bpy.ops.render.render(write_still=True)

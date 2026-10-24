@@ -56,6 +56,7 @@ export function createHmtRestPose() {
   >();
   for (const side of [1, -1]) {
     // 肩带、关节、上臂共用后收变换，保持锁骨到肩轴的真实连接。
+    // 肩甲轮廓单独收窄；肩关节保留已确认落点，避免垂手侵入大腿。
     const shoulder = armFrame.clone().multiply(turn([side * 0.08, 1.99, -0.025], [0, side * 24, 0]));
     const upper = shoulder.clone().multiply(turn([side * 0.355, 1.985, -0.012], [8, side * -10, side * 18]));
     const foreBase = upper.clone().multiply(turn([side * 0.434, 1.644, 0.002], [-22, side * 7, side * -8]));
@@ -87,6 +88,23 @@ export function createHmtRestPose() {
       )
       .multiply(new Matrix4().makeTranslation(...targetWrist.clone().negate().toArray()))
       .multiply(alignedHand);
+    // 从肩沿骨段朝末端看：右臂逆时针、左臂顺时针。
+    // 40° / 80° 是各自骨轴上的转面量，不改变肩肘腕中心，也不把手掌一起拧转。
+    const shoulderCenter = new Vector3(side * 0.355, 1.985, -0.012).applyMatrix4(upper);
+    for (const [frame, a, b, degrees] of [
+      [upper, shoulderCenter, elbow, 40],
+      [fore, elbow, targetWrist, 80],
+    ] as const) {
+      frame.premultiply(
+        new Matrix4()
+          .compose(
+            a,
+            new Quaternion().setFromAxisAngle(b.clone().sub(a).normalize(), side * degrees * radians),
+            unit,
+          )
+          .multiply(new Matrix4().makeTranslation(...a.clone().negate().toArray())),
+      );
+    }
     const hip = new Vector3(side * 0.166, 1.221, -0.014);
     const knee = new Vector3(side * 0.218, 0.679, 0.008);
     const ankle = new Vector3(side * 0.265, 0.156, -0.017);
@@ -103,9 +121,21 @@ export function createHmtRestPose() {
     const targetKnee = targetHip.clone().addScaledVector(axis, along).addScaledVector(forward, kneeHeight);
     const thigh = align(hip, knee, targetHip, targetKnee);
     const calf = align(knee, ankle, targetKnee, targetAnkle);
+    // 绕各自骨轴外翻，髋、膝、踝中心和脚底高度保持不变。
+    for (const [frame, a, b] of [
+      [thigh, targetHip, targetKnee],
+      [calf, targetKnee, targetAnkle],
+    ] as const) {
+      const q = new Quaternion().setFromAxisAngle(b.clone().sub(a).normalize(), -side * 8 * radians);
+      frame.premultiply(
+        new Matrix4()
+          .compose(a, q, unit)
+          .multiply(new Matrix4().makeTranslation(...a.clone().negate().toArray())),
+      );
+    }
     const foot = new Matrix4()
       .makeTranslation(...targetAnkle.clone().sub(ankle).toArray())
-      .multiply(turn(ankle.toArray(), [0, side * 11, 0]));
+      .multiply(turn(ankle.toArray(), [0, side * 22, 0]));
     sides.set(side, { shoulder, upper, fore, hand, thigh, calf, foot });
   }
   function waist(y: number): Matrix4 {

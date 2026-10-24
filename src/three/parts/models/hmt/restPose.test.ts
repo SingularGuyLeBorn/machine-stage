@@ -1,9 +1,47 @@
 import { describe, expect, it } from "vitest";
-import { Vector3 } from "three";
+import { Matrix4, Quaternion, Vector3 } from "three";
 import { createHmtRestPose } from "./restPose";
+import approved from "../../../../../docs/briefs/hmt-interface-reference/approved-pose-frames.json";
 
 describe("HMT 参考静止姿态", () => {
   const pose = createHmtRestPose();
+  it("大臂四十度、小臂八十度均为镜像轴向旋转，关节中心保持原折线", () => {
+    for (const side of [1, -1] as const) {
+      const limb = pose.sides.get(side)!;
+      for (const [name, degrees, a, b] of [
+        ["upper", 40, [side * 0.355, 1.985, -0.012], [side * 0.434, 1.644, 0.002]],
+        ["fore", 80, [side * 0.434, 1.644, 0.002], [side * 0.452, 1.207, 0.021]],
+      ] as const) {
+        const before = new Matrix4().fromArray(approved.sides[side][name]);
+        const q = new Quaternion()
+          .setFromRotationMatrix(limb[name])
+          .multiply(new Quaternion().setFromRotationMatrix(before).invert());
+        const axis = new Vector3(...b).sub(new Vector3(...a)).transformDirection(before);
+        const signedAngle = (2 * Math.atan2(new Vector3(q.x, q.y, q.z).dot(axis), q.w) * 180) / Math.PI;
+        expect(signedAngle).toBeCloseTo(side * degrees, 8);
+        for (const p of [a, b]) {
+          const target = new Vector3(...p).applyMatrix4(before);
+          expect(new Vector3(...p).applyMatrix4(limb[name]).distanceTo(target)).toBeLessThan(1e-9);
+        }
+      }
+    }
+  });
+  it("腿甲绕骨轴外翻约八度，脚尖左右外撇约二十二度", () => {
+    for (const side of [1, -1] as const) {
+      const limb = pose.sides.get(side)!;
+      for (const name of ["thigh", "calf"] as const) {
+        const before = new Vector3(1, 0, 0).transformDirection(
+          new Matrix4().fromArray(approved.sides[side][name]),
+        );
+        const after = new Vector3(1, 0, 0).transformDirection(limb[name]);
+        const angle = (before.angleTo(after) * 180) / Math.PI;
+        expect(angle).toBeGreaterThan(7);
+        expect(angle).toBeLessThan(9);
+      }
+      const toe = new Vector3(0, 0, 1).transformDirection(limb.foot);
+      expect((side * Math.atan2(toe.x, toe.z) * 180) / Math.PI).toBeCloseTo(22, 6);
+    }
+  });
   it("批注的正面浅折线左右镜像，腕在肘内侧且前臂更接近竖直", () => {
     const joints = [1, -1].map((side) => {
       const limb = pose.sides.get(side)!;

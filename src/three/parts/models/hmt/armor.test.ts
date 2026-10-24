@@ -1,11 +1,11 @@
-import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { resolveSpec } from "../../assembler/geometry";
 import { resolveConstants } from "../../registry/expression";
 import type { GeometrySpec } from "../../registry/types";
 import { makeHmtRegistry } from "./registry";
 import { shellHeight } from "./geometry";
+import { createHmtRestPose } from "./restPose";
+import approved from "../../../../../docs/briefs/hmt-interface-reference/approved-pose-frames.json";
 
 describe("用户确认体态后的装甲改版", () => {
   const registry = makeHmtRegistry({ machined: false });
@@ -17,12 +17,16 @@ describe("用户确认体态后的装甲改版", () => {
     if (spec.type !== "kit") throw new Error(id + " 必须是实体壳体");
     return spec.params!;
   };
-  it("保持用户确认的完整体态源不变", () => {
-    expect(
-      createHash("sha256")
-        .update(readFileSync(new URL("restPose.ts", import.meta.url)))
-        .digest("hex"),
-    ).toBe("110ff98ae8d73ff693151c1b4fc25eed72d15f7873f7cb0e7c99e4373025b1e7");
+  it("肩甲轮廓独立调整，肩关节、腰弧、头部和骨盆保持确认状态", () => {
+    const pose = createHmtRestPose();
+    expect(pose.chest.elements).toEqual(approved.chest);
+    expect(pose.head.elements).toEqual(approved.head);
+    expect(pose.pelvis.elements).toEqual(approved.pelvis);
+    for (const side of [1, -1] as const) {
+      const shoulder = pose.sides.get(side)!.shoulder.elements;
+      const previous = approved.sides[side].shoulder;
+      for (let i = 0; i < 16; i++) expect(shoulder[i]).toBeCloseTo(previous[i], 10);
+    }
   });
   it("分片不切断窗口，每组窗口只有一个归属", () => {
     for (const id of ["arms.fore_shell", "legs.thigh"]) {
