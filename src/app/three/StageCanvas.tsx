@@ -228,6 +228,21 @@ function InteriorFillLight() {
           </>
         )
       ) : null}
+      {cameraMode === "crew" ? (
+        modelId === "carrier" ? (
+          <>
+            <pointLight position={[0, 13.2, 63]} intensity={2.0} distance={7} decay={1.35} color="#e8dfcf" />
+            <pointLight position={[-1.8, 12.8, 60]} intensity={1.6} distance={6} decay={1.4} color="#d9e4e8" />
+            <pointLight position={[1.8, 12.8, 66]} intensity={1.6} distance={6} decay={1.4} color="#d9e4e8" />
+          </>
+        ) : (
+          <>
+            <pointLight position={[0, 4.8, 0]} intensity={1.4} distance={12} decay={1.35} color="#d9e4e8" />
+            <pointLight position={[-2.4, 4.8, 4.5]} intensity={1.2} distance={8} decay={1.4} color="#e8dfcf" />
+            <pointLight position={[2.4, 4.8, -4.0]} intensity={1.0} distance={8} decay={1.4} color="#d9e4e8" />
+          </>
+        )
+      ) : null}
       {cameraMode === "bridge" ? (
         modelId === "carrier" ? (
           <>
@@ -247,12 +262,40 @@ function InteriorFillLight() {
   );
 }
 
+// 外部视角下舰桥/情报中心必须能透过玻璃看到舱内。舱室是封闭体，主光进不去，
+// 这里常驻两盏低功率点光（带距离衰减，不影响舰体外观），不再用海景贴图背板遮丑。
+function CommandCabinShowcaseLight() {
+  const cameraMode = useStageStore((state) => state.cameraMode);
+  const modelId = useStageStore((state) => state.modelId);
+  if (isCarrierInteriorMode(cameraMode)) return null;
+  if (modelId === "carrier") {
+    return (
+      <>
+        <pointLight position={[24.9, 48.1, -38.2]} intensity={2.6} distance={7} decay={1.35} color="#f4ecdd" />
+        <pointLight position={[24.9, 48.1, -41.8]} intensity={2.2} distance={7} decay={1.35} color="#dcebf2" />
+        <pointLight position={[24.9, 41.4, -36.2]} intensity={1.6} distance={7} decay={1.4} color="#dcebf2" />
+      </>
+    );
+  }
+  if (modelId === "type055") {
+    return (
+      <>
+        <pointLight position={[-2.0, 23.2, 28.0]} intensity={1.5} distance={11} decay={1.35} color="#f0eadc" />
+        <pointLight position={[2.0, 23.2, 28.0]} intensity={1.5} distance={11} decay={1.35} color="#dcebf2" />
+        <pointLight position={[0, 20.9, 18.0]} intensity={1.3} distance={12} decay={1.35} color="#dcebf2" />
+      </>
+    );
+  }
+  return null;
+}
+
 function Studio() {
   return (
     <>
       <ambientLight intensity={0.12} />
       <hemisphereLight args={["#dfe7ef", "#1b2025", 0.2]} />
       <InteriorFillLight />
+      <CommandCabinShowcaseLight />
       <CockpitCanopyVisibility />
       <directionalLight
         castShadow

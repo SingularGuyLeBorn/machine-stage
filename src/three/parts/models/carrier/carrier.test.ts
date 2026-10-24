@@ -125,7 +125,8 @@ describe("福建舰 · 整机", () => {
       expect(staticIds.has(`carrier.deck.wire_${tag}_r_cable`), `wire ${i} r`).toBe(true);
     }
     expect(staticIds.has("carrier.deck.arrestor_l_cylinder")).toBe(true);
-    expect(staticIds.has("carrier.deck.arrestor_net")).toBe(true);
+    expect(staticIds.has("carrier.deck.arrestor_net_trough")).toBe(true);
+    expect(staticIds.has("carrier.deck.arrestor_net_pack")).toBe(true);
     expect(ELEVATOR_NODES).toHaveLength(2);
     for (let i = 1; i <= 2; i++) {
       expect(built.getNode(ELEVATOR_NODES[i - 1]!)).toBeDefined();

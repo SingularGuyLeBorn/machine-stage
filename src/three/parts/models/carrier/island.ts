@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { CV } from "./constants";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
 import { addBridgeInterior } from "./bridge";
+import { addCarrierCrew } from "./crew";
 import { addCicInterior } from "./cic";
 
 // ============================================================================
@@ -463,6 +464,7 @@ export function addIsland(ctx: CarrierCtx): void {
 
   addCicInterior(ctx);
   addBridgeInterior(ctx);
+  addCarrierCrew(ctx);
 
   // 右舷航行舰桥翼台：外伸格栅平台 + 斜撑 + 双层栏杆（真实可站立结构）。
   {
@@ -714,7 +716,7 @@ export function addIsland(ctx: CarrierCtx): void {
     name_en: "satcom pedestal",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(B(0.34, 0.06, 0.34, [0, 0.03, 0], 0.004), C(0.13, 0.34, [0, 0.23, 0], 14), C(0.2, 0.05, [0, 0.42, 0], 16)),
+    geometry: M(B(0.26, 0.05, 0.26, [0, 0.025, 0], 0.004), C(0.09, 0.26, [0, 0.17, 0], 14), C(0.13, 0.04, [0, 0.32, 0], 16)),
     material: "cv_hull",
     mate: A([x + 0.52, baseY + 1.97, z + 2.72]),
   });
@@ -724,9 +726,10 @@ export function addIsland(ctx: CarrierCtx): void {
     name_en: "satcom radome",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(S(0.24, [0, 0, 0], 24), C(0.28, 0.08, [0, -0.22, 0], 24)),
+    // 卫通罩真实直径约 2m（编辑尺度 1:8 → 半径 0.13），旧版 0.24 半径做成 3.8m 大白球。
+    geometry: M(S(0.13, [0, 0, 0], 20), C(0.15, 0.05, [0, -0.12, 0], 20)),
     material: "cv_radar",
-    mate: A([x + 0.52, baseY + 2.55, z + 2.72]),
+    mate: A([x + 0.52, baseY + 2.4, z + 2.72]),
   });
   // 烟囱：垂直结构件 + 排气帽/两根排气管，去掉倾斜的大黑箱。
   add({
@@ -929,47 +932,207 @@ export function addIsland(ctx: CarrierCtx): void {
     });
   });
 
-  // 近程防空导弹（8 联装）×2 + 干扰弹发射器。
-  for (const side of [-1, 1] as const) {
+  // 近程防空：HQ-10 18 联装发射装置 ×2（舰岛前、后各一），装在两舷通道外侧。
+  // 旧版是两块 9.5m×7m 的大铁板 + 16 个 4.3m 高的白色圆筒，既不是发射装置，
+  // 又把 1:1 尺寸误写进 1:8 编辑尺度。这里按真实 18 联装筒式发射架重建。
+  // 发射装置布置在传感器舱顶两舷（真实近防导弹不占飞行甲板停机位），
+  // 前后各一，避开 1130 炮位与一体化桅杆。
+  for (const [tag, sz] of [["aft", -7.2], ["fwd", -2.9]] as const) {
+    const sx = 3.55;
+    const plateY = roofY + 0.03;
     add({
-      id: `${P}sam_launcher_${side === -1 ? "p" : "s"}`,
-      name_cn: `近程防空导弹发射架 ${side === -1 ? "左" : "右"}`,
-      name_en: `SAM launcher ${side === -1 ? "p" : "s"}`,
+      id: `${P}sam_${tag}_deck_plate`,
+      name_cn: `HQ-10 发射装置 ${tag === "fwd" ? "前" : "后"} 底座`,
+      name_en: `HQ-10 launcher ${tag} deck plate`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(1.2, 0.4, 0.9, [0, 0, 0], 0.012), B(1.0, 0.1, 0.08, [0, 0.26, 0], 0.004)),
-      material: "cv_hull_dark",
-      mate: A([x + side * 0.75, baseY + 0.2, z - 5.2]),
+      geometry: M(
+        B(0.46, 0.035, 0.4, [0, 0.018, 0], 0.008),
+        B(0.34, 0.03, 0.3, [0, 0.04, 0], 0.006),
+        ...[-1, 1].flatMap((sx2) => [-1, 1].map((sz2) => B(0.05, 0.05, 0.05, [sx2 * 0.19, 0.045, sz2 * 0.16], 0.004))),
+      ),
+      material: "cv_steel_dark",
+      mate: A([sx, plateY, sz]),
     });
-    for (let cell = 0; cell < 8; cell++) {
-      add({
-        id: `${P}sam_${side === -1 ? "p" : "s"}_cell_${pad(cell + 1)}`,
-        name_cn: `防空导弹 ${side === -1 ? "左" : "右"}-${cell + 1}`,
-        name_en: `SAM ${side === -1 ? "p" : "s"}-${cell + 1}`,
-        assembly: ASSEMBLY,
-        build_layer: 4,
-        geometry: M(C(0.055, 0.55, [0, 0, 0], 12), C(0.02, 0.16, [0, 0.35, 0], 10), B(0.16, 0.012, 0.1, [0, 0, -0.25], 0.002)),
-        material: "cv_steel",
-        mate: A([x + side * 0.75 + ((cell % 4) - 1.5) * 0.23, baseY + 0.22, z - 5.2 + (Math.floor(cell / 4) - 0.5) * 0.22], [0, 0, 0]),
-      });
+    add({
+      id: `${P}sam_${tag}_pedestal`,
+      name_cn: `HQ-10 发射装置 ${tag === "fwd" ? "前" : "后"} 回转座`,
+      name_en: `HQ-10 launcher ${tag} pedestal`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        C(0.1, 0.14, [0, 0.07, 0], 18),
+        T(0.115, 0.085, 0.025, [0, 0.145, 0], 18),
+        B(0.32, 0.05, 0.28, [0, 0.17, 0], 0.008),
+        B(0.06, 0.1, 0.06, [0.12, 0.11, 0.06], 0.004),
+      ),
+      material: "cv_hull_dark",
+      mate: A([sx, plateY + 0.05, sz]),
+    });
+    add({
+      id: `${P}sam_${tag}_yoke`,
+      name_cn: `HQ-10 发射装置 ${tag === "fwd" ? "前" : "后"} 俯仰耳轴`,
+      name_en: `HQ-10 launcher ${tag} trunnion yoke`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        B(0.035, 0.28, 0.2, [-0.15, 0.16, 0], 0.006),
+        B(0.035, 0.28, 0.2, [0.15, 0.16, 0], 0.006),
+        B(0.34, 0.045, 0.045, [0, 0.27, 0], 0.004),
+      ),
+      material: "cv_steel",
+      mate: A([sx, plateY + 0.02, sz - 0.02]),
+    });
+    // 发射箱：18 个筒口，6 列 × 3 排；仰角 12°。筒口内凹，弹头露尖，不是外凸白卷。
+    const cellGeos: Parameters<typeof M>[0][] = [];
+    for (let c = 0; c < 6; c++) {
+      for (let r = 0; r < 3; r++) {
+        const cx = -0.1 + c * 0.04;
+        const cy = -0.075 + r * 0.075;
+        cellGeos.push(T(0.0125, 0.0095, 0.012, [cx, cy, 0.118], 12));
+      }
     }
     add({
-      id: `${P}decoy_${side === -1 ? "p" : "s"}`,
-      name_cn: `干扰弹发射器 ${side === -1 ? "左" : "右"}`,
-      name_en: `decoy launcher ${side === -1 ? "p" : "s"}`,
+      id: `${P}sam_${tag}_body`,
+      name_cn: `HQ-10 18 联装发射箱 ${tag === "fwd" ? "前" : "后"}`,
+      name_en: `HQ-10 18-cell launcher box ${tag}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(0.55, 0.3, 0.22, [0, 0, 0], 0.006), C(0.055, 0.3, [0, 0, 0], 12)),
-      material: "cv_steel_dark",
-      mate: A([x + side * 0.7, baseY + 1.35, z + 2.85]),
-      instances: 6,
-      indexed: true,
-      instance_layout: `carrier.island.decoy${side}`,
+      geometry: M(
+        B(0.29, 0.27, 0.23, [0, 0, 0], 0.012),
+        B(0.31, 0.03, 0.25, [0, 0.12, 0], 0.006),
+        B(0.31, 0.03, 0.25, [0, -0.12, 0], 0.006),
+        B(0.29, 0.27, 0.02, [0, 0, 0.118], 0.006),
+        B(0.03, 0.27, 0.02, [-0.135, 0, 0.118], 0.004),
+        B(0.03, 0.27, 0.02, [0.135, 0, 0.118], 0.004),
+        B(0.27, 0.02, 0.02, [0, 0.055, 0.12], 0.004),
+        B(0.27, 0.02, 0.02, [0, -0.055, 0.12], 0.004),
+      ),
+      material: "cv_hull_dark",
+      mate: A([sx, plateY + 0.47, sz - 0.02], [-12, 0, 0]),
     });
-    ctx.layout(`carrier.island.decoy${side}`, ({ index: i }) => {
-      const col = i % 3;
-      const row = Math.floor(i / 3);
-      return new THREE.Matrix4().makeTranslation((col - 1) * 0.18, row * 0.12, 0);
+    add({
+      id: `${P}sam_${tag}_cell_rims`,
+      name_cn: `HQ-10 18 联装筒口 ${tag === "fwd" ? "前" : "后"}`,
+      name_en: `HQ-10 18 canister mouths ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(...cellGeos),
+      material: "cv_steel",
+      mate: A([sx, plateY + 0.47, sz - 0.02], [-12, 0, 0]),
+    });
+    add({
+      id: `${P}sam_${tag}_missile_tips`,
+      name_cn: `HQ-10 待发弹头 ${tag === "fwd" ? "前" : "后"} ×18`,
+      name_en: `HQ-10 sealed missile tips ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        ...Array.from({ length: 18 }, (_, i) => {
+          const cx = -0.1 + (i % 6) * 0.04;
+          const cy = -0.075 + Math.floor(i / 6) * 0.075;
+          return C(0.009, 0.01, [cx, cy, 0.121], 10);
+        }),
+      ),
+      material: "cv_radar",
+      mate: A([sx, plateY + 0.47, sz - 0.02], [-12, 0, 0]),
+    });
+    add({
+      id: `${P}sam_${tag}_servo`,
+      name_cn: `HQ-10 俯仰伺服 ${tag === "fwd" ? "前" : "后"}`,
+      name_en: `HQ-10 elevation servo ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        C(0.035, 0.13, [0, 0, 0], 12),
+        B(0.07, 0.07, 0.07, [0, 0.07, 0.02], 0.004),
+        { type: "weld", from: [0.13, 0.03, 0], to: [0.13, 0.16, 0.04], radius: 0.008 },
+      ),
+      material: "cv_brass",
+      mate: A([sx + 0.16, plateY + 0.11, sz + 0.05], [0, 0, 90]),
+    });
+    add({
+      id: `${P}sam_${tag}_control`,
+      name_cn: `HQ-10 发射控制盒 ${tag === "fwd" ? "前" : "后"}`,
+      name_en: `HQ-10 fire control box ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        B(0.14, 0.18, 0.1, [0, 0.09, 0], 0.006),
+        B(0.1, 0.06, 0.01, [0, 0.12, 0.055], 0.002),
+        C(0.012, 0.04, [0.04, 0.19, 0], 8),
+      ),
+      material: "cv_steel_dark",
+      mate: A([sx - 0.24, plateY, sz + 0.12], [0, 25, 0]),
+    });
+  }
+
+  // 干扰弹发射器 ×2：装在舰岛前壁两侧，6 管（3×2）可俯仰的箱式发射器。
+  // 旧版是 6 个叠在一起的 0.55×0.3 大方块，看起来就是一块板。
+  for (const side of [-1, 1] as const) {
+    const tag = side === -1 ? "p" : "s";
+    // 装在一层前壁两角、窗带之外，不遮住甲板室窗户。
+    const dx = x + (side === -1 ? -0.8 : 0.75);
+    // 贴在一层舰岛前壁外侧（前壁面 z=-2.02），不能悬在舰桥玻璃外。
+    const dz = z + 3.0;
+    const dy = baseY + 0.78;
+    add({
+      id: `${P}decoy_${tag}_mount`,
+      name_cn: `干扰弹发射器 ${side === -1 ? "左" : "右"} 基座`,
+      name_en: `decoy launcher mount ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        B(0.2, 0.16, 0.06, [0, 0, 0], 0.006),
+        C(0.045, 0.12, [0, 0.02, 0.07], 12),
+        B(0.1, 0.03, 0.22, [0, 0.1, 0.14], 0.004),
+      ),
+      material: "cv_steel_dark",
+      mate: A([dx, dy - 0.08, dz]),
+    });
+    add({
+      id: `${P}decoy_${tag}_cradle`,
+      name_cn: `干扰弹发射器 ${side === -1 ? "左" : "右"} 俯仰架`,
+      name_en: `decoy launcher cradle ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        B(0.2, 0.03, 0.2, [0, 0, 0], 0.004),
+        B(0.03, 0.15, 0.16, [-0.085, 0.08, 0], 0.004),
+        B(0.03, 0.15, 0.16, [0.085, 0.08, 0], 0.004),
+        B(0.2, 0.03, 0.03, [0, 0.16, -0.04], 0.004),
+      ),
+      material: "cv_steel",
+      mate: A([dx, dy, dz + 0.06], [18, 0, 0]),
+    });
+    const tubes: Array<Parameters<typeof M>[0]> = [];
+    for (let c = 0; c < 3; c++) {
+      for (let r = 0; r < 2; r++) {
+        const cx = -0.06 + c * 0.06;
+        const cy = 0.06 + r * 0.06;
+        tubes.push({ type: "weld", from: [cx, cy, 0], to: [cx, cy + 0.04, 0.2], radius: 0.013, seed: 900 + c * 2 + r });
+        tubes.push({ type: "torus", radius: 0.015, tube: 0.003, radialSegments: 8, tubularSegments: 12, at: [cx, cy + 0.04, 0.2] });
+      }
+    }
+    add({
+      id: `${P}decoy_${tag}_tubes`,
+      name_cn: `干扰弹发射器 ${side === -1 ? "左" : "右"} 6 联装`,
+      name_en: `decoy launcher ${tag} six tubes`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(...tubes),
+      material: "cv_steel_dark",
+      mate: A([dx, dy + 0.14, dz + 0.08], [-18, 0, 0]),
+    });
+    add({
+      id: `${P}decoy_${tag}_junction`,
+      name_cn: `干扰弹发射器 ${side === -1 ? "左" : "右"} 接线盒`,
+      name_en: `decoy launcher junction box ${tag}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.07, 0.07, 0.05, [0, 0, 0], 0.004), C(0.01, 0.07, [0.02, -0.03, 0], 8)),
+      material: "cv_brass",
+      mate: A([dx + side * 0.1, dy - 0.02, dz + 0.02], [0, 0, 90]),
     });
   }
 }

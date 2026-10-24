@@ -44,10 +44,10 @@ const RUNWAY_AFT_Z = -18.5;
 const RUNWAY_COS = Math.cos((RUNWAY_DEG * Math.PI) / 180);
 const RUNWAY_SIN = Math.sin((RUNWAY_DEG * Math.PI) / 180);
 const runwayX = (z: number): number => RUNWAY_AFT_X - ((z - RUNWAY_AFT_Z) / RUNWAY_COS) * RUNWAY_SIN;
-const TAXI_BACK_MID = new THREE.Vector3(2.5, DECK_TOP, 3.8);
-// 绕网第二拐点：先沿右舷往前开过拦阻网所在 z=6.0，再横越回左舷停机区。
-// 旧路线在 z=6 处横越时飞机左翼尖距网右支柱只有几厘米，动画扫掠会穿模。
-const TAXI_BACK_FWD = new THREE.Vector3(2.7, DECK_TOP, 7.2);
+const TAXI_BACK_MID = new THREE.Vector3(1.8, DECK_TOP, 3.9);
+// 绕网第二拐点：越过已收起的拦阻网槽后回到右舷停机位。路线保持在 x≈2.2，
+// 否则展开的右翼尖会扫到右舷停放 J-15 的左翼。
+const TAXI_BACK_FWD = new THREE.Vector3(1.8, DECK_TOP, 7.2);
 const CATCH_Z = -7.5;
 const WIRE_PULL_MAX = 1.5;
 

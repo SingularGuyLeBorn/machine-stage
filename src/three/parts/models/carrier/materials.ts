@@ -28,6 +28,7 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_055_console: { base: "#232c33", metalness: 0.28, roughness: 0.52, preset: "primer", envMapIntensity: 0.35, doubleSided: true },
   cv_055_console_alt: { base: "#2c3439", metalness: 0.24, roughness: 0.56, preset: "primer", envMapIntensity: 0.32, doubleSided: true },
   cv_055_console_alt2: { base: "#1b2328", metalness: 0.3, roughness: 0.46, preset: "primer", envMapIntensity: 0.3, doubleSided: true },
+  cv_055_mesh: { base: "#202428", metalness: 0.18, roughness: 0.72, pbr: "plates", repeat: [2, 2], envMapIntensity: 0.25 },
   cv_055_seat_alt2: { base: "#3a322c", metalness: 0.04, roughness: 0.78, preset: "canvas", envMapIntensity: 0.16 },
   cv_055_console_top: { base: "#151d23", metalness: 0.2, roughness: 0.42, preset: "primer", envMapIntensity: 0.3 },
   cv_055_acoustic: { base: "#33424c", metalness: 0.06, roughness: 0.86, pbr: "plates", repeat: [4, 2], envMapIntensity: 0.15, doubleSided: true },
@@ -45,7 +46,8 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_055_prop: { base: "#b08c4a", metalness: 0.72, roughness: 0.38, preset: "primer", envMapIntensity: 0.9 },
   cv_steam: { base: "#e3ebec", metalness: 0.0, roughness: 0.96, preset: "none", opacity: 0.32, depthWrite: false, doubleSided: true, envMapIntensity: 0.1 },
   cv_smoke: { base: "#383c3d", metalness: 0.0, roughness: 0.98, preset: "none", opacity: 0.38, depthWrite: false, doubleSided: true, envMapIntensity: 0.05 },
-  cv_glass: { base: "#1b2b34", metalness: 0.5, roughness: 0.06, preset: "none", envMapIntensity: 1.9 },
+  // 舷窗/机舱盖玻璃：半透明深色，不再是一块反射出黑洞的实心板。
+  cv_glass: { base: "#2a3d47", metalness: 0.35, roughness: 0.06, preset: "none", envMapIntensity: 1.2, opacity: 0.42, depthWrite: false, doubleSided: true },
   cv_bridge_glass: { base: "#eef8fc", metalness: 0.0, roughness: 0.02, preset: "none", envMapIntensity: 0.08, opacity: 0.045, depthWrite: false, doubleSided: true },
   cv_055_bridge_glass: { base: "#e6f2f7", metalness: 0.0, roughness: 0.02, preset: "none", envMapIntensity: 0.08, opacity: 0.045, depthWrite: false, doubleSided: true },
   cv_clear_glass: { base: "#eef8fc", metalness: 0.0, roughness: 0.02, preset: "none", envMapIntensity: 0.06, opacity: 0.04, depthWrite: false, doubleSided: true },
@@ -55,6 +57,9 @@ export const CV_MATERIALS: ModelRegistry["materials"] = {
   cv_screen: { base: "#0a1a1e", metalness: 0.05, roughness: 0.35, preset: "none", emissive: "#1f8f86", emissiveIntensity: 0.75, envMapIntensity: 0.4 },
   // 指挥舱显控屏：贴图由 CommandScreens 组件在浏览器端加载，避免材质库同步依赖 DOM。
   cv_scr_ocean: { base: "#0b1418", metalness: 0.02, roughness: 0.42, preset: "none", emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 0.15, doubleSided: true },
+  cv_scr_vls: { base: "#0b1418", metalness: 0.02, roughness: 0.42, preset: "none", emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 0.15, doubleSided: true },
+  cv_scr_ciws: { base: "#0b1418", metalness: 0.02, roughness: 0.42, preset: "none", emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 0.15, doubleSided: true },
+  cv_scr_cctv: { base: "#0b1418", metalness: 0.02, roughness: 0.42, preset: "none", emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 0.15, doubleSided: true },
   cv_scr_chart: { base: "#0b1418", metalness: 0.02, roughness: 0.42, preset: "none", emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 0.15, doubleSided: true },
   cv_scr_radar: { base: "#0b1418", metalness: 0.02, roughness: 0.42, preset: "none", emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 0.15, doubleSided: true },
   cv_scr_tactical: { base: "#0b1418", metalness: 0.02, roughness: 0.42, preset: "none", emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 0.15, doubleSided: true },

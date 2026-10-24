@@ -17,7 +17,7 @@ afterAll(() => built.dispose());
 
 describe("055 型驱逐舰", () => {
   it("舰体/112 VLS/主炮/相控阵/动力/机库都装出来了", () => {
-    expect(built.parts.length).toBeGreaterThanOrEqual(1004);
+    expect(built.parts.length).toBeGreaterThanOrEqual(1046);
     const hatchInstances = built.parts
       .filter((part) => part.partId === "type055.vls.hatch" || part.partId.startsWith("type055.vls.hatch_hero"))
       .reduce((sum, part) => sum + part.instances.length, 0);
@@ -73,7 +73,7 @@ describe("055 型驱逐舰", () => {
     expect(built.getPart("type055.radar.ew_panel_r")).toBeDefined();
     expect(built.getPart("type055.hangar.door_l")).toBeDefined();
     const physical = built.parts.reduce((sum, part) => sum + part.instances.length, 0);
-    expect(physical).toBeGreaterThanOrEqual(2239);
+    expect(physical).toBeGreaterThanOrEqual(2281);
   });
 
   it("垂发与导弹按公开数据建模", () => {

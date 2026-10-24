@@ -572,8 +572,9 @@ export const type055BridgeShell: GeometryBuilder = () => {
   // 后壁 + 顶盖
   quad([-wb, 0, -db], [wb, 0, -db], [wt, h, -dt], [-wt, h, -dt]);
   quad([-wt, h, -dt], [wt, h, -dt], [wt, h, dt], [-wt, h, dt]);
-  // 前壁下槛
-  const y0 = 1.05;
+  // 前壁下槛：真实舰桥窗台很低（离桥面约 0.7m），否则坐在/站在前显控台后
+  // 完全看不到前甲板，只能看到海平线。
+  const y0 = 0.75;
   const y1 = 3.35;
   const xAt = (y: number) => wb - (wb - wt) * (y / h);
   const zAt = (y: number) => db - (db - dt) * (y / h);
@@ -1262,6 +1263,33 @@ export const type055CommandConsole: GeometryBuilder = (spec) => {
     bay(0.88, 0.5, 0, 0.98);
     parts.push(box(0.7, 0.012, 0.4, 0, 0.795, 0.05));
     parts.push(box(0.16, 0.02, 0.04, 0, 0.81, 0.16));
+  } else if (kind === "ciws") {
+    bay(0.78, 0.48, 0.12, 1.0);
+    bay(0.32, 0.32, -0.52, 1.0);
+    parts.push(cyl(0.07, 0.04, -0.4, 0.82, 0.02, 14));
+    parts.push(new THREE.SphereGeometry(0.05, 12, 8).translate(-0.4, 0.87, 0.02));
+    parts.push(box(0.08, 0.03, 0.06, 0.5, 0.84, -0.18));
+    parts.push(box(0.1, 0.04, 0.05, 0.64, 0.84, -0.18));
+  } else if (kind === "vls") {
+    bay(0.86, 0.52, 0, 1.0);
+    bay(0.3, 0.3, 0.55, 0.96);
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+      parts.push(box(0.045, 0.025, 0.035, -0.34 + c * 0.075, 0.76 - r * 0.045, -0.15));
+    }
+    parts.push(cyl(0.055, 0.035, 0.5, 0.82, -0.12, 14));
+    parts.push(new THREE.TorusGeometry(0.075, 0.012, 6, 16).rotateX(Math.PI / 2).translate(0.5, 0.808, -0.12));
+  } else if (kind === "cctv") {
+    bay(0.42, 0.32, -0.24, 1.09);
+    bay(0.42, 0.32, 0.24, 1.09);
+    bay(0.42, 0.32, -0.24, 0.8);
+    bay(0.42, 0.32, 0.24, 0.8);
+    parts.push(box(0.72, 0.03, 0.26, 0, 0.76, 0.02));
+  } else if (kind === "command") {
+    bay(1.08, 0.5, 0, 1.0);
+    bay(0.28, 0.28, -0.62, 0.96);
+    bay(0.28, 0.28, 0.62, 0.96);
+    parts.push(new THREE.SphereGeometry(0.055, 12, 8).translate(0, 0.86, -0.02));
+    parts.push(new THREE.TorusGeometry(0.08, 0.013, 6, 18).rotateX(Math.PI / 2).translate(0, 0.845, -0.02));
   } else {
     // ops / eval：双屏
     bay(0.54, 0.46, -0.31, 0.98);
@@ -1319,50 +1347,52 @@ export const type055CommandChair: GeometryBuilder = (spec) => {
   const helm = kind === "helm";
   const jump = kind === "jump";
   const noHeadrest = ["cic_damage", "cic_engine", "cic_eval", "bridge_damage"].includes(station);
-  const noArms = ["cic_chart", "cic_engine", "cic_eval", "cic_damage"].includes(station);
-  const wide = ["bridge_helm", "cic_radar", "cic_tactical"].includes(station);
-  const tall = ["bridge_helm", "cic_radar", "cic_tactical", "cic_sonar"].includes(station);
-  const width = captain || wide ? 0.62 : 0.54;
-  parts.push(soft(width, 0.13, 0.55, 0, 0.52, 0, 0.04));
-  parts.push(soft(width - 0.07, 0.075, 0.26, 0, 0.585, -0.12, 0.03));
-  parts.push(soft(width - 0.07, 0.065, 0.24, 0, 0.578, 0.12, 0.03));
-  const backHeight = captain ? 0.82 : tall ? 0.74 : 0.62;
-  const back = new RoundedBoxGeometry(width, backHeight, 0.13, 3, 0.035);
-  back.rotateX(-0.1);
-  back.translate(0, captain ? 1.02 : tall ? 0.96 : 0.9, -0.24);
-  parts.push(back);
-  parts.push(soft(width - 0.08, 0.15, 0.14, 0, 0.7, -0.19, 0.03));
+  const noArms = ["cic_chart", "cic_engine", "cic_eval", "cic_damage", "cic_vls"].includes(station);
+  const wide = ["bridge_helm", "cic_radar", "cic_tactical", "cic_command"].includes(station);
+  const tall = ["bridge_helm", "cic_radar", "cic_tactical", "cic_sonar", "cic_command"].includes(station);
+  const width = captain || wide ? 0.6 : 0.52;
+  const backHeight = captain ? 0.8 : tall ? 0.7 : 0.58;
+
+  // 网背人体工学椅：坐垫、外框、网面、腰托、头枕、扶手、倾仰机构。
+  parts.push(soft(width, 0.11, 0.53, 0, 0.52, 0, 0.035));
+  parts.push(soft(width - 0.05, 0.055, 0.14, 0, 0.505, 0.22, 0.025));
+  parts.push(box(width - 0.1, 0.05, 0.42, 0, 0.44, -0.02));
+  parts.push(box(0.2, 0.08, 0.16, 0, 0.42, -0.18));
   for (const side of [-1, 1] as const) {
-    parts.push(soft(0.07, backHeight * 0.62, 0.16, side * (width / 2 - 0.02), captain ? 0.96 : tall ? 0.9 : 0.84, -0.25, 0.025));
-    parts.push(soft(0.08, 0.09, 0.42, side * (width / 2 - 0.04), 0.58, 0, 0.025));
+    parts.push(soft(0.055, backHeight, 0.07, side * (width / 2 - 0.03), captain ? 0.99 : tall ? 0.94 : 0.88, -0.25, 0.02));
+    parts.push(soft(0.055, 0.14, 0.09, side * (width / 2 - 0.03), 0.62, -0.25, 0.02));
   }
+  parts.push(soft(width - 0.05, 0.06, 0.07, 0, captain ? 1.41 : tall ? 1.33 : 1.2, -0.25, 0.02));
+  parts.push(soft(width - 0.1, 0.055, 0.07, 0, 0.65, -0.25, 0.02));
+  // 网面 + 横向网肋
+  parts.push(soft(width - 0.14, backHeight - 0.12, 0.025, 0, captain ? 1.0 : tall ? 0.95 : 0.9, -0.265, 0.012));
+  for (let i = 0; i < 5; i++) {
+    parts.push(box(width - 0.15, 0.012, 0.035, 0, 0.7 + i * (backHeight - 0.2) / 4, -0.28));
+  }
+  parts.push(soft(width - 0.16, 0.09, 0.05, 0, 0.74, -0.3, 0.02));
   if (!jump && !noHeadrest) {
-    parts.push(soft(0.34, captain ? 0.24 : 0.2, 0.13, 0, captain ? 1.5 : 1.35, -0.29, 0.035));
+    parts.push(box(0.035, 0.16, 0.035, 0, captain ? 1.45 : 1.39, -0.26));
+    parts.push(soft(0.3, 0.05, 0.06, 0, captain ? 1.55 : 1.49, -0.28, 0.02));
+    parts.push(soft(0.27, 0.17, 0.025, 0, captain ? 1.53 : 1.47, -0.3, 0.012));
+    parts.push(soft(0.26, 0.045, 0.06, 0, captain ? 1.45 : 1.39, -0.28, 0.02));
   }
   if (!jump && !noArms) {
     for (const side of [-1, 1] as const) {
-      parts.push(soft(0.1, 0.055, 0.44, side * (width / 2 + 0.05), 0.73, -0.04, 0.022));
-      parts.push(box(0.04, 0.12, 0.04, side * (width / 2 + 0.02), 0.65, 0.05));
+      parts.push(box(0.04, 0.22, 0.04, side * (width / 2 + 0.05), 0.64, -0.02));
+      parts.push(soft(0.09, 0.045, 0.4, side * (width / 2 + 0.05), 0.76, -0.02, 0.02));
+      parts.push(box(0.035, 0.12, 0.035, side * (width / 2 + 0.02), 0.58, 0.02));
     }
   }
-  if (captain) {
-    parts.push(box(width + 0.12, 0.04, 0.5, 0, 0.75, 0));
-    for (const side of [-1, 1] as const) parts.push(box(0.16, 0.03, 0.5, side * (width / 2 + 0.13), 0.63, 0));
-  }
   if (helm) {
-    // 安全带/扶手锁扣
-    parts.push(box(0.05, 0.4, 0.04, -0.2, 1.02, -0.31));
-    parts.push(box(0.05, 0.4, 0.04, 0.2, 1.02, -0.31));
+    parts.push(box(0.04, 0.34, 0.03, -0.18, 0.98, -0.32));
+    parts.push(box(0.04, 0.34, 0.03, 0.18, 0.98, -0.32));
   }
-  if (kind === "comms" || station === "cic_sonar") {
-    parts.push(box(0.05, 0.2, 0.05, width / 2 + 0.12, 1.2, -0.18));
-    parts.push(new THREE.TorusGeometry(0.08, 0.012, 6, 16).translate(width / 2 + 0.12, 1.3, -0.18));
+  if (kind === "comms" || station === "cic_sonar" || station === "cic_cctv") {
+    parts.push(box(0.045, 0.18, 0.045, width / 2 + 0.12, 1.16, -0.16));
+    parts.push(new THREE.TorusGeometry(0.07, 0.011, 6, 16).translate(width / 2 + 0.12, 1.25, -0.16));
   }
   if (station === "cic_damage" || station === "cic_eval") {
-    parts.push(box(width, 0.03, 0.05, 0, 0.36, -0.04));
-  }
-  if (jump) {
-    parts.push(box(width, 0.03, 0.05, 0, 0.34, -0.05));
+    parts.push(box(width - 0.04, 0.025, 0.04, 0, 0.37, -0.02));
   }
   return merge(parts);
 };

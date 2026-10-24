@@ -248,17 +248,20 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       name_en: `jet blast deflector ${track.id}`,
       assembly: ASSEMBLY,
       build_layer: 3,
+      // 真实挡焰板宽而低（约 12m×5m）；旧版做成 8.5m 宽、7.3m 高的竖板，
+      // 竖起后比舰载机还高，比例失真。编辑尺度 1:8，故 1.5×0.62。
       geometry: M(
-        B(1.08, 0.92, 0.07, [0, 0.46, 0], 0.01),
-        B(0.96, 0.035, 0.04, [0, 0.2, 0.045], 0.004),
-        B(1.0, 0.045, 0.06, [0, 0.36, 0.05], 0.004),
-        B(1.0, 0.045, 0.06, [0, 0.68, 0.05], 0.004),
-        B(1.0, 0.045, 0.06, [0, 0.9, 0.05], 0.004),
-        B(0.055, 0.84, 0.055, [-0.4, 0.5, 0.055], 0.004),
-        B(0.055, 0.84, 0.055, [0.4, 0.5, 0.055], 0.004),
-        B(1.0, 0.07, 0.075, [0, 0.035, 0.02], 0.004),
-        B(0.09, 0.13, 0.11, [-0.36, 0.03, 0.02], 0.004),
-        B(0.09, 0.13, 0.11, [0.36, 0.03, 0.02], 0.004),
+        B(1.5, 0.62, 0.055, [0, 0.31, 0], 0.008),
+        B(1.4, 0.028, 0.035, [0, 0.12, 0.035], 0.003),
+        B(1.42, 0.032, 0.05, [0, 0.3, 0.04], 0.003),
+        B(1.42, 0.032, 0.05, [0, 0.48, 0.04], 0.003),
+        B(0.045, 0.56, 0.045, [-0.58, 0.32, 0.042], 0.003),
+        B(0.045, 0.56, 0.045, [0.58, 0.32, 0.042], 0.003),
+        B(1.44, 0.06, 0.06, [0, 0.028, 0.018], 0.003),
+        B(0.08, 0.09, 0.09, [-0.52, 0.025, 0.018], 0.003),
+        B(0.08, 0.09, 0.09, [0.52, 0.025, 0.018], 0.003),
+        // 铰链座：贴合甲板，竖起时绕同一轴转。
+        B(0.9, 0.05, 0.05, [0, 0.02, -0.01], 0.004),
       ),
       material: "cv_steel_dark",
       node,
@@ -564,16 +567,17 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       mate: A([side * 2.0, CV.DECK_Y - 0.1, -10.2]),
     });
   }
-  // ---- 应急拦阻网：布置在斜角着舰区前端（不是舰艉），由左右支柱 + 交叉网带组成 ----
+  // ---- 应急拦阻网（收起状态）：布置在斜角着舰区前段、2 号弹射挡焰板之后 ----
+  // 旧版把一张 1.2m 高、像球门一样的立网放在 z=6，正好压在 1/2 号挡焰板上；
+  // 真实航母在非降落作业时拦阻网是收起的，这里按“收起”建模：两根折叠立柱贴在
+  // 跑道两舷，网包横卧在甲板上的低矮网槽里，不挡弹射器、不与挡焰板重叠。
   {
-    const netZ = 6.0;
+    const netZ = 3.3;
     const netRad = (9.3 * Math.PI) / 180;
     const netSin = Math.sin(netRad);
     const netCos = Math.cos(netRad);
-    // 网中心必须落在斜角跑道中线上：用跑道艉端 x=1.05 反算，旧版用 0.5 让整张网向
-    // 左舷偏 0.55，左支柱悬出甲板外。
     const netCenterX = 1.05 - ((netZ + 18.5) / netCos) * netSin;
-    const netHalf = 2.0;
+    const netHalf = 1.9;
     const netYaw = -9.3;
     const postAt = (side: -1 | 1): [number, number] => [
       netCenterX + side * netHalf * netCos,
@@ -583,46 +587,98 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       const [px, pz] = postAt(side);
       const tag = side === -1 ? "l" : "r";
       add({
-        id: `${P}arrestor_net_post_${tag}`,
-        name_cn: `拦阻网支柱 ${side === -1 ? "左" : "右"}`,
-        name_en: `barrier net post ${tag}`,
+        id: `${P}arrestor_net_hinge_${tag}`,
+        name_cn: `拦阻网折叠座 ${side === -1 ? "左" : "右"}`,
+        name_en: `barrier net hinge base ${tag}`,
         assembly: ASSEMBLY,
         build_layer: 3,
-        geometry: M(C(0.07, 1.2, [0, 0, 0], 12), B(0.32, 0.08, 0.32, [0, -0.58, 0], 0.008)),
+        geometry: M(
+          B(0.36, 0.055, 0.3, [0, 0.028, 0], 0.006),
+          B(0.22, 0.1, 0.16, [0, 0.09, 0], 0.008),
+          B(0.08, 0.05, 0.05, [-0.09, 0.14, 0], 0.004),
+          B(0.08, 0.05, 0.05, [0.09, 0.14, 0], 0.004),
+        ),
         material: "cv_steel_dark",
-        mate: A([px, deckTop + 0.6, pz]),
+        mate: A([px, deckTop, pz]),
+      });
+      // 折叠立柱：沿甲板纵轴倒伏，落在两只鞍座上，不横跨跑道。
+      add({
+        id: `${P}arrestor_net_stanchion_${tag}`,
+        name_cn: `拦阻网折叠立柱 ${side === -1 ? "左" : "右"}`,
+        name_en: `barrier net stowed stanchion ${tag}`,
+        assembly: ASSEMBLY,
+        build_layer: 3,
+        geometry: M(
+          B(0.085, 0.085, 0.78, [0, 0, 0.39], 0.008),
+          B(0.11, 0.09, 0.05, [0, 0.01, -0.02], 0.004),
+          B(0.04, 0.04, 0.04, [0, 0.01, 0.72], 0.002),
+        ),
+        material: "cv_steel",
+        mate: A([px, deckTop + 0.1, pz]),
       });
       add({
-        id: `${P}arrestor_net_brace_${tag}`,
-        name_cn: `拦阻网支柱斜撑 ${side === -1 ? "左" : "右"}`,
-        name_en: `barrier net post brace ${tag}`,
+        id: `${P}arrestor_net_cradle_${tag}`,
+        name_cn: `拦阻网立柱鞍座 ${side === -1 ? "左" : "右"}`,
+        name_en: `barrier net cradle ${tag}`,
         assembly: ASSEMBLY,
         build_layer: 3,
-        geometry: M({ type: "weld", from: [px, deckTop + 1.08, pz], to: [px - side * 0.7, deckTop + 0.06, pz], radius: 0.032 }),
+        geometry: M(B(0.16, 0.09, 0.12, [0, 0, 0.62], 0.004), B(0.2, 0.03, 0.16, [0, -0.04, 0.62], 0.003)),
         material: "cv_steel_dark",
-        mate: A([0, 0, 0]),
+        mate: A([px, deckTop + 0.06, pz]),
+      });
+      add({
+        id: `${P}arrestor_net_ram_${tag}`,
+        name_cn: `拦阻网液压作动筒 ${side === -1 ? "左" : "右"}`,
+        name_en: `barrier net hydraulic ram ${tag}`,
+        assembly: ASSEMBLY,
+        build_layer: 3,
+        geometry: M(C(0.022, 0.32, [0, 0, 0], 10), C(0.035, 0.12, [0, 0.2, 0], 10)),
+        material: "cv_brass",
+        mate: A([px + (side === -1 ? 0.09 : -0.09), deckTop + 0.07, pz + 0.18], [90, 0, 0]),
       });
     }
-    // 网带：7 道横带 + 11 道竖带 + 顶部张紧杆，合并成一个零件，避免网带互相穿模报告。
-    const netBands: Array<ReturnType<typeof B>> = [];
-    for (let h = 0; h < 9; h++) {
-      netBands.push(B(netHalf * 2, 0.012, 0.012, [0, 0.14 + h * 0.12, 0], 0.0006));
-    }
-    for (let v = 0; v < 15; v++) {
-      netBands.push(B(0.012, 0.96, 0.012, [-netHalf + v * (netHalf * 2) / 14, 0.62, 0], 0.0006));
-    }
-    netBands.push(B(netHalf * 2 + 0.14, 0.06, 0.06, [0, 1.2, 0], 0.002));
-    netBands.push(B(netHalf * 2, 0.05, 0.05, [0, 0.05, 0], 0.002));
+    // 网槽本体：低矮钢槽横跨跑道，网包/张紧索全部收在里面。
     add({
-      id: `${P}arrestor_net`,
-      name_cn: "拦阻网（网带式，可升起）",
-      name_en: "barrier net mesh",
+      id: `${P}arrestor_net_trough`,
+      name_cn: "拦阻网网槽（网包收起）",
+      name_en: "barrier net stowed trough",
       assembly: ASSEMBLY,
       build_layer: 3,
-      geometry: M(...netBands),
+      geometry: M(
+        B(netHalf * 2, 0.055, 0.16, [0, 0.028, 0], 0.006),
+        B(netHalf * 2 - 0.1, 0.028, 0.2, [0, 0.052, 0], 0.004),
+        B(0.12, 0.04, 0.14, [-netHalf + 0.2, 0.02, 0], 0.004),
+        B(0.12, 0.04, 0.14, [netHalf - 0.2, 0.02, 0], 0.004),
+      ),
+      material: "cv_steel_dark",
+      mate: A([netCenterX, deckTop, netZ], [0, netYaw, 0]),
+    });
+    add({
+      id: `${P}arrestor_net_pack`,
+      name_cn: "拦阻网网包与张紧索",
+      name_en: "barrier net stowed pack",
+      assembly: ASSEMBLY,
+      build_layer: 3,
+      geometry: M(
+        B(netHalf * 2 - 0.18, 0.075, 0.1, [0, 0.06, 0], 0.008),
+        B(0.03, 0.03, netHalf * 2 - 0.2, [0, 0.1, 0], 0.002),
+        ...Array.from({ length: 7 }, (_, k) => B(0.02, 0.082, 0.11, [-netHalf + 0.3 + k * 0.52, 0.06, 0], 0.002)),
+      ),
       material: "cv_canvas",
       mate: A([netCenterX, deckTop, netZ], [0, netYaw, 0]),
     });
+    for (let w = 0; w < 11; w++) {
+      add({
+        id: `${P}arrestor_net_trough_stripe_${pad(w + 1)}`,
+        name_cn: `拦阻网网槽警示条 ${w + 1}`,
+        name_en: `barrier net trough warning stripe ${w + 1}`,
+        assembly: ASSEMBLY,
+        build_layer: 4,
+        geometry: M(B(0.16, 0.004, 0.1, [0, 0.058, 0], 0.001)),
+        material: w % 2 === 0 ? "cv_deck_red" : "cv_deck_yellow",
+        mate: A([netCenterX - netHalf + 0.4 + w * 0.34, deckTop, netZ], [0, netYaw, 0]),
+      });
+    }
   }
 
   // ---- 右舷艉部航空吊车：基座/回转齿圈/桅柱/司机室/桁架吊臂/绞车/吊钩 ----
@@ -864,17 +920,19 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   for (let n = 0; n < 6; n++) {
     const nz = -12.6 + n * 1.15;
     const netEdge = deckEdgeAt(nz, -1).x;
+    // 安全网从甲板边缘向下外倾约 35°，不是一张悬在海面上的水平格栅桌。
     const netParts: Parameters<typeof M>[0][] = [];
+    const yAt = (x: number) => -0.05 + ((x + 0.02) / -0.73) * -0.5;
     for (let v = 0; v < 6; v++) {
       const x = -0.75 + v * 0.15;
-      netParts.push({ type: "weld", from: [x, -0.18, -0.5], to: [x, -0.22, 0.5], radius: 0.008, seed: 200 + n * 10 + v });
+      netParts.push({ type: "weld", from: [x, yAt(x), -0.5], to: [x, yAt(x), 0.5], radius: 0.008, seed: 200 + n * 10 + v });
     }
     for (let h = 0; h < 5; h++) {
       const z = -0.5 + h * 0.25;
-      netParts.push({ type: "weld", from: [-0.75, -0.18, z], to: [-0.02, -0.23, z], radius: 0.008, seed: 300 + n * 10 + h });
+      netParts.push({ type: "weld", from: [-0.75, yAt(-0.75), z], to: [-0.02, yAt(-0.02), z], radius: 0.008, seed: 300 + n * 10 + h });
     }
     for (const side of [-1, 1] as const) {
-      netParts.push({ type: "weld", from: [-0.78, -0.18, side * 0.46], to: [-0.16, 0.02, side * 0.46], radius: 0.018, seed: 400 + n * 2 + (side === -1 ? 0 : 1) });
+      netParts.push({ type: "weld", from: [-0.78, yAt(-0.78), side * 0.46], to: [-0.16, 0.02, side * 0.46], radius: 0.018, seed: 400 + n * 2 + (side === -1 ? 0 : 1) });
     }
     add({
       id: `${P}safety_net_${pad(n + 1)}`,
@@ -1213,10 +1271,11 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     });
   }
   // 停机位框线 + 编号（七段数字），全部贴在甲板上；避开斜角着舰跑道。
-  const parkingSpots: Array<[number, number, number]> = [
-    [-3.0, -8.3, 1], [-3.15, -11.2, 2], [-3.0, -14.2, 3], [-2.55, -16.2, 4],
+  const parkingSpots: Array<[number, number, number, number]> = [
+    // x, z, 编号, 机体朝向（与 PARKED_SPOTS 一致）
+    [4.05, -9.6, 1, 0], [4.1, 5.2, 2, 0],
     // 5 号是现役演示机位：艏部右舷弹射跑道外侧，不压着舰跑道/拦阻网。
-    [2.95, 8.8, 5],
+    [2.95, 8.8, 5, 0],
   ];
   const digitSegments: Record<string, string[]> = {
     "1": ["b", "c"], "2": ["a", "b", "g", "e", "d"], "3": ["a", "b", "g", "c", "d"],
@@ -1246,10 +1305,10 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       });
     }
   };
-  parkingSpots.forEach(([sx, sz, n]) => {
-    // 5 号位停现役 J20（20.4m），框线按 2.2×3.0；艉部停放位用 1.9×2.6。
-    const w = n === 5 ? 2.2 : 1.9;
-    const d = n === 5 ? 3.0 : 2.6;
+  parkingSpots.forEach(([sx, sz, n, yaw]) => {
+    // 5 号位停现役 J20（20.4m），框线按 2.2×3.0；折叠翼 J-15 用 1.28×2.7。
+    const w = n === 5 ? 2.2 : 1.1;
+    const d = n === 5 ? 3.0 : 2.7;
     add({
       id: `${P}parking_box_${pad(n)}`,
       name_cn: `停机位框线 ${n}`,
@@ -1258,9 +1317,14 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       build_layer: 4,
       geometry: M(B(w, 0.006, 0.05, [0, 0, d / 2], 0.0015), B(w, 0.006, 0.05, [0, 0, -d / 2], 0.0015), B(0.05, 0.006, d, [-w / 2, 0, 0], 0.0015), B(0.05, 0.006, d, [w / 2, 0, 0], 0.0015)),
       material: "cv_deck_yellow",
-      mate: A([sx, markY + 0.003, sz]),
+      mate: A([sx, markY + 0.003, sz], [0, yaw, 0]),
     });
-    drawDigit(String(n), `parking_num_${n}`, sx + w / 2 + 0.22, sz + d / 2 + 0.14, 0.36);
+    const yawRad = (yaw * Math.PI) / 180;
+    // 右侧贴舷停机位的编号往舰内放，不能刷到甲板外。
+    const numSide = sx > 3.8 ? -1 : 1;
+    const numX = sx + numSide * (w / 2 + 0.22) * Math.cos(yawRad) + (d / 2 + 0.14) * Math.sin(yawRad);
+    const numZ = sz - numSide * (w / 2 + 0.22) * Math.sin(yawRad) + (d / 2 + 0.14) * Math.cos(yawRad);
+    drawDigit(String(n), `parking_num_${n}`, numX, numZ, 0.36);
   });
   // 甲板外缘线：直接沿真实 deckPlan 折线勾边，向甲板内侧偏 0.05。
   // 旧版用的是改轮廓之前的硬编码折线（还带升降机缺口），线画在甲板里面，
@@ -1363,18 +1427,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       });
     }
   });
-  for (let st = 0; st < 6; st++) {
-    add({
-      id: `${P}stern_danger_${st + 1}`,
-      name_cn: `艉部危险区 ${st + 1}`,
-      name_en: `stern danger stripe ${st + 1}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(B(3.2 - st * 0.22, 0.006, 0.18, [0, 0, 0], 0.0015)),
-      material: st % 2 === 0 ? "cv_deck_red" : "cv_deck_yellow",
-      mate: A([0, markY + 0.005, -18.7 + st * 0.18]),
-    });
-  }
+  // 旧版在 x=0、z=-18.7 画了一组“艉部危险区”，正好压在斜角着舰跑道艉端标线上。
+  // 艉部本身没有独立喷流危险区，直接移除，避免标线互相覆盖。
   add({
     id: `${P}tiedown`,
     name_cn: "甲板系留点 ×80",
@@ -1533,10 +1587,24 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       name_en: `recovery net bar ${i + 1}`,
       assembly: ASSEMBLY,
       build_layer: 3,
-      geometry: M(C(0.012, 4.6, [0, 0, 0], 6)),
+      // 编辑尺度 1:8：真实横杆约 4.6m，旧版直接写了 4.6 编辑单位（36m），
+      // 从舰桥看就是一把横跨舰艏的长杆。
+      geometry: M(C(0.004, 0.58, [0, 0, 0], 6)),
       material: "cv_canvas",
-      mate: A([0, deckTop + 0.1, 19.8 + i * 0.42], [0, 0, 90]),
+      mate: A([0, deckTop + 0.1, 19.8 + i * 0.18], [0, 0, 90]),
     });
+    for (const side of [-1, 1] as const) {
+      add({
+        id: `${P}recovery_net_post_${i + 1}_${side === -1 ? "p" : "s"}`,
+        name_cn: `回收角网杆立柱 ${i + 1} ${side === -1 ? "左" : "右"}`,
+        name_en: `recovery net post ${i + 1} ${side === -1 ? "l" : "r"}`,
+        assembly: ASSEMBLY,
+        build_layer: 3,
+        geometry: M(B(0.012, 0.1, 0.012, [0, 0.05, 0], 0.0015)),
+        material: "cv_steel",
+        mate: A([side * 0.29, deckTop, 19.8 + i * 0.18]),
+      });
+    }
   }
   for (let i = 0; i < 8; i++) {
     add({
@@ -1545,9 +1613,9 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       name_en: `recovery net line ${i + 1}`,
       assembly: ASSEMBLY,
       build_layer: 3,
-      geometry: M(C(0.008, 1.6, [0, 0, 0], 6)),
+      geometry: M(C(0.003, 0.2, [0, 0, 0], 6)),
       material: "cv_canvas",
-      mate: A([-1.9 + i * 0.55, deckTop + 0.09, 20.5], [90, 0, 0]),
+      mate: A([-0.23 + i * 0.066, deckTop + 0.09, 20.2], [90, 0, 0]),
     });
   }
 

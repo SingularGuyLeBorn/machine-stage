@@ -182,8 +182,9 @@ export function addSurface(ctx: CarrierCtx): void {
     });
   };
   buildDeckRail(-1, 0.5, 8);
-  // 右舷栏杆只保留后升降机与前升降机之间的一段，不横跨升降机平台。
-  buildDeckRail(1, -10, 0);
+  // 右舷栏杆只保留 1 号升降机与舰岛之间的一段；舰岛后方是折叠翼停机位，
+  // 栏杆不能穿过停放机的翼尖作动筒。
+  buildDeckRail(1, -8.4, 0);
 
   // 救生圈/救生筏/消防栓（避开升降机开口）。
   const ringZPort = [-12, -8.8, -5.6, -4.4];
@@ -197,35 +198,78 @@ export function addSurface(ctx: CarrierCtx): void {
       name_en: `life ring ${l + 1}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M({ type: "torus", radius: 0.06, tube: 0.014, radialSegments: 10, tubularSegments: 24 }),
+      // 真实救生圈外径 0.75m；编辑尺度 1:8，半径 0.047、管径 0.006。
+      geometry: M({ type: "torus", radius: 0.047, tube: 0.006, radialSegments: 8, tubularSegments: 20 }),
       material: "cv_warning",
-      mate: A([side * (side === -1 ? 3.85 : 4.0), deckTop + 0.085, side === -1 ? ringZPort[index]! : ringZStarboard[index]!], [0, 90, 0]),
+      mate: A([side * (side === -1 ? 3.85 : 4.0), deckTop + 0.06, side === -1 ? ringZPort[index]! : ringZStarboard[index]!], [0, 90, 0]),
     });
   }
+  // 救生筏：真实筏罐约 0.4m 直径×1.3m 高，6 只分两层收在左舷筏架里。
+  // 旧版用 0.3 编辑单位半径（≈2.4m）并排成 6 只，看起来是一排悬空的大蓝桶。
   add({
     id: `${P}life_raft`,
     name_cn: "救生筏 ×6",
     name_en: "life rafts",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(C(0.3, 0.55, [0, 0, 0], 16), T(0.32, 0.26, 0.05, [0, 0.28, 0], 16)),
-    material: "cv_canvas",
-    mate: A([-4.35, deckTop + 0.335, -6.0]),
+    geometry: M(
+      C(0.05, 0.16, [0, 0, 0], 14),
+      C(0.045, 0.02, [0, 0.09, 0], 12),
+      T(0.052, 0.043, 0.012, [0, 0.042, 0], 14),
+      T(0.052, 0.043, 0.012, [0, -0.04, 0], 14),
+      B(0.02, 0.02, 0.02, [0, 0.1, 0], 0.002),
+    ),
+    material: "cv_warning",
+    mate: A([-4.04, deckTop + 0.116, -6.42]),
     instances: 6,
     indexed: true,
     instance_layout: "carrier.surface.raft",
   });
-  ctx.layout("carrier.surface.raft", ({ index }) => new THREE.Matrix4().makeTranslation((index % 2) * 0.55 - 0.25, 0, -index * 0.75));
+  ctx.layout("carrier.surface.raft", ({ index }) => {
+    const col = index % 3;
+    const row = Math.floor(index / 3);
+    return new THREE.Matrix4().makeTranslation(0, 0, -0.4 + col * 0.16 + row * 0.48);
+  });
   add({
     id: `${P}life_raft_rack`,
-    name_cn: "左舷救生筏鞍座",
+    name_cn: "左舷救生筏筏架",
     name_en: "port life raft rack",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(B(0.7, 0.06, 4.6, [0, 0, 0], 0.004)),
+    geometry: M(
+      B(0.22, 0.03, 1.1, [0, 0, 0], 0.004),
+      B(0.02, 0.14, 1.12, [-0.115, 0.085, 0], 0.003),
+      B(0.02, 0.14, 1.12, [0.115, 0.085, 0], 0.003),
+      ...[-0.55, 0.55].flatMap((dz) => [
+        B(0.03, 0.24, 0.03, [-0.1, 0.12, dz], 0.002),
+        B(0.03, 0.24, 0.03, [0.1, 0.12, dz], 0.002),
+      ]),
+      B(0.24, 0.025, 0.03, [0, 0.24, -0.55], 0.002),
+      B(0.24, 0.025, 0.03, [0, 0.24, 0.55], 0.002),
+      B(0.1, 0.06, 0.06, [0.12, 0.07, -0.56], 0.004),
+    ),
     material: "cv_steel_dark",
-    mate: A([-4.35, deckTop + 0.03, -7.85]),
+    mate: A([-4.04, deckTop + 0.02, -6.42]),
   });
+  for (let s = 0; s < 6; s++) {
+    const col = s % 3;
+    const row = Math.floor(s / 3);
+    add({
+      id: `${P}life_raft_strap_${s + 1}`,
+      name_cn: `救生筏绑扎带 ${s + 1}`,
+      name_en: `life raft strap ${s + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(
+        B(0.26, 0.012, 0.022, [0, 0.235, 0], 0.002),
+        B(0.012, 0.075, 0.022, [-0.135, 0.193, 0], 0.002),
+        B(0.012, 0.075, 0.022, [0.135, 0.193, 0], 0.002),
+      ),
+      material: "cv_canvas",
+      mate: A([-4.04, deckTop, -6.42 - 0.4 + col * 0.16 + row * 0.48]),
+    });
+  }
+  // 筏架本身座在甲板上，不再另加会插进筏体的托架。
 
   // 左舷艉部救生艇 + 吊艇架（艇体放样、充气舷管、挂机、操控台、吊臂/绞车）。
   // 救生艇必须收在外飘底封板（y≈4.03）以下，否则吊艇架/绞车会顶穿封板。

@@ -74,8 +74,9 @@ export const CAT_TRACKS: readonly CatTrack[] = [
   // 舰艏两条：2 号与甲板中线平行，1 号向右偏 3°（公开资料描述），起点前移到拦阻网/着舰区前方。
   { id: 1, x0: -1.55, z0: 10.0, yawDeg: 3.0, length: 8.4 },
   { id: 2, x0: 1.55, z0: 10.0, yawDeg: 0.0, length: 8.4 },
-  // 腰部三号：与斜角着舰跑道平行，放在跑道右侧（靠舰岛一侧），不再横跨跑道。
-  { id: 3, x0: 2.62, z0: -8.6, yawDeg: -9.3, length: 8.4 },
+  // 腰部三号：真实福建舰位于左舷斜角甲板前端，与斜角着舰跑道平行、指向左前方。
+  // 旧版放在右舷舰岛正前方，飞机弹射会直接撞上舰岛，属结构性错误。
+  { id: 3, x0: -2.05, z0: -7.2, yawDeg: -9.3, length: 8.4 },
 ];
 
 export function catPoint(track: CatTrack, s: number): { x: number; z: number } {

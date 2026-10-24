@@ -27,6 +27,7 @@ export type CameraMode =
   | "reactor_room"
   | "magazine"
   | "hangar"
+  | "crew"
   | "cockpit"
   | "flight";
 
@@ -37,6 +38,7 @@ export const CARRIER_INTERIOR_MODES = [
   "reactor_room",
   "magazine",
   "hangar",
+  "crew",
   "cockpit",
 ] as const;
 
@@ -180,11 +182,13 @@ interface CarrierInteriorViewSpec {
 
 const TYPE055_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec>> = {
   bridge: {
-    eyePart: "type055.interior.bridge_captain_seat_back",
-    eye: [0, 0.05, 0.25],
+    // 站在前显控台后方（不是舰长席 6m 开外）。眼点高于窗台、离玻璃 1.2m，
+    // 向下视线才能越过窗台看到前甲板；否则整片甲板会被窗台挡住。
+    eyePart: "type055.interior.bridge_view_anchor",
+    eye: [0, 0, 0],
     targetPart: "type055.super.bridge_glass_front",
-    targetOffset: [0, -1.8, 0],
-    fov: 68,
+    targetOffset: [0, -0.3, 0],
+    fov: 72,
   },
   cic: {
     eyePart: "type055.interior.cic_chart_table",
@@ -206,6 +210,13 @@ const TYPE055_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec
     targetPart: "type055.hangar.z20_hangar_r_cabin_upper",
     fov: 70,
   },
+  crew: {
+    eyePart: "type055.interior.crew_mess",
+    eye: [0, 1.0, 0],
+    targetPart: "type055.interior.crew_bunk_frames",
+    targetOffset: [0, 0.2, 0],
+    fov: 74,
+  },
   magazine: {
     eyePart: "type055.gun.magazine",
     eye: [0, -0.55, 2.2],
@@ -220,6 +231,13 @@ const CARRIER_INTERIOR_VIEWS: Partial<Record<CameraMode, CarrierInteriorViewSpec
     eye: [0, 0.16, 0.28],
     targetPart: "carrier.island.bridge_front_glass_c",
     fov: 66,
+  },
+  crew: {
+    eyePart: "carrier.crew.view_mount",
+    eye: [0, 0.36, 0],
+    targetPart: "carrier.crew.bunks",
+    targetOffset: [0, 0.06, 0],
+    fov: 72,
   },
   cic: {
     eyePart: "carrier.island.cic_watch_seat_back",
@@ -265,6 +283,7 @@ export const CAMERA_MODE_LABELS: Record<CameraMode, { label: string; hint: strin
   reactor_room: { label: "反应堆舱", hint: "在反应堆屏蔽舱内，拖动环视压力容器 / 控制棒 / 一回路仪表；再点一次退出" },
   magazine: { label: "弹药库", hint: "在弹药库内，拖动环视弹药架 / 扬弹机 / 库存显控；再点一次退出" },
   hangar: { label: "机库", hint: "在机库内，拖动环视停机位 / 维护区 / 机库控制台；再点一次退出" },
+  crew: { label: "船员生活舱", hint: "在水下住舱内，拖动环视三层铺位 / 餐桌 / 厨房 / 卫生间 / 储物柜；再点一次退出" },
   cockpit: { label: "舰载机座舱", hint: "舰载机座舱：平显 / 多功能显示器 / 操纵杆，拖动环视；再点一次退出" },
   flight: { label: "跟拍舰载机", hint: "跟拍舰载机：完整看滑行 / 弹射 / 爬升 / 进近 / 拦阻；再点一次退出" },
 };

@@ -423,9 +423,9 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     name_en: "bridge front window",
     assembly: "superstructure",
     build_layer: 4,
-    geometry: M(B(6.8, 2.3, 0.05, [0, 0, 0], 0.004)),
+    geometry: M(B(6.8, 2.6, 0.05, [0, 0, 0], 0.004)),
     material: "cv_055_bridge_glass",
-    mate: A([0, DECK + 9.6, 33.04], [-12.8, 0, 0]),
+    mate: A([0, DECK + 9.45, 33.04], [-12.8, 0, 0]),
   });
   for (const side of [-1, 1] as const) {
     add({
@@ -435,7 +435,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       assembly: "superstructure",
       build_layer: 4,
       geometry: M(B(0.06, 0.9, 7.0, [0, 0, 0], 0.004)),
-      material: "cv_glass",
+      material: "cv_055_bridge_glass",
       mate: A([side * 4.52, DECK + 9.6, 26.3]),
     });
   }
@@ -653,9 +653,11 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       name_en: `bridge window mullion ${i + 1}`,
       assembly: "superstructure",
       build_layer: 4,
-      geometry: M(B(0.1, 1.25, 0.1, [0, 0, 0], 0.004)),
-      material: "cv_steel_dark",
-      mate: A([-3.0 + i * 1.2, DECK + 9.6, 33.07]),
+      // 竖梃必须从窗台连到窗楣；旧版只有 1.25m 高，悬浮在玻璃中间，
+      // 从舰桥看出去像一排立在甲板上的细杆子。
+      geometry: M(B(0.05, 2.6, 0.07, [0, 0, 0], 0.003)),
+      material: "cv_055_fitting",
+      mate: A([-3.0 + i * 1.2, DECK + 9.45, 33.07]),
     });
   }
 
@@ -1813,8 +1815,30 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
   });
 
   // ---------------- 近防/导弹 ----------------
-  for (const [tag, z, y] of [["fwd", 37.2, DECK + 7.85], ["aft", -58, DECK + 6.75]] as const) {
+  // 前近防炮真实位置在主炮/前垂发之后、舰桥之前的独立炮位平台上；
+  // 旧版把它放在舰桥正前方同一高度（DECK+7.85，z=37.2），从舰桥看出去
+  // 就是“一个球 + 一大堆炮管”糊在窗中央，还挡住整片前甲板。
+  for (const [tag, z, y] of [["fwd", 40.3, DECK + 1.35], ["aft", -58, DECK + 6.75]] as const) {
     ctx.node({ name: `CV_055_Ciws_${tag}`, parent: "root", pivot: [0, y, z], motion: "rotate", axis: "y", rest_rotation: [0, tag === "aft" ? 180 : 0, 0], note: `1130 近防 ${tag}` });
+    if (tag === "fwd") {
+      add({
+        id: `${P}ciws.fwd_platform`,
+        name_cn: "前近防炮平台",
+        name_en: "forward CIWS platform",
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(
+          B(2.6, 0.9, 2.4, [0, 0, 0], 0.04),
+          B(2.75, 0.08, 2.5, [0, 0.49, 0], 0.02),
+          B(0.9, 0.55, 0.04, [0, -0.1, 1.21], 0.01),
+          B(0.7, 0.06, 0.08, [0, 0.2, 1.24], 0.004),
+          B(0.1, 0.1, 0.1, [-1.32, 0.1, 0.9], 0.004),
+          B(0.1, 0.1, 0.1, [1.32, 0.1, 0.9], 0.004),
+        ),
+        material: "cv_055_hull",
+        mate: A([0, DECK + 0.45, 40.3]),
+      });
+    }
     add({
       id: `${P}ciws.${tag}_base`,
       name_cn: `1130 近防基座 ${tag}`,
@@ -1867,7 +1891,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       mate: A([0, 0.8, 0]),
     });
   }
-  for (const [tag, z] of [["fwd", 42], ["aft", -62]] as const) {
+  for (const [tag, z] of [["fwd", 42.6], ["aft", -62]] as const) {
     add({
       id: `${P}weapons.hhq10_${tag}`,
       name_cn: `红旗-10 发射装置 ${tag}`,
@@ -2859,6 +2883,14 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       screens: [screen(0, 1.0, 1.12, 0.54, "cv_scr_tactical")] },
     { tag: "cic_ops", role: "作战战位", x: 4.0, z: 13.5, floorY: cicFloor, kind: "ops", seat: "operator",
       screens: [screen(-0.31, 0.98, 0.54, 0.46, "cv_scr_chart"), screen(0.31, 0.98, 0.54, 0.46, "cv_scr_camera")] },
+    { tag: "cic_ciws", role: "近防指挥席", x: -4.4, z: 21.0, floorY: cicFloor, kind: "ciws", seat: "helm",
+      screens: [screen(0.12, 1.0, 0.78, 0.48, "cv_scr_ciws"), screen(-0.52, 1.0, 0.32, 0.32, "cv_scr_radar")] },
+    { tag: "cic_vls", role: "垂发指挥席", x: -1.5, z: 21.0, floorY: cicFloor, kind: "vls", seat: "operator",
+      screens: [screen(0, 1.0, 0.86, 0.52, "cv_scr_vls"), screen(0.55, 0.96, 0.3, 0.3, "cv_scr_chart")] },
+    { tag: "cic_cctv", role: "全舰监控席", x: 1.5, z: 21.0, floorY: cicFloor, kind: "cctv", seat: "comms",
+      screens: [screen(-0.24, 1.09, 0.42, 0.32, "cv_scr_cctv"), screen(0.24, 1.09, 0.42, 0.32, "cv_scr_camera"), screen(-0.24, 0.8, 0.42, 0.32, "cv_scr_engine"), screen(0.24, 0.8, 0.42, 0.32, "cv_scr_damage")] },
+    { tag: "cic_command", role: "指挥席", x: 4.4, z: 21.0, floorY: cicFloor, kind: "command", seat: "captain",
+      screens: [screen(0, 1.0, 1.08, 0.5, "cv_scr_tactical"), screen(-0.62, 0.96, 0.28, 0.28, "cv_scr_vls"), screen(0.62, 0.96, 0.28, 0.28, "cv_scr_ciws")] },
     { tag: "cic_chart", role: "海图战位", x: -4.0, z: 17.5, floorY: cicFloor, kind: "chart", seat: "operator",
       screens: [screen(0, 0.98, 0.88, 0.5, "cv_scr_chart")] },
     { tag: "cic_comms", role: "通信战位", x: -2.0, z: 17.5, floorY: cicFloor, kind: "comms", seat: "comms",
@@ -2901,7 +2933,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       assembly: "interior",
       build_layer: 2,
       geometry: { type: "kit", kit: "type055CommandChair", params: { kind: st.seat, station: st.tag } },
-      material: ["cv_055_seat", "cv_055_seat_alt", "cv_055_seat_alt2"][stationIndex % 3] ?? "cv_055_seat",
+      material: st.seat === "captain" ? "cv_055_seat" : "cv_055_mesh",
       mate: A([st.x, st.floorY, st.z - 1.0]),
     });
     add({
@@ -2972,6 +3004,17 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     });
   }
 
+  add({
+    id: `${P}interior.bridge_view_anchor`,
+    name_cn: "舰桥第一人称视点锚点",
+    name_en: "bridge first-person view anchor",
+    assembly: "interior",
+    build_layer: 2,
+    geometry: M(B(0.004, 0.004, 0.004, [0, 0, 0], 0.001)),
+    material: "cv_055_console",
+    // 站在前显控台后方，眼点高于窗台，越过窗台看到前甲板/垂发/主炮。
+    mate: A([0, DECK + 9.7, 30.5]),
+  });
   add({
     id: `${P}interior.bridge_floor`,
     name_cn: "舰桥地板",
@@ -3435,7 +3478,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       B(0.14, 0.12, 0.38, [3.35, -0.02, 0], 0.004),
     ),
     material: "cv_055_console",
-    mate: A([0, DECK + 8.45, 33.28]),
+    mate: A([0, DECK + 8.15, 33.28]),
   });
   add({
     id: `${P}interior.bridge_window_top`,
@@ -3454,15 +3497,15 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     assembly: "interior",
     build_layer: 3,
     geometry: M(
-      { type: "weld", from: [-1.5, 0, 0], to: [-1.2, 0.7, 0.08], radius: 0.018 },
-      { type: "weld", from: [-1.2, 0.7, 0.08], to: [-1.05, 1.12, 0.1], radius: 0.014 },
-      B(0.035, 0.55, 0.035, [-1.12, 0.9, 0.1], 0.003),
-      { type: "weld", from: [1.5, 0, 0], to: [1.2, 0.7, 0.08], radius: 0.018 },
-      { type: "weld", from: [1.2, 0.7, 0.08], to: [1.05, 1.12, 0.1], radius: 0.014 },
-      B(0.035, 0.55, 0.035, [1.12, 0.9, 0.1], 0.003),
+      { type: "weld", from: [-2.5, 0, 0], to: [-2.35, 0.5, 0.05], radius: 0.009 },
+      { type: "weld", from: [-2.35, 0.5, 0.05], to: [-2.25, 0.92, 0.07], radius: 0.007 },
+      B(0.02, 0.4, 0.02, [-2.3, 0.72, 0.07], 0.002),
+      { type: "weld", from: [2.5, 0, 0], to: [2.35, 0.5, 0.05], radius: 0.009 },
+      { type: "weld", from: [2.35, 0.5, 0.05], to: [2.25, 0.92, 0.07], radius: 0.007 },
+      B(0.02, 0.4, 0.02, [2.3, 0.72, 0.07], 0.002),
     ),
     material: "cv_steel_dark",
-    mate: A([0, DECK + 8.7, 33.42]),
+    mate: A([0, DECK + 8.45, 33.42]),
   });
   add({
     id: `${P}interior.bridge_floor_seams`,
@@ -3713,6 +3756,259 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     ),
     material: "cv_scr_comms",
     mate: A([0, DECK + 8.3, 22.6]),
+  });
+
+  // ---------------- 船员生活舱（水下住舱/餐厅/厨房/卫生/储物） ----------------
+  // 位置：主甲板下、机舱之前，避开 VLS 与动力舱。
+  const crewFloor = 2.55;
+  add({
+    id: `${P}interior.crew_shell`,
+    name_cn: "船员生活舱围壁/甲板",
+    name_en: "crew living compartment shell",
+    assembly: "interior",
+    build_layer: 1,
+    geometry: M(
+      B(8.4, 0.1, 16.0, [0, crewFloor, 0], 0.01),
+      B(8.4, 0.08, 16.0, [0, 5.52, 0], 0.01),
+      B(0.1, 2.9, 16.0, [-4.2, 4.05, 0], 0.01),
+      B(0.1, 2.9, 16.0, [4.2, 4.05, 0], 0.01),
+      B(8.4, 2.9, 0.1, [0, 4.05, -8.0], 0.01),
+      B(8.4, 2.9, 0.1, [0, 4.05, 8.0], 0.01),
+      B(1.1, 2.1, 0.12, [0, 3.7, 7.95], 0.01),
+      B(1.1, 2.1, 0.12, [0, 3.7, -7.95], 0.01),
+    ),
+    material: "cv_055_acoustic",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}interior.crew_carpet`,
+    name_cn: "生活舱地毯/防滑走道",
+    name_en: "crew carpet",
+    assembly: "interior",
+    build_layer: 2,
+    geometry: M(B(8.0, 0.02, 15.6, [0, crewFloor + 0.06, 0], 0.004), B(2.0, 0.02, 13.0, [0, crewFloor + 0.07, 0], 0.004)),
+    material: "cv_055_carpet",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}interior.crew_ceiling_lights`,
+    name_cn: "生活舱顶灯 ×8",
+    name_en: "crew ceiling lights ×8",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      ...[-6, -2, 2, 6].flatMap((z) => [
+        B(1.2, 0.05, 0.35, [-2.3, 5.46, z], 0.004),
+        B(1.2, 0.05, 0.35, [2.3, 5.46, z], 0.004),
+      ]),
+    ),
+    material: "cv_055_lamp",
+    mate: A([0, 0, 0]),
+  });
+
+  // 三层铺位两列 + 床垫/枕头/隐私帘/爬梯/个人柜
+  const bunkFrame: Array<ReturnType<typeof B>> = [];
+  const bunkMattress: Array<ReturnType<typeof B>> = [];
+  const bunkBedding: Array<ReturnType<typeof B>> = [];
+  for (const side of [-1, 1] as const) {
+    const bx = side * 3.2;
+    for (const [tier, y] of [2.95, 3.7, 4.45].entries()) {
+      bunkFrame.push(B(0.9, 0.06, 3.9, [bx, y, -4.0], 0.008));
+      for (const z of [-5.95, -2.05]) {
+        bunkFrame.push(B(0.06, 1.7, 0.06, [bx - 0.42, y + 0.85, z], 0.004));
+        bunkFrame.push(B(0.06, 1.7, 0.06, [bx + 0.42, y + 0.85, z], 0.004));
+      }
+      bunkFrame.push(B(0.06, 0.045, 3.9, [bx + 0.42, y + 1.25, -4.0], 0.004));
+      bunkFrame.push(B(0.06, 0.045, 3.9, [bx - 0.42, y + 1.25, -4.0], 0.004));
+      bunkFrame.push(B(0.05, 0.05, 3.6, [bx + 0.45, y + 1.22, -4.0], 0.004));
+      bunkMattress.push(B(0.82, 0.16, 1.85, [bx, y + 0.11, -4.6], 0.035));
+      bunkBedding.push(B(0.7, 0.08, 0.34, [bx, y + 0.22, -5.35], 0.02));
+      bunkBedding.push(B(0.78, 0.04, 1.0, [bx, y + 0.22, -4.0], 0.01));
+      if (tier === 0) {
+        bunkFrame.push(B(0.8, 0.45, 1.2, [bx, crewFloor + 0.28, -2.4], 0.01));
+      }
+    }
+    bunkFrame.push(B(0.06, 1.7, 0.06, [bx, 3.6, -1.95], 0.004));
+    bunkFrame.push(B(0.5, 0.04, 0.3, [bx, 3.9, -1.95], 0.004));
+    for (let r = 0; r < 5; r++) bunkFrame.push(B(0.4, 0.035, 0.06, [bx, 3.1 + r * 0.34, -1.95], 0.003));
+  }
+  add({
+    id: `${P}interior.crew_bunk_frames`,
+    name_cn: "船员三层铺位/爬梯/床架",
+    name_en: "crew bunk frames",
+    assembly: "interior",
+    build_layer: 2,
+    geometry: M(...bunkFrame),
+    material: "cv_steel_dark",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}interior.crew_bunk_mattresses`,
+    name_cn: "船员床垫",
+    name_en: "crew mattresses",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(...bunkMattress),
+    material: "cv_upholstery",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}interior.crew_bedding`,
+    name_cn: "船员床单/枕头",
+    name_en: "crew bedding",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(...bunkBedding),
+    material: "cv_deck_line",
+    mate: A([0, 0, 0]),
+  });
+
+  // 个人储物柜、餐桌、长凳、厨房、卫生间、休息区
+  add({
+    id: `${P}interior.crew_lockers`,
+    name_cn: "个人储物柜 ×8",
+    name_en: "personal lockers ×8",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      ...Array.from({ length: 8 }, (_, i) =>
+        B(0.5, 1.1, 0.42, [-1.95 + (i % 4) * 1.3, 3.2, 6.75], 0.008),
+      ),
+      ...Array.from({ length: 8 }, (_, i) =>
+        B(0.05, 0.18, 0.04, [-1.95 + (i % 4) * 1.3 + 0.16, 3.2, 6.52], 0.004),
+      ),
+    ),
+    material: "cv_055_console",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}interior.crew_mess`,
+    name_cn: "船员餐桌/长凳",
+    name_en: "crew mess table",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      B(2.6, 0.08, 1.1, [0, 3.3, 2.8], 0.02),
+      B(0.1, 0.7, 0.9, [-1.0, 2.95, 2.8], 0.008),
+      B(0.1, 0.7, 0.9, [1.0, 2.95, 2.8], 0.008),
+      B(2.4, 0.06, 0.35, [0, 3.0, 3.55], 0.01),
+      B(2.4, 0.06, 0.35, [0, 3.0, 2.05], 0.01),
+      B(2.3, 0.45, 0.08, [0, 3.2, 3.72], 0.01),
+      B(2.3, 0.45, 0.08, [0, 3.2, 1.88], 0.01),
+      B(0.34, 0.18, 0.02, [-0.6, 3.45, 2.8], 0.006),
+      C(0.05, 0.1, [0.55, 3.4, 2.8], 12),
+      C(0.05, 0.1, [0.35, 3.4, 2.65], 12),
+    ),
+    material: "cv_055_console_top",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}interior.crew_mess_seats`,
+    name_cn: "船员餐椅 ×4",
+    name_en: "crew mess stools ×4",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      ...[-0.8, 0, 0.8, 1.6].flatMap((x) => [
+        C(0.08, 0.45, [x - 0.9, 2.95, 3.55], 10),
+        B(0.4, 0.06, 0.4, [x - 0.9, 3.22, 3.55], 0.02),
+      ]),
+    ),
+    material: "cv_upholstery",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}interior.crew_galley`,
+    name_cn: "生活舱厨房/配餐台",
+    name_en: "crew galley",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      B(0.7, 0.9, 4.0, [-3.8, 3.0, 4.0], 0.02),
+      B(0.75, 0.06, 4.0, [-3.8, 3.48, 4.0], 0.01),
+      B(0.55, 0.06, 1.1, [-3.8, 3.53, 3.0], 0.006),
+      B(0.55, 0.06, 0.7, [-3.8, 3.53, 4.8], 0.006),
+      B(0.8, 1.8, 0.85, [-3.75, 3.45, 7.1], 0.02),
+      B(0.8, 0.06, 0.85, [-3.75, 4.38, 7.1], 0.01),
+      B(0.3, 1.0, 0.3, [-3.8, 4.15, 2.7], 0.006),
+      B(0.8, 0.5, 0.8, [-3.8, 4.55, 3.9], 0.01),
+    ),
+    material: "cv_steel_dark",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}interior.crew_galley_white`,
+    name_cn: "厨房台面/水槽/灶台",
+    name_en: "galley worktops",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      B(0.7, 0.05, 1.4, [-3.8, 3.5, 3.9], 0.01),
+      B(0.4, 0.02, 0.5, [-3.8, 3.53, 4.2], 0.006),
+      B(0.42, 0.03, 0.62, [-3.8, 3.54, 5.3], 0.006),
+      B(0.5, 0.03, 0.42, [-3.8, 3.54, 2.4], 0.006),
+    ),
+    material: "cv_deck_line",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}interior.crew_heads`,
+    name_cn: "生活舱卫生间/淋浴",
+    name_en: "crew heads",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      B(1.6, 2.2, 0.1, [3.2, 3.6, 4.4], 0.01),
+      B(0.1, 2.2, 2.0, [2.45, 3.6, 5.4], 0.01),
+      B(0.1, 2.2, 2.0, [3.95, 3.6, 5.4], 0.01),
+      B(1.5, 2.2, 0.1, [3.2, 3.6, 6.4], 0.01),
+      B(0.9, 0.08, 0.9, [3.2, 2.62, 5.9], 0.01),
+      C(0.3, 0.25, [3.2, 2.82, 6.1], 14),
+      B(0.5, 0.12, 0.4, [3.2, 3.05, 5.0], 0.02),
+      C(0.03, 1.4, [2.75, 3.5, 6.2], 8),
+    ),
+    material: "cv_deck_line",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}interior.crew_lounge`,
+    name_cn: "生活舱休息区/沙发",
+    name_en: "crew lounge",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      B(2.2, 0.65, 0.8, [0, 2.95, -7.1], 0.04),
+      B(2.0, 0.15, 0.65, [0, 3.3, -7.1], 0.03),
+      B(0.5, 0.6, 0.6, [-1.2, 2.9, -7.5], 0.03),
+      B(0.5, 0.6, 0.6, [1.2, 2.9, -7.5], 0.03),
+      B(1.4, 0.75, 0.06, [0, 4.35, -7.9], 0.01),
+    ),
+    material: "cv_upholstery",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}interior.crew_lounge_tv`,
+    name_cn: "休息区电视",
+    name_en: "crew lounge TV",
+    assembly: "interior",
+    build_layer: 4,
+    geometry: M(B(1.34, 0.7, 0.02, [0, 4.35, -7.86], 0.002)),
+    material: "cv_scr_camera",
+    mate: A([0, 0, 0]),
+  });
+  add({
+    id: `${P}interior.crew_signage`,
+    name_cn: "生活舱标识/应急灯",
+    name_en: "crew signage",
+    assembly: "interior",
+    build_layer: 3,
+    geometry: M(
+      B(0.9, 0.16, 0.03, [0, 4.9, 7.5], 0.006),
+      C(0.09, 0.08, [-4.0, 4.95, 5.8], 10),
+      C(0.09, 0.08, [4.0, 4.95, 5.8], 10),
+    ),
+    material: "cv_deck_red",
+    mate: A([0, 0, 0]),
   });
 
   // ---------------- 表面：锚/救生/舷号 ----------------

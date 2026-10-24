@@ -124,17 +124,8 @@ export function addBridgeInterior(ctx: CarrierCtx): void {
   }
   part(`front_sill`, "舰桥前窗内窗台", M(B(width - 0.08, 0.02, 0.1, [0, 0, 0], 0.003)), "cv_steel", [x, sillY, z + halfL - 0.04]);
 
-  // 舰桥视景背板：保证玻璃外有真实海天，而不是白墙/空白背景。
-  part("view_front", "舰桥前视景背板", M(B(width - 0.04, glassH + 0.1, 0.02, [0, 0, 0], 0.002)), "cv_scr_ocean", [x, glassY, z + halfL + 0.075]);
-  for (const side of [-1, 1] as const) {
-    part(
-      `view_side_${side === -1 ? "p" : "s"}`,
-      `舰桥侧视景背板 ${side === -1 ? "左" : "右"}`,
-      M(B(0.02, glassH + 0.1, len - 0.45, [0, 0, 0], 0.002)),
-      "cv_scr_ocean",
-      [x + side * (halfW + 0.045), glassY, z],
-    );
-  }
+  // 前窗/侧窗外是真实飞行甲板、舰体和海面，不再放“海景贴图背板”。
+  // 玻璃用 cv_clear_glass（双面、depthWrite=false），舱内从外看同样透过去。
 
   // 后壁 + 滑动门（关闭状态，门轮/观察窗）。
   const doorX = x + 0.28;

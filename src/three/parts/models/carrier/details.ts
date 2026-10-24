@@ -559,20 +559,8 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
     }
     void base;
   }
-  for (let s = 0; s < 2; s++) {
-    for (let k = 0; k < 8; k++) {
-      add({
-        id: `carrier.island.detail_sam_${s + 1}_${k + 1}`,
-        name_cn: `防空导弹 ${s + 1}-${k + 1} 导引头`,
-        name_en: `SAM seeker ${s + 1}-${k + 1}`,
-        assembly: ISLAND,
-        build_layer: 4,
-        geometry: M(C(0.03, 0.12, [0, 0, 0], 10), C(0.05, 0.03, [0, 0.06, 0], 10)),
-        material: "cv_radar",
-        mate: A([CV.ISLAND_X + (s === 0 ? -1 : 1) * 0.75 + ((k % 4) - 1.5) * 0.23, CV.DECK_Y + CV.DECK_T + 0.38, CV.ISLAND_Z - 5.2 + (Math.floor(k / 4) - 0.5) * 0.22]),
-      });
-    }
-  }
+  // 旧版“防空导弹导引头”是 16 个竖立的白色纸巾卷，尺寸也按 1:1 米误写进 1:8 编辑尺度。
+  // 近程防空导弹改由 island.ts 的 HQ-10 18 联装发射装置统一建模，这里不再重复占位。
   for (let m = 0; m < 20; m++) {
     add({
       id: `carrier.island.detail_mast_${pad(m + 1)}`,
