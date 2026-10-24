@@ -480,8 +480,8 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
   const arrays: Array<[string, [number, number, number], number]> = [
     ["front", [0, DECK + 6.2, 39.1], 0],
     ["aft", [0, DECK + 6.2, 4.9], 180],
-    ["port", [-6.9, DECK + 6.2, 22], 90],
-    ["starboard", [6.9, DECK + 6.2, 22], -90],
+    ["port", [-6.9, DECK + 6.2, 22], -90],
+    ["starboard", [6.9, DECK + 6.2, 22], 90],
   ];
   for (const [tag, pos, yaw] of arrays) {
     add({
@@ -537,6 +537,97 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     mate: A([0, 0, 0]),
   });
 
+  // 346B 阵面前盖：4 面 ×64 个 T/R 组件独立成件，近看有真实模块颗粒度。
+  for (let panel = 0; panel < arrays.length; panel++) {
+    const [tag, pos, yaw] = arrays[panel]!;
+    const rad = (yaw * Math.PI) / 180;
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        const lx = -2.4 + (4.8 * (col + 0.75)) / 8.6;
+        const ly = -1.9 + (3.8 * (row + 0.75)) / 8.6;
+        const lz = -0.21;
+        const wx = pos[0] + Math.cos(rad) * lx + Math.sin(rad) * lz;
+        const wz = pos[2] - Math.sin(rad) * lx + Math.cos(rad) * lz;
+        add({
+          id: `${P}radar.tr_cover_${tag}_${pad(row + 1)}_${pad(col + 1)}`,
+          name_cn: `346B T/R 组件前盖 ${tag} ${row + 1}-${col + 1}`,
+          name_en: `346B T/R module cover ${tag} ${row + 1}-${col + 1}`,
+          assembly: "radar",
+          build_layer: 4,
+          geometry: M(B(0.42, 0.34, 0.03, [0, 0, 0], 0.0008), B(0.34, 0.26, 0.01, [0, 0, 0.018], 0.0004)),
+          material: "cv_055_aesa_tile",
+          mate: A([wx, pos[1] + ly, wz], [0, yaw, 0]),
+        });
+      }
+    }
+    // 阵面四周冷却/密封压条 + 四角安装座
+    for (const [suffix, lx, ly, w, h] of [
+      ["top", 0, 2.02, 4.95, 0.1],
+      ["bottom", 0, -2.02, 4.95, 0.1],
+      ["left", -2.48, 0, 0.1, 4.1],
+      ["right", 2.48, 0, 0.1, 4.1],
+    ] as const) {
+      const lz = 0.09;
+      const wx = pos[0] + Math.cos(rad) * lx + Math.sin(rad) * lz;
+      const wz = pos[2] - Math.sin(rad) * lx + Math.cos(rad) * lz;
+      add({
+        id: `${P}radar.aesa_trim_${tag}_${suffix}`,
+        name_cn: `346B 阵面${suffix === "top" ? "上" : suffix === "bottom" ? "下" : suffix === "left" ? "左" : "右"}压条 ${tag}`,
+        name_en: `346B array trim ${tag} ${suffix}`,
+        assembly: "radar",
+        build_layer: 4,
+        geometry: M(B(w, h, 0.06, [0, 0, 0], 0.004)),
+        material: "cv_steel_dark",
+        mate: A([wx, pos[1] + ly, wz], [0, yaw, 0]),
+      });
+    }
+    for (const [sx, sy] of [
+      [-2.45, 1.95],
+      [2.45, 1.95],
+      [-2.45, -1.95],
+      [2.45, -1.95],
+    ] as const) {
+      const lz = 0.08;
+      const wx = pos[0] + Math.cos(rad) * sx + Math.sin(rad) * lz;
+      const wz = pos[2] - Math.sin(rad) * sx + Math.cos(rad) * lz;
+      add({
+        id: `${P}radar.aesa_corner_${tag}_${sx > 0 ? "s" : "p"}_${sy > 0 ? "u" : "dn"}`,
+        name_cn: `346B 阵面安装座 ${tag}`,
+        name_en: `346B array corner mount ${tag}`,
+        assembly: "radar",
+        build_layer: 4,
+        geometry: M(B(0.18, 0.18, 0.14, [0, 0, 0], 0.006), C(0.04, 0.08, [0, 0, 0.09], 8)),
+        material: "cv_steel_dark",
+        mate: A([wx, pos[1] + sy, wz], [0, yaw, 0]),
+      });
+    }
+  }
+
+  // 阵面另一面也布置同规格模块盖：侧阵安装方向由舰体斜面决定，双面盖保证从任一舷都能看到真实模块颗粒。
+  for (let panel = 0; panel < arrays.length; panel++) {
+    const [tag, pos, yaw] = arrays[panel]!;
+    const rad = (yaw * Math.PI) / 180;
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        const lx = -2.4 + (4.8 * (col + 0.75)) / 8.6;
+        const ly = -1.9 + (3.8 * (row + 0.75)) / 8.6;
+        const lz = 0.17;
+        const wx = pos[0] + Math.cos(rad) * lx + Math.sin(rad) * lz;
+        const wz = pos[2] - Math.sin(rad) * lx + Math.cos(rad) * lz;
+        add({
+          id: `${P}radar.tr_cover_outer_${tag}_${pad(row + 1)}_${pad(col + 1)}`,
+          name_cn: `346B T/R 组件外盖 ${tag} ${row + 1}-${col + 1}`,
+          name_en: `346B T/R outer cover ${tag} ${row + 1}-${col + 1}`,
+          assembly: "radar",
+          build_layer: 4,
+          geometry: M(B(0.42, 0.34, 0.03, [0, 0, 0], 0.0008), B(0.34, 0.26, 0.01, [0, 0, 0.018], 0.0004)),
+          material: "cv_steel_dark",
+          mate: A([wx, pos[1] + ly, wz], [0, yaw, 0]),
+        });
+      }
+    }
+  }
+
   // 旋转导航雷达 / 卫通 / ESM
   ctx.node({ name: "CV_055_Radar", parent: "root", pivot: [0, DECK + 26.05, 20], motion: "rotate", axis: "y", note: "旋转导航雷达" });
   add({
@@ -550,6 +641,91 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     node: "CV_055_Radar",
     mate: A([0, 0, 0]),
   });
+  // 导航雷达波导缝隙/驱动/基座
+  for (let s = 0; s < 8; s++) {
+    add({
+      id: `${P}radar.nav_slot_${s + 1}`,
+      name_cn: `导航雷达波导缝隙 ${s + 1}`,
+      name_en: `nav radar slot ${s + 1}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(0.1, 0.025, 0.22, [0, 0, 0], 0.001)),
+      material: "cv_radar_dark",
+      node: "CV_055_Radar",
+      mate: A([-1.1 + s * 0.31, 0.27, 0]),
+    });
+  }
+  // 驱动/波导布置在雷达头自身顶面，避免向下插进桅顶结构。
+  for (let s = 0; s < 4; s++) {
+    add({
+      id: `${P}radar.nav_bracket_${s + 1}`,
+      name_cn: `导航雷达阵面支架 ${s + 1}`,
+      name_en: `nav radar bracket ${s + 1}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(0.1, 0.12, 0.16, [0, 0, 0], 0.003)),
+      material: "cv_steel_dark",
+      node: "CV_055_Radar",
+      mate: A([-1.05 + s * 0.7, 0.14, 0.12]),
+    });
+  }
+  add({
+    id: `${P}radar.nav_gearbox`,
+    name_cn: "导航雷达减速箱",
+    name_en: "nav radar gearbox",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(B(0.34, 0.16, 0.24, [0, 0, 0], 0.006), C(0.1, 0.16, [0.2, 0, 0], 10)),
+    material: "cv_steel_dark",
+    node: "CV_055_Radar",
+    mate: A([0, 0.1, 0.2]),
+  });
+  add({
+    id: `${P}radar.nav_motor`,
+    name_cn: "导航雷达驱动电机",
+    name_en: "nav radar drive motor",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(C(0.14, 0.26, [0, 0, 0], 12), C(0.07, 0.1, [0, 0.17, 0], 8)),
+    material: "cv_steel",
+    node: "CV_055_Radar",
+    mate: A([0.28, 0.14, 0.3], [0, 0, 45]),
+  });
+  add({
+    id: `${P}radar.nav_waveguide`,
+    name_cn: "导航雷达波导",
+    name_en: "nav radar waveguide",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(B(0.08, 0.08, 0.34, [0, 0, 0], 0.003)),
+    material: "cv_brass",
+    node: "CV_055_Radar",
+    mate: A([-0.28, 0.12, 0.26]),
+  });
+  add({
+    id: `${P}radar.nav_iff`,
+    name_cn: "导航雷达顶部敌我识别振子",
+    name_en: "nav radar IFF dipole",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(C(0.025, 0.8, [0, 0, 0], 8), B(0.5, 0.03, 0.03, [0, 0.4, 0], 0.002)),
+    material: "cv_steel",
+    node: "CV_055_Radar",
+    mate: A([0, 0.55, 0]),
+  });
+  for (const s of [-1, 1] as const) {
+    add({
+      id: `${P}radar.nav_cable_${s === -1 ? "l" : "r"}`,
+      name_cn: `导航雷达电缆 ${s === -1 ? "左" : "右"}`,
+      name_en: `nav radar cable ${s === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M({ type: "weld", from: [s * 0.2, 0.08, 0.2], to: [s * 0.2, 0.05, 0.42], radius: 0.012 }),
+      material: "cv_rubber",
+      node: "CV_055_Radar",
+      mate: A([0, 0, 0]),
+    });
+  }
   for (const side of [-1, 1] as const) {
     add({
       id: `${P}radar.satcom_${side === -1 ? "l" : "r"}`,
@@ -561,6 +737,29 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       material: "cv_radar",
       mate: A([side * 3.9, DECK + 13.9, 21]),
     });
+    add({
+      id: `${P}radar.satcom_ring_${side === -1 ? "l" : "r"}`,
+      name_cn: `卫通基座环 ${side === -1 ? "左" : "右"}`,
+      name_en: `SATCOM pedestal ring ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(T(0.9, 0.76, 0.1, [0, 0, 0], 18)),
+      material: "cv_055_fitting",
+      mate: A([side * 3.9, DECK + 13.2, 21]),
+    });
+    for (let b = 0; b < 4; b++) {
+      const a = (Math.PI * 2 * b) / 4;
+      add({
+        id: `${P}radar.satcom_bolt_${side === -1 ? "l" : "r"}_${b + 1}`,
+        name_cn: `卫通基座螺栓 ${side === -1 ? "左" : "右"} ${b + 1}`,
+        name_en: `SATCOM pedestal bolt ${side === -1 ? "l" : "r"} ${b + 1}`,
+        assembly: "radar",
+        build_layer: 4,
+        geometry: M(C(0.035, 0.08, [0, 0, 0], 8)),
+        material: "cv_steel",
+        mate: A([side * 3.9 + Math.cos(a) * 0.82, DECK + 13.26, 21 + Math.sin(a) * 0.82]),
+      });
+    }
     add({
       id: `${P}radar.esm_${side === -1 ? "l" : "r"}`,
       name_cn: `电子战天线 ${side === -1 ? "左" : "右"}`,
@@ -732,7 +931,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
         mate: A([x, 22.1, z]),
       });
     }
-    for (const [i, z] of [8, 16, 24].entries()) {
+    for (const [i, z] of [8, 16, 5].entries()) {
       add({
         id: `${P}surface.bridge_liferaft_${side === -1 ? "l" : "r"}_${i + 1}`,
         name_cn: `舰桥侧救生筏 ${side === -1 ? "左" : "右"} ${i + 1}`,
@@ -1020,6 +1219,191 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       geometry: M(C(0.03, 0.9, [0, 0, 0], 6)),
       material: "cv_steel_dark",
       mate: A([i % 2 === 0 ? -3.1 : 3.1, 40.73, i < 2 ? 17.6 : 22.4]),
+    });
+  }
+
+  // 桅顶/桥楼电子设备补充：卫通副罩、设备柜、横桁天线、告警/数据链阵面
+  for (const side of [-1, 1] as const) {
+    for (let k = 0; k < 2; k++) {
+      const x = side * (1.8 + k * 0.8);
+      const z = 20 + (k === 0 ? -1.6 : 1.6);
+      add({
+        id: `${P}radar.satcom_aux_ped_${side === -1 ? "l" : "r"}_${k + 1}`,
+        name_cn: `辅助卫通基座 ${side === -1 ? "左" : "右"} ${k + 1}`,
+        name_en: `aux SATCOM pedestal ${side === -1 ? "l" : "r"} ${k + 1}`,
+        assembly: "radar",
+        build_layer: 4,
+        geometry: M(C(0.16, 0.45, [0, 0, 0], 12), T(0.26, 0.2, 0.05, [0, -0.2, 0], 14)),
+        material: "cv_steel_dark",
+        mate: A([x, 40.5, z]),
+      });
+      add({
+        id: `${P}radar.satcom_aux_dome_${side === -1 ? "l" : "r"}_${k + 1}`,
+        name_cn: `辅助卫通罩 ${side === -1 ? "左" : "右"} ${k + 1}`,
+        name_en: `aux SATCOM dome ${side === -1 ? "l" : "r"} ${k + 1}`,
+        assembly: "radar",
+        build_layer: 4,
+        geometry: M(S(0.4, [0, 0, 0], 16), C(0.34, 0.18, [0, -0.28, 0], 14)),
+        material: "cv_radar",
+        mate: A([x, 40.92, z]),
+      });
+      add({
+        id: `${P}radar.satcom_aux_ring_${side === -1 ? "l" : "r"}_${k + 1}`,
+        name_cn: `辅助卫通基座环 ${side === -1 ? "左" : "右"} ${k + 1}`,
+        name_en: `aux SATCOM ring ${side === -1 ? "l" : "r"} ${k + 1}`,
+        assembly: "radar",
+        build_layer: 4,
+        geometry: M(T(0.38, 0.3, 0.06, [0, 0, 0], 16)),
+        material: "cv_055_fitting",
+        mate: A([x, 40.76, z]),
+      });
+      for (let b = 0; b < 4; b++) {
+        const a = (Math.PI * 2 * b) / 4;
+        add({
+          id: `${P}radar.satcom_aux_bolt_${side === -1 ? "l" : "r"}_${k + 1}_${b + 1}`,
+          name_cn: `辅助卫通螺栓 ${side === -1 ? "左" : "右"} ${k + 1}-${b + 1}`,
+          name_en: `aux SATCOM bolt ${side === -1 ? "l" : "r"} ${k + 1}-${b + 1}`,
+          assembly: "radar",
+          build_layer: 4,
+          geometry: M(C(0.025, 0.05, [0, 0, 0], 6)),
+          material: "cv_steel",
+          mate: A([x + Math.cos(a) * 0.33, 40.79, z + Math.sin(a) * 0.33]),
+        });
+      }
+    }
+  }
+  for (let c = 0; c < 8; c++) {
+    const x = -2.4 + (c % 4) * 1.6;
+    const z = c < 4 ? 18.1 : 21.9;
+    add({
+      id: `${P}radar.mast_cabinet_${c + 1}`,
+      name_cn: `桅顶电子设备柜 ${c + 1}`,
+      name_en: `mast equipment cabinet ${c + 1}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(0.35, 0.24, 0.3, [0, 0, 0], 0.006), B(0.28, 0.02, 0.02, [0, 0, 0.16], 0.002)),
+      material: "cv_055_console",
+      mate: A([x, 40.4, z]),
+    });
+  }
+  for (let a = 0; a < 8; a++) {
+    const x = a < 4 ? -4.3 + a * 1.1 : 1.0 + (a - 4) * 1.1;
+    add({
+      id: `${P}radar.yardarm_element_${a + 1}`,
+      name_cn: `桅横桁天线 ${a + 1}`,
+      name_en: `yardarm antenna ${a + 1}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(C(0.02, 0.45, [0, 0, 0], 6), C(0.05, 0.04, [0, -0.2, 0], 6)),
+      material: "cv_steel_dark",
+      mate: A([x, 38.9, 20]),
+    });
+  }
+  for (const side of [-1, 1] as const) {
+    for (const y of [30.6, 32.0]) {
+      add({
+        id: `${P}radar.rwr_${side === -1 ? "l" : "r"}_${y > 31 ? "hi" : "lo"}`,
+        name_cn: `雷达告警阵面 ${side === -1 ? "左" : "右"} ${y > 31 ? "上" : "下"}`,
+        name_en: `RWR panel ${side === -1 ? "l" : "r"}`,
+        assembly: "radar",
+        build_layer: 4,
+        geometry: M(B(0.06, 0.28, 0.4, [0, 0, 0], 0.004)),
+        material: "cv_radar_dark",
+        mate: A([side * 2.38, y, 20]),
+      });
+    }
+    for (const x of [side * 2.0, side * 3.4]) {
+      add({
+        id: `${P}radar.maws_${x > 0 ? "s" : "p"}_${Math.abs(x) > 2.5 ? "o" : "i"}`,
+        name_cn: `导弹逼近告警传感器`,
+        name_en: `MAWS sensor`,
+        assembly: "radar",
+        build_layer: 4,
+        geometry: M(S(0.075, [0, 0, 0], 8), C(0.05, 0.04, [0, -0.06, 0], 8)),
+        material: "cv_radar_dark",
+        mate: A([x, 27.1, 33.05]),
+      });
+    }
+    add({
+      id: `${P}radar.laser_warn_${side === -1 ? "l" : "r"}`,
+      name_cn: `激光告警头 ${side === -1 ? "左" : "右"}`,
+      name_en: `laser warning head ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(0.12, 0.12, 0.05, [0, 0, 0], 0.004), S(0.045, [0, 0, 0.03], 8)),
+      material: "cv_radar_dark",
+      mate: A([side * 1.2, 40.34, 22.3]),
+    });
+    add({
+      id: `${P}radar.iff_platform_${side === -1 ? "l" : "r"}`,
+      name_cn: `桅顶敌我识别振子 ${side === -1 ? "左" : "右"}`,
+      name_en: `platform IFF dipole ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(0.04, 0.34, 0.04, [0, 0, 0], 0.002), B(0.35, 0.04, 0.04, [0, 0.18, 0], 0.002)),
+      material: "cv_steel",
+      mate: A([side * 2.4, 40.47, 22.3]),
+    });
+  }
+  for (const [tag, x, z] of [
+    ["gps", 0.6, 17.9],
+    ["tacan", -0.6, 22.1],
+  ] as const) {
+    add({
+      id: `${P}radar.${tag}_mast`,
+      name_cn: tag === "gps" ? "桅顶卫导天线" : "桅顶塔康天线",
+      name_en: tag === "gps" ? "mast GPS antenna" : "mast TACAN antenna",
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(S(0.1, [0, 0, 0], 10), C(0.05, 0.08, [0, -0.09, 0], 8)),
+      material: "cv_radar",
+      mate: A([x, 40.37, z]),
+    });
+  }
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}radar.anemometer_${side === -1 ? "l" : "r"}`,
+      name_cn: `风速风向仪 ${side === -1 ? "左" : "右"}`,
+      name_en: `anemometer ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(C(0.03, 0.35, [0, 0, 0], 6), B(0.3, 0.02, 0.02, [0, 0.18, 0], 0.002), B(0.02, 0.02, 0.3, [0, 0.18, 0], 0.002)),
+      material: "cv_steel",
+      mate: A([side * 0.8, 40.45, 17.55]),
+    });
+    add({
+      id: `${P}radar.platform_cam_${side === -1 ? "l" : "r"}_a`,
+      name_cn: `桅顶摄像机 ${side === -1 ? "左" : "右"} 1`,
+      name_en: `mast camera ${side === -1 ? "l" : "r"} 1`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(0.14, 0.1, 0.12, [0, 0, 0], 0.004), S(0.04, [0, 0, 0.08], 8)),
+      material: "cv_055_console",
+      mate: A([side * 2.6, 40.34, 18.0]),
+    });
+    add({
+      id: `${P}radar.platform_cam_${side === -1 ? "l" : "r"}_b`,
+      name_cn: `桅顶摄像机 ${side === -1 ? "左" : "右"} 2`,
+      name_en: `mast camera ${side === -1 ? "l" : "r"} 2`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(0.14, 0.1, 0.12, [0, 0, 0], 0.004), S(0.04, [0, 0, 0.08], 8)),
+      material: "cv_055_console",
+      mate: A([side * 2.6, 40.34, 22.0]),
+    });
+  }
+  for (let d = 0; d < 4; d++) {
+    const side = d % 2 === 0 ? -1 : 1;
+    const z = d < 2 ? 23.49 : 16.51;
+    add({
+      id: `${P}radar.datalink_${d + 1}`,
+      name_cn: `数据链阵面 ${d + 1}`,
+      name_en: `datalink array ${d + 1}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(B(0.5, 0.4, 0.06, [0, 0, 0], 0.004)),
+      material: "cv_aesa",
+      mate: A([side * 0.8, 31.5, z], [0, d < 2 ? 0 : 180, 0]),
     });
   }
 
@@ -1639,6 +2023,136 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       scale: [0.001, 0.001, 0.001],
     });
   }
+  // 每个井口独立密封圈 / 单元编号牌 / 模块冷却管
+  for (const cell of allCells) {
+    const y = t55DeckTop(cell.z);
+    add({
+      id: `${P}vls.seal_${cell.bank}_${cell.row}_${cell.col}`,
+      name_cn: `垂发井口密封圈 ${cell.bank}-${cell.row}-${cell.col}`,
+      name_en: `VLS cell seal ${cell.bank}-${cell.row}-${cell.col}`,
+      assembly: "vls",
+      build_layer: 3,
+      geometry: M(T(0.47, 0.43, 0.022, [0, 0, 0], 18)),
+      material: "cv_rubber",
+      mate: A([cell.x, y + 0.02, cell.z]),
+    });
+    add({
+      id: `${P}vls.cell_tag_${cell.bank}_${cell.row}_${cell.col}`,
+      name_cn: `垂发单元编号牌 ${cell.bank}-${cell.row}-${cell.col}`,
+      name_en: `VLS cell number plate ${cell.bank}-${cell.row}-${cell.col}`,
+      assembly: "vls",
+      build_layer: 4,
+      geometry: M(B(0.16, 0.008, 0.08, [0, 0, 0], 0.001)),
+      material: "cv_deck_line",
+      mate: A([cell.x, y + 0.018, cell.z + 0.49]),
+    });
+  }
+  for (const [tag, z0, rows] of [
+    ["fwd", VLS.FWD_Z, VLS.FWD_ROWS],
+    ["aft", VLS.AFT_Z, VLS.AFT_ROWS],
+  ] as const) {
+    for (let r = 0; r < rows; r++) {
+      const z = z0 + r * VLS.PITCH + VLS.PITCH / 2;
+      add({
+        id: `${P}vls.module_cool_${tag}_${r + 1}`,
+        name_cn: `垂发模块冷却管 ${tag} ${r + 1}`,
+        name_en: `VLS module cooling pipe ${tag} ${r + 1}`,
+        assembly: "vls",
+        build_layer: 3,
+        geometry: M({ type: "weld", from: [-3.3, 0, 0], to: [3.3, 0, 0], radius: 0.03 }),
+        material: "cv_copper",
+        mate: A([0, t55DeckTop(z) + 0.025, z]),
+      });
+    }
+    for (let v = 0; v < 4; v++) {
+      add({
+        id: `${P}vls.gas_vent_cell_${tag}_${v + 1}`,
+        name_cn: `垂发燃气排导格栅 ${tag} ${v + 1}`,
+        name_en: `VLS gas vent grille ${tag} ${v + 1}`,
+        assembly: "vls",
+        build_layer: 4,
+        geometry: M(B(0.34, 0.02, 0.5, [0, 0, 0], 0.002), ...Array.from({ length: 4 }, (_, k) => B(0.3, 0.012, 0.04, [0, 0.012, -0.2 + k * 0.13], 0.001))),
+        material: "cv_steel_dark",
+        mate: A([-2.85 + v * 1.9, t55DeckTop(z0 + rows * VLS.PITCH) + 0.03, z0 + rows * VLS.PITCH + 0.45]),
+      });
+    }
+  }
+  // 动态导弹：弹体识别环/电缆槽/TVC/分离螺栓，随导弹节点运动
+  for (const hero of VLS_HEROES) {
+    const tag = hero.tag;
+    const spec = MISSILES[hero.type];
+    const half = spec.length / 2;
+    const radius = spec.diameter / 2;
+    const missileNode = `CV_055_VlsMissile_${tag}`;
+    for (let b = 0; b < 3; b++) {
+      add({
+        id: `${P}vls.body_band_${tag}_${b + 1}`,
+        name_cn: `${spec.label} 弹体识别环 ${tag} ${b + 1}`,
+        name_en: `${spec.label} body band ${tag} ${b + 1}`,
+        assembly: "vls",
+        build_layer: 3,
+        geometry: M(T(radius + 0.008, radius, 0.035, [0, 0, 0], 16)),
+        material: "cv_steel_dark",
+        node: missileNode,
+        mate: A([0, -half * 0.55 + b * half * 0.55, 0]),
+      });
+    }
+    add({
+      id: `${P}vls.raceway_${tag}`,
+      name_cn: `${spec.label} 弹体电缆槽 ${tag}`,
+      name_en: `${spec.label} umbilical raceway ${tag}`,
+      assembly: "vls",
+      build_layer: 3,
+      geometry: M(B(0.05, spec.length * 0.52, 0.04, [0, 0, 0], 0.002)),
+      material: "cv_steel",
+      node: missileNode,
+      mate: A([radius * 0.94, 0, 0]),
+    });
+    for (let a = 0; a < 4; a++) {
+      const ang = (Math.PI * 2 * a) / 4;
+      add({
+        id: `${P}vls.tvc_${tag}_${a + 1}`,
+        name_cn: `${spec.label} 推力矢量作动器 ${tag} ${a + 1}`,
+        name_en: `${spec.label} TVC actuator ${tag} ${a + 1}`,
+        assembly: "vls",
+        build_layer: 3,
+        geometry: M(C(0.035, 0.3, [0, 0, 0], 8), C(0.02, 0.12, [0, 0.21, 0], 6)),
+        material: "cv_steel_dark",
+        node: missileNode,
+        mate: A([Math.cos(ang) * radius * 0.72, -half + 0.3, Math.sin(ang) * radius * 0.72]),
+      });
+    }
+    for (const s of [-1, 1] as const) {
+      add({
+        id: `${P}vls.sep_bolt_${tag}_${s === -1 ? "l" : "r"}`,
+        name_cn: `${spec.label} 分离螺栓 ${tag} ${s === -1 ? "左" : "右"}`,
+        name_en: `${spec.label} separation bolt ${tag} ${s === -1 ? "l" : "r"}`,
+        assembly: "vls",
+        build_layer: 3,
+        geometry: M(C(0.025, 0.08, [0, 0, 0], 6)),
+        material: "cv_steel",
+        node: missileNode,
+        mate: A([s * radius * 0.5, -half + 0.12, 0]),
+      });
+    }
+    if (hero.type === "yj21") {
+      for (let a = 0; a < 4; a++) {
+        const ang = (Math.PI * 2 * a) / 4;
+        add({
+          id: `${P}vls.glider_actuator_${tag}_${a + 1}`,
+          name_cn: `鹰击-21 滑翔体舵机 ${tag} ${a + 1}`,
+          name_en: `YJ-21 glider actuator ${tag} ${a + 1}`,
+          assembly: "vls",
+          build_layer: 3,
+          geometry: M(B(0.06, 0.18, 0.07, [0, 0, 0], 0.003)),
+          material: "cv_steel_dark",
+          node: `CV_055_VlsGlider_${tag}`,
+          mate: A([Math.cos(ang) * 0.26, 0.35, Math.sin(ang) * 0.26]),
+        });
+      }
+    }
+  }
+
   // 阵列框/燃气排导
   for (const [tag, z0, rows] of [
     ["fwd", VLS.FWD_Z, VLS.FWD_ROWS],
@@ -1935,28 +2449,229 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       node: `CV_055_Ciws_${tag}`,
       mate: A([0, 0.45, 0]),
     });
-    const barrels: Array<Parameters<typeof M>[0]> = [];
+    // 11 根炮管各自独立：管体 + 隔热套 + 炮口环，近看能分辨 11 管转管炮。
+    const barrelPositions: Array<[number, number]> = [];
     for (let b = 0; b < 11; b++) {
       const a = (b / 11) * Math.PI * 2;
-      const x = Math.cos(a) * 0.19;
-      const y = Math.sin(a) * 0.19;
-      barrels.push({ type: "weld", from: [x, y, 0], to: [x, y, 2.05], radius: 0.04 });
+      barrelPositions.push([Math.cos(a) * 0.19, Math.sin(a) * 0.19]);
+    }
+    for (const [b, [x, y]] of barrelPositions.entries()) {
+      add({
+        id: `${P}ciws.${tag}_barrel_${pad(b + 1)}`,
+        name_cn: `1130 炮管 ${tag} ${b + 1}`,
+        name_en: `1130 barrel ${tag} ${b + 1}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(
+          { type: "weld", from: [x, y, 0], to: [x, y, 2.05], radius: 0.04 },
+          { type: "weld", from: [x, y, 0.42], to: [x, y, 1.02], radius: 0.055 },
+          { type: "torus", radius: 0.052, tube: 0.014, radialSegments: 6, tubularSegments: 12, at: [x, y, 2.02] },
+        ),
+        material: "cv_steel_dark",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([0, 0.8, 0]),
+      });
     }
     add({
       id: `${P}ciws.${tag}_barrels`,
-      name_cn: `1130 十一管 ${tag}`,
-      name_en: `1130 barrels ${tag}`,
+      name_cn: `1130 炮管束/束紧环 ${tag}`,
+      name_en: `1130 barrel cluster ${tag}`,
       assembly: "weapons",
       build_layer: 4,
       geometry: M(
-        ...barrels,
+        { type: "torus", radius: 0.25, tube: 0.03, radialSegments: 8, tubularSegments: 18, at: [0, 0, 0.38] },
+        { type: "torus", radius: 0.25, tube: 0.03, radialSegments: 8, tubularSegments: 18, at: [0, 0, 1.3] },
+        { type: "torus", radius: 0.24, tube: 0.035, radialSegments: 8, tubularSegments: 18, at: [0, 0, 1.88] },
         C(0.27, 0.34, [0, 0, 0.5], 16),
         C(0.3, 0.12, [0, 0, 1.92], 16),
       ),
-      material: "cv_steel_dark",
+      material: "cv_steel",
       node: `CV_055_Ciws_${tag}`,
       mate: A([0, 0.8, 0]),
     });
+    // 弹鼓/供弹链/炮架耳轴/伺服
+    add({
+      id: `${P}ciws.${tag}_ammo_drum`,
+      name_cn: `1130 弹鼓 ${tag}`,
+      name_en: `1130 ammo drum ${tag}`,
+      assembly: "weapons",
+      build_layer: 4,
+      geometry: M(C(0.34, 0.52, [0, 0, 0], 18), C(0.16, 0.1, [0, 0, 0.3], 12)),
+      material: "cv_steel_dark",
+      node: `CV_055_Ciws_${tag}`,
+      mate: A([-0.62, 0.45, -0.82], [90, 0, 0]),
+    });
+    for (let b = 0; b < 11; b++) {
+      const a = (b / 11) * Math.PI * 2;
+      add({
+        id: `${P}ciws.${tag}_round_${pad(b + 1)}`,
+        name_cn: `1130 弹鼓待发弹 ${tag} ${b + 1}`,
+        name_en: `1130 ready round ${tag} ${b + 1}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(C(0.026, 0.1, [0, 0, 0], 6)),
+        material: "cv_brass",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([-0.9, 0.45 + Math.cos(a) * 0.18, -0.82 + Math.sin(a) * 0.18]),
+      });
+    }
+    for (let s = 0; s < 3; s++) {
+      add({
+        id: `${P}ciws.${tag}_feed_${s + 1}`,
+        name_cn: `1130 供弹链 ${tag} ${s + 1}`,
+        name_en: `1130 feed chute ${tag} ${s + 1}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(B(0.18, 0.14, 0.32, [0, 0, 0], 0.006)),
+        material: "cv_steel_dark",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([-0.44 + s * 0.12, 0.5 + s * 0.06, -0.56 + s * 0.12]),
+      });
+    }
+    for (const s of [-1, 1] as const) {
+      add({
+        id: `${P}ciws.${tag}_trunnion_${s === -1 ? "l" : "r"}`,
+        name_cn: `1130 俯仰耳轴 ${tag} ${s === -1 ? "左" : "右"}`,
+        name_en: `1130 trunnion ${tag} ${s === -1 ? "l" : "r"}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(C(0.09, 0.18, [0, 0, 0], 12), C(0.05, 0.12, [0, 0, 0.12], 10)),
+        material: "cv_steel",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([s * 0.46, 0.82, 0.42], [0, 0, 90]),
+      });
+      add({
+        id: `${P}ciws.${tag}_recoil_${s === -1 ? "l" : "r"}`,
+        name_cn: `1130 制退机 ${tag} ${s === -1 ? "左" : "右"}`,
+        name_en: `1130 recoil damper ${tag} ${s === -1 ? "l" : "r"}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(C(0.06, 0.6, [0, 0, 0], 10)),
+        material: "cv_steel_dark",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([s * 0.3, 0.82, 0.7], [0, 0, 90]),
+      });
+      add({
+        id: `${P}ciws.${tag}_servo_${s === -1 ? "l" : "r"}`,
+        name_cn: `1130 随动伺服 ${tag} ${s === -1 ? "左" : "右"}`,
+        name_en: `1130 servo ${tag} ${s === -1 ? "l" : "r"}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(B(0.2, 0.22, 0.24, [0, 0, 0], 0.008), C(0.05, 0.12, [s * 0.1, 0.16, 0], 10)),
+        material: "cv_steel_dark",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([s * 0.58, 0.35, -0.45]),
+      });
+    }
+    // 光电/雷达跟踪头
+    add({
+      id: `${P}ciws.${tag}_eo`,
+      name_cn: `1130 光电跟踪球 ${tag}`,
+      name_en: `1130 EO director ${tag}`,
+      assembly: "weapons",
+      build_layer: 4,
+      geometry: M(S(0.22, [0, 0, 0], 14), C(0.14, 0.12, [0, -0.18, 0], 10)),
+      material: "cv_radar_dark",
+      node: `CV_055_Ciws_${tag}`,
+      mate: A([0.34, 1.25, 0.18]),
+    });
+    for (let l = 0; l < 3; l++) {
+      add({
+        id: `${P}ciws.${tag}_eo_lens_${l + 1}`,
+        name_cn: `1130 光电窗口 ${tag} ${l + 1}`,
+        name_en: `1130 EO window ${tag} ${l + 1}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(C(0.045, 0.02, [0, 0, 0], 8)),
+        material: l === 1 ? "cv_glass" : "cv_radar",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([0.34 - 0.08 + l * 0.08, 1.25, 0.4], [90, 0, 0]),
+      });
+    }
+    add({
+      id: `${P}ciws.${tag}_track_radar`,
+      name_cn: `1130 跟踪雷达罩 ${tag}`,
+      name_en: `1130 tracking radome ${tag}`,
+      assembly: "weapons",
+      build_layer: 4,
+      geometry: M(S(0.3, [0, 0, 0], 16), C(0.2, 0.16, [0, -0.24, 0], 12)),
+      material: "cv_radar",
+      node: `CV_055_Ciws_${tag}`,
+      mate: A([-0.34, 1.3, 0.02]),
+    });
+    add({
+      id: `${P}ciws.${tag}_radar_yoke`,
+      name_cn: `1130 雷达俯仰架 ${tag}`,
+      name_en: `1130 radar yoke ${tag}`,
+      assembly: "weapons",
+      build_layer: 4,
+      geometry: M(B(0.5, 0.08, 0.08, [0, 0, 0], 0.004), C(0.035, 0.12, [0, 0, 0], 8)),
+      material: "cv_steel_dark",
+      node: `CV_055_Ciws_${tag}`,
+      mate: A([-0.34, 1.02, 0.02]),
+    });
+    // 炮塔检修门/把手
+    for (let p = 0; p < 4; p++) {
+      const ang = 45 + p * 90;
+      const rad = (ang * Math.PI) / 180;
+      add({
+        id: `${P}ciws.${tag}_panel_${p + 1}`,
+        name_cn: `1130 炮塔检修板 ${tag} ${p + 1}`,
+        name_en: `1130 turret access panel ${tag} ${p + 1}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(B(0.34, 0.4, 0.05, [0, 0, 0], 0.004), B(0.12, 0.03, 0.04, [0, -0.12, 0.03], 0.002)),
+        material: "cv_055_hull",
+        node: `CV_055_Ciws_${tag}`,
+        mate: A([Math.cos(rad) * 0.84, 0.5, Math.sin(rad) * 0.84], [0, -ang + 90, 0]),
+      });
+    }
+    // 基座细节
+    for (let b = 0; b < 8; b++) {
+      const a = (Math.PI * 2 * b) / 8;
+      add({
+        id: `${P}ciws.${tag}_base_bolt_${b + 1}`,
+        name_cn: `1130 基座地脚螺栓 ${tag} ${b + 1}`,
+        name_en: `1130 base bolt ${tag} ${b + 1}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(C(0.035, 0.08, [0, 0, 0], 6)),
+        material: "cv_steel",
+        mate: A([Math.cos(a) * 1.0, y - 0.42, z + Math.sin(a) * 1.0]),
+      });
+    }
+    add({
+      id: `${P}ciws.${tag}_train_ring`,
+      name_cn: `1130 回转齿圈 ${tag}`,
+      name_en: `1130 training ring ${tag}`,
+      assembly: "weapons",
+      build_layer: 4,
+      geometry: M(T(0.95, 0.8, 0.1, [0, 0, 0], 20)),
+      material: "cv_steel_dark",
+      mate: A([0, y - 0.3, z]),
+    });
+    add({
+      id: `${P}ciws.${tag}_ammo_hatch`,
+      name_cn: `1130 弹舱门 ${tag}`,
+      name_en: `1130 ammo hatch ${tag}`,
+      assembly: "weapons",
+      build_layer: 4,
+      geometry: M(B(0.6, 0.12, 0.4, [0, 0, 0], 0.006), B(0.18, 0.04, 0.05, [0, 0.02, 0.2], 0.003)),
+      material: "cv_055_hull",
+      mate: A([0, y - 0.36, z + 0.95]),
+    });
+    for (let s = 0; s < 5; s++) {
+      add({
+        id: `${P}ciws.${tag}_ladder_${s + 1}`,
+        name_cn: `1130 炮位直梯踏棍 ${tag} ${s + 1}`,
+        name_en: `1130 ladder rung ${tag} ${s + 1}`,
+        assembly: "weapons",
+        build_layer: 4,
+        geometry: M(B(0.05, 0.04, 0.4, [0, 0, 0], 0.003)),
+        material: "cv_steel_dark",
+        mate: A([0, y - 0.55 + s * 0.22, z + 1.0]),
+      });
+    }
   }
   for (const [tag, z] of [["fwd", 42.6], ["aft", -62]] as const) {
     add({

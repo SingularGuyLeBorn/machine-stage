@@ -41,6 +41,17 @@ describe("055 型驱逐舰", () => {
     expect(built.getNode("CV_055_GT1_Rotor")).toBeDefined();
     expect(built.getPart("type055.power.gt1_rotor")).toBeDefined();
     expect(built.getPart("type055.vls.missile_fwd_3")).toBeDefined();
+    expect(built.getPart("type055.vls.seal_fwd_0_0")).toBeDefined();
+    expect(built.getPart("type055.radar.tr_cover_front_08_08")).toBeDefined();
+    expect(built.getPart("type055.radar.tr_cover_outer_front_08_08")).toBeDefined();
+    expect(built.getPart("type055.ciws.fwd_barrel_11")).toBeDefined();
+    expect(built.getPart("type055.hangar.z20_pad_detail_skin_up_l_1_1")).toBeDefined();
+    const z20PadParts = built.parts.filter((part) => part.partId.includes(".z20_pad_")).length;
+    const z20HangarParts = built.parts.filter((part) => part.partId.includes(".z20_hangar_l_")).length;
+    expect(z20PadParts).toBeGreaterThanOrEqual(1000);
+    expect(z20HangarParts).toBeGreaterThanOrEqual(1000);
+    expect(built.parts.filter((part) => /^type055\.ciws\.(fwd|aft)_barrel_\d+$/.test(part.partId))).toHaveLength(22);
+    expect(built.parts.filter((part) => /tr_cover_(outer_)?(front|aft|port|starboard)_/.test(part.partId))).toHaveLength(512);
     expect(VLS_HEROES).toHaveLength(16);
     expect(built.getPart("type055.vls.hatch_hero_fwd_0")).toBeDefined();
     expect(built.getPart("type055.vls.hatch_hero_fwd_7")).toBeDefined();

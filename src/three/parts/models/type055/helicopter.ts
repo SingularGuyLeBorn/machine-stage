@@ -1,5 +1,6 @@
 import type { GeometrySpec, MateSpec } from "../../registry/types";
 import { A, B, C, M, S, T, type CarrierCtx } from "../carrier/common";
+import { addZ20Details } from "./helicopterDetails";
 
 // ============================================================================
 // models/type055/helicopter —— 直-20 舰载直升机（反潜/通用）
@@ -281,4 +282,6 @@ export function addZ20(ctx: CarrierCtx, opts: Z20Options): void {
       A([side * 1.245, 1.9, 2.4]),
     );
   }
+
+  addZ20Details({ add, folded, root, mainRotor, tailRotor });
 }
