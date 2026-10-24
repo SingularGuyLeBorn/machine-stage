@@ -3758,258 +3758,644 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     mate: A([0, DECK + 8.3, 22.6]),
   });
 
-  // ---------------- 船员生活舱（水下住舱/餐厅/厨房/卫生/储物） ----------------
-  // 位置：主甲板下、机舱之前，避开 VLS 与动力舱。
+  // ---------------- 船员生活区：走廊 + 8 个独立舱室（不是一个大通舱） ----------------
+  // 公开资料：055 编制约 300 人，士兵 8 人间、带衣柜/电视/木纹家具，军官单人间；
+  // 舰上有大食堂、休息室、阅览室、健身房、洗衣房/超市。这里把水下生活甲板做成
+  // 一条 1.8m 走廊，两舷各 4 个功能舱：水兵住舱 A/B、士官舱、军官舱、
+  // 餐厅、厨房/冷藏、医务室、健身/洗衣/阅览。每个舱室的床位、家具、配色都不同。
   const crewFloor = 2.55;
+  const FT = crewFloor + 0.05; // 地板面
+  const CH = 5.42; // 天花底面
+  const BH = CH - FT;
+  const XO = 4.2; // 生活区外壁
+  const XC = 0.94; // 走廊壁
+  const WT = 0.08; // 舱壁厚
+  const crewPart = (
+    id: string,
+    name_cn: string,
+    geometry: Parameters<typeof M>[0],
+    material: string,
+    at: [number, number, number] = [0, 0, 0],
+    rotation?: [number, number, number],
+  ) =>
+    add({
+      id: `${P}interior.crew_${id}`,
+      name_cn,
+      name_en: `crew ${id.replace(/_/g, " ")}`,
+      assembly: "interior",
+      build_layer: 3,
+      geometry,
+      material,
+      mate: A(at, rotation),
+    });
+
+  // 外壳：地板/天花/四壁；走廊两端各一道水密门。
   add({
     id: `${P}interior.crew_shell`,
-    name_cn: "船员生活舱围壁/甲板",
-    name_en: "crew living compartment shell",
+    name_cn: "船员生活区围壁/甲板",
+    name_en: "crew living deck shell",
     assembly: "interior",
     build_layer: 1,
     geometry: M(
-      B(8.4, 0.1, 16.0, [0, crewFloor, 0], 0.01),
-      B(8.4, 0.08, 16.0, [0, 5.52, 0], 0.01),
-      B(0.1, 2.9, 16.0, [-4.2, 4.05, 0], 0.01),
-      B(0.1, 2.9, 16.0, [4.2, 4.05, 0], 0.01),
-      B(8.4, 2.9, 0.1, [0, 4.05, -8.0], 0.01),
-      B(8.4, 2.9, 0.1, [0, 4.05, 8.0], 0.01),
-      B(1.1, 2.1, 0.12, [0, 3.7, 7.95], 0.01),
-      B(1.1, 2.1, 0.12, [0, 3.7, -7.95], 0.01),
+      B(XO * 2, 0.1, 16.0, [0, crewFloor, 0], 0.01),
+      B(XO * 2, 0.08, 16.0, [0, CH + 0.04, 0], 0.01),
+      B(0.1, BH, 16.0, [-XO, FT + BH / 2, 0], 0.01),
+      B(0.1, BH, 16.0, [XO, FT + BH / 2, 0], 0.01),
+      B(XO * 2, BH, 0.1, [0, FT + BH / 2, -8.0], 0.01),
+      B(XO * 2, BH, 0.1, [0, FT + BH / 2, 8.0], 0.01),
     ),
-    material: "cv_055_acoustic",
+    material: "cv_055_bulkhead",
     mate: A([0, 0, 0]),
   });
-  add({
-    id: `${P}interior.crew_carpet`,
-    name_cn: "生活舱地毯/防滑走道",
-    name_en: "crew carpet",
-    assembly: "interior",
-    build_layer: 2,
-    geometry: M(B(8.0, 0.02, 15.6, [0, crewFloor + 0.06, 0], 0.004), B(2.0, 0.02, 13.0, [0, crewFloor + 0.07, 0], 0.004)),
-    material: "cv_055_carpet",
-    mate: A([0, 0, 0]),
-  });
-  add({
-    id: `${P}interior.crew_ceiling_lights`,
-    name_cn: "生活舱顶灯 ×8",
-    name_en: "crew ceiling lights ×8",
-    assembly: "interior",
-    build_layer: 3,
-    geometry: M(
-      ...[-6, -2, 2, 6].flatMap((z) => [
-        B(1.2, 0.05, 0.35, [-2.3, 5.46, z], 0.004),
-        B(1.2, 0.05, 0.35, [2.3, 5.46, z], 0.004),
-      ]),
-    ),
-    material: "cv_055_lamp",
-    mate: A([0, 0, 0]),
-  });
-
-  // 三层铺位两列 + 床垫/枕头/隐私帘/爬梯/个人柜
-  const bunkFrame: Array<ReturnType<typeof B>> = [];
-  const bunkMattress: Array<ReturnType<typeof B>> = [];
-  const bunkBedding: Array<ReturnType<typeof B>> = [];
-  for (const side of [-1, 1] as const) {
-    const bx = side * 3.2;
-    for (const [tier, y] of [2.95, 3.7, 4.45].entries()) {
-      bunkFrame.push(B(0.9, 0.06, 3.9, [bx, y, -4.0], 0.008));
-      for (const z of [-5.95, -2.05]) {
-        bunkFrame.push(B(0.06, 1.7, 0.06, [bx - 0.42, y + 0.85, z], 0.004));
-        bunkFrame.push(B(0.06, 1.7, 0.06, [bx + 0.42, y + 0.85, z], 0.004));
-      }
-      bunkFrame.push(B(0.06, 0.045, 3.9, [bx + 0.42, y + 1.25, -4.0], 0.004));
-      bunkFrame.push(B(0.06, 0.045, 3.9, [bx - 0.42, y + 1.25, -4.0], 0.004));
-      bunkFrame.push(B(0.05, 0.05, 3.6, [bx + 0.45, y + 1.22, -4.0], 0.004));
-      bunkMattress.push(B(0.82, 0.16, 1.85, [bx, y + 0.11, -4.6], 0.035));
-      bunkBedding.push(B(0.7, 0.08, 0.34, [bx, y + 0.22, -5.35], 0.02));
-      bunkBedding.push(B(0.78, 0.04, 1.0, [bx, y + 0.22, -4.0], 0.01));
-      if (tier === 0) {
-        bunkFrame.push(B(0.8, 0.45, 1.2, [bx, crewFloor + 0.28, -2.4], 0.01));
-      }
-    }
-    bunkFrame.push(B(0.06, 1.7, 0.06, [bx, 3.6, -1.95], 0.004));
-    bunkFrame.push(B(0.5, 0.04, 0.3, [bx, 3.9, -1.95], 0.004));
-    for (let r = 0; r < 5; r++) bunkFrame.push(B(0.4, 0.035, 0.06, [bx, 3.1 + r * 0.34, -1.95], 0.003));
+  crewPart("corridor_floor", "生活区走廊防滑地板", M(B(1.72, 0.02, 15.8, [0, FT + 0.01, 0], 0.003)), "cv_055_carpet");
+  for (const [tag, z] of [["aft", -7.9], ["fwd", 7.9]] as const) {
+    crewPart(
+      `corridor_wt_door_${tag}`,
+      `生活区${tag === "aft" ? "后" : "前"}水密门`,
+      M(
+        B(1.4, 2.2, 0.1, [0, FT + 1.1, z], 0.008),
+        B(0.14, 2.3, 0.16, [-0.77, FT + 1.15, z], 0.006),
+        B(0.14, 2.3, 0.16, [0.77, FT + 1.15, z], 0.006),
+        C(0.05, 0.12, [0.5, FT + 1.1, z + 0.07], 12),
+        B(0.5, 0.1, 0.04, [0, FT + 2.05, z + 0.07], 0.004),
+      ),
+      "cv_055_console",
+    );
   }
-  add({
-    id: `${P}interior.crew_bunk_frames`,
-    name_cn: "船员三层铺位/爬梯/床架",
-    name_en: "crew bunk frames",
-    assembly: "interior",
-    build_layer: 2,
-    geometry: M(...bunkFrame),
-    material: "cv_steel_dark",
-    mate: A([0, 0, 0]),
-  });
-  add({
-    id: `${P}interior.crew_bunk_mattresses`,
-    name_cn: "船员床垫",
-    name_en: "crew mattresses",
-    assembly: "interior",
-    build_layer: 3,
-    geometry: M(...bunkMattress),
-    material: "cv_upholstery",
-    mate: A([0, 0, 0]),
-  });
-  add({
-    id: `${P}interior.crew_bedding`,
-    name_cn: "船员床单/枕头",
-    name_en: "crew bedding",
-    assembly: "interior",
-    build_layer: 3,
-    geometry: M(...bunkBedding),
-    material: "cv_deck_line",
-    mate: A([0, 0, 0]),
+
+  // ---- 舱壁：走廊纵壁（留门洞）+ 各舱横壁 ----
+  const wallGeos: Array<ReturnType<typeof B>> = [];
+  const frameGeos: Array<ReturnType<typeof B>> = [];
+  const leafGeos: Array<ReturnType<typeof B>> = [];
+  const doorDetailGeos: Array<ReturnType<typeof B>> = [];
+  const doorGlassGeos: Array<ReturnType<typeof B>> = [];
+  const portDoors = [
+    { z: -6.3, w: 1.0, tag: "berth_a" },
+    { z: -4.1, w: 0.8, tag: "head_1" },
+    { z: -1.6, w: 0.95, tag: "berth_b" },
+    { z: 1.9, w: 0.95, tag: "nco" },
+    { z: 4.55, w: 0.9, tag: "officer_1" },
+    { z: 6.85, w: 0.9, tag: "officer_2" },
+  ] as const;
+  const starDoors = [
+    { z: -5.9, w: 1.0, tag: "mess" },
+    { z: -1.7, w: 0.95, tag: "galley" },
+    { z: 2.0, w: 0.95, tag: "medical" },
+    { z: 4.1, w: 0.8, tag: "head_2" },
+    { z: 6.3, w: 0.95, tag: "rec" },
+  ] as const;
+  for (const [side, doors] of [
+    [-1, portDoors],
+    [1, starDoors],
+  ] as const) {
+    const x = side * XC;
+    const edges = [-8.0, ...doors.flatMap((d) => [d.z - d.w / 2, d.z + d.w / 2]), 8.0];
+    for (let i = 0; i < edges.length; i += 2) {
+      const a = edges[i]!;
+      const b = edges[i + 1]!;
+      if (b - a > 0.01) wallGeos.push(B(WT, BH, b - a, [x, FT + BH / 2, (a + b) / 2], 0.004));
+    }
+    for (const d of doors) {
+      // 门楣 + 门框
+      wallGeos.push(B(WT, BH - 2.15, d.w + 0.16, [x, FT + 2.15 + (BH - 2.15) / 2, d.z], 0.004));
+      frameGeos.push(B(0.14, 2.22, 0.1, [x, FT + 1.11, d.z - d.w / 2 - 0.05], 0.004));
+      frameGeos.push(B(0.14, 2.22, 0.1, [x, FT + 1.11, d.z + d.w / 2 + 0.05], 0.004));
+      frameGeos.push(B(0.14, 0.12, d.w + 0.2, [x, FT + 2.18, d.z], 0.004));
+      // 门扇：全部向舱内开启，贴在舱壁内侧；厕所门半掩。
+      // 门扇开启后贴平在舱壁内侧（不是横在舱室中间挡视线），门洞保持通透。
+      const leafX = side * (XC + 0.06);
+      const leafZ = d.z - d.w - 0.02;
+      leafGeos.push(B(0.035, 2.05, d.w - 0.06, [leafX, FT + 1.03, leafZ], 0.004));
+      doorGlassGeos.push(B(0.006, 0.32, 0.3, [leafX + side * 0.02, FT + 1.55, leafZ], 0.002));
+      doorDetailGeos.push(B(0.012, 0.18, d.w - 0.12, [leafX + side * 0.02, FT + 0.13, leafZ], 0.002));
+      doorDetailGeos.push(B(0.03, 0.18, 0.035, [leafX + side * 0.03, FT + 1.02, leafZ + d.w / 2 - 0.1], 0.003));
+      doorDetailGeos.push(C(0.02, 0.06, [leafX + side * 0.03, FT + 1.02, leafZ + d.w / 2 - 0.12], 8));
+    }
+  }
+  // 横向舱壁（每个功能舱的隔壁）
+  for (const [side, boundaries] of [
+    [-1, [-4.6, -3.6, 0.4, 3.4, 5.7]],
+    [1, [-3.8, 0.4, 3.6, 4.6]],
+  ] as const) {
+    const x0 = side * XC;
+    const x1 = side * XO;
+    const w = Math.abs(x1 - x0);
+    for (const z of boundaries) {
+      wallGeos.push(B(w, BH, WT, [(x0 + x1) / 2, FT + BH / 2, z], 0.004));
+    }
+  }
+  // 军官舱/厕所内部隔墙
+  wallGeos.push(B(0.9, BH, WT, [-3.75, FT + BH / 2, 5.7], 0.004)); // 军官1/2 之间保留
+  wallGeos.push(B(1.4, BH, WT, [-3.5, FT + BH / 2, 7.05], 0.004)); // 军官2 独立卫浴
+  wallGeos.push(B(WT, BH, 1.4, [-2.8, FT + BH / 2, 7.0], 0.004));
+  crewPart("partitions", "生活区舱壁/门洞", M(...wallGeos), "cv_055_acoustic");
+  crewPart("door_frames", "生活区门框/把手", M(...frameGeos), "cv_steel");
+  crewPart("door_leaves", "生活区舱门（开启）", M(...leafGeos), "cv_055_ceiling");
+  crewPart("door_details", "舱门踢脚板/把手", M(...doorDetailGeos), "cv_steel");
+  crewPart("door_glass", "舱门观察窗", M(...doorGlassGeos), "cv_clear_glass");
+
+  // 门楣上的舱室标识牌（用颜色区分功能，避免满墙无信息）
+  const signMats = ["cv_deck_red", "cv_deck_yellow", "cv_deck_line", "cv_055_seat", "cv_berth_olive"];
+  [...portDoors, ...starDoors].forEach((d, i) => {
+    add({
+      id: `${P}interior.crew_door_sign_${i + 1}`,
+      name_cn: `生活区舱室标识牌 ${d.tag}`,
+      name_en: `crew door sign ${d.tag}`,
+      assembly: "interior",
+      build_layer: 3,
+      geometry: M(B(0.02, 0.16, 0.46, [0, 0, 0], 0.002)),
+      material: signMats[i % signMats.length]!,
+      mate: A([i < portDoors.length ? -(XC - 0.055) : XC - 0.055, FT + 2.34, d.z]),
+    });
   });
 
-  // 个人储物柜、餐桌、长凳、厨房、卫生间、休息区
-  add({
-    id: `${P}interior.crew_lockers`,
-    name_cn: "个人储物柜 ×8",
-    name_en: "personal lockers ×8",
-    assembly: "interior",
-    build_layer: 3,
-    geometry: M(
-      ...Array.from({ length: 8 }, (_, i) =>
-        B(0.5, 1.1, 0.42, [-1.95 + (i % 4) * 1.3, 3.2, 6.75], 0.008),
-      ),
-      ...Array.from({ length: 8 }, (_, i) =>
-        B(0.05, 0.18, 0.04, [-1.95 + (i % 4) * 1.3 + 0.16, 3.2, 6.52], 0.004),
-      ),
+  // 各舱地板/天花/顶灯
+  const floorTile = (x0: number, x1: number, z0: number, z1: number) =>
+    B(x1 - x0, 0.012, z1 - z0, [(x0 + x1) / 2, FT + 0.012, (z0 + z1) / 2], 0.002);
+  crewPart(
+    "cabin_floors",
+    "住舱/餐厅/医务室地板",
+    M(
+      floorTile(-XO + 0.03, -XC - 0.02, -8, -4.6),
+      floorTile(-XO + 0.03, -XC - 0.02, -3.6, 8),
+      floorTile(XC + 0.02, XO - 0.03, -8, 4.6),
+      floorTile(XC + 0.02, XO - 0.03, 4.6, 8),
     ),
-    material: "cv_055_console",
-    mate: A([0, 0, 0]),
-  });
-  add({
-    id: `${P}interior.crew_mess`,
-    name_cn: "船员餐桌/长凳",
-    name_en: "crew mess table",
-    assembly: "interior",
-    build_layer: 3,
-    geometry: M(
-      B(2.6, 0.08, 1.1, [0, 3.3, 2.8], 0.02),
-      B(0.1, 0.7, 0.9, [-1.0, 2.95, 2.8], 0.008),
-      B(0.1, 0.7, 0.9, [1.0, 2.95, 2.8], 0.008),
-      B(2.4, 0.06, 0.35, [0, 3.0, 3.55], 0.01),
-      B(2.4, 0.06, 0.35, [0, 3.0, 2.05], 0.01),
-      B(2.3, 0.45, 0.08, [0, 3.2, 3.72], 0.01),
-      B(2.3, 0.45, 0.08, [0, 3.2, 1.88], 0.01),
-      B(0.34, 0.18, 0.02, [-0.6, 3.45, 2.8], 0.006),
-      C(0.05, 0.1, [0.55, 3.4, 2.8], 12),
-      C(0.05, 0.1, [0.35, 3.4, 2.65], 12),
+    "cv_deck_tile",
+  );
+  crewPart(
+    "wet_floors",
+    "厨房/厕所/淋浴间地砖",
+    M(
+      floorTile(XC + 0.02, XO - 0.03, -3.8, 0.4),
+      floorTile(-XO + 0.03, -XC - 0.02, -4.6, -3.6),
+      floorTile(XC + 0.02, XO - 0.03, 3.6, 4.6),
+      floorTile(-3.45, -2.82, 6.35, 7.68),
     ),
-    material: "cv_055_console_top",
-    mate: A([0, 0, 0]),
-  });
-  add({
-    id: `${P}interior.crew_mess_seats`,
-    name_cn: "船员餐椅 ×4",
-    name_en: "crew mess stools ×4",
-    assembly: "interior",
-    build_layer: 3,
-    geometry: M(
-      ...[-0.8, 0, 0.8, 1.6].flatMap((x) => [
-        C(0.08, 0.45, [x - 0.9, 2.95, 3.55], 10),
-        B(0.4, 0.06, 0.4, [x - 0.9, 3.22, 3.55], 0.02),
-      ]),
+    "cv_deck_tile",
+  );
+  const lightBars: Array<ReturnType<typeof B>> = [];
+  for (const z of [-6.6, -4.2, -1.8, 0.6, 3.0, 5.4, 7.4]) {
+    lightBars.push(B(0.1, 0.04, 1.2, [-2.55, CH - 0.04, z], 0.003));
+    lightBars.push(B(0.1, 0.04, 1.2, [2.55, CH - 0.04, z], 0.003));
+  }
+  for (const z of [-6.2, -2.4, 1.4, 5.2]) lightBars.push(B(0.8, 0.04, 0.1, [0, CH - 0.04, z], 0.003));
+  crewPart("ceiling_lights", "生活区顶灯/走廊灯带 ×18", M(...lightBars), "cv_055_lamp");
+  crewPart(
+    "ceiling_panels",
+    "住舱/餐厅白色吸音顶板",
+    M(
+      B(1.68, 0.02, 15.8, [0, CH - 0.025, 0], 0.003),
+      B(3.2, 0.02, 3.3, [-2.57, CH - 0.025, -6.3], 0.003),
+      B(3.2, 0.02, 4.2, [-2.57, CH - 0.025, -1.6], 0.003),
+      B(3.2, 0.02, 4.4, [-2.57, CH - 0.025, 4.7], 0.003),
+      B(3.2, 0.02, 4.2, [2.57, CH - 0.025, -5.9], 0.003),
+      B(3.2, 0.02, 3.2, [2.57, CH - 0.025, 1.9], 0.003),
+      B(3.2, 0.02, 3.4, [2.57, CH - 0.025, 6.3], 0.003),
     ),
-    material: "cv_upholstery",
-    mate: A([0, 0, 0]),
-  });
-  add({
-    id: `${P}interior.crew_galley`,
-    name_cn: "生活舱厨房/配餐台",
-    name_en: "crew galley",
-    assembly: "interior",
-    build_layer: 3,
-    geometry: M(
-      B(0.7, 0.9, 4.0, [-3.8, 3.0, 4.0], 0.02),
-      B(0.75, 0.06, 4.0, [-3.8, 3.48, 4.0], 0.01),
-      B(0.55, 0.06, 1.1, [-3.8, 3.53, 3.0], 0.006),
-      B(0.55, 0.06, 0.7, [-3.8, 3.53, 4.8], 0.006),
-      B(0.8, 1.8, 0.85, [-3.75, 3.45, 7.1], 0.02),
-      B(0.8, 0.06, 0.85, [-3.75, 4.38, 7.1], 0.01),
-      B(0.3, 1.0, 0.3, [-3.8, 4.15, 2.7], 0.006),
-      B(0.8, 0.5, 0.8, [-3.8, 4.55, 3.9], 0.01),
+    "cv_055_ceiling",
+  );
+
+  // ---- 铺位/家具：按舱室分别构建，不共享同一套几何 ----
+  const frame: Array<ReturnType<typeof B>> = [];
+  const mattress: Array<ReturnType<typeof B>> = [];
+  const bedding: Record<"navy" | "grey" | "olive" | "tan" | "red", Array<ReturnType<typeof B>>> = {
+    navy: [],
+    grey: [],
+    olive: [],
+    tan: [],
+    red: [],
+  };
+  const beddingMat: Record<keyof typeof bedding, string> = {
+    navy: "cv_berth_navy",
+    grey: "cv_berth_grey",
+    olive: "cv_berth_olive",
+    tan: "cv_berth_tan",
+    red: "cv_berth_red",
+  };
+  const curtainGeos: Array<ReturnType<typeof B>> = [];
+  const bunkProps: Array<ReturnType<typeof B>> = [];
+  const rack = (
+    cx: number,
+    cz: number,
+    tiers: number,
+    color: keyof typeof bedding,
+    len = 2.0,
+    wid = 0.9,
+    curtainSide: 1 | -1 = 1,
+  ) => {
+    const tierY = tiers === 3 ? [0.34, 1.02, 1.7] : [0.4, 1.2];
+    for (const y of tierY) {
+      frame.push(B(wid, 0.07, len, [cx, FT + y, cz], 0.008));
+      frame.push(B(0.06, 1.98, 0.06, [cx - wid / 2 + 0.03, FT + 0.99, cz - len / 2 + 0.03], 0.004));
+      frame.push(B(0.06, 1.98, 0.06, [cx - wid / 2 + 0.03, FT + 0.99, cz + len / 2 - 0.03], 0.004));
+      frame.push(B(0.06, 1.98, 0.06, [cx + wid / 2 - 0.03, FT + 0.99, cz - len / 2 + 0.03], 0.004));
+      frame.push(B(0.06, 1.98, 0.06, [cx + wid / 2 - 0.03, FT + 0.99, cz + len / 2 - 0.03], 0.004));
+      mattress.push(B(wid - 0.05, 0.12, len - 0.1, [cx, FT + y + 0.1, cz], 0.03));
+      bedding[color]!.push(B(0.5, 0.07, 0.3, [cx, FT + y + 0.2, cz + len / 2 - 0.22], 0.02));
+      bedding[color]!.push(B(wid - 0.08, 0.03, 0.95, [cx, FT + y + 0.19, cz - 0.1], 0.01));
+      frame.push(B(0.05, 0.05, 0.12, [cx + wid / 2 - 0.07, FT + y + 0.42, cz + len / 2 - 0.1], 0.003));
+      // 隐私帘只拉一半，不同铺位长短不一；金属帘盒与挂环在床架上。
+      curtainGeos.push(B(0.018, 0.5, len * 0.62, [cx + curtainSide * (wid / 2 + 0.035), FT + y + 0.35, cz - len * 0.12], 0.003));
+      frame.push(B(0.04, 0.04, len, [cx + curtainSide * (wid / 2 + 0.035), FT + y + 0.9, cz], 0.002));
+    }
+    // 爬梯/底部个人柜
+    for (const dz of [-len / 2 + 0.12, len / 2 - 0.12]) {
+      frame.push(B(0.05, 1.9, 0.05, [cx + wid / 2 + 0.06, FT + 0.95, cz + dz], 0.003));
+      for (let r = 0; r < 4; r++) frame.push(B(0.32, 0.03, 0.04, [cx + wid / 2 + 0.06, FT + 0.35 + r * 0.45, cz + dz], 0.002));
+    }
+    frame.push(B(wid - 0.12, 0.28, len - 0.18, [cx, FT + 0.16, cz], 0.006));
+    frame.push(B(wid - 0.18, 0.02, 0.04, [cx, FT + 0.24, cz - len / 2 + 0.12], 0.002));
+    // 每个铺位的私人物品不完全一样：书/耳机/水杯/背包/毛巾
+    bunkProps.push(B(0.24, 0.05, 0.32, [cx + wid * 0.15, FT + 0.52, cz + len / 2 - 0.45], 0.004));
+    bunkProps.push(B(0.16, 0.22, 0.28, [cx - wid * 0.18, FT + 0.9, cz + len / 2 - 0.55], 0.02));
+    bunkProps.push(B(0.18, 0.03, 0.26, [cx - wid * 0.12, FT + 1.28, cz - len / 2 + 0.35], 0.003));
+  };
+  // A 舱（8 人，2 层铺 ×4，深蓝/灰）
+  rack(-3.62, -7.15, 2, "navy", 2.0, 0.9, 1);
+  rack(-3.62, -5.05, 2, "grey", 2.0, 0.9, 1);
+  rack(-1.5, -7.15, 2, "navy", 2.0, 0.9, -1);
+  rack(-1.5, -5.05, 2, "grey", 2.0, 0.9, -1);
+  // B 舱（8 人，2 层铺 ×4，橄榄/沙色，另加中央条桌）
+  rack(-3.62, -2.5, 2, "olive", 2.0, 0.9, 1);
+  rack(-3.62, -0.4, 2, "tan", 2.0, 0.9, 1);
+  rack(-1.5, -2.5, 2, "tan", 2.0, 0.9, -1);
+  rack(-1.5, -0.4, 2, "olive", 2.0, 0.9, -1);
+  // 士官舱（4 人，2 层铺 ×2，灰/深蓝）
+  rack(-3.62, 1.45, 2, "grey", 1.9, 0.9, 1);
+  rack(-3.62, 3.0, 2, "navy", 1.2, 0.9, 1);
+  // 军官舱（单人床）
+  frame.push(B(1.0, 0.05, 2.0, [-3.5, FT + 0.62, 4.5], 0.01));
+  for (const z of [3.55, 5.45]) frame.push(B(0.08, 0.55, 0.08, [-3.95, FT + 0.3, z], 0.004));
+  frame.push(B(1.0, 0.05, 0.06, [-3.5, FT + 0.95, 3.55], 0.004));
+  mattress.push(B(0.95, 0.16, 1.95, [-3.5, FT + 0.73, 4.5], 0.03));
+  bedding.navy.push(B(0.6, 0.09, 0.35, [-3.5, FT + 0.86, 3.75], 0.02));
+  bedding.navy.push(B(0.9, 0.04, 1.05, [-3.5, FT + 0.85, 4.6], 0.01));
+  frame.push(B(1.15, 0.05, 2.05, [-3.5, FT + 0.05, 7.25], 0.01));
+  for (const z of [6.35, 8.0]) frame.push(B(0.08, 0.5, 0.08, [-4.0, FT + 0.27, z], 0.004));
+  mattress.push(B(1.1, 0.16, 2.0, [-3.5, FT + 0.16, 7.25], 0.03));
+  bedding.tan.push(B(0.7, 0.1, 0.38, [-3.5, FT + 0.3, 6.45], 0.02));
+  bedding.tan.push(B(1.0, 0.05, 1.1, [-3.5, FT + 0.29, 7.4], 0.01));
+  crewPart("bunk_frames", "生活区铺位/床架/爬梯/个人柜", M(...frame), "cv_055_console");
+  crewPart("bunk_mattresses", "生活区床垫", M(...mattress), "cv_mattress");
+  for (const color of Object.keys(bedding) as Array<keyof typeof bedding>) {
+    const geos = bedding[color];
+    if (geos.length) crewPart(`bedding_${color}`, `生活区被褥/枕头（${color}）`, M(...geos), beddingMat[color]!);
+  }
+
+  crewPart("bunk_curtains", "铺位隐私帘", M(...curtainGeos), "cv_berth_grey");
+  crewPart("bunk_personal", "铺位上的书/耳机/水杯/背包", M(...bunkProps), "cv_055_console");
+
+  // A 舱：可折叠小桌 + 壁挂电视 + 风扇
+  crewPart(
+    "berth_a_extras",
+    "水兵住舱折叠桌/壁挂电视/风扇",
+    M(
+      B(0.35, 0.04, 1.15, [-1.12, FT + 0.74, -6.0], 0.006),
+      B(0.03, 0.7, 0.03, [-1.28, FT + 0.37, -6.5], 0.003),
+      B(0.03, 0.7, 0.03, [-1.28, FT + 0.37, -5.5], 0.003),
+      B(0.04, 0.55, 0.95, [-1.0, FT + 1.62, -6.55], 0.004),
+      B(0.02, 0.46, 0.82, [-0.975, FT + 1.62, -6.55], 0.002),
+      C(0.12, 0.06, [-2.55, CH - 0.18, -7.2], 12),
+      B(0.1, 0.1, 0.1, [-2.55, CH - 0.1, -7.2], 0.004),
     ),
-    material: "cv_steel_dark",
-    mate: A([0, 0, 0]),
-  });
-  add({
-    id: `${P}interior.crew_galley_white`,
-    name_cn: "厨房台面/水槽/灶台",
-    name_en: "galley worktops",
-    assembly: "interior",
-    build_layer: 3,
-    geometry: M(
-      B(0.7, 0.05, 1.4, [-3.8, 3.5, 3.9], 0.01),
-      B(0.4, 0.02, 0.5, [-3.8, 3.53, 4.2], 0.006),
-      B(0.42, 0.03, 0.62, [-3.8, 3.54, 5.3], 0.006),
-      B(0.5, 0.03, 0.42, [-3.8, 3.54, 2.4], 0.006),
+    "cv_055_wood",
+  );
+
+  crewPart(
+    "berth_a_tv",
+    "水兵住舱壁挂电视屏幕",
+    M(B(0.012, 0.46, 0.82, [-1.03, FT + 1.62, -6.55], 0.002)),
+    "cv_scr_camera",
+  );
+
+  // 各舱室家具：木纹/布面/金属分开，细节各不相同
+  const wood: Array<ReturnType<typeof B>> = [];
+  const dark: Array<ReturnType<typeof B>> = [];
+  const fabric: Array<ReturnType<typeof B>> = [];
+  const white: Array<ReturnType<typeof B>> = [];
+  const displayGeos: Array<Parameters<typeof M>[0]> = [];
+  const props: Array<Parameters<typeof M>[0]> = [];
+  // A 舱：床头柜/折叠凳/挂衣钩/风扇/照片
+  for (const z of [-7.9, -4.4]) {
+    wood.push(B(0.5, 0.5, 0.35, [-1.3, FT + 0.28, z], 0.006));
+    wood.push(B(0.02, 0.3, 0.03, [-1.06, FT + 0.28, z], 0.002));
+  }
+  props.push(B(0.35, 0.04, 0.35, [-2.6, FT + 0.45, -6.1], 0.006));
+  props.push(B(0.03, 0.42, 0.03, [-2.6, FT + 0.23, -6.1], 0.002));
+  props.push(B(0.3, 0.02, 0.3, [-2.6, FT + 0.42, -6.1], 0.004));
+  // B 舱：中央条桌/长凳/电视/吉他/水壶/绿植
+  wood.push(B(1.5, 0.06, 0.7, [-2.55, FT + 0.72, -1.5], 0.01));
+  dark.push(B(0.08, 0.68, 0.6, [-3.2, FT + 0.36, -1.5], 0.004));
+  dark.push(B(0.08, 0.68, 0.6, [-1.9, FT + 0.36, -1.5], 0.004));
+  fabric.push(B(1.4, 0.1, 0.35, [-2.55, FT + 0.46, -2.15], 0.02));
+  fabric.push(B(1.4, 0.1, 0.35, [-2.55, FT + 0.46, -0.85], 0.02));
+  displayGeos.push(B(1.0, 0.58, 0.03, [-2.55, FT + 1.7, 0.34], 0.004));
+  dark.push(B(1.1, 0.7, 0.05, [-2.55, FT + 1.7, 0.37], 0.006));
+  props.push(B(0.12, 0.85, 0.06, [-3.9, FT + 1.35, -3.1], 0.004));
+  props.push(C(0.1, 0.06, [-3.9, FT + 1.7, -3.1], 10));
+  props.push(C(0.08, 0.16, [-1.25, FT + 0.82, -0.3], 10));
+  props.push(C(0.12, 0.18, [-1.35, FT + 0.12, 3.1], 10));
+  props.push(C(0.16, 0.22, [-1.35, FT + 0.3, 3.1], 10));
+  // 士官舱：书桌/2 把椅子/书架/咖啡机/衣柜
+  wood.push(B(1.6, 0.05, 0.7, [-1.55, FT + 0.74, 1.9], 0.01));
+  dark.push(B(0.06, 0.7, 0.6, [-2.3, FT + 0.37, 1.9], 0.004));
+  dark.push(B(0.06, 0.7, 0.6, [-0.82, FT + 0.37, 1.9], 0.004));
+  fabric.push(B(0.5, 0.08, 0.5, [-1.35, FT + 0.46, 1.45], 0.02));
+  fabric.push(B(0.5, 0.45, 0.08, [-1.35, FT + 0.7, 1.2], 0.02));
+  fabric.push(B(0.5, 0.08, 0.5, [-1.9, FT + 0.46, 2.5], 0.02));
+  fabric.push(B(0.5, 0.45, 0.08, [-1.9, FT + 0.7, 2.75], 0.02));
+  dark.push(B(0.35, 1.8, 0.35, [-1.1, FT + 0.9, 3.2], 0.006));
+  wood.push(B(1.2, 0.05, 0.25, [-2.8, FT + 1.55, 0.48], 0.006));
+  wood.push(B(1.2, 0.05, 0.25, [-2.8, FT + 1.1, 0.48], 0.006));
+  for (let b = 0; b < 8; b++) props.push(B(0.04, 0.18, 0.14, [-3.3 + b * 0.13, FT + 1.25, 0.48], 0.002));
+  props.push(B(0.22, 0.3, 0.22, [-0.95, FT + 0.9, 0.55], 0.006));
+  props.push(C(0.04, 0.1, [-0.95, FT + 1.1, 0.55], 8));
+  // 军官 1/2：写字台/办公椅/衣柜/洗手盆/镜子/沙发/保险柜/小冰箱
+  for (const [z, tag] of [[4.45, "1"], [7.25, "2"]] as const) {
+    wood.push(B(1.35, 0.06, 0.65, [-1.55, FT + 0.74, z], 0.01));
+    dark.push(B(0.06, 0.7, 0.55, [-2.2, FT + 0.37, z], 0.004));
+    dark.push(B(0.06, 0.7, 0.55, [-0.9, FT + 0.37, z], 0.004));
+    fabric.push(B(0.5, 0.08, 0.5, [-1.5, FT + 0.48, z - 0.55], 0.02));
+    fabric.push(B(0.5, 0.48, 0.08, [-1.5, FT + 0.74, z - 0.8], 0.02));
+    wood.push(B(0.65, 1.9, 0.45, [-3.82, FT + 0.95, z + (tag === "1" ? -1.1 : 0.9)], 0.006));
+    props.push(B(0.45, 0.15, 0.35, [-3.9, FT + 0.95, z + (tag === "1" ? 0.2 : 0.1)], 0.006));
+    props.push(B(0.5, 0.55, 0.04, [-4.05, FT + 1.55, z], 0.004));
+    props.push(B(0.3, 0.02, 0.24, [-1.4, FT + 0.78, z], 0.002));
+  }
+  fabric.push(B(1.2, 0.4, 0.55, [-2.6, FT + 0.26, 5.95], 0.02));
+  fabric.push(B(1.2, 0.5, 0.08, [-2.6, FT + 0.5, 5.65], 0.02));
+  wood.push(B(0.7, 0.4, 0.5, [-2.6, FT + 0.22, 6.75], 0.01));
+  dark.push(B(0.32, 0.4, 0.28, [-1.35, FT + 0.2, 6.0], 0.004));
+  props.push(B(0.4, 0.3, 0.35, [-1.35, FT + 0.5, 6.0], 0.004));
+  // 军官 2 独立卫浴
+  white.push(B(0.42, 0.04, 0.5, [-3.35, FT + 0.78, 6.55], 0.01));
+  white.push(C(0.16, 0.25, [-3.35, FT + 0.9, 6.55], 12));
+  white.push(B(0.32, 0.04, 0.38, [-3.95, FT + 0.4, 7.55], 0.01));
+  white.push(C(0.14, 0.18, [-3.95, FT + 0.48, 7.55], 12));
+  props.push(B(0.03, 1.7, 0.03, [-3.0, FT + 0.85, 7.55], 0.002));
+  props.push(B(0.5, 0.02, 0.5, [-3.35, FT + 1.72, 7.55], 0.004));
+
+  // 餐厅：3 张餐桌 + 长凳 + 配餐台 + 饮料站 + 菜单板 + 电视
+  for (const z of [-7.2, -5.6, -4.1]) {
+    wood.push(B(2.0, 0.07, 0.85, [2.55, FT + 0.74, z], 0.01));
+    dark.push(B(0.08, 0.7, 0.75, [1.7, FT + 0.37, z], 0.004));
+    dark.push(B(0.08, 0.7, 0.75, [3.4, FT + 0.37, z], 0.004));
+    fabric.push(B(1.9, 0.1, 0.32, [2.55, FT + 0.44, z - 0.62], 0.02));
+    fabric.push(B(1.9, 0.1, 0.32, [2.55, FT + 0.44, z + 0.62], 0.02));
+    fabric.push(B(1.8, 0.42, 0.06, [2.55, FT + 0.68, z - 0.78], 0.02));
+    fabric.push(B(1.8, 0.42, 0.06, [2.55, FT + 0.68, z + 0.78], 0.02));
+    props.push(B(0.35, 0.06, 0.25, [2.2, FT + 0.8, z], 0.004));
+    props.push(C(0.035, 0.08, [2.5, FT + 0.83, z + 0.1], 8));
+    props.push(C(0.035, 0.08, [2.75, FT + 0.83, z - 0.05], 8));
+  }
+  white.push(B(2.6, 0.08, 0.75, [2.55, FT + 0.8, -7.75], 0.01));
+  dark.push(B(2.6, 0.85, 0.65, [2.55, FT + 0.4, -7.78], 0.01));
+  for (let p = 0; p < 4; p++) {
+    props.push(B(0.5, 0.08, 0.42, [1.5 + p * 0.6, FT + 0.87, -7.75], 0.006));
+    props.push(B(0.44, 0.06, 0.36, [1.5 + p * 0.6, FT + 0.94, -7.75], 0.003));
+  }
+  props.push(B(2.3, 0.04, 0.06, [2.55, FT + 1.35, -7.3], 0.004));
+  props.push(B(0.4, 0.5, 0.4, [3.9, FT + 0.3, -4.25], 0.006));
+  props.push(C(0.18, 0.38, [3.9, FT + 0.9, -4.25], 12));
+  props.push(C(0.14, 0.32, [3.65, FT + 0.85, -4.25], 12));
+  displayGeos.push(B(1.1, 0.64, 0.03, [4.12, FT + 1.65, -5.9], 0.004));
+  props.push(B(1.2, 0.72, 0.05, [4.15, FT + 1.65, -5.9], 0.006));
+  props.push(B(0.8, 0.55, 0.04, [0.98, FT + 1.45, -6.9], 0.004));
+  props.push(B(0.5, 0.1, 0.1, [1.9, FT + 0.3, -6.6], 0.006));
+  props.push(C(0.04, 0.06, [1.9, FT + 0.38, -6.6], 8));
+
+  // 厨房：电磁灶/蒸锅/水槽/排烟罩/双冷库/干货架/洗碗机
+  white.push(B(0.65, 0.85, 3.4, [3.85, FT + 0.43, -1.6], 0.01));
+  dark.push(B(0.7, 0.06, 3.4, [3.85, FT + 0.88, -1.6], 0.006));
+  for (let h = 0; h < 4; h++) {
+    props.push(C(0.16, 0.012, [3.85, FT + 0.92, -2.8 + h * 0.8], 18));
+    props.push(C(0.12, 0.014, [3.85, FT + 0.93, -2.8 + h * 0.8], 18));
+  }
+  props.push(C(0.24, 0.34, [3.85, FT + 1.08, -2.1], 16));
+  props.push(C(0.24, 0.34, [3.85, FT + 1.08, -1.3], 16));
+  props.push(T(0.25, 0.2, 0.05, [3.85, FT + 1.27, -2.1], 16));
+  props.push(T(0.25, 0.2, 0.05, [3.85, FT + 1.27, -1.3], 16));
+  white.push(B(0.55, 0.02, 0.45, [3.85, FT + 0.9, -0.65], 0.006));
+  white.push(B(0.55, 0.02, 0.45, [3.85, FT + 0.9, 0.0], 0.006));
+  props.push(B(0.5, 0.5, 0.9, [3.85, FT + 1.5, -1.6], 0.008));
+  props.push(B(0.58, 0.05, 0.98, [3.85, FT + 1.26, -1.6], 0.004));
+  dark.push(B(0.9, 2.15, 1.35, [2.2, FT + 1.08, -3.55], 0.02));
+  dark.push(B(0.9, 2.15, 1.35, [3.45, FT + 1.08, -3.55], 0.02));
+  props.push(B(0.75, 0.08, 1.1, [2.2, FT + 1.2, -2.84], 0.006));
+  props.push(B(0.75, 0.08, 1.1, [3.45, FT + 1.2, -2.84], 0.006));
+  props.push(C(0.07, 0.16, [2.2, FT + 1.2, -2.75], 10));
+  props.push(C(0.07, 0.16, [3.45, FT + 1.2, -2.75], 10));
+  props.push(B(0.25, 0.18, 0.02, [2.2, FT + 1.65, -2.82], 0.002));
+  props.push(B(0.25, 0.18, 0.02, [3.45, FT + 1.65, -2.82], 0.002));
+  for (let sh = 0; sh < 4; sh++) {
+    wood.push(B(1.15, 0.05, 0.35, [1.32, FT + 0.45 + sh * 0.5, -1.6], 0.006));
+    for (let k = 0; k < 5; k++) props.push(B(0.18, 0.16, 0.2, [1.0 + k * 0.16, FT + 0.58 + sh * 0.5, -1.6], 0.003));
+  }
+  white.push(B(1.4, 0.85, 0.65, [2.25, FT + 0.43, 0.0], 0.01));
+  white.push(B(0.6, 0.08, 0.45, [1.95, FT + 0.88, 0.0], 0.006));
+  props.push(B(0.55, 0.5, 0.55, [3.0, FT + 0.7, 0.0], 0.006));
+  props.push(C(0.1, 0.2, [3.0, FT + 1.1, 0.0], 10));
+  props.push(C(0.06, 0.5, [1.0, FT + 0.25, -3.4], 8));
+
+  // 医务室：检查床 + 无影灯 + 手术床 + 麻醉机 + 药柜 + 洗手池 + 轮椅
+  fabric.push(B(2.0, 0.18, 0.75, [2.55, FT + 0.62, 2.9], 0.03));
+  white.push(B(2.0, 0.1, 0.75, [2.55, FT + 0.4, 2.9], 0.01));
+  dark.push(B(0.08, 0.35, 0.65, [1.7, FT + 0.2, 2.9], 0.004));
+  dark.push(B(0.08, 0.35, 0.65, [3.4, FT + 0.2, 2.9], 0.004));
+  bedding.grey.push(B(0.55, 0.12, 0.3, [2.55, FT + 0.76, 3.2], 0.02));
+  props.push(B(0.03, 1.8, 0.03, [1.45, FT + 1.0, 3.5], 0.002));
+  props.push(B(0.6, 0.02, 0.6, [1.45, FT + 1.9, 3.5], 0.004));
+  props.push(B(0.55, 0.02, 0.55, [2.55, FT + 1.95, 2.9], 0.004));
+  props.push(C(0.03, 0.7, [2.55, FT + 1.6, 2.9], 8));
+  for (let l = 0; l < 4; l++) {
+    const a = (l / 4) * Math.PI * 2;
+    props.push(C(0.06, 0.05, [2.55 + Math.cos(a) * 0.15, FT + 1.92, 2.9 + Math.sin(a) * 0.15], 8));
+  }
+  fabric.push(B(1.9, 0.16, 0.7, [2.55, FT + 0.72, 1.15], 0.03));
+  white.push(B(1.9, 0.1, 0.7, [2.55, FT + 0.55, 1.15], 0.01));
+  props.push(B(0.35, 0.32, 0.3, [3.55, FT + 0.85, 0.9], 0.006));
+  props.push(C(0.08, 0.18, [3.55, FT + 1.1, 0.9], 10));
+  props.push(B(0.25, 0.2, 0.02, [3.55, FT + 1.0, 1.06], 0.002));
+  wood.push(B(1.6, 0.06, 0.65, [2.4, FT + 0.74, 0.55], 0.01));
+  dark.push(B(0.05, 0.7, 0.6, [1.65, FT + 0.37, 0.55], 0.004));
+  props.push(B(0.55, 0.38, 0.06, [2.4, FT + 1.05, 0.55], 0.004));
+  props.push(B(0.45, 0.3, 0.04, [2.4, FT + 1.02, 0.58], 0.003));
+  white.push(B(0.85, 1.7, 0.35, [1.2, FT + 0.85, 2.5], 0.006));
+  props.push(B(0.75, 0.05, 0.4, [1.2, FT + 1.02, 2.5], 0.004));
+  props.push(B(0.75, 0.05, 0.4, [1.2, FT + 1.45, 2.5], 0.004));
+  white.push(B(0.45, 0.35, 0.35, [1.2, FT + 0.2, 3.2], 0.006));
+  props.push(B(0.6, 0.75, 0.55, [3.9, FT + 0.4, 1.5], 0.01));
+  props.push(C(0.24, 0.05, [3.9, FT + 0.72, 1.5], 18));
+  props.push(C(0.24, 0.05, [3.9, FT + 0.72, 1.95], 18));
+  props.push(B(0.08, 0.45, 0.08, [3.9, FT + 0.85, 1.5], 0.004));
+  props.push(B(0.4, 0.05, 0.5, [3.9, FT + 1.1, 1.65], 0.004));
+  // 轮椅
+  props.push(B(0.45, 0.08, 0.45, [1.3, FT + 0.48, 1.4], 0.004));
+  props.push(B(0.45, 0.5, 0.06, [1.3, FT + 0.72, 1.18], 0.004));
+  props.push({ type: "torus", radius: 0.26, tube: 0.035, radialSegments: 8, tubularSegments: 20, at: [1.5, FT + 0.28, 1.4] });
+  props.push({ type: "torus", radius: 0.26, tube: 0.035, radialSegments: 8, tubularSegments: 20, at: [1.1, FT + 0.28, 1.4] });
+  props.push(C(0.06, 0.04, [1.3, FT + 0.05, 1.68], 10));
+  // 厕所/淋浴
+  for (const [cx, tag] of [[-3.5, "p"], [2.2, "s"]] as const) {
+    const zBase = tag === "p" ? -4.1 : 4.1;
+    for (let s = 0; s < 2; s++) {
+      white.push(B(0.9, 0.02, 0.9, [cx + s * 1.05, FT + 0.02, zBase], 0.004));
+      white.push(C(0.18, 0.3, [cx + s * 1.05, FT + 0.2, zBase], 12));
+      props.push(B(0.5, 0.7, 0.04, [cx + s * 1.05, FT + 0.55, zBase + 0.45], 0.004));
+      props.push(B(0.04, 1.9, 0.9, [cx + s * 1.05 + 0.48, FT + 0.95, zBase], 0.004));
+    }
+    props.push(B(1.15, 0.06, 0.5, [cx + 2.4, FT + 0.82, zBase], 0.006));
+    props.push(C(0.2, 0.12, [cx + 2.4, FT + 0.9, zBase], 14));
+    props.push(B(0.5, 0.55, 0.03, [cx + 2.4, FT + 1.45, zBase + 0.3], 0.004));
+  }
+  // 健身/洗衣/阅览
+  props.push(B(0.9, 0.08, 0.22, [2.5, FT + 0.22, 5.4], 0.006));
+  props.push(B(0.9, 0.06, 0.16, [2.5, FT + 0.45, 5.8], 0.004));
+  props.push(B(0.06, 0.5, 0.06, [2.1, FT + 0.45, 5.2], 0.004));
+  props.push(B(0.06, 0.5, 0.06, [2.9, FT + 0.45, 5.2], 0.004));
+  props.push({ type: "weld", from: [2.5, FT + 0.5, 5.4], to: [2.5, FT + 0.9, 6.2], radius: 0.018 });
+  props.push(B(0.06, 0.06, 0.1, [2.5, FT + 0.95, 6.25], 0.004));
+  for (let d = 0; d < 4; d++) {
+    props.push(C(0.09, 0.16, [3.2 + d * 0.18, FT + 0.1, 6.7], 10));
+    props.push(B(0.28, 0.16, 0.16, [3.2 + d * 0.18, FT + 0.2, 6.85], 0.006));
+  }
+  fabric.push(B(1.2, 0.12, 0.45, [2.5, FT + 0.5, 7.5], 0.02));
+  fabric.push(B(1.2, 0.12, 0.3, [2.5, FT + 0.8, 7.72], 0.02));
+  props.push(B(1.4, 0.55, 0.04, [2.55, FT + 1.75, 7.92], 0.004));
+  displayGeos.push(B(1.3, 0.5, 0.02, [2.55, FT + 1.75, 7.9], 0.003));
+  wood.push(B(1.2, 0.8, 0.25, [1.25, FT + 0.55, 7.4], 0.006));
+  for (let b = 0; b < 9; b++) props.push(B(0.05, 0.2, 0.16, [0.75 + b * 0.09, FT + 0.45 + (b % 2) * 0.3, 7.4], 0.002));
+  white.push(B(0.6, 0.85, 0.6, [3.7, FT + 0.43, 5.6], 0.01));
+  white.push(B(0.6, 0.85, 0.6, [3.7, FT + 1.28, 5.6], 0.01));
+  props.push(C(0.18, 0.04, [3.7, FT + 0.55, 5.28], 18));
+  props.push(C(0.18, 0.04, [3.7, FT + 1.4, 5.28], 18));
+  props.push(B(0.8, 0.05, 0.55, [2.9, FT + 0.7, 7.1], 0.006));
+  props.push(B(0.08, 0.7, 0.08, [2.55, FT + 0.35, 7.1], 0.004));
+  props.push(B(0.08, 0.7, 0.08, [3.25, FT + 0.35, 7.1], 0.004));
+  props.push(B(0.5, 0.65, 0.05, [3.2, FT + 1.3, 5.0], 0.004));
+
+  crewPart("wood_furniture", "生活区木纹家具/床板/桌面", M(...wood), "cv_055_wood");
+  crewPart("dark_furniture", "生活区深色金属家具/柜架", M(...dark), "cv_055_console");
+  crewPart("fabric_furniture", "生活区布艺/沙发/床垫/隔帘", M(...fabric), "cv_055_seat");
+  crewPart("white_furniture", "厨房/医务/卫生白色设备", M(...white), "cv_055_ceiling");
+  crewPart("screens", "生活区电视/医疗监护屏", M(...displayGeos), "cv_scr_camera");
+  crewPart("props", "生活区随身物件/餐具/器材", M(...props), "cv_steel");
+
+  // ---- 8 名舰员（不同身高/制服/姿态），不是复制粘贴的方块人 ----
+  const skin: Array<ReturnType<typeof S>> = [];
+  const boots: Array<ReturnType<typeof B>> = [];
+  const uniforms: Record<string, Array<ReturnType<typeof B>>> = {
+    blue: [],
+    olive: [],
+    white: [],
+    navy: [],
+    red: [],
+  };
+  const person = (
+    x: number,
+    z: number,
+    uniform: keyof typeof uniforms,
+    height = 1.72,
+    cap = false,
+  ) => {
+    const s = height / 1.72;
+    const u = uniforms[uniform]!;
+    u.push(B(0.4 * s, 0.52 * s, 0.22 * s, [x, FT + 1.1 * s, z], 0.02));
+    u.push(B(0.12 * s, 0.48 * s, 0.14 * s, [x - 0.27 * s, FT + 1.1 * s, z], 0.012));
+    u.push(B(0.12 * s, 0.48 * s, 0.14 * s, [x + 0.27 * s, FT + 1.1 * s, z], 0.012));
+    u.push(B(0.14 * s, 0.8 * s, 0.16 * s, [x - 0.1 * s, FT + 0.46 * s, z], 0.012));
+    u.push(B(0.14 * s, 0.8 * s, 0.16 * s, [x + 0.1 * s, FT + 0.46 * s, z], 0.012));
+    u.push(B(0.42 * s, 0.06 * s, 0.24 * s, [x, FT + 0.84 * s, z], 0.01));
+    if (cap) {
+      u.push(B(0.23 * s, 0.065 * s, 0.23 * s, [x, FT + 1.7 * s, z], 0.02));
+      u.push(B(0.19 * s, 0.025 * s, 0.09 * s, [x, FT + 1.68 * s, z + 0.09 * s], 0.01));
+    } else {
+      u.push(B(0.19 * s, 0.065 * s, 0.19 * s, [x, FT + 1.69 * s, z - 0.01 * s], 0.03));
+    }
+    u.push(B(0.42 * s, 0.07 * s, 0.26 * s, [x, FT + 0.88 * s, z], 0.01));
+    u.push(B(0.09 * s, 0.055 * s, 0.09 * s, [x, FT + 1.47 * s, z], 0.01));
+    u.push(B(0.14 * s, 0.025 * s, 0.006 * s, [x, FT + 1.27 * s, z + 0.116 * s], 0.002));
+    u.push(B(0.1 * s, 0.012 * s, 0.006 * s, [x, FT + 1.12 * s, z + 0.116 * s], 0.001));
+    u.push(B(0.06 * s, 0.08 * s, 0.02 * s, [x + 0.13 * s, FT + 1.14 * s, z + 0.115 * s], 0.003));
+    u.push(B(0.05 * s, 0.05 * s, 0.02 * s, [x - 0.16 * s, FT + 1.31 * s, z + 0.115 * s], 0.003));
+    skin.push(S(0.105 * s, [x, FT + 1.6 * s, z], 12));
+    skin.push(S(0.018 * s, [x - 0.045 * s, FT + 1.62 * s, z + 0.095 * s], 8));
+    skin.push(S(0.018 * s, [x + 0.045 * s, FT + 1.62 * s, z + 0.095 * s], 8));
+    skin.push(B(0.04 * s, 0.035 * s, 0.05 * s, [x, FT + 1.57 * s, z + 0.105 * s], 0.008));
+    skin.push(S(0.045 * s, [x - 0.31 * s, FT + 0.85 * s, z], 8));
+    skin.push(S(0.045 * s, [x + 0.31 * s, FT + 0.85 * s, z], 8));
+    boots.push(B(0.14 * s, 0.08 * s, 0.26 * s, [x - 0.1 * s, FT + 0.04 * s, z + 0.03 * s], 0.004));
+    boots.push(B(0.14 * s, 0.08 * s, 0.26 * s, [x + 0.1 * s, FT + 0.04 * s, z + 0.03 * s], 0.004));
+    u.push(B(0.1 * s, 0.1 * s, 0.02 * s, [x + 0.12 * s, FT + 1.22 * s, z + 0.12 * s], 0.003));
+  };
+  person(1.9, -7.0, "blue", 1.76, false);
+  person(3.0, -6.4, "white", 1.68, true);
+  person(3.55, -7.0, "blue", 1.8, false);
+  person(2.15, -1.1, "white", 1.65, true);
+  person(3.1, 1.9, "red", 1.7, false);
+  person(-1.8, -2.0, "olive", 1.74, false);
+  person(-1.15, 5.25, "blue", 1.7, false);
+  person(0.7, 1.4, "navy", 1.78, true);
+  person(-2.2, 7.2, "blue", 1.7, false);
+  for (const [mat, geos] of Object.entries(uniforms)) {
+    if (geos.length) crewPart(`figure_${mat}`, `生活区舰员制服（${mat}）`, M(...geos), mat === "white" ? "cv_apron" : mat === "red" ? "cv_deck_red" : mat === "olive" ? "cv_berth_olive" : mat === "navy" ? "cv_055_seat" : "cv_055_mesh");
+  }
+  crewPart("figure_skin", "生活区舰员头部/手", M(...skin), "cv_skin");
+  crewPart("figure_boots", "生活区舰员靴子", M(...boots), "cv_steel_dark");
+
+  crewPart(
+    "berth_a_wall_details",
+    "水兵住舱后壁时钟/公告板/灭火器",
+    M(
+      C(0.14, 0.03, [-2.55, FT + 1.95, -7.94], 18),
+      B(0.02, 0.12, 0.9, [-2.55, FT + 1.55, -7.94], 0.004),
+      B(0.5, 0.36, 0.02, [-1.55, FT + 1.6, -7.93], 0.004),
+      C(0.05, 0.3, [-1.0, FT + 0.3, -7.6], 12),
+      B(0.16, 0.03, 0.16, [-1.0, FT + 0.45, -7.6], 0.003),
     ),
-    material: "cv_deck_line",
-    mate: A([0, 0, 0]),
-  });
-  add({
-    id: `${P}interior.crew_heads`,
-    name_cn: "生活舱卫生间/淋浴",
-    name_en: "crew heads",
-    assembly: "interior",
-    build_layer: 3,
-    geometry: M(
-      B(1.6, 2.2, 0.1, [3.2, 3.6, 4.4], 0.01),
-      B(0.1, 2.2, 2.0, [2.45, 3.6, 5.4], 0.01),
-      B(0.1, 2.2, 2.0, [3.95, 3.6, 5.4], 0.01),
-      B(1.5, 2.2, 0.1, [3.2, 3.6, 6.4], 0.01),
-      B(0.9, 0.08, 0.9, [3.2, 2.62, 5.9], 0.01),
-      C(0.3, 0.25, [3.2, 2.82, 6.1], 14),
-      B(0.5, 0.12, 0.4, [3.2, 3.05, 5.0], 0.02),
-      C(0.03, 1.4, [2.75, 3.5, 6.2], 8),
-    ),
-    material: "cv_deck_line",
-    mate: A([0, 0, 0]),
-  });
-  add({
-    id: `${P}interior.crew_lounge`,
-    name_cn: "生活舱休息区/沙发",
-    name_en: "crew lounge",
-    assembly: "interior",
-    build_layer: 3,
-    geometry: M(
-      B(2.2, 0.65, 0.8, [0, 2.95, -7.1], 0.04),
-      B(2.0, 0.15, 0.65, [0, 3.3, -7.1], 0.03),
-      B(0.5, 0.6, 0.6, [-1.2, 2.9, -7.5], 0.03),
-      B(0.5, 0.6, 0.6, [1.2, 2.9, -7.5], 0.03),
-      B(1.4, 0.75, 0.06, [0, 4.35, -7.9], 0.01),
-    ),
-    material: "cv_upholstery",
-    mate: A([0, 0, 0]),
-  });
-  add({
-    id: `${P}interior.crew_lounge_tv`,
-    name_cn: "休息区电视",
-    name_en: "crew lounge TV",
-    assembly: "interior",
-    build_layer: 4,
-    geometry: M(B(1.34, 0.7, 0.02, [0, 4.35, -7.86], 0.002)),
-    material: "cv_scr_camera",
-    mate: A([0, 0, 0]),
-  });
-  add({
-    id: `${P}interior.crew_signage`,
-    name_cn: "生活舱标识/应急灯",
-    name_en: "crew signage",
-    assembly: "interior",
-    build_layer: 3,
-    geometry: M(
-      B(0.9, 0.16, 0.03, [0, 4.9, 7.5], 0.006),
-      C(0.09, 0.08, [-4.0, 4.95, 5.8], 10),
-      C(0.09, 0.08, [4.0, 4.95, 5.8], 10),
-    ),
-    material: "cv_deck_red",
-    mate: A([0, 0, 0]),
-  });
+    "cv_055_console",
+  );
+
+  // 走廊附件：扶手/消防瓶/损管柜/管路/标识/救生衣
+  const corridorProps: Array<ReturnType<typeof B>> = [];
+  corridorProps.push(B(0.05, 0.05, 14.6, [-0.82, FT + 1.0, 0], 0.003));
+  corridorProps.push(B(0.05, 0.05, 14.6, [0.82, FT + 1.0, 0], 0.003));
+  corridorProps.push(B(0.4, 0.85, 0.35, [0.55, FT + 0.43, -7.2], 0.006));
+  corridorProps.push(C(0.12, 0.5, [0.55, FT + 0.7, -6.9], 12));
+  corridorProps.push(B(0.35, 0.55, 0.25, [-0.55, FT + 0.3, 5.9], 0.006));
+  corridorProps.push(B(0.25, 0.35, 0.02, [-0.55, FT + 0.4, 6.04], 0.003));
+  for (const z of [-7.0, -3.0, 1.0, 5.0]) corridorProps.push(B(0.18, 0.06, 0.03, [-0.78, FT + 2.2, z], 0.002));
+  corridorProps.push(B(0.5, 0.12, 0.03, [0, FT + 2.32, -6.3], 0.002));
+  corridorProps.push(B(0.5, 0.12, 0.03, [0, FT + 2.32, 1.9], 0.002));
+  crewPart("corridor_props", "生活区走廊扶手/损管柜/消防瓶/标识", M(...corridorProps), "cv_055_console");
+  const pipes: Array<Parameters<typeof M>[0]> = [];
+  for (const [dx, y] of [[-0.55, CH - 0.11], [-0.46, CH - 0.11], [0.5, CH - 0.13], [0.58, CH - 0.13]] as const) {
+    pipes.push({ type: "weld", from: [dx, y, -8], to: [dx, y, 8], radius: 0.012 });
+  }
+  crewPart("corridor_pipes", "生活区走廊电缆/水管", M(...pipes), "cv_copper");
+
+  // 视点锚点（走廊/水兵住舱/餐厅厨房）
+  const anchors: Array<[string, string, [number, number, number]]> = [
+    ["crew_corridor_eye", "生活区走廊视点", [0, FT + 1.65, 6.9]],
+    ["crew_corridor_end", "生活区走廊尽头", [0, FT + 1.5, -7.85]],
+    ["crew_berth_eye", "水兵住舱视点", [-2.55, FT + 1.62, -4.85]],
+    ["crew_berth_target", "水兵住舱铺位目标", [-2.55, FT + 1.0, -7.5]],
+    ["crew_mess_eye", "餐厅厨房视点", [1.2, FT + 1.82, -4.2]],
+    ["crew_mess_target", "餐厅配餐台目标", [2.7, FT + 1.05, -7.55]],
+  ];
+  for (const [tag, cn, at] of anchors) {
+    add({
+      id: `${P}interior.${tag}`,
+      name_cn: cn,
+      name_en: tag.replace(/_/g, " "),
+      assembly: "interior",
+      build_layer: 3,
+      geometry: M(B(0.004, 0.004, 0.004, [0, 0, 0], 0.001)),
+      material: "cv_055_console",
+      mate: A(at),
+    });
+  }
 
   // ---------------- 表面：锚/救生/舷号 ----------------
   for (const side of [-1, 1] as const) {

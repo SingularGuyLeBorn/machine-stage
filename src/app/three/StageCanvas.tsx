@@ -228,18 +228,31 @@ function InteriorFillLight() {
           </>
         )
       ) : null}
-      {cameraMode === "crew" ? (
+      {cameraMode === "crew" || cameraMode === "crew_berth" || cameraMode === "crew_mess" ? (
         modelId === "carrier" ? (
           <>
-            <pointLight position={[0, 13.2, 63]} intensity={2.0} distance={7} decay={1.35} color="#e8dfcf" />
-            <pointLight position={[-1.8, 12.8, 60]} intensity={1.6} distance={6} decay={1.4} color="#d9e4e8" />
-            <pointLight position={[1.8, 12.8, 66]} intensity={1.6} distance={6} decay={1.4} color="#d9e4e8" />
+            <pointLight position={[0, 13.3, 63]} intensity={2.0} distance={10} decay={1.35} color="#e8dfcf" />
+            <pointLight position={[-4.2, 13.0, 42]} intensity={1.7} distance={8} decay={1.4} color="#d9e4e8" />
+            <pointLight position={[-4.2, 13.0, 58]} intensity={1.7} distance={8} decay={1.4} color="#e8dfcf" />
+            <pointLight position={[-4.2, 13.0, 78]} intensity={1.6} distance={8} decay={1.4} color="#d9e4e8" />
+            <pointLight position={[4.2, 13.0, 40]} intensity={1.8} distance={8} decay={1.4} color="#e8dfcf" />
+            <pointLight position={[4.2, 13.0, 55]} intensity={1.7} distance={8} decay={1.4} color="#d9e4e8" />
+            <pointLight position={[4.2, 13.0, 70]} intensity={1.9} distance={8} decay={1.4} color="#e8f1f5" />
+            <pointLight position={[4.2, 13.0, 86]} intensity={1.6} distance={8} decay={1.4} color="#e8dfcf" />
           </>
         ) : (
           <>
-            <pointLight position={[0, 4.8, 0]} intensity={1.4} distance={12} decay={1.35} color="#d9e4e8" />
-            <pointLight position={[-2.4, 4.8, 4.5]} intensity={1.2} distance={8} decay={1.4} color="#e8dfcf" />
-            <pointLight position={[2.4, 4.8, -4.0]} intensity={1.0} distance={8} decay={1.4} color="#d9e4e8" />
+            <pointLight position={[0, 4.4, 5.6]} intensity={1.0} distance={9} decay={1.3} color="#dfe9ee" />
+            <pointLight position={[0, 4.4, 0]} intensity={0.9} distance={9} decay={1.3} color="#d9e4e8" />
+            <pointLight position={[0, 4.4, -5.6]} intensity={1.0} distance={9} decay={1.3} color="#dfe9ee" />
+            <pointLight position={[-2.8, 4.35, -6.4]} intensity={2.1} distance={7} decay={1.3} color="#e8dfcf" />
+            <pointLight position={[-2.8, 4.35, -2.0]} intensity={1.8} distance={7} decay={1.3} color="#d9e4e8" />
+            <pointLight position={[-2.8, 4.35, 2.2]} intensity={1.6} distance={7} decay={1.3} color="#e8dfcf" />
+            <pointLight position={[-2.8, 4.35, 6.4]} intensity={1.5} distance={7} decay={1.3} color="#d9e4e8" />
+            <pointLight position={[2.8, 4.35, -6.2]} intensity={1.25} distance={7} decay={1.3} color="#f4ecdc" />
+            <pointLight position={[2.8, 4.35, -2.0]} intensity={1.5} distance={7} decay={1.3} color="#e8f1f5" />
+            <pointLight position={[2.8, 4.35, 2.0]} intensity={1.5} distance={7} decay={1.3} color="#e8f1f5" />
+            <pointLight position={[2.8, 4.35, 6.2]} intensity={1.7} distance={7} decay={1.3} color="#e8dfcf" />
           </>
         )
       ) : null}

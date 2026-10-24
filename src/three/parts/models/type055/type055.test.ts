@@ -64,6 +64,19 @@ describe("055 型驱逐舰", () => {
     expect(built.getPart("type055.interior.seat_cic_sonar")).toBeDefined();
     expect(built.getPart("type055.interior.deskitem_bridge_helm")).toBeDefined();
     expect(built.getPart("type055.interior.screen_bridge_weapons_3")).toBeDefined();
+    // 生活区：走廊 + 水兵/士官/军官舱、餐厅/厨房/医务/健身，全部独立舱室
+    for (const id of [
+      "type055.interior.crew_corridor_eye",
+      "type055.interior.crew_berth_eye",
+      "type055.interior.crew_mess_eye",
+      "type055.interior.crew_partitions",
+      "type055.interior.crew_bunk_curtains",
+      "type055.interior.crew_bunk_personal",
+      "type055.interior.crew_ceiling_panels",
+      "type055.interior.crew_figure_skin",
+    ]) {
+      expect(built.getPart(id), id).toBeDefined();
+    }
     expect(built.getPart("type055.hull.stabilizer_l")).toBeDefined();
     expect(built.getPart("type055.vls.glider_fwd_4")).toBeDefined();
     expect(built.getNode("CV_055_VlsGlider_fwd_4")).toBeDefined();

@@ -1636,8 +1636,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   }
   // 舰艏舷墙：沿最后 3 段甲板边缘抬起，侧视能看到舰艏上翘而不是平切方盒。
   const bowEdges: Array<{ tag: string; points: Array<[number, number]> }> = [
-    { tag: "p", points: [[-1.7, 18.0], [-1.55, 20.7]] },
-    { tag: "s", points: [[1.9, 18.0], [1.85, 20.7]] },
+    { tag: "p", points: [[-2.15, 17.0], [-1.5, 20.55]] },
+    { tag: "s", points: [[2.2, 17.0], [1.55, 20.55]] },
   ];
   for (const edge of bowEdges) {
     for (let i = 0; i < edge.points.length - 1; i++) {
@@ -1663,8 +1663,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     name_en: "bow front bulwark",
     assembly: ASSEMBLY,
     build_layer: 3,
-    geometry: M(B(3.4, 0.38, 0.07, [0, 0, 0], 0.006)),
+    geometry: M(B(2.8, 0.38, 0.07, [0, 0, 0], 0.006)),
     material: "cv_hull",
-    mate: A([0.15, deckTop + 0.22, 20.65], [0, 0, 0]),
+    mate: A([0, deckTop + 0.22, 20.65], [0, 0, 0]),
   });
 }

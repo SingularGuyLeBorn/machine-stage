@@ -146,6 +146,17 @@ describe("福建舰 · 整机", () => {
     }
     expect(built.getNode(RADAR_NODE)).toBeDefined();
     expect(staticIds.has("carrier.island.radar_antenna")).toBe(true);
+    for (const id of [
+      "carrier.crew.corridor_eye",
+      "carrier.crew.berth_eye",
+      "carrier.crew.mess_eye",
+      "carrier.crew.bunk_curtains",
+      "carrier.crew.figure_skin",
+      "carrier.crew.screens",
+      "carrier.crew.partition",
+    ]) {
+      expect(staticIds.has(id), id).toBe(true);
+    }
     expect(CIWS_NODES).toHaveLength(2);
     for (let ciws = 1; ciws <= 2; ciws++) {
       const tag = String(ciws).padStart(2, "0");
