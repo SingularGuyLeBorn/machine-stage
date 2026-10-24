@@ -1,6 +1,7 @@
 import * as THREE from "three";
-import { CAT_TRACKS, CV, catAcross, catPoint } from "./constants";
+import { CAT_TRACKS, CV, carrierJbdOffset, catAcross, catPoint } from "./constants";
 import { deckEdgeAt, deckPlan, hullSurfaceHalfAt } from "./kits";
+import { LANDING_RUNWAY, LANDING_RUNWAY_POLYGON, TAKEOFF_RUNWAY_POLYGON } from "./runwayPlan";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
 import type { GeometrySpec } from "../../registry/types";
 
@@ -238,30 +239,30 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // 让铰链轴始终横跨轨道；挡焰板整体放在轨道起点后方 3.2，避开着舰跑道。
   CAT_TRACKS.forEach((track, index) => {
     const node = JBD_NODES[index]!;
-    const pos = catPoint(track, -3.2);
+    const pos = catPoint(track, carrierJbdOffset(track.id));
     const align = `CV_JBD_Align_${track.id}`;
     ctx.node({ name: align, parent: "root", pivot: [pos.x, deckTop + 0.05, pos.z], rest_rotation: [0, track.yawDeg, 0] });
     ctx.node({ name: node, parent: align, pivot: [0, 0, 0], motion: "rotate", axis: "x", rest_rotation: [-90, 0, 0], note: `弹射器 ${track.id} 挡焰板` });
+    // 用户 JSON 的舰艏挡焰板宽约 1.0 编辑单位；三号腰部挡焰板仍保留 1.5。
+    const w = track.id === 3 ? 1.5 : 0.98;
+    const k = w / 1.5;
     add({
       id: `${P}cat_${pad(track.id)}_jbd_panel`,
       name_cn: `弹射器 ${track.id} 挡焰板`,
       name_en: `jet blast deflector ${track.id}`,
       assembly: ASSEMBLY,
       build_layer: 3,
-      // 真实挡焰板宽而低（约 12m×5m）；旧版做成 8.5m 宽、7.3m 高的竖板，
-      // 竖起后比舰载机还高，比例失真。编辑尺度 1:8，故 1.5×0.62。
       geometry: M(
-        B(1.5, 0.62, 0.055, [0, 0.31, 0], 0.008),
-        B(1.4, 0.028, 0.035, [0, 0.12, 0.035], 0.003),
-        B(1.42, 0.032, 0.05, [0, 0.3, 0.04], 0.003),
-        B(1.42, 0.032, 0.05, [0, 0.48, 0.04], 0.003),
-        B(0.045, 0.56, 0.045, [-0.58, 0.32, 0.042], 0.003),
-        B(0.045, 0.56, 0.045, [0.58, 0.32, 0.042], 0.003),
-        B(1.44, 0.06, 0.06, [0, 0.028, 0.018], 0.003),
-        B(0.08, 0.09, 0.09, [-0.52, 0.025, 0.018], 0.003),
-        B(0.08, 0.09, 0.09, [0.52, 0.025, 0.018], 0.003),
-        // 铰链座：贴合甲板，竖起时绕同一轴转。
-        B(0.9, 0.05, 0.05, [0, 0.02, -0.01], 0.004),
+        B(w, 0.62, 0.055, [0, 0.31, 0], 0.008),
+        B(w - 0.1, 0.028, 0.035, [0, 0.12, 0.035], 0.003),
+        B(w - 0.08, 0.032, 0.05, [0, 0.3, 0.04], 0.003),
+        B(w - 0.08, 0.032, 0.05, [0, 0.48, 0.04], 0.003),
+        B(0.045, 0.56, 0.045, [-0.58 * k, 0.32, 0.042], 0.003),
+        B(0.045, 0.56, 0.045, [0.58 * k, 0.32, 0.042], 0.003),
+        B(w - 0.06, 0.06, 0.06, [0, 0.028, 0.018], 0.003),
+        B(0.08, 0.09, 0.09, [-0.52 * k, 0.025, 0.018], 0.003),
+        B(0.08, 0.09, 0.09, [0.52 * k, 0.025, 0.018], 0.003),
+        B(w * 0.6, 0.05, 0.05, [0, 0.02, -0.01], 0.004),
       ),
       material: "cv_steel_dark",
       node,
@@ -276,7 +277,7 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       geometry: M(C(0.04, 0.3, [0, 0, 0], 12), C(0.022, 0.22, [0, 0.18, 0], 10)),
       material: "cv_steel",
       node,
-      mate: A([0.38, 0.16, -0.06], [0, 0, 25]),
+      mate: A([0.38 * k, 0.16, -0.06], [0, 0, 25]),
     });
   });
   // 滑梭（唯一被动画驱动的是 2 号弹射器）；静止姿态带轨道偏航。
@@ -284,7 +285,8 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   ctx.node({
     name: SHUTTLE_NODE,
     parent: "root",
-    pivot: [launchTrack.x0, deckTop + 0.09, launchTrack.z0],
+    // 滑梭贴甲板更低：新位置在机轮滑行包络内，旧高度会让细节机轮穿进梭体 20mm。
+    pivot: [launchTrack.x0, deckTop + 0.06, launchTrack.z0],
     rest_rotation: [0, launchTrack.yawDeg, 0],
     motion: "translate",
     axis: "z",
@@ -1024,162 +1026,149 @@ export function addFlightDeck(ctx: CarrierCtx): void {
 
   // ---- 甲板标记与系留点 ----
   const markY = deckTop + 0.014;
-  // 斜角着舰跑道：按用户给定的四点着舰区标定（艉端中心 -0.576/-19.9，艏端 -2.5/10.77），
-  // 长 30.7、宽约 2.5、相对甲板轴线左偏 3.59°。
-  const RUNWAY_DEG = 3.59;
+  // 降落跑道：用户 lnj-coordinates.json 的四点轮廓（几乎沿舰体中轴，艏窄艉宽）。
+  const RUNWAY_DEG = LANDING_RUNWAY.deg;
   const RUNWAY_RAD = (RUNWAY_DEG * Math.PI) / 180;
   const RUNWAY_SIN = Math.sin(RUNWAY_RAD);
   const RUNWAY_COS = Math.cos(RUNWAY_RAD);
   const RUNWAY_YAW = -RUNWAY_DEG;
-  const RUNWAY_AFT_X = -0.5756;
-  const RUNWAY_AFT_Z = -19.9;
-  const RUNWAY_LEN = 30.7;
-  const RUNWAY_WIDTH = 2.5;
-  const runwayAt = (s: number): [number, number] => [RUNWAY_AFT_X - s * RUNWAY_SIN, RUNWAY_AFT_Z + s * RUNWAY_COS];
+  const runwayAt = (s: number): [number, number] => [
+    LANDING_RUNWAY.aftX - s * RUNWAY_SIN,
+    LANDING_RUNWAY.aftZ + s * RUNWAY_COS,
+  ];
   const runwayAcross = (s: number, side: number, distance: number): [number, number] => {
     const [x, z] = runwayAt(s);
     return [x + side * distance * RUNWAY_COS, z + side * distance * RUNWAY_SIN];
   };
-  // 斜角跑道底层浅灰漆带：给所有白色标线提供连续附着面，同时形成真实跑道底色。
-  // 用 cv_runway（比甲板浅一档）而不是甲板板材质——俯视时能一眼认出是斜跑道。
-  const underlay = runwayAt(RUNWAY_LEN / 2);
+  // 用四点精确多边形铺底色，而不是旋转矩形；标线仍按跑道中心线/真实边线生成。
   add({
     id: `${P}runway_underlay`,
-    name_cn: "斜角着舰跑道底色",
-    name_en: "angled runway underlay",
+    name_cn: "着舰跑道底色",
+    name_en: "landing runway underlay",
     assembly: ASSEMBLY,
     build_layer: 4,
-    geometry: M(B(RUNWAY_WIDTH, 0.004, RUNWAY_LEN - 0.3, [0, 0, 0], 0.0015)),
+    geometry: {
+      type: "kit",
+      kit: "carrierDeckArmorPlate",
+      params: { points: LANDING_RUNWAY_POLYGON, topY: deckTop + 0.005, thickness: 0.004 },
+    },
     material: "cv_runway",
-    mate: A([underlay[0], deckTop + 0.006, underlay[1]], [0, RUNWAY_YAW, 0]),
+    mate: A([0, 0, 0]),
   });
-  // 中线虚线：沿跑道纵向等距 1.24，24 段从头到尾严格一条直线。
-  for (let d = 0; d < 24; d++) {
-    const [x, z] = runwayAt(0.9 + d * 1.24);
+  const addDeckLine = (
+    id: string,
+    name_cn: string,
+    a: readonly [number, number],
+    b: readonly [number, number],
+    width: number,
+  ) => {
+    const dx = b[0] - a[0];
+    const dz = b[1] - a[1];
     add({
-      id: `${P}runway_center_${pad(d + 1)}`,
-      name_cn: `斜角跑道中线 ${d + 1}`,
-      name_en: `angled runway centerline ${d + 1}`,
+      id: `${P}${id}`,
+      name_cn,
+      name_en: name_cn,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(0.14, 0.006, 0.7, [0, 0, 0], 0.002)),
+      geometry: M(B(width, 0.006, Math.hypot(dx, dz), [0, 0, 0], 0.0015)),
+      material: "cv_deck_line",
+      mate: A([(a[0] + b[0]) / 2, markY + 0.005, (a[1] + b[1]) / 2], [0, (Math.atan2(dx, dz) * 180) / Math.PI, 0]),
+    });
+  };
+  const lpForeStar = LANDING_RUNWAY_POLYGON[0]!;
+  const lpForePort = LANDING_RUNWAY_POLYGON[1]!;
+  const lpAftPort = LANDING_RUNWAY_POLYGON[2]!;
+  const lpAftStar = LANDING_RUNWAY_POLYGON[3]!;
+  // 两条真实长边 + 艏艉端线，全部按 JSON 四点生成，而不是恒定宽度的矩形。
+  addDeckLine("runway_edge_p", "着舰跑道左舷边线", lpForePort, lpAftPort, 0.12);
+  addDeckLine("runway_edge_s", "着舰跑道右舷边线", lpForeStar, lpAftStar, 0.12);
+  addDeckLine("runway_end_fwd", "着舰跑道艏端线", lpForePort, lpForeStar, 0.14);
+  addDeckLine("runway_end_aft", "着舰跑道艉端线", lpAftPort, lpAftStar, 0.14);
+  // 中线虚线：沿新跑道中心线等距 1.2。
+  for (let d = 0; d < 24; d++) {
+    const [x, z] = runwayAt(0.9 + d * 1.2);
+    add({
+      id: `${P}runway_center_${pad(d + 1)}`,
+      name_cn: `着舰跑道中线 ${d + 1}`,
+      name_en: `landing runway centerline ${d + 1}`,
+      assembly: ASSEMBLY,
+      build_layer: 4,
+      geometry: M(B(0.13, 0.006, 0.64, [0, 0, 0], 0.002)),
       material: "cv_deck_line",
       mate: A([x, markY + 0.004, z], [0, RUNWAY_YAW, 0]),
     });
   }
-  // 跑道两侧边线：沿跑道横向 ±1.17，与中线同角度。
-  for (const side of [-1, 1] as const) {
-    for (let s = 0; s < 10; s++) {
-      const [x, z] = runwayAcross(1.6 + s * 3.0, side, 1.17);
-      add({
-        id: `${P}runway_edge_${side === -1 ? "p" : "s"}_${pad(s + 1)}`,
-        name_cn: `斜角跑道${side === -1 ? "左" : "右"}边线 ${s + 1}`,
-        name_en: `angled runway edge ${side === -1 ? "p" : "s"} ${s + 1}`,
-        assembly: ASSEMBLY,
-        build_layer: 4,
-        geometry: M(B(0.12, 0.006, 2.6, [0, 0, 0], 0.0015)),
-        material: "cv_deck_line",
-        mate: A([x, markY + 0.004, z], [0, RUNWAY_YAW, 0]),
-      });
-    }
-  }
-  // 着舰区“钢琴键”：8 根纵向条带横跨跑道，全部按跑道角度排齐。
+  // 着舰区“钢琴键”：艉端 8 根纵向条带，按艉端实际宽度排布。
   for (let bar = 0; bar < 8; bar++) {
-    const [x, z] = runwayAcross(2.4, 1, -0.98 + bar * 0.28);
+    const [x, z] = runwayAcross(1.5, 1, -0.98 + bar * 0.28);
     add({
       id: `${P}runway_threshold_${pad(bar + 1)}`,
       name_cn: `着舰区钢琴键 ${bar + 1}`,
       name_en: `landing threshold piano key ${bar + 1}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(0.16, 0.006, 1.1, [0, 0, 0], 0.0015)),
+      geometry: M(B(0.15, 0.006, 1.0, [0, 0, 0], 0.0015)),
       material: "cv_deck_line",
       mate: A([x, markY + 0.005, z], [0, RUNWAY_YAW, 0]),
     });
   }
-  // 接地点：两列 × 三排，沿跑道横向 ±0.58。
+  // 接地点：两列 × 三排，沿新跑道中心线横向 ±0.48。
   for (let row = 0; row < 3; row++) {
     for (const side of [-1, 1] as const) {
-      const [x, z] = runwayAcross(8.2 + row * 1.4, side, 0.52);
+      const [x, z] = runwayAcross(5.4 + row * 1.35, side, 0.48);
       add({
         id: `${P}runway_touchdown_${pad(row * 2 + (side === -1 ? 1 : 2))}`,
         name_cn: `着舰接地点标记 ${row * 2 + (side === -1 ? 1 : 2)}`,
         name_en: `touchdown mark ${row * 2 + (side === -1 ? 1 : 2)}`,
         assembly: ASSEMBLY,
         build_layer: 4,
-        geometry: M(B(0.42, 0.006, 0.16, [0, 0, 0], 0.0015)),
+        geometry: M(B(0.4, 0.006, 0.16, [0, 0, 0], 0.0015)),
         material: "cv_deck_line",
         mate: A([x, markY + 0.005, z], [0, RUNWAY_YAW, 0]),
       });
     }
   }
-  for (const [tag, s] of [["aft", 0.35], ["fwd", RUNWAY_LEN - 0.35]] as const) {
-    const [cx, cz] = runwayAt(s);
+  // 舰艏起飞跑道：用户 lnj-coordinates.json 的四点窄楔形，覆盖两条右舷弹射器。
+  const tpForePort = TAKEOFF_RUNWAY_POLYGON[0]!;
+  const tpAftPort = TAKEOFF_RUNWAY_POLYGON[1]!;
+  const tpAftStar = TAKEOFF_RUNWAY_POLYGON[2]!;
+  const tpForeStar = TAKEOFF_RUNWAY_POLYGON[3]!;
+  add({
+    id: `${P}takeoff_runway_underlay`,
+    name_cn: "舰艏起飞跑道底色",
+    name_en: "bow takeoff runway underlay",
+    assembly: ASSEMBLY,
+    build_layer: 4,
+    geometry: {
+      type: "kit",
+      kit: "carrierDeckArmorPlate",
+      params: { points: TAKEOFF_RUNWAY_POLYGON, topY: deckTop + 0.004, thickness: 0.003 },
+    },
+    material: "cv_runway",
+    mate: A([0, 0, 0]),
+  });
+  addDeckLine("takeoff_edge_p", "舰艏起飞跑道左舷边线", tpForePort, tpAftPort, 0.08);
+  addDeckLine("takeoff_edge_s", "舰艏起飞跑道右舷边线", tpForeStar, tpAftStar, 0.08);
+  addDeckLine("takeoff_threshold", "舰艏起飞位横线", tpAftPort, tpAftStar, 0.12);
+  const tpMidBow: [number, number] = [(tpForePort[0] + tpForeStar[0]) / 2, (tpForePort[1] + tpForeStar[1]) / 2];
+  const tpMidAft: [number, number] = [(tpAftPort[0] + tpAftStar[0]) / 2, (tpAftPort[1] + tpAftStar[1]) / 2];
+  const tpDx = tpMidAft[0] - tpMidBow[0];
+  const tpDz = tpMidAft[1] - tpMidBow[1];
+  const tpYaw = (Math.atan2(tpDx, tpDz) * 180) / Math.PI;
+  for (let d = 0; d < 7; d++) {
+    const t = 0.14 + d * 0.11;
     add({
-      id: `${P}runway_end_${tag}`,
-      name_cn: `斜角跑道端线 ${tag === "aft" ? "艉" : "艏"}`,
-      name_en: `angled runway end ${tag}`,
+      id: `${P}takeoff_center_${pad(d + 1)}`,
+      name_cn: `舰艏起飞跑道中线 ${d + 1}`,
+      name_en: `bow takeoff centerline ${d + 1}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(RUNWAY_WIDTH - 0.14, 0.006, 0.12, [0, 0, 0], 0.0015)),
-      material: "cv_deck_line",
-      mate: A([cx, markY + 0.006, cz], [0, RUNWAY_YAW, 0]),
+      geometry: M(B(0.06, 0.004, 0.5, [0, 0, 0], 0.0015)),
+      material: "cv_deck_yellow",
+      mate: A([tpMidBow[0] + tpDx * t, markY + 0.004, tpMidBow[1] + tpDz * t], [0, tpYaw, 0]),
     });
   }
-  // 舰艏起飞区：两条弹射器各铺一条窄起飞带，不再用一整块 3.4 宽的浅灰跑道。
-  // 这样两条起飞带都落在用户轮廓的窄艏甲板内，也不会与左侧斜角着舰区叠在一起；
-  // 窄带中心随各自轨道偏航，挡焰板/滑梭/喷流烧蚀区仍由 CAT_TRACKS 自动跟随。
-  CAT_TRACKS.slice(0, 2).forEach((track) => {
-    const tag = pad(track.id);
-    const center = catPoint(track, 4.2);
-    add({
-      id: `${P}launch_runway_${tag}`,
-      name_cn: `舰艏 ${track.id} 号起飞带`,
-      name_en: `bow launch strip ${track.id}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(B(0.78, 0.004, 7.6, [0, 0, 0], 0.0015)),
-      material: "cv_runway",
-      mate: A([center.x, deckTop + 0.005, center.z], [0, track.yawDeg, 0]),
-    });
-    for (const side of [-1, 1] as const) {
-      const edge = catAcross(track, 4.2, side * 0.36);
-      add({
-        id: `${P}launch_edge_${tag}_${side === -1 ? "p" : "s"}`,
-        name_cn: `舰艏 ${track.id} 号起飞带${side === -1 ? "左" : "右"}边线`,
-        name_en: `bow launch strip ${track.id} edge ${side === -1 ? "p" : "s"}`,
-        assembly: ASSEMBLY,
-        build_layer: 4,
-        geometry: M(B(0.06, 0.004, 7.4, [0, 0, 0], 0.0015)),
-        material: "cv_deck_line",
-        mate: A([edge.x, markY, edge.z], [0, track.yawDeg, 0]),
-      });
-    }
-    for (let d = 0; d < 6; d++) {
-      const dash = catPoint(track, 0.9 + d * 1.25);
-      add({
-        id: `${P}launch_center_${tag}_${pad(d + 1)}`,
-        name_cn: `舰艏 ${track.id} 号起飞带中线 ${d + 1}`,
-        name_en: `bow launch strip ${track.id} centerline ${d + 1}`,
-        assembly: ASSEMBLY,
-        build_layer: 4,
-        geometry: M(B(0.07, 0.004, 0.5, [0, 0, 0], 0.0015)),
-        material: "cv_deck_line",
-        mate: A([dash.x, markY, dash.z], [0, track.yawDeg, 0]),
-      });
-    }
-    const threshold = catPoint(track, 0.5);
-    add({
-      id: `${P}launch_threshold_${tag}`,
-      name_cn: `舰艏 ${track.id} 号起飞位横线`,
-      name_en: `bow launch threshold ${track.id}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(B(0.88, 0.004, 0.12, [0, 0, 0], 0.0015)),
-      material: "cv_deck_line",
-      mate: A([threshold.x, markY + 0.001, threshold.z], [0, track.yawDeg, 0]),
-    });
-  });
+  // 两段电磁弹射器起点盖板：由 CAT_TRACKS 的定子段自动覆盖，这里留出编号标记空间。
   // 舰艏甲板舷号“18”：真实福建舰舰艏刷有 18，俯视一眼可辨。
   const bowNumberY = markY + 0.002;
   const deckBar = (id: string, x: number, z: number, w: number, l: number) =>
@@ -1244,48 +1233,23 @@ export function addFlightDeck(ctx: CarrierCtx): void {
     });
   });
   CAT_TRACKS.forEach((track, index) => {
-    const scorch = catPoint(track, -3.55);
+    const scorch = catPoint(track, carrierJbdOffset(track.id) - 0.35);
     add({
       id: `${P}jbd_scorch_${index + 1}`,
       name_cn: `挡焰板烧蚀区 ${index + 1}`,
       name_en: `JBD scorch mark ${index + 1}`,
       assembly: ASSEMBLY,
       build_layer: 4,
-      geometry: M(B(1.2, 0.003, 0.62, [0, 0, 0], 0.002)),
+      geometry: M(B(track.id === 3 ? 1.2 : 0.82, 0.003, 0.62, [0, 0, 0], 0.002)),
       material: "cv_deck_wear",
       mate: A([scorch.x, markY + 0.001, scorch.z], [0, track.yawDeg, 0]),
     });
   });
 
-  // 直通起飞区：中线 + 两侧边线（黄色）。
-  for (let d = 0; d < 10; d++) {
-    add({
-      id: `${P}takeoff_center_${pad(d + 1)}`,
-      name_cn: `起飞区中线 ${d + 1}`,
-      name_en: `takeoff centerline ${d + 1}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(B(0.06, 0.006, 0.6, [0, 0, 0], 0.0015)),
-      material: "cv_deck_yellow",
-      mate: A([0, markY + 0.004, 4.0 + d * 1.2]),
-    });
-  }
-  for (const side of [-1, 1] as const) {
-    add({
-      id: `${P}takeoff_edge_${side === -1 ? "p" : "s"}`,
-      name_cn: `起飞区${side === -1 ? "左" : "右"}边线`,
-      name_en: `takeoff edge ${side === -1 ? "p" : "s"}`,
-      assembly: ASSEMBLY,
-      build_layer: 4,
-      geometry: M(B(0.06, 0.006, 6.0, [0, 0, 0], 0.0015)),
-      material: "cv_deck_yellow",
-      mate: A([side * 1.95, markY + 0.004, 6.0]),
-    });
-  }
-  // 停机位框线 + 编号（七段数字），全部贴在甲板上；避开斜角着舰跑道。
+  // 停机位框线 + 编号（七段数字），全部贴在甲板上；避开着舰/起飞跑道。
   const parkingSpots: Array<[number, number, number, number]> = [
     // x, z, 编号, 机体朝向（与 PARKED_SPOTS 一致）
-    [4.05, -9.6, 1, 0], [4.1, 5.2, 2, 0],
+    [3.95, -10.2, 1, 0], [4.1, 5.2, 2, 0],
     // 5 号是现役演示机位：艏部右舷弹射跑道外侧，不压着舰跑道/拦阻网。
     [2.95, 8.8, 5, 0],
   ];
@@ -1426,14 +1390,14 @@ export function addFlightDeck(ctx: CarrierCtx): void {
   // 不铺到斜角着舰跑道上；弹射位数字已在上方按轨道生成，这里不再重复。
   CAT_TRACKS.forEach((track) => {
     for (let st = 0; st < 3; st++) {
-      const p = catPoint(track, -3.3 - st * 0.18);
+      const p = catPoint(track, carrierJbdOffset(track.id) - 0.3 - st * 0.18);
       add({
         id: `${P}danger_${track.id}_${st + 1}`,
         name_cn: `挡焰板危险区 ${track.id}-${st + 1}`,
         name_en: `JBD danger stripe ${track.id}-${st + 1}`,
         assembly: ASSEMBLY,
         build_layer: 4,
-        geometry: M(B(2.0 - st * 0.3, 0.006, 0.16, [0, 0, 0], 0.0015)),
+        geometry: M(B(track.id === 3 ? 2.0 - st * 0.3 : 0.95 - st * 0.18, 0.006, 0.16, [0, 0, 0], 0.0015)),
         material: st % 2 === 0 ? "cv_deck_red" : "cv_deck_yellow",
         mate: A([p.x, markY + 0.005, p.z], [0, track.yawDeg, 0]),
       });
@@ -1659,15 +1623,17 @@ export function addFlightDeck(ctx: CarrierCtx): void {
       const x1 = deckEdgeAt(z1, side).x + side * 0.028;
       const dx = x1 - x0;
       const dz = z1 - z0;
+      // 右舷艏部是起飞跑道出口，舷墙做低矮唇口，避免飞机翼尖/导弹越舷时穿墙。
+      const h = side === 1 ? 0.08 : 0.3 + i * 0.012;
       add({
         id: `${P}bow_bulwark_${tag}_${i + 1}`,
         name_cn: `舰艏舷墙 ${tag.toUpperCase()}-${i + 1}`,
         name_en: `bow bulwark ${tag} ${i + 1}`,
         assembly: ASSEMBLY,
         build_layer: 3,
-        geometry: M(B(0.055, 0.3 + i * 0.012, Math.hypot(dx, dz), [0, 0, 0], 0.004)),
+        geometry: M(B(0.055, h, Math.hypot(dx, dz), [0, 0, 0], 0.004)),
         material: "cv_hull",
-        mate: A([(x0 + x1) / 2, deckTop + 0.15 + i * 0.006, (z0 + z1) / 2], [0, (Math.atan2(dx, dz) * 180) / Math.PI, 0]),
+        mate: A([(x0 + x1) / 2, deckTop + h / 2 + (side === 1 ? 0 : i * 0.006), (z0 + z1) / 2], [0, (Math.atan2(dx, dz) * 180) / Math.PI, 0]),
       });
     }
   }

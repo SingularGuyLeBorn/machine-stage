@@ -3,6 +3,7 @@ import type { AssembledModel } from "../../assembler/assembler";
 import { CAT_TRACKS, CV, catPoint } from "./constants";
 import { AIRCRAFT_NODE, AIRCRAFT_SCALE_Z, HOOK_NODE, WING_FOLD_L, WING_FOLD_R } from "./aircraft";
 import { SHUTTLE_NODE, JBD_NODES, WIRE_NODES } from "./flightdeck";
+import { LANDING_RUNWAY } from "./runwayPlan";
 import { RADAR_NODE, CIWS_NODES } from "./island";
 import { AMMO_ELEVATOR_NODE, HANGAR_DOOR_NODES } from "./hangar";
 import {
@@ -35,12 +36,12 @@ export const CAT_NOSE_ENGAGE = AIRCRAFT_SCALE_Z * 1.13;
 const LAUNCH_START_POINT = catPoint(LAUNCH_TRACK, -CAT_NOSE_ENGAGE);
 const LAUNCH_END_POINT = catPoint(LAUNCH_TRACK, LAUNCH_TRACK.length - CAT_NOSE_ENGAGE);
 const CAT_START = new THREE.Vector3(LAUNCH_START_POINT.x, DECK_TOP, LAUNCH_START_POINT.z);
-// 斜角着舰跑道：与甲板标线同一坐标系（艉端 x=-0.576/z=-19.9，向左舷偏 3.59°）。
+// 着舰跑道：与甲板标线共用 lnj-coordinates.json 的中心线（几乎沿舰体中轴）。
 // 进近/滑跑/拦阻全部贴跑道中线，不能再用 x=0 的直线。
-const RUNWAY_DEG = 3.59;
+const RUNWAY_DEG = LANDING_RUNWAY.deg;
 const RUNWAY_YAW = (-RUNWAY_DEG * Math.PI) / 180;
-const RUNWAY_AFT_X = -0.5756;
-const RUNWAY_AFT_Z = -19.9;
+const RUNWAY_AFT_X = LANDING_RUNWAY.aftX;
+const RUNWAY_AFT_Z = LANDING_RUNWAY.aftZ;
 const RUNWAY_COS = Math.cos((RUNWAY_DEG * Math.PI) / 180);
 const RUNWAY_SIN = Math.sin((RUNWAY_DEG * Math.PI) / 180);
 const runwayX = (z: number): number => RUNWAY_AFT_X - ((z - RUNWAY_AFT_Z) / RUNWAY_COS) * RUNWAY_SIN;
@@ -251,7 +252,9 @@ function flightPose(t: number): {
     position.y = DECK_TOP;
     wingFold = 1.72 * (1 - smooth(t / 1.25));
     yaw = LAUNCH_YAW * smooth(u);
-    jbd = smooth((t - 2.0) / 0.5);
+    // 挡焰板在飞机滑跑离开尾部包络后再竖起；JSON 的新 JBD 位置更靠前，
+    // 旧时序会在 t=2.5s 压到机尾。竖起窗口 2.8–3.3s 仍覆盖整段弹射。
+    jbd = smooth((t - 2.8) / 0.5);
   } else if (t < LAUNCH_END) {
     phase = "launch";
     const u = clamp01((t - TAXI_END) / (LAUNCH_END - TAXI_END));

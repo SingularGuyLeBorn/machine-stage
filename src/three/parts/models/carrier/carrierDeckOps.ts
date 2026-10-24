@@ -1,5 +1,5 @@
 import { A, B, C, M, S, T, type CarrierCtx } from "./common";
-import { CAT_TRACKS, CV } from "./constants";
+import { CAT_TRACKS, CV, carrierJbdOffset, catPoint } from "./constants";
 
 // ============================================================================
 // 福建舰飞行甲板作业链：牵引车/消防车/挂弹车/系留/轮挡/JBD 液压/拦阻索附件。
@@ -125,7 +125,7 @@ export function addCarrierDeckOps(ctx: CarrierCtx): void {
   }
 
   // ---------------- JBD 液压动力站/铰链附件 ----------------
-  CAT_TRACKS.forEach((_track, index) => {
+  CAT_TRACKS.forEach((track, index) => {
     // 动力站放在着舰区与返航滑行线之间的空档：既避开两条弹射轨道/挡焰板，
     // 也避开演示机从着舰点返回停机位时经过的 x≈1.8 滑行线。
     const pos = index === 0
@@ -142,7 +142,17 @@ export function addCarrierDeckOps(ctx: CarrierCtx): void {
         [pos.x + dx, deckTop + 0.1, pos.z + dz],
       );
     }
-    add(`jbd_hinge_pin_${index + 1}`, `挡焰板铰链销 ${index + 1}`, M(C(0.03, 0.9, [0, 0, 0], 10)), "cv_steel", [pos.x, deckTop + 0.03, pos.z], undefined, [0, 0, 90]);
+    // 铰链销必须跟挡焰板一起移动，不能落在旧的固定 z 位置。
+    const hinge = catPoint(track, carrierJbdOffset(track.id));
+    add(
+      `jbd_hinge_pin_${index + 1}`,
+      `挡焰板铰链销 ${index + 1}`,
+      M(C(0.03, track.id === 3 ? 0.9 : 0.62, [0, 0, 0], 10)),
+      "cv_steel",
+      [hinge.x, deckTop + 0.03, hinge.z],
+      undefined,
+      [0, 0, 90],
+    );
   });
 
   // ---------------- 拦阻索端部滑轮/制动索 ----------------

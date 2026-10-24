@@ -5,10 +5,11 @@ import { detectFloatingIslands } from "@/three/parts/solver/support";
 import { detectKitIslands } from "@/three/parts/solver/kitConnectivity";
 import { findModel } from "@/app/catalog";
 import { animateCarrier, carrierFlightPhase, CAT_NOSE_ENGAGE } from "./motion";
-import { CV } from "./constants";
+import { CAT_TRACKS, CV } from "./constants";
 import { HANGAR_DOOR_NODES, AMMO_ELEVATOR_NODE } from "./hangar";
 import { WIRE_NODES, SHUTTLE_NODE, JBD_NODES, ELEVATOR_NODES } from "./flightdeck";
 import { deckPlan } from "./kits";
+import { LANDING_RUNWAY, LANDING_RUNWAY_POLYGON, TAKEOFF_RUNWAY_POLYGON } from "./runwayPlan";
 import { RADAR_NODE, CIWS_NODES } from "./island";
 import { AIRCRAFT_NODE, HOOK_NODE, WING_FOLD_L, WING_FOLD_R } from "./aircraft";
 import { CARRIER_CREW_FIGURES } from "../crewFigures";
@@ -53,30 +54,32 @@ describe("福建舰 · 整机", () => {
     );
   });
 
-  it("甲板轮廓采用用户 36 点数据，着舰区四点落在甲板内", () => {
+  it("甲板轮廓采用用户 36 点数据，lnj 起飞/着舰跑道落在甲板内", () => {
     const plan = deckPlan();
     expect(plan).toHaveLength(36);
-    const inside = (x: number, z: number): boolean => {
+    const inside = (poly: ReadonlyArray<readonly [number, number]>, x: number, z: number): boolean => {
       let hit = false;
-      for (let i = 0, j = plan.length - 1; i < plan.length; j = i++) {
-        const [xi, zi] = plan[i]!;
-        const [xj, zj] = plan[j]!;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const [xi, zi] = poly[i]!;
+        const [xj, zj] = poly[j]!;
         if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) hit = !hit;
       }
       return hit;
     };
-    const landing: Array<[number, number]> = [
-      [-1.277, 11.496],
-      [-3.725, 10.042],
-      [-1.806, -19.938],
-      [0.655, -19.861],
-    ];
-    // 艉端两角几乎贴着艉板折线（仅 ~13cm 余量），向着舰区中心收 3% 再判内，
-    // 避免点在边界上的射线法数值歧义；前两角同样收一点，语义仍是四点都在甲板内。
-    const cx = landing.reduce((sum, p) => sum + p[0], 0) / landing.length;
-    const cz = landing.reduce((sum, p) => sum + p[1], 0) / landing.length;
-    for (const [x, z] of landing) {
-      expect(inside(x + (cx - x) * 0.03, z + (cz - z) * 0.03), `${x},${z}`).toBe(true);
+    // 艉端两角几乎贴着艉板折线，向跑道中心收 6% 再判内；前两角同样收一点。
+    const checkPolygon = (poly: ReadonlyArray<readonly [number, number]>, inset: number) => {
+      const cx = poly.reduce((sum, p) => sum + p[0], 0) / poly.length;
+      const cz = poly.reduce((sum, p) => sum + p[1], 0) / poly.length;
+      for (const [x, z] of poly) {
+        expect(inside(plan, x + (cx - x) * inset, z + (cz - z) * inset), `${x},${z}`).toBe(true);
+      }
+    };
+    checkPolygon(LANDING_RUNWAY_POLYGON, 0.06);
+    checkPolygon(TAKEOFF_RUNWAY_POLYGON, 0.04);
+    // 用户 JSON 的着舰跑道几乎沿舰体中轴，不是旧的 3.59° 斜角。
+    expect(Math.abs(LANDING_RUNWAY.deg)).toBeLessThan(1);
+    for (const track of CAT_TRACKS.slice(0, 2)) {
+      expect(inside(TAKEOFF_RUNWAY_POLYGON, track.x0, track.z0), `cat ${track.id} start`).toBe(true);
     }
   });
 

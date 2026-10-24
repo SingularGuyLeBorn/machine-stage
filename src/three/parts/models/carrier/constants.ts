@@ -5,6 +5,8 @@
 // 坐标：+X 右舷（舰岛侧）、+Y 上、+Z 舰艏；龙骨底面 y=0，飞行甲板面 y=4.4（编辑单位）。
 // ============================================================================
 
+import { TAKEOFF_CAT_X, TAKEOFF_CAT_Z0, TAKEOFF_JBD_S } from "./runwayPlan";
+
 export const CV = {
   SCALE: 8,
   LENGTH: 40,
@@ -71,15 +73,20 @@ export type CatTrack = {
 };
 
 export const CAT_TRACKS: readonly CatTrack[] = [
-  // 舰艏两条：随用户甲板轮廓的右舷偏置内收，两条轨道都落在窄艏甲板内，
-  // 不再让 1 号轨道伸到左舷轮廓外；2 号保持平行，1 号右偏 3°。
-  { id: 1, x0: 0.2, z0: 10.0, yawDeg: 3.0, length: 8.4 },
-  { id: 2, x0: 1.6, z0: 10.0, yawDeg: 0.0, length: 8.4 },
+  // 舰艏两条：按用户 lnj-coordinates.json 的两段电磁弹射器起箱位置，
+  // 都落在右舷起飞跑道内，平行于舰体轴线。
+  { id: 1, x0: TAKEOFF_CAT_X[0], z0: TAKEOFF_CAT_Z0, yawDeg: 0.0, length: 8.4 },
+  { id: 2, x0: TAKEOFF_CAT_X[1], z0: TAKEOFF_CAT_Z0, yawDeg: 0.0, length: 8.4 },
   // 腰部三号：移到着舰区左舷外侧的净空条带，与甲板中线平行。
   // 旧位置在斜角着舰区内部，和着舰跑道重叠；再向外就是着舰区边界，
   // 因此改成平行艏艉线，JBD/滑梭/喷流区随轨道整体平移。
   { id: 3, x0: -3.6, z0: -7.2, yawDeg: 0, length: 8.4 },
 ];
+
+/** 挡焰板在各自轨道上的纵向位置：舰艏两条按用户 JSON 后移，三号保持原位。 */
+export function carrierJbdOffset(trackId: number): number {
+  return trackId === 3 ? -3.2 : TAKEOFF_JBD_S;
+}
 
 export function catPoint(track: CatTrack, s: number): { x: number; z: number } {
   const yaw = (track.yawDeg * Math.PI) / 180;
