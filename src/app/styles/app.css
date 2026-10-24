@@ -749,6 +749,150 @@
 }
 
 
+
+.walk-travel-toggle {
+  position: absolute;
+  top: 388px;
+  right: 16px;
+  width: 212px;
+  z-index: 9;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.walk-travel-toggle kbd {
+  padding: 0 4px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.walk-travel {
+  position: absolute;
+  top: 120px;
+  right: 16px;
+  width: 344px;
+  max-height: calc(100% - 190px);
+  overflow: auto;
+  z-index: 11;
+  padding: 10px 12px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(9, 13, 19, 0.95);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  color: rgba(238, 245, 252, 0.94);
+  pointer-events: auto;
+}
+
+.walk-travel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 4px;
+}
+
+.walk-travel__head strong {
+  display: block;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+.walk-travel__head span {
+  display: block;
+  margin-top: 2px;
+  color: rgba(232, 240, 248, 0.52);
+  font-size: 10px;
+}
+
+.walk-travel__close {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(238, 245, 252, 0.8);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.walk-travel__close:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.walk-travel__section h3 {
+  margin: 10px 0 6px;
+  color: rgba(226, 237, 246, 0.56);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.walk-travel__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.walk-travel__hotspots {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.walk-travel__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(240, 247, 253, 0.94);
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.walk-travel__item:hover {
+  background: rgba(127, 231, 255, 0.14);
+  border-color: rgba(127, 231, 255, 0.42);
+}
+
+.walk-travel__item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.walk-travel__item small {
+  color: rgba(226, 237, 246, 0.48);
+  font-size: 10px;
+}
+
+.walk-travel__item em {
+  color: #7fe7ff;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.walk-travel__item.is-active {
+  border-color: rgba(127, 231, 255, 0.55);
+  background: rgba(127, 231, 255, 0.12);
+}
+
 /* 第一人称漫游小地图：右上角俯视图 + 玩家朝向 + 交互点。 */
 .walk-minimap {
   position: absolute;

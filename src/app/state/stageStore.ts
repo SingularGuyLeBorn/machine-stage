@@ -197,6 +197,10 @@ interface StageState {
   walkFading: boolean;
   /** 第一人称漫游：玩家在编辑坐标里的位置与朝向（供小地图 10Hz 刷新）。 */
   walkPose: { x: number; z: number; yaw: number };
+  /** 快速前往面板是否打开。 */
+  walkTravelOpen: boolean;
+  /** 快速前往请求（nonce 保证点击同一目的地也能触发）。 */
+  walkTravel: { area: string; pos: [number, number, number]; yaw: number; nonce: number } | null;
   /** 战损形态（完好/破损/破碎）：只切预制变体，不影响碰撞与支撑检测。 */
   damage: DamageState;
   /** 随机破口种子：每次「随机破口」+1，重建时由 damage kit 读取。 */
@@ -243,6 +247,9 @@ interface StageState {
   setWalkLocked(locked: boolean): void;
   setWalkFading(fading: boolean): void;
   setWalkPose(pose: { x: number; z: number; yaw: number }): void;
+  setWalkTravelOpen(open: boolean): void;
+  requestWalkTravel(area: string, pos: [number, number, number], yaw: number): void;
+  clearWalkTravel(): void;
   setDamage(state: DamageState): void;
   /** 换一组随机破口并切到破碎，触发重建。 */
   rerollDamage(): void;
@@ -359,6 +366,8 @@ export const useStageStore = create<StageState>((set, get) => ({
   walkLocked: false,
   walkFading: false,
   walkPose: { x: 0, z: 0, yaw: 0 },
+  walkTravelOpen: false,
+  walkTravel: null,
   damage: "intact",
   damageSeed: 0,
   lidOverrides: {},
@@ -401,6 +410,8 @@ export const useStageStore = create<StageState>((set, get) => ({
       walkLocked: false,
       walkFading: false,
       walkPose: { x: 0, z: 0, yaw: 0 },
+      walkTravelOpen: false,
+      walkTravel: null,
       damage: "intact",
       damageSeed: 0,
       lidOverrides: {},
@@ -597,6 +608,12 @@ export const useStageStore = create<StageState>((set, get) => ({
   setWalkLocked: (walkLocked) => set({ walkLocked }),
   setWalkFading: (walkFading) => set({ walkFading }),
   setWalkPose: (walkPose) => set({ walkPose }),
+  setWalkTravelOpen: (walkTravelOpen) => set({ walkTravelOpen }),
+  requestWalkTravel: (area, pos, yaw) =>
+    set((state) => ({
+      walkTravel: { area, pos, yaw, nonce: (state.walkTravel?.nonce ?? 0) + 1 },
+    })),
+  clearWalkTravel: () => set({ walkTravel: null }),
 
   setDamage: (damage) => set({ damage }),
 

@@ -57,6 +57,9 @@ export function WalkController() {
   const setWalkLocked = useStageStore((state) => state.setWalkLocked);
   const setWalkFading = useStageStore((state) => state.setWalkFading);
   const setWalkPose = useStageStore((state) => state.setWalkPose);
+  const walkTravel = useStageStore((state) => state.walkTravel);
+  const clearWalkTravel = useStageStore((state) => state.clearWalkTravel);
+  const travelOpen = useStageStore((state) => state.walkTravelOpen);
   const camera = useThree((state) => state.camera);
   const gl = useThree((state) => state.gl);
   const isCarrier = assembled?.registry.model === "carrier";
@@ -172,12 +175,35 @@ export function WalkController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, assembled]);
 
+  // 快速前往请求：面板/快捷键写入 store，这里统一走与门户相同的淡入淡出传送。
+  useEffect(() => {
+    if (!walkTravel) return;
+    const next = walkTravel;
+    clearWalkTravel();
+    if (!config?.areas[next.area]) return;
+    teleport(next.area, next.pos, next.yaw);
+    // teleport 依赖当前渲染的 config/assembled；walkTravel 变化时闭包就是最新的。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walkTravel]);
+
   // 键盘/鼠标/指针锁。
   useEffect(() => {
     if (!config) return;
     const canvas = gl.domElement;
     const down = (event: KeyboardEvent) => {
+      if (event.code === "KeyT") {
+        event.preventDefault();
+        const state = useStageStore.getState();
+        state.setWalkTravelOpen(!state.walkTravelOpen);
+        if (document.pointerLockElement) document.exitPointerLock();
+        return;
+      }
       if (event.code === "Escape") {
+        const state = useStageStore.getState();
+        if (state.walkTravelOpen) {
+          state.setWalkTravelOpen(false);
+          return;
+        }
         if (!document.pointerLockElement) setCameraMode("orbit");
         return;
       }
@@ -350,8 +376,8 @@ export function WalkController() {
       }
     }
 
-    // 移动。
-    if (!transitioning.current) {
+    // 移动（快速前往面板打开时暂停）。
+    if (!transitioning.current && !travelOpen) {
       const p = player.current;
       const forward = new THREE.Vector3(-Math.sin(p.yaw), 0, -Math.cos(p.yaw));
       const right = new THREE.Vector3(Math.cos(p.yaw), 0, -Math.sin(p.yaw));
@@ -444,8 +470,8 @@ export function WalkController() {
       }
     }
 
-    // 最近可交互物与提示。
-    if (!transitioning.current) {
+    // 最近可交互物与提示（快速前往面板打开时暂停 F）。
+    if (!transitioning.current && !travelOpen) {
       let best: WalkInteraction | null = null;
       let bestDistance = Infinity;
       for (const interaction of config.interactions) {

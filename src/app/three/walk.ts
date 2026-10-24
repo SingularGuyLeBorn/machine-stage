@@ -1047,3 +1047,95 @@ export function clampToArea(
   };
 }
 
+
+// ----------------------------------------------------------------------------
+// 快速前往：区域列表 + 关键交互点（面板点击/按 T 打开）。
+// ----------------------------------------------------------------------------
+
+export interface WalkDestination {
+  id: string;
+  label: string;
+  area: string;
+  pos: [number, number, number];
+  yaw: number;
+  hint?: string;
+}
+
+interface WalkHotspotSpec {
+  id: string;
+  label: string;
+  interactionId: string;
+  /** 传送落点相对交互点的平移，避免站进设备/控制台里。 */
+  standoff?: [number, number];
+}
+
+const WALK_HOTSPOTS: Record<string, WalkHotspotSpec[]> = {
+  carrier: [
+    { id: "barrier", label: "应急拦阻网控制台", interactionId: "deck_barrier", standoff: [0.45, 0.75] },
+    { id: "island", label: "舰岛入口 · 舰桥", interactionId: "deck_island_bridge" },
+    { id: "ordnance", label: "甲板弹药升降口", interactionId: "deck_ordnance_magazine" },
+    { id: "elevator", label: "机库升降机", interactionId: "deck_elevator_hangar" },
+    { id: "jbd1", label: "1 号挡焰板", interactionId: "deck_jbd_1" },
+    { id: "jbd2", label: "2 号挡焰板", interactionId: "deck_jbd_2" },
+    { id: "jbd3", label: "3 号挡焰板", interactionId: "deck_jbd_3" },
+    { id: "engine_door", label: "机库艉部 · 机舱水密门", interactionId: "hangar_engine_door" },
+    { id: "crew_door", label: "机库艏部 · 生活区水密门", interactionId: "hangar_crew_door" },
+    { id: "hangar_ammo", label: "机库 · 弹药提升井", interactionId: "hangar_magazine" },
+    { id: "workshop", label: "机库 · 维修车间", interactionId: "hangar_workshop" },
+    { id: "bridge_cic", label: "舰桥 · CIC 水密门", interactionId: "bridge_cic" },
+    { id: "reactor_door", label: "机舱 · 反应堆舱门", interactionId: "engine_reactor" },
+    { id: "crew_berth", label: "生活区 · 水兵住舱门", interactionId: "crew_berth", standoff: [0.06, 0] },
+    { id: "crew_mess", label: "生活区 · 餐厅门", interactionId: "crew_mess", standoff: [-0.06, 0] },
+  ],
+  type055: [
+    { id: "bridge", label: "舰桥入口", interactionId: "ddg_deck_bridge" },
+    { id: "hangar", label: "机库入口", interactionId: "ddg_deck_hangar" },
+    { id: "engine", label: "机舱入口", interactionId: "ddg_deck_engine" },
+    { id: "magazine", label: "弹药库入口", interactionId: "ddg_deck_magazine" },
+    { id: "crew", label: "生活区入口", interactionId: "ddg_deck_crew" },
+    { id: "z20", label: "直-20 旁", interactionId: "ddg_hangar_z20" },
+  ],
+  tiger: [
+    { id: "driver", label: "驾驶席旁", interactionId: "tiger_enter_driver" },
+    { id: "commander", label: "车长塔旁", interactionId: "tiger_enter_commander" },
+    { id: "top", label: "车顶攀爬点", interactionId: "tiger_enter_top" },
+  ],
+  mbt90: [
+    { id: "driver", label: "驾驶席旁", interactionId: "mbt_enter_driver" },
+    { id: "commander", label: "车长塔旁", interactionId: "mbt_enter_commander" },
+    { id: "top", label: "车顶攀爬点", interactionId: "mbt_enter_top" },
+  ],
+};
+WALK_HOTSPOTS.ed90 = WALK_HOTSPOTS.mbt90!;
+
+export function walkDestinationsOf(
+  modelId: string,
+  config: WalkConfig,
+): { areas: WalkDestination[]; hotspots: WalkDestination[] } {
+  const areas: WalkDestination[] = Object.values(config.areas).map((area) => ({
+    id: `area:${area.id}`,
+    label: area.label,
+    area: area.id,
+    pos: area.spawn.pos,
+    yaw: area.spawn.yaw,
+    hint: `${config.interactions.filter((item) => item.area === area.id).length} 个交互`,
+  }));
+  const hotspots: WalkDestination[] = [];
+  for (const spec of WALK_HOTSPOTS[modelId] ?? []) {
+    const interaction = config.interactions.find((item) => item.id === spec.interactionId);
+    const area = interaction ? config.areas[interaction.area] : undefined;
+    if (!interaction || !area) continue;
+    const x = interaction.pos[0] + (spec.standoff?.[0] ?? 0);
+    const z = interaction.pos[1] + (spec.standoff?.[1] ?? 0);
+    const y = areaFloorAt(area, x, z);
+    hotspots.push({
+      id: `hotspot:${spec.id}`,
+      label: spec.label,
+      area: area.id,
+      pos: [x, y, z],
+      yaw: area.spawn.yaw,
+      hint: area.label,
+    });
+  }
+  return { areas, hotspots };
+}

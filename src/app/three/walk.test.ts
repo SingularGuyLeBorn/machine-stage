@@ -8,6 +8,7 @@ import {
   TYPE055_WALK_LIGHTS,
   areaFloorAt,
   isInsideArea,
+  walkDestinationsOf,
 } from "./walk";
 
 const config = CARRIER_WALK_CONFIG;
@@ -90,6 +91,40 @@ describe("055 · 第一人称漫游配置", () => {
     expect(ddg.interactions.some((item) => item.kind === "mount")).toBe(true);
     for (const id of ["bridge", "cic", "engine_room", "hangar", "crew", "magazine", "workshop"]) {
       expect(TYPE055_WALK_LIGHTS[id]?.length ?? 0, id).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("漫游快速前往", () => {
+  it("福建舰区域/关键位置齐全，落点都在对应区域内且 ID 唯一", () => {
+    const { areas, hotspots } = walkDestinationsOf("carrier", CARRIER_WALK_CONFIG);
+    expect(areas).toHaveLength(Object.keys(CARRIER_WALK_CONFIG.areas).length);
+    expect(hotspots.length).toBeGreaterThanOrEqual(10);
+    const ids = new Set<string>();
+    for (const destination of [...areas, ...hotspots]) {
+      expect(ids.has(destination.id), destination.id).toBe(false);
+      ids.add(destination.id);
+      const area = CARRIER_WALK_CONFIG.areas[destination.area]!;
+      expect(isInsideArea(area, destination.pos[0], destination.pos[2]), destination.id).toBe(true);
+      expect(Number.isFinite(destination.pos[1])).toBe(true);
+    }
+    expect(hotspots.some((item) => item.label.includes("拦阻网"))).toBe(true);
+    expect(hotspots.some((item) => item.label.includes("舰桥"))).toBe(true);
+  });
+
+  it("055/坦克也有快速前往落点", () => {
+    for (const [id, config] of [
+      ["type055", TYPE055_WALK_CONFIG],
+      ["tiger", TIGER_WALK_CONFIG],
+      ["mbt90", MBT_WALK_CONFIG],
+      ["ed90", MBT_WALK_CONFIG],
+    ] as const) {
+      const { areas, hotspots } = walkDestinationsOf(id, config);
+      expect(areas.length).toBeGreaterThan(0);
+      for (const destination of [...areas, ...hotspots]) {
+        const area = config.areas[destination.area]!;
+        expect(isInsideArea(area, destination.pos[0], destination.pos[2]), `${id} ${destination.id}`).toBe(true);
+      }
     }
   });
 });

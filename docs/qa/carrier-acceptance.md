@@ -685,10 +685,16 @@ npm run build
 - 玩家位姿以 10Hz 写入 `walkPose`，只有小地图订阅，不会让整个 Viewport 跟着重渲染；甲板/舱室/055/坦克/ED90 均有对应地图（坦克车外显示车体、炮塔、车头方向）。
 - 证据：`carrier-walk-minimap-deck.jpeg`、`carrier-walk-minimap-hangar.jpeg`、`carrier-walk-055-minimap.jpeg`、`tank-walk-tiger-minimap.jpeg`；新增 `WalkMinimap.test.tsx` 2 项与地图特征断言。
 
+### 快速前往（T）
+- 漫游 HUD 右上角小地图下方新增「快速前往」按钮，也可按 `T` 开关；面板列出全部区域（当前区域高亮）与关键位置（拦阻网控制台、舰岛入口、弹药升降口、挡焰板、机库两道水密门、CIC/反应堆门、住舱/餐厅门等）。
+- 点击任意目的地即按与门户相同的淡入淡出传送，落点按区域地面高度/避让偏移计算；面板打开时暂停 WASD/F 并释放指针锁，`Esc` 关闭面板。
+- 055 面板含 11 个区域与舰桥/机库/机舱/弹药库/生活区/直-20 入口；虎式/MBT-90/ED-90 面板含车外/驾驶席/车长塔/炮塔顶。
+- 证据：`carrier-walk-travel-panel.jpeg`、`carrier-walk-travel-bridge.jpeg`、`carrier-walk-travel-barrier.jpeg`、`carrier-walk-055-travel-panel.jpeg`；新增快速前往目的地断言与面板交互测试。
+
 ### 门禁（2026-10-25 最终）
 - 福建舰：10,249 定义件 / 11,403 实例；注册表校验 0 错；悬空 0、悬空孤岛 0、合并件内部悬空 0；**静态穿模 15,273 报告 / 未豁免 0**。
 - 扫掠：`flight_ops` 30s@2fps 798 / **0**；`hangar` 26 / 0；`engine` 558 / 0；`ciws` 166 / 0。
-- 单元测试：`npx vitest run` **371 通过 / 1 跳过**（56 个文件通过 / 1 跳过）；`npm run build`（tsc --noEmit + vite build）通过。新增 `walk.test.ts` 8 项（福建舰 5 / 055 1 / 坦克 2）、`WalkMinimap.test.tsx` 2 项，航母测试 13 项。
+- 单元测试：`npx vitest run` **375 通过 / 1 跳过**（57 个文件通过 / 1 跳过）；本轮并行构建负载下 King Joe 模块几何测试一次 20s 超时，单独复跑 15/15 通过；`npm run build`（tsc --noEmit + vite build）通过。新增 `walk.test.ts` 10 项、`WalkMinimap.test.tsx` 2 项、`WalkTravelPanel.test.tsx` 2 项，航母测试 13 项。
 - 055：11,944 件；坦克：虎式 293 件 / MBT 1,299 件（既有门禁不受本轮漫游配置影响）。
 
 ### 已知限制
