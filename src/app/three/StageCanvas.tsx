@@ -1,7 +1,7 @@
 import { ContactShadows, Environment, Grid, Html, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { acceleratedRaycast } from "three-mesh-bvh";
 import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
@@ -18,6 +18,7 @@ import { applyDamage, applyDetach, applyExplode, applyHighlight, applyXray, clea
 import { applyInternalVisibility, isInternalPart, isXrayShellPart } from "./internal";
 import { createLocalXray } from "./localXray";
 import { Weather } from "./Weather";
+import { CarrierOcean } from "./CarrierOcean";
 import { setArmourWet } from "@/three/parts/kernel/armourSurface";
 import { TigerVfx } from "./vfx/TigerVfx";
 import { MbtVfx } from "./vfx/MbtVfx";
@@ -77,7 +78,7 @@ interface CachedBuild {
   warmed: boolean;
 }
 
-export function StageCanvas() {
+function StageCanvasImpl() {
   const heavy = useStageStore((state) => state.modelId === "carrier");
   const hmt = useStageStore((state) => state.modelId === "hmt");
   return (
@@ -103,6 +104,7 @@ export function StageCanvas() {
         </Suspense>
         <StageFog />
         <StageRuntime />
+        <CarrierWalkLod />
         <TigerVfx />
         <MbtVfx />
         <Type055Vfx />
@@ -112,6 +114,8 @@ export function StageCanvas() {
         <CameraRig />
         <WalkGate />
         <CarrierCameraFloor />
+        <CarrierUnderwaterView />
+        <UnderwaterBackground />
         {!qaNoFx && <StageEffects />}
       </Canvas>
       <WarmupOverlay />
@@ -119,9 +123,209 @@ export function StageCanvas() {
   );
 }
 
+// 座舱状态每 80ms 发布一次；StageCanvas 没有 props，不能被父级带着整树重渲染。
+export const StageCanvas = memo(StageCanvasImpl);
+
+interface WalkLodEntry {
+  object: THREE.Mesh;
+  radius: number;
+  center: THREE.Vector3;
+  group: InteriorGroup | null;
+  exterior: "deck" | "surface" | "island" | null;
+  hidden: boolean;
+  source: "lod" | "interior" | null;
+}
+
+type InteriorGroup = "aircraft" | "hangar" | "power" | "crew";
+
+// 封闭舱室只在玩家进入对应区域时绘制：从甲板看，机库飞机/机舱/生活区
+// 都被舰体挡住，但仍然会进入渲染队列。按区域显隐不改变可见画面，只省 draw call。
+const INTERIOR_AREAS: Record<InteriorGroup, readonly string[]> = {
+  aircraft: ["hangar", "workshop", "aircraft1"],
+  hangar: ["hangar", "magazine", "workshop", "aircraft1"],
+  power: ["engine_room", "reactor_room"],
+  crew: ["crew", "crew_berth", "crew_mess", "workshop", "bridge", "cic"],
+};
+
+/** 舰体内部的封闭区域：这里看不到甲板上的小零件和停放的 J20。 */
+const ENCLOSED_AREAS = new Set([
+  "hangar",
+  "magazine",
+  "engine_room",
+  "reactor_room",
+  "crew",
+  "crew_berth",
+  "crew_mess",
+  "workshop",
+  "aircraft1",
+]);
+
+function interiorGroupOf(id: string): InteriorGroup | null {
+  if (id.startsWith("carrier.aircraft.hangarparked")) return "aircraft";
+  if (id.startsWith("carrier.hangar.")) return "hangar";
+  if (id.startsWith("carrier.power.")) return "power";
+  if (id.startsWith("carrier.crew.")) return "crew";
+  return null;
+}
+
+function exteriorGroupOf(id: string): WalkLodEntry["exterior"] {
+  if (id.startsWith("carrier.deck.")) return "deck";
+  if (id.startsWith("carrier.surface.")) return "surface";
+  if (id.startsWith("carrier.island.")) return "island";
+  return null;
+}
+
+function walkLodEntries(assembled: AssembledModel): WalkLodEntry[] {
+  assembled.root.updateMatrixWorld(true);
+  const entries: WalkLodEntry[] = [];
+  const position = new THREE.Vector3();
+  const scale = new THREE.Vector3();
+  const quaternion = new THREE.Quaternion();
+  for (const handle of assembled.parts) {
+    if (handle.instanced) continue;
+    const id = handle.def.id;
+    // 现役机与甲板停放机已由 j20Mount 替换成 InstancedMesh；旧 J-15 代理件
+    // 的显隐归 j20Mount 管，不参与这里的裁剪。只收编机库里的折叠翼 J-15。
+    if (id.startsWith("carrier.aircraft.") && !id.startsWith("carrier.aircraft.hangarparked")) continue;
+    if (handle.def.tags?.includes("fx")) continue;
+    const object = handle.object as THREE.Mesh;
+    const geometry = handle.geometry;
+    if (!object.isMesh || !geometry) continue;
+    if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+    const sphere = geometry.boundingSphere;
+    if (!sphere) continue;
+    object.matrixWorld.decompose(position, quaternion, scale);
+    entries.push({
+      object,
+      radius: sphere.radius * Math.max(scale.x, scale.y, scale.z),
+      center: sphere.center.clone().applyMatrix4(object.matrixWorld),
+      group: interiorGroupOf(id),
+      exterior: exteriorGroupOf(id),
+      hidden: false,
+      source: null,
+    });
+  }
+  return entries;
+}
+
+/**
+ * 漫游/座舱视角的细节 LOD：按屏幕投影尺寸隐藏远处不足 6px 的小件，
+ * 并按玩家所在舱室隐藏被舰体完全遮住的封闭内部。
+ * 舰体细节上万件，全量绘制会把 walking 卡在 40fps 左右；近处细节保持原样。
+ */
+function CarrierWalkLod() {
+  const assembled = useStageStore((state) => state.assembled);
+  const active = useStageStore((state) => state.cameraMode === "walk" && state.modelId === "carrier");
+  const walkArea = useStageStore((state) => state.walkArea);
+  const cockpitActive = useStageStore((state) => Boolean(state.cockpit?.active));
+  const camera = useThree((state) => state.camera);
+  const size = useThree((state) => state.size);
+  const entries = useMemo(() => (assembled ? walkLodEntries(assembled) : []), [assembled]);
+  const clock = useRef(0);
+  const insideEnclosed = active && !cockpitActive && ENCLOSED_AREAS.has(walkArea);
+
+  useEffect(() => {
+    clock.current = 1;
+  }, [walkArea, cockpitActive]);
+
+  // 停放的 J20 是 j20Mount 运行期加的 InstancedMesh，不在零件表里；整组显隐。
+  useEffect(() => {
+    if (!assembled) return;
+    const groups: THREE.Object3D[] = [];
+    assembled.root.traverse((object) => {
+      if (object.userData.hideInEnclosedInterior) groups.push(object);
+    });
+    for (const group of groups) group.visible = !insideEnclosed;
+    return () => {
+      for (const group of groups) group.visible = true;
+    };
+  }, [assembled, insideEnclosed]);
+
+  useEffect(() => {
+    if (active) return;
+    for (const entry of entries) {
+      if (!entry.hidden) continue;
+      entry.object.visible = true;
+      entry.hidden = false;
+      entry.source = null;
+    }
+  }, [active, entries]);
+
+  useEffect(
+    () => () => {
+      for (const entry of entries) {
+        if (!entry.hidden) continue;
+        entry.object.visible = true;
+        entry.hidden = false;
+        entry.source = null;
+      }
+    },
+    [entries],
+  );
+
+  useFrame((_, delta) => {
+    if (!active || entries.length === 0) return;
+    clock.current += delta;
+    if (clock.current < 0.2) return;
+    clock.current = 0;
+    const perspective = camera as THREE.PerspectiveCamera;
+    const tanHalf = Math.tan((perspective.fov * Math.PI) / 360);
+    const height = size.height || 1;
+    const cam = camera.position;
+    const area = cockpitActive ? "deck" : walkArea;
+    for (const entry of entries) {
+      if (entry.hidden && entry.object.visible) {
+        // 其他系统主动恢复了显隐（构建滑杆等），不再由 LOD 接管。
+        entry.hidden = false;
+        entry.source = null;
+      }
+      if (entry.group && !INTERIOR_AREAS[entry.group].includes(area)) {
+        if (!entry.hidden && entry.object.visible) {
+          entry.object.visible = false;
+          entry.hidden = true;
+          entry.source = "interior";
+        }
+        continue;
+      }
+      // 在封闭舱室里，甲板/舷侧/舰岛上的小零件全被舰体挡住；
+      // 保留大结构（甲板面、舰体、舰岛主体），只裁 <4m 的碎件。
+      if (insideEnclosed && entry.exterior && entry.radius < 4) {
+        if (!entry.hidden && entry.object.visible) {
+          entry.object.visible = false;
+          entry.hidden = true;
+          entry.source = "interior";
+        }
+        continue;
+      }
+      if (entry.source === "interior") {
+        entry.object.visible = true;
+        entry.hidden = false;
+        entry.source = null;
+      }
+      const distance = entry.center.distanceTo(cam);
+      if (distance < 1e-4) continue;
+      const pixels = (entry.radius * height) / (tanHalf * distance);
+      if (!entry.hidden) {
+        if (entry.object.visible && pixels < 6) {
+          entry.object.visible = false;
+          entry.hidden = true;
+          entry.source = "lod";
+        }
+      } else if (entry.object.visible) {
+        entry.hidden = false;
+        entry.source = null;
+      } else if (pixels > 8.5) {
+        entry.object.visible = true;
+        entry.hidden = false;
+        entry.source = null;
+      }
+    }
+  });
+  return null;
+}
+
 /** 重模型加载提示：装配与着色器编译期间用 DOM 层盖住画面，避免低端 GPU 看起来像卡死/黑屏。 */
-function WarmupOverlay() {
-  const assembling = useStageStore((state) => state.assembling);
+function WarmupOverlay() {  const assembling = useStageStore((state) => state.assembling);
   const warming = useStageStore((state) => state.shaderWarming);
   const heavy = useStageStore((state) => state.modelId === "carrier");
   if (!assembling && !warming) return null;
@@ -169,14 +373,47 @@ function WarmupOverlay() {
 function CockpitCanopyVisibility() {
   const assembled = useStageStore((state) => state.assembled);
   const cameraMode = useStageStore((state) => state.cameraMode);
+  const rideActive = useStageStore((state) => state.cockpit?.active ?? false);
   useEffect(() => {
     const canopy = assembled?.getPart("carrier.aircraft.canopy");
-    if (!canopy) return;
-    canopy.object.visible = cameraMode !== "cockpit";
-    return () => {
-      canopy.object.visible = true;
+    if (canopy) canopy.object.visible = cameraMode !== "cockpit" && !rideActive;
+    // 当前实际渲染的是运行时挂载的 J20（动态 import，可能晚于本 effect 挂上）。
+    // 因此这里不能只做一次：先做，再在 0.1/0.5/1.5/3s 重试，补齐后挂上的机壳/舱盖/乘员。
+    const aircraft = assembled?.getNode("CV_Aircraft");
+    const inside = cameraMode === "cockpit" || rideActive;
+    if (!inside) {
+      return () => {
+        if (canopy) canopy.object.visible = true;
+      };
+    }
+    const previous = new Map<THREE.Object3D, boolean>();
+    let touched = false;
+    const apply = () => {
+      const visual = aircraft?.getObjectByName("CarrierJ20Visual");
+      if (!visual) return;
+      touched = true;
+      const keep = new Set<THREE.Object3D>();
+      visual.getObjectByName("Cockpit")?.traverse((object) => keep.add(object));
+      visual.traverse((object) => {
+        if (!(object as THREE.Mesh).isMesh) return;
+        if (!previous.has(object)) previous.set(object, object.visible);
+        object.visible = keep.has(object);
+      });
+      for (const name of ["Pilot", "CanopyGlass"]) {
+        const object = visual.getObjectByName(name);
+        if (!object) continue;
+        if (!previous.has(object)) previous.set(object, object.visible);
+        object.visible = false;
+      }
     };
-  }, [assembled, cameraMode]);
+    apply();
+    const timers = [100, 500, 1500, 3000].map((delay) => window.setTimeout(apply, delay));
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer);
+      if (canopy) canopy.object.visible = true;
+      if (touched) for (const [object, visible] of previous) object.visible = visible;
+    };
+  }, [assembled, cameraMode, rideActive]);
   return null;
 }
 
@@ -935,7 +1172,9 @@ function StageRuntime() {
   // 进入舰内视角时也必须隐藏：海面是无限大平面，会穿进弹药库/生活区等水下舱室。
   useEffect(() => {
     if (!assembled) return;
-    const showSea = views.sea && !isCarrierInteriorMode(cameraMode);
+    // 航母改用 CarrierOcean 的 GPU 频谱海；旧的 carrier.sea.* 静态网格只保留在零件树里，
+    // 不再参与渲染（否则会和新的海面 z-fighting，且旧尾流是静态的）。
+    const showSea = views.sea && !isCarrierInteriorMode(cameraMode) && assembled.registry.model !== "carrier";
     for (const handle of assembled.parts) {
       if (!handle.partId.startsWith("carrier.sea.")) continue;
       handle.object.visible = showSea;
@@ -1160,6 +1399,7 @@ function StageRuntime() {
         />
       ) : null}
       <Weather assembled={assembled} />
+      {modelId === "carrier" ? <CarrierOcean /> : null}
       {assembled ? (
         <AssembledObject
           key={`assembled:${scene?.seq ?? 0}`}
@@ -1300,14 +1540,15 @@ function CarrierCameraFloor() {
   const cameraMode = useStageStore((state) => state.cameraMode);
   const camera = useThree((state) => state.camera);
   const seaOn = useStageStore((state) => state.views.sea);
+  const underwater = useStageStore((state) => state.views.underwater);
   const controls = useThree((state) => state.controls) as
     | { target: THREE.Vector3; update: () => void }
     | null;
   useFrame(() => {
     if (modelId !== "carrier" || cameraMode !== "orbit" || !controls) return;
     let changed = false;
-    // 海面可见时把相机压在水面以上；关掉海面后允许降到舰底以下做完整 360° 检查。
-    const floorY = seaOn ? 24 : 2;
+    // 海面可见时把相机压在水面以上；水下视角或关掉海面后允许降到舰底以下。
+    const floorY = seaOn && !underwater ? 24 : 2;
     if (camera.position.y < floorY) {
       camera.position.y = floorY;
       changed = true;
@@ -1331,6 +1572,75 @@ function CarrierCameraFloor() {
     }
     if (changed) controls.update();
   });
+  return null;
+}
+
+/** 水下视角：打开时把 Orbit 相机送到水面以下，关闭时恢复原相机位。 */
+function CarrierUnderwaterView() {
+  const modelId = useStageStore((state) => state.modelId);
+  const cameraMode = useStageStore((state) => state.cameraMode);
+  const underwater = useStageStore((state) => state.views.underwater);
+  const assembled = useStageStore((state) => state.assembled);
+  const camera = useThree((state) => state.camera);
+  const scene = useThree((state) => state.scene);
+  const controls = useThree((state) => state.controls) as
+    | { target: THREE.Vector3; update: () => void }
+    | null;
+  const previous = useRef<{ position: THREE.Vector3; target: THREE.Vector3 } | null>(null);
+  const home = useStageStore((state) => state.home);
+  const settleUntil = useRef(0);
+
+  useEffect(() => {
+    if (modelId !== "carrier" || cameraMode !== "orbit" || !assembled || !controls) return;
+    if (underwater) {
+      settleUntil.current = performance.now() + 1600;
+      if (!previous.current) {
+        previous.current = { position: camera.position.clone(), target: controls.target.clone() };
+      }
+      const ocean = scene.getObjectByName("carrier-ocean-gpu");
+      const waterY = ocean?.position.y ?? 18;
+      const center = home ? new THREE.Vector3(...home.center) : new THREE.Vector3();
+      camera.position.set(center.x + 135, waterY - 8, center.z - 10);
+      controls.target.set(center.x, waterY - 4, center.z - 100);
+      controls.update();
+    } else if (previous.current) {
+      camera.position.copy(previous.current.position);
+      controls.target.copy(previous.current.target);
+      previous.current = null;
+      controls.update();
+    }
+  }, [underwater, modelId, cameraMode, assembled, camera, controls, scene, home]);
+
+  // 从漫游切回自由视角时，CameraRig 会在入场后一帧把相机飞回原方位；
+  // 入水后的 1.6 秒内持续校正，避免水下按钮被漫游退出动画覆盖。
+  useFrame(() => {
+    if (!underwater || cameraMode !== "orbit" || !controls) return;
+    if (performance.now() > settleUntil.current) return;
+    const ocean = scene.getObjectByName("carrier-ocean-gpu");
+    const waterY = ocean?.position.y ?? 18;
+    if (camera.position.y > waterY - 1) {
+      const center = home ? new THREE.Vector3(...home.center) : new THREE.Vector3();
+      camera.position.set(center.x + 135, waterY - 8, center.z - 10);
+      controls.target.set(center.x, waterY - 4, center.z - 100);
+      controls.update();
+    }
+  });
+
+  return null;
+}
+
+/** 水下时把环境背景切成深青，避免从水面下方看到摄影棚浅灰底。 */
+function UnderwaterBackground() {
+  const scene = useThree((state) => state.scene);
+  const active = useStageStore((state) => state.underwaterActive);
+  useEffect(() => {
+    if (!active) return;
+    const previous = scene.background;
+    scene.background = new THREE.Color("#062a38");
+    return () => {
+      scene.background = previous;
+    };
+  }, [scene, active]);
   return null;
 }
 
@@ -1592,6 +1902,7 @@ function CameraRig() {
 
   const target = useMemo(() => new THREE.Vector3(0, 0.8, 0), []);
   const seaOn = useStageStore((state) => state.views.sea);
+  const underwaterView = useStageStore((state) => state.views.underwater);
   return (
     <OrbitControls
       makeDefault
@@ -1601,7 +1912,7 @@ function CameraRig() {
       minDistance={0.1}
       maxDistance={2000}
       minPolarAngle={modelId === "carrier" ? 0.02 : 0.04}
-      maxPolarAngle={modelId === "carrier" ? (seaOn ? 1.55 : Math.PI - 0.06) : Math.PI / 2 - 0.015}
+      maxPolarAngle={modelId === "carrier" ? (underwaterView || !seaOn ? Math.PI - 0.06 : 1.55) : Math.PI / 2 - 0.015}
     />
   );
 }

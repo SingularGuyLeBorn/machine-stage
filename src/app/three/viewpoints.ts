@@ -139,8 +139,8 @@ export function firstPersonView(
     if (!node) return null;
     const m = node.matrixWorld;
     return {
-      position: new THREE.Vector3(0, 0.72, 0.36).applyMatrix4(m),
-      target: new THREE.Vector3(0, 0.648, 0.525).applyMatrix4(m),
+      position: new THREE.Vector3(0, 3.16 / 8, 2.62 / (8 * 0.914380714879468)).applyMatrix4(m),
+      target: new THREE.Vector3(0, 2.86 / 8, 4.3 / (8 * 0.914380714879468)).applyMatrix4(m),
       fov: 66,
     };
   }

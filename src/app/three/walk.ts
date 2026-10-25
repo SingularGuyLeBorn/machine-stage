@@ -33,7 +33,7 @@ import {
 // 所有数值都在模型编辑坐标里（presentationScale=7.9 由控制器统一乘）。
 // ============================================================================
 
-export type WalkInteractionKind = "portal" | "doors" | "barrier" | "jbd" | "mount" | "dismount";
+export type WalkInteractionKind = "portal" | "doors" | "barrier" | "jbd" | "mount" | "dismount" | "cockpit";
 
 export interface WalkArea {
   id: string;
@@ -145,9 +145,9 @@ const CARRIER_DECK_MAP: WalkMapFeature[] = [
   ...CV.ELEVATOR_Z.map((z, index): WalkMapFeature => ({
     kind: "zone",
     rect: [
-      CV.ELEVATOR_X - CV.ELEVATOR_W / 2,
+      CV.ELEVATOR_X_BY_INDEX[index]! - CV.ELEVATOR_W / 2,
       z - CV.ELEVATOR_L / 2,
-      CV.ELEVATOR_X + CV.ELEVATOR_W / 2,
+      CV.ELEVATOR_X_BY_INDEX[index]! + CV.ELEVATOR_W / 2,
       z + CV.ELEVATOR_L / 2,
     ],
     label: `升${index + 1}`,
@@ -285,7 +285,7 @@ const CARRIER_WALK: WalkConfig = {
       id: "deck_elevator_hangar",
       area: "deck",
       kind: "portal",
-      pos: [3.42, 2.0],
+      pos: [CV.ELEVATOR_X_BY_INDEX[0]!, 2.0],
       radius: 1.15,
       label: "乘升降机下机库",
       targetArea: "hangar",
@@ -324,6 +324,14 @@ const CARRIER_WALK: WalkConfig = {
       targetArea: "aircraft1",
       targetPos: [2.82, 4.92, -10.3],
       targetYaw: Math.PI,
+    },
+    {
+      id: "deck_aircraft_cockpit",
+      area: "deck",
+      kind: "cockpit",
+      pos: [3.62, 8.8],
+      radius: 1.3,
+      label: "进入舰载机座舱 · 电磁弹射体验",
     },
     {
       id: "deck_barrier",
@@ -367,7 +375,7 @@ const CARRIER_WALK: WalkConfig = {
       radius: 1.1,
       label: "乘升降机回飞行甲板",
       targetArea: "deck",
-      targetPos: [2.7, deckFloor(0, 2.0), 2.0],
+      targetPos: [2.75, deckFloor(0, 2.0), 2.0],
       targetYaw: Math.PI,
     },
     {
@@ -1075,6 +1083,7 @@ const WALK_HOTSPOTS: Record<string, WalkHotspotSpec[]> = {
     { id: "island", label: "舰岛入口 · 舰桥", interactionId: "deck_island_bridge" },
     { id: "ordnance", label: "甲板弹药升降口", interactionId: "deck_ordnance_magazine" },
     { id: "elevator", label: "机库升降机", interactionId: "deck_elevator_hangar" },
+    { id: "cockpit_ride", label: "舰载机座舱 · 电磁弹射体验", interactionId: "deck_aircraft_cockpit", standoff: [0.15, 1.0] },
     { id: "jbd1", label: "1 号挡焰板", interactionId: "deck_jbd_1" },
     { id: "jbd2", label: "2 号挡焰板", interactionId: "deck_jbd_2" },
     { id: "jbd3", label: "3 号挡焰板", interactionId: "deck_jbd_3" },

@@ -19,6 +19,53 @@ import type { CameraMode } from "../three/viewpoints";
 import { setDamageSeed } from "@/three/parts/models/tiger/damage/plan";
 import { resetTigerLidPose } from "@/three/parts/models/tiger/lids";
 
+/** 漫游悬停：十字准星指到的零件。 */
+export interface WalkHoverInfo {
+  partId: string;
+  name: string;
+  instance: number | null;
+}
+
+/** 舰载机弹射体验阶段。 */
+export type CockpitPhase = "taxi" | "arming" | "launch" | "airborne" | "combat" | "complete";
+export interface CockpitStatus {
+  active: boolean;
+  phase: CockpitPhase;
+  message: string;
+  speed: number;
+  heading: number;
+  pitch: number;
+  roll: number;
+  altitude: number;
+  verticalSpeed: number;
+  target: [number, number];
+  distance: number;
+  aligned: boolean;
+  countdown: number;
+  weapon: "GUN" | "AIM9";
+  gunAmmo: number;
+  aim9: number;
+  flares: number;
+  lock: boolean;
+  lockScreen: [number, number] | null;
+  targetCount: number;
+  targetRange: number;
+  closure: number;
+  wezMax: number;
+  wezMin: number;
+  nez: number;
+  missileCount: number;
+  radarContacts: Array<{ bearing: number; range: number; locked: boolean }>;
+  throttle: number;
+  fuel: number;
+  gLoad: number;
+  engineRpm: number;
+  gearDown: boolean;
+  autopilot: boolean;
+  rwr: boolean;
+  pullUp: boolean;
+}
+
 // ============================================================================
 // stageStore —— 展示台单一状态源
 //
@@ -131,6 +178,7 @@ const VIEWS_DEFAULT: Record<ViewKey, boolean> = {
   shadow: true,
   rain: false,
   thermal: false,
+  underwater: false,
   sea: true,
 };
 
@@ -179,6 +227,8 @@ interface StageState {
   assembling: boolean;
 
   views: Record<ViewKey, boolean>;
+  /** 相机实际位于水面以下（水下遮罩/提示用；由 CarrierOcean 根据相机高度更新）。 */
+  underwaterActive: boolean;
   layout: PanelLayout;
   machineState: string;
   energyBoost: boolean;
@@ -201,6 +251,14 @@ interface StageState {
   walkTravelOpen: boolean;
   /** 快速前往请求（nonce 保证点击同一目的地也能触发）。 */
   walkTravel: { area: string; pos: [number, number, number]; yaw: number; nonce: number } | null;
+  /** 一键登机请求（nonce 自增，WalkController 消费后清空）。 */
+  walkCockpitEntry: number | null;
+  /** 漫游悬停零件（供准星提示与 E 查看）。 */
+  walkHover: WalkHoverInfo | null;
+  /** 舰载机弹射体验状态（null = 未进入座舱）。 */
+  cockpit: CockpitStatus | null;
+  /** 座舱操作面板的按钮请求（nonce 允许连续点击同一动作）。 */
+  cockpitCommand: { type: string; value?: string; nonce: number } | null;
   /** 战损形态（完好/破损/破碎）：只切预制变体，不影响碰撞与支撑检测。 */
   damage: DamageState;
   /** 随机破口种子：每次「随机破口」+1，重建时由 damage kit 读取。 */
@@ -232,6 +290,7 @@ interface StageState {
   toggleDetach(partId: string, index: number): void;
   toggleView(key: ViewKey): void;
   setView(key: ViewKey, value: boolean): void;
+  setUnderwaterActive(active: boolean): void;
   setColumnWidth(side: "left" | "right", width: number): void;
   toggleColumn(side: "left" | "right"): void;
   setDrawer(open: boolean): void;
@@ -248,8 +307,14 @@ interface StageState {
   setWalkFading(fading: boolean): void;
   setWalkPose(pose: { x: number; z: number; yaw: number }): void;
   setWalkTravelOpen(open: boolean): void;
+  setWalkHover(info: WalkHoverInfo | null): void;
+  setCockpit(status: CockpitStatus | null): void;
+  requestCockpitCommand(type: string, value?: string): void;
+  clearCockpitCommand(): void;
   requestWalkTravel(area: string, pos: [number, number, number], yaw: number): void;
   clearWalkTravel(): void;
+  requestWalkCockpitEntry(): void;
+  clearWalkCockpitEntry(): void;
   setDamage(state: DamageState): void;
   /** 换一组随机破口并切到破碎，触发重建。 */
   rerollDamage(): void;
@@ -352,6 +417,7 @@ export const useStageStore = create<StageState>((set, get) => ({
   assembling: false,
 
   views: { ...VIEWS_DEFAULT },
+  underwaterActive: false,
   layout: {
     left: { ...LAYOUT_DEFAULT.left },
     right: { ...LAYOUT_DEFAULT.right },
@@ -368,6 +434,10 @@ export const useStageStore = create<StageState>((set, get) => ({
   walkPose: { x: 0, z: 0, yaw: 0 },
   walkTravelOpen: false,
   walkTravel: null,
+  walkCockpitEntry: null,
+  walkHover: null,
+  cockpit: null,
+  cockpitCommand: null,
   damage: "intact",
   damageSeed: 0,
   lidOverrides: {},
@@ -415,12 +485,17 @@ export const useStageStore = create<StageState>((set, get) => ({
       walkPose: { x: 0, z: 0, yaw: 0 },
       walkTravelOpen: false,
       walkTravel: null,
+      walkCockpitEntry: null,
+      walkHover: null,
+      cockpit: null,
+      cockpitCommand: null,
       damage: "intact",
       damageSeed: 0,
       lidOverrides: {},
       preserveViewOnRebuild: false,
       variantId: model.variants?.[0]?.id ?? "",
       views: { ...VIEWS_DEFAULT },
+      underwaterActive: false,
       focus: null,
       home: null,
       notice: null,
@@ -530,6 +605,9 @@ export const useStageStore = create<StageState>((set, get) => ({
       return { views };
     }),
   setView: (key, value) => set((state) => ({ views: { ...state.views, [key]: value } })),
+  setUnderwaterActive: (active) => {
+    if (get().underwaterActive !== active) set({ underwaterActive: active });
+  },
 
   setColumnWidth: (side, width) =>
     set((state) => ({
@@ -603,7 +681,19 @@ export const useStageStore = create<StageState>((set, get) => ({
   },
 
   // 相机模式与机器状态解耦：切状态不该把人从驾驶舱里踢出来。
-  setCameraMode: (mode) => set({ cameraMode: mode }),
+  setCameraMode: (mode) =>
+    set((state) => ({
+      cameraMode: mode,
+      // 离开漫游/座舱体验时清掉悬停与座舱状态，避免回到自由视角后 HUD 残留。
+      walkHover: null,
+      cockpit: mode === "walk" ? state.cockpit : null,
+      underwaterActive: mode === "orbit" ? state.underwaterActive : false,
+    })),
+  setWalkHover: (walkHover) => set({ walkHover }),
+  setCockpit: (cockpit) => set({ cockpit }),
+  requestCockpitCommand: (type, value) =>
+    set({ cockpitCommand: { type, value, nonce: Date.now() + Math.random() } }),
+  clearCockpitCommand: () => set({ cockpitCommand: null }),
   setWalkArea: (walkArea) => set({ walkArea }),
   setWalkPrompt: (walkPrompt) => {
     if (get().walkPrompt !== walkPrompt) set({ walkPrompt });
@@ -617,6 +707,9 @@ export const useStageStore = create<StageState>((set, get) => ({
       walkTravel: { area, pos, yaw, nonce: (state.walkTravel?.nonce ?? 0) + 1 },
     })),
   clearWalkTravel: () => set({ walkTravel: null }),
+  requestWalkCockpitEntry: () =>
+    set((state) => ({ walkCockpitEntry: (state.walkCockpitEntry ?? 0) + 1 })),
+  clearWalkCockpitEntry: () => set({ walkCockpitEntry: null }),
 
   setDamage: (damage) => set({ damage }),
 

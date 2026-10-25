@@ -12,6 +12,7 @@ import type { CodeCharacter } from "./j20/types";
 // InstancedMesh（8 个停放位共享几何），现役机保留完整细节。
 const J20_SCALE = 1 / 8;
 const FX_NAME = /^(Flame|MissileFlame|Smoke|Boom)/;
+const canopies = new WeakMap<AssembledModel, THREE.Object3D>();
 
 function prepare(root: THREE.Group): void {
   root.scale.set(J20_SCALE, J20_SCALE, J20_SCALE / AIRCRAFT_SCALE_Z);
@@ -38,6 +39,7 @@ export function mountCarrierJ20(assembled: AssembledModel): () => void {
     return () => {};
   }
   const source = character.root;
+  source.name = "CarrierJ20Visual";
   prepare(source);
   source.updateMatrixWorld(true);
 
@@ -56,6 +58,12 @@ export function mountCarrierJ20(assembled: AssembledModel): () => void {
   }
 
   const instanced: THREE.InstancedMesh[] = [];
+  // 停放机与现役机各自包一层：进入机库/机舱等封闭舱室时整组隐藏，
+  // 避免被舰体挡住的上层甲板飞机仍然提交数百次 draw call。
+  const parkedGroup = new THREE.Group();
+  parkedGroup.name = "CarrierJ20Parked";
+  parkedGroup.userData.hideInEnclosedInterior = true;
+  assembled.root.add(parkedGroup);
   if (parkedMatrices.length > 0) {
     const meshes: THREE.Mesh[] = [];
     source.traverse((object) => {
@@ -78,8 +86,8 @@ export function mountCarrierJ20(assembled: AssembledModel): () => void {
           out.instanceMatrix.needsUpdate = true;
           out.castShadow = true;
           out.receiveShadow = true;
-          out.frustumCulled = false;
-          assembled.root.add(out);
+          out.computeBoundingSphere();
+          parkedGroup.add(out);
           instanced.push(out);
         }
         continue;
@@ -92,13 +100,19 @@ export function mountCarrierJ20(assembled: AssembledModel): () => void {
       out.instanceMatrix.needsUpdate = true;
       out.castShadow = true;
       out.receiveShadow = true;
-      out.frustumCulled = false;
-      assembled.root.add(out);
+      out.computeBoundingSphere();
+      parkedGroup.add(out);
       instanced.push(out);
     }
   }
 
-  aircraft.add(source);
+  const activeGroup = new THREE.Group();
+  activeGroup.name = "CarrierJ20Active";
+  activeGroup.userData.hideInEnclosedInterior = true;
+  aircraft.add(activeGroup);
+  activeGroup.add(source);
+  const canopyHinge = source.getObjectByName("CanopyHinge");
+  if (canopyHinge) canopies.set(assembled, canopyHinge);
 
   const hidden: Array<{ object: THREE.Object3D; visible: boolean }> = [];
   for (const handle of assembled.parts) {
@@ -109,12 +123,21 @@ export function mountCarrierJ20(assembled: AssembledModel): () => void {
   }
 
   return () => {
-    aircraft.remove(source);
+    canopies.delete(assembled);
+    aircraft.remove(activeGroup);
+    assembled.root.remove(parkedGroup);
     for (const mesh of instanced) {
-      assembled.root.remove(mesh);
       mesh.dispose();
     }
     for (const item of hidden) item.object.visible = item.visible;
     character.dispose();
   };
+}
+
+/** 座舱盖开合：0 = 关闭，1 = 全开。J20 舱盖绕后铰链上翻。 */
+export function setCarrierCanopyOpen(assembled: AssembledModel, open: number): void {
+  const hinge = canopies.get(assembled);
+  if (!hinge) return;
+  const value = Math.max(0, Math.min(1, open));
+  hinge.rotation.x = -1.08 * value;
 }

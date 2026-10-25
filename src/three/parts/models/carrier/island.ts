@@ -940,7 +940,9 @@ export function addIsland(ctx: CarrierCtx): void {
   const hq10Mounts: Hq10Mount[] = [
     { tag: "bow_p", sx: -3.55, sy: 3.78, sz: 10.6, yaw: 8, sponson: true },
     { tag: "bow_s", sx: 4.45, sy: 3.78, sz: 10.6, yaw: -8, sponson: true },
-    { tag: "stern_p", sx: -2.85, sy: baseY, sz: -17.3, yaw: 172 },
+    // 左舷原位置 x=-2.85 已经压进着舰跑道边线；左舷艉部甲板在 z=-16 之后
+    // 还有一段宽度，整组前移到这里，既仍属舰艉左舷，又完全让开跑道。
+    { tag: "stern_p", sx: -3.45, sy: baseY, sz: -15.9, yaw: 172 },
     { tag: "stern_s", sx: 1.95, sy: baseY, sz: -17.3, yaw: -172 },
   ];
   for (const mount of hq10Mounts) {

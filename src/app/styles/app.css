@@ -773,6 +773,39 @@
   font-weight: 700;
 }
 
+/* 甲板一键登机：不用先跑到机旁找交互点。 */
+.walk-enter-aircraft {
+  position: absolute;
+  top: 426px;
+  right: 16px;
+  width: 212px;
+  z-index: 9;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: auto;
+  border: 1px solid rgba(127, 231, 255, 0.38);
+  background: rgba(8, 18, 23, 0.82);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(6px);
+  color: #d9f5ff;
+  font-weight: 600;
+}
+.walk-enter-aircraft:hover {
+  border-color: rgba(127, 231, 255, 0.7);
+  background: rgba(127, 231, 255, 0.12);
+}
+.walk-enter-aircraft kbd {
+  padding: 0 4px;
+  border-radius: 3px;
+  border: 1px solid rgba(190, 238, 255, 0.35);
+  background: rgba(127, 231, 255, 0.14);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .walk-travel {
   position: absolute;
   top: 120px;
@@ -1125,14 +1158,15 @@
 /* 当前零件信息：视口左侧中部（零件树默认收起后的主信息入口） */
 .part-card {
   position: absolute;
-  z-index: 6;
-  left: 56px;
-  top: 50%;
-  transform: translateY(-50%);
+  z-index: 9;
+  left: 16px;
+  top: 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: min(330px, 42%);
+  max-height: min(58vh, 460px);
+  overflow: auto;
   padding: 12px 14px;
   pointer-events: auto;
 }
@@ -2302,3 +2336,1078 @@
 .viewport__canvas--thermal {
   filter: grayscale(1) contrast(1.55) brightness(0.92) sepia(1) hue-rotate(150deg) saturate(2.6);
 }
+
+/* 水下视角：相机低于水面时给一层水体色，海面本身由 GPU 海的双面着色从水下呈现。 */
+.underwater-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  background:
+    radial-gradient(ellipse at 50% 18%, rgba(96, 180, 190, 0.1), rgba(9, 60, 78, 0.3) 52%, rgba(1, 14, 23, 0.55) 100%);
+}
+.underwater-veil.is-on { opacity: 1; }
+.underwater-badge {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  z-index: 5;
+  padding: 5px 11px;
+  border: 1px solid rgba(127, 231, 255, 0.32);
+  border-radius: 999px;
+  background: rgba(3, 20, 28, 0.72);
+  color: #cdefff;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+
+/* 座舱弹射体验 HUD：塔台通话 / 弹射位对准 / 速度 / 倒计时。 */
+.cockpit-reticle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 1px solid rgba(126, 244, 190, 0.55);
+  border-radius: 50%;
+  box-shadow: 0 0 12px rgba(64, 220, 150, 0.22), inset 0 0 8px rgba(64, 220, 150, 0.18);
+}
+.cockpit-reticle span {
+  position: absolute;
+  background: rgba(150, 255, 200, 0.85);
+}
+.cockpit-reticle span:first-child {
+  left: 50%;
+  top: 9px;
+  width: 1px;
+  height: 16px;
+}
+.cockpit-reticle span:last-child {
+  left: 9px;
+  top: 50%;
+  width: 16px;
+  height: 1px;
+}
+.cockpit-status {
+  position: absolute;
+  left: 50%;
+  top: 82px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 6px 14px;
+  border: 1px solid rgba(112, 231, 179, 0.24);
+  border-radius: 6px;
+  background: rgba(6, 16, 14, 0.66);
+  color: rgba(214, 244, 231, 0.82);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  backdrop-filter: blur(4px);
+}
+.cockpit-status b {
+  color: #a8ffd5;
+  font-weight: 650;
+}
+.cockpit-status .is-ok {
+  color: #7dffbe;
+}
+.cockpit-status .is-warn {
+  color: #ffd57a;
+}
+.cockpit-radio {
+  position: absolute;
+  left: 18px;
+  bottom: 64px;
+  width: min(380px, 48%);
+  padding: 8px 11px;
+  border-left: 2px solid rgba(126, 244, 190, 0.7);
+  border-radius: 0 5px 5px 0;
+  background: rgba(5, 13, 12, 0.7);
+  backdrop-filter: blur(4px);
+  color: rgba(222, 247, 236, 0.9);
+  pointer-events: none;
+}
+.cockpit-radio__tag {
+  display: block;
+  margin-bottom: 3px;
+  color: rgba(126, 244, 190, 0.72);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+.cockpit-radio p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.cockpit-countdown {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  color: #b8ffd9;
+  font: 700 64px/1 var(--mono);
+  text-shadow: 0 0 24px rgba(80, 255, 170, 0.45);
+  pointer-events: none;
+}
+.walk-hud__prompt--muted {
+  color: rgba(236, 244, 250, 0.72);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.walk-hud__hover {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 58px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  background: rgba(8, 14, 20, 0.62);
+  color: rgba(232, 243, 252, 0.9);
+  font-size: 11px;
+  white-space: nowrap;
+  backdrop-filter: blur(3px);
+}
+.walk-hud__hover kbd {
+  padding: 0 5px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  font: inherit;
+  font-weight: 700;
+}
+
+/* 塔台通讯：无气泡、薄线、打字机报文、角色/情绪与事件 toast。 */
+.tower-radio {
+  position: absolute;
+  left: 20px;
+  bottom: 78px;
+  width: min(400px, 50%);
+  padding: 12px 14px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(214, 224, 218, 0.16);
+  background:
+    linear-gradient(180deg, rgba(20, 25, 24, 0.7), rgba(9, 12, 12, 0.78)),
+    rgba(10, 13, 13, 0.72);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px) saturate(0.8);
+  color: #e9efea;
+  pointer-events: none;
+}
+.tower-radio--urgent {
+  border-color: rgba(255, 196, 120, 0.34);
+}
+.tower-radio__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(220, 230, 224, 0.09);
+}
+.tower-radio__signal {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 13px;
+}
+.tower-radio__signal i {
+  display: block;
+  width: 2px;
+  background: #a9c6b4;
+  animation: tower-signal 1.15s ease-in-out infinite;
+}
+.tower-radio__signal i:nth-child(1) { height: 5px; animation-delay: -0.3s; }
+.tower-radio__signal i:nth-child(2) { height: 9px; animation-delay: -0.55s; }
+.tower-radio__signal i:nth-child(3) { height: 13px; animation-delay: -0.15s; }
+@keyframes tower-signal {
+  0%, 100% { opacity: 0.35; transform: scaleY(0.55); }
+  50% { opacity: 1; transform: scaleY(1); }
+}
+.tower-radio__ident {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.tower-radio__ident strong {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+.tower-radio__ident span {
+  color: rgba(221, 232, 225, 0.46);
+  font-size: 9px;
+  letter-spacing: 0.09em;
+}
+.tower-radio__emotion {
+  padding: 2px 7px;
+  border: 1px solid rgba(220, 230, 224, 0.14);
+  border-radius: 999px;
+  color: rgba(228, 238, 232, 0.62);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+.tower-radio--warm .tower-radio__emotion { color: #b8d6c2; border-color: rgba(155, 200, 172, 0.28); }
+.tower-radio--urgent .tower-radio__emotion { color: #e6c391; border-color: rgba(230, 195, 145, 0.3); }
+.tower-radio__message {
+  position: relative;
+  margin: 9px 0 0;
+  min-height: 38px;
+  padding-left: 2px;
+  color: rgba(238, 245, 240, 0.94);
+  font-size: 12px;
+  line-height: 1.65;
+  letter-spacing: 0.005em;
+}
+.tower-radio__caret {
+  display: inline-block;
+  width: 5px;
+  height: 13px;
+  margin-left: 2px;
+  vertical-align: -2px;
+  background: rgba(196, 224, 207, 0.8);
+  animation: tower-caret 0.95s steps(1) infinite;
+}
+.tower-radio__cursor {
+  display: none;
+}
+@keyframes tower-caret {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0; }
+}
+.tower-radio__log {
+  margin: 8px 0 0;
+  padding: 7px 0 0;
+  border-top: 1px solid rgba(220, 230, 224, 0.07);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: rgba(222, 235, 226, 0.46);
+  font-size: 10px;
+  line-height: 1.45;
+}
+.tower-radio__log li span {
+  margin-right: 7px;
+  color: rgba(194, 219, 204, 0.62);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+}
+.tower-toast {
+  position: absolute;
+  left: 50%;
+  top: 112px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 9px;
+  width: min(430px, 58%);
+  padding: 9px 12px;
+  border-radius: 7px;
+  border: 1px solid rgba(221, 232, 224, 0.16);
+  background: rgba(14, 19, 18, 0.82);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(10px);
+  color: rgba(240, 246, 242, 0.94);
+  animation: tower-toast-in 0.24s cubic-bezier(0.2, 0.8, 0.3, 1);
+  pointer-events: none;
+}
+.tower-toast__beam {
+  width: 2px;
+  border-radius: 2px;
+  background: #a9c6b4;
+}
+.tower-toast--urgent .tower-toast__beam { background: #e6c391; }
+.tower-toast strong {
+  display: block;
+  margin-bottom: 2px;
+  color: rgba(235, 244, 238, 0.78);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.tower-toast p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+@keyframes tower-toast-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* 座舱第一人称的战术眼镜/头盔/耳机/麦克风外壳。 */
+.cockpit-rig {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  overflow: hidden;
+  pointer-events: none;
+}
+.cockpit-visor {
+  position: absolute;
+  inset: 0;
+  box-shadow:
+    inset 0 0 120px 38px rgba(0, 0, 0, 0.38),
+    inset 0 46px 72px -40px rgba(0, 0, 0, 0.62),
+    inset 0 -46px 72px -40px rgba(0, 0, 0, 0.58);
+}
+.cockpit-visor::before,
+.cockpit-visor::after {
+  content: "";
+  position: absolute;
+  left: -4%;
+  width: 108%;
+  height: 8%;
+  border: 0 solid rgba(12, 15, 16, 0.82);
+}
+.cockpit-visor::before {
+  top: -3.6%;
+  border-bottom-width: 18px;
+  border-radius: 0 0 48% 48% / 0 0 100% 100%;
+}
+.cockpit-visor::after {
+  bottom: -4%;
+  border-top-width: 20px;
+  border-radius: 48% 48% 0 0 / 100% 100% 0 0;
+}
+.cockpit-glasses {
+  position: absolute;
+  left: 50%;
+  top: 7.5%;
+  width: 66%;
+  height: 3px;
+  transform: translateX(-50%);
+  border-top: 1px solid rgba(191, 217, 202, 0.18);
+  border-radius: 50%;
+  box-shadow: 0 -9px 20px -12px rgba(183, 221, 201, 0.5);
+}
+.cockpit-glasses::before,
+.cockpit-glasses::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  width: 28%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(191, 217, 202, 0.16));
+}
+.cockpit-glasses::before { left: -28%; transform: rotate(3deg); }
+.cockpit-glasses::after { right: -28%; transform: rotate(-3deg); }
+.cockpit-headset {
+  position: absolute;
+  bottom: -36px;
+  width: 112px;
+  height: 152px;
+  border-radius: 46% 46% 30% 30% / 36% 36% 26% 26%;
+  background: linear-gradient(160deg, #1a1e1f 10%, #0a0c0d 70%);
+  border: 1px solid rgba(190, 202, 196, 0.13);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.cockpit-headset--l { left: -46px; }
+.cockpit-headset--r { right: -46px; }
+.cockpit-headset span {
+  position: absolute;
+  left: 50%;
+  top: 28%;
+  width: 54px;
+  height: 70px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 1px solid rgba(196, 210, 202, 0.12);
+  background: radial-gradient(circle at 42% 38%, rgba(122, 138, 130, 0.18), transparent 65%);
+}
+.cockpit-boom {
+  position: absolute;
+  left: 2.6%;
+  bottom: 3.2%;
+  width: 30%;
+  height: 11%;
+  border-left: 2px solid rgba(9, 12, 13, 0.9);
+  border-bottom: 2px solid rgba(9, 12, 13, 0.9);
+  border-radius: 0 0 0 46%;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5));
+}
+.cockpit-boom i {
+  position: absolute;
+  left: 68%;
+  bottom: -11px;
+  width: 34px;
+  height: 20px;
+  border-radius: 50% 50% 45% 45%;
+  background: linear-gradient(150deg, #23282a, #0a0c0d);
+  border: 1px solid rgba(185, 200, 192, 0.16);
+}
+.cockpit-boom b {
+  position: absolute;
+  left: calc(68% + 26px);
+  bottom: -9px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #161a1b;
+  box-shadow: inset 0 0 0 1px rgba(205, 216, 208, 0.12);
+}
+
+/* 座舱体验时收起编辑器工具条，只留塔台/头盔 HUD，避免像调试工具。 */
+.viewport--cockpit .viewport__overlay--tr,
+.viewport--cockpit .viewport__overlay--br,
+.viewport--cockpit .viewport__overlay--tl,
+.viewport--cockpit .part-card,
+.viewport--cockpit .lid-hint {
+  display: none;
+}
+.viewport--cockpit .cockpit-status {
+  top: 74px;
+}
+
+.tower-radio__avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(197, 218, 205, 0.24);
+  background: rgba(176, 204, 188, 0.1);
+  color: rgba(226, 240, 231, 0.82);
+  font-size: 11px;
+  font-weight: 650;
+}
+.cockpit-glasses::before,
+.cockpit-glasses::after {
+  border-color: rgba(196, 222, 207, 0.18);
+}
+
+/* F-15 式战术 HUD：全 DOM/SVG，薄线、低饱和、可独立改布局。 */
+.tac-hud {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+  color: rgba(210, 238, 219, 0.86);
+  font-family: var(--mono);
+  text-shadow: 0 0 6px rgba(120, 240, 170, 0.22);
+}
+.tac-warn {
+  position: absolute;
+  left: 18px;
+  top: 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 9px;
+  letter-spacing: 0.09em;
+  color: rgba(206, 231, 214, 0.42);
+}
+.tac-warn .is-ok { color: rgba(143, 235, 182, 0.72); }
+.tac-warn .is-alert {
+  color: #ffd27a;
+  animation: tac-flash 0.8s steps(1) infinite;
+}
+@keyframes tac-flash { 50% { opacity: 0.32; } }
+
+.tac-heading {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  width: 400px;
+  height: 42px;
+  transform: translateX(-50%);
+  border-bottom: 1px solid rgba(186, 222, 200, 0.22);
+  overflow: hidden;
+}
+.tac-heading__window {
+  position: absolute;
+  inset: 0;
+  color: rgba(190, 226, 204, 0.55);
+  font-size: 8px;
+}
+.tac-heading__tick {
+  position: absolute;
+  bottom: 13px;
+  width: 1px;
+  height: 5px;
+  background: rgba(180, 218, 195, 0.28);
+  transform: translateX(-0.5px);
+}
+.tac-heading__tick.is-major {
+  height: 8px;
+  background: rgba(196, 232, 210, 0.58);
+  text-align: center;
+  color: rgba(206, 238, 216, 0.62);
+  padding-top: 9px;
+}
+.tac-heading__caret {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 6px solid #b6e7ca;
+}
+.tac-heading b {
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  transform: translateX(-50%);
+  color: #d7f5e2;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+.tac-heading small {
+  position: absolute;
+  right: 2px;
+  top: 4px;
+  color: rgba(194, 228, 205, 0.45);
+  font-size: 8px;
+}
+
+.tac-pitch {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 250px;
+  height: 310px;
+  transform: translate(-50%, -50%);
+  overflow: visible;
+}
+.tac-pitch line,
+.tac-pitch path {
+  stroke: rgba(188, 242, 210, 0.83);
+  stroke-width: 1;
+  fill: none;
+}
+.tac-pitch__horizon { stroke: rgba(189, 236, 207, 0.8); stroke-width: 1.2; }
+.tac-pitch__mark text {
+  fill: rgba(202, 241, 217, 0.78);
+  font-size: 8px;
+  font-family: var(--mono);
+}
+.tac-pitch__mark.is-negative line { stroke: rgba(170, 220, 192, 0.36); stroke-dasharray: 3 4; }
+.tac-pitch__boresight path { stroke: rgba(198, 244, 217, 0.95); stroke-width: 1.4; }
+.tac-pitch__boresight circle { fill: rgba(213, 249, 225, 0.85); }
+
+.tac-ias,
+.tac-alt {
+  position: absolute;
+  top: 58%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 82px;
+  padding: 7px 9px;
+  border-top: 1px solid rgba(188, 229, 204, 0.34);
+  border-bottom: 1px solid rgba(188, 229, 204, 0.14);
+  background: linear-gradient(180deg, rgba(5, 14, 10, 0.66), rgba(5, 14, 10, 0.2));
+  backdrop-filter: blur(3px);
+  border-radius: 4px;
+}
+.tac-ias { left: 3%; }
+.tac-alt { right: 3%; text-align: right; }
+.tac-ias small,
+.tac-alt small {
+  color: rgba(182, 221, 197, 0.46);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+}
+.tac-ias b,
+.tac-alt b {
+  color: rgba(215, 248, 226, 0.96);
+  font-size: 25px;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.tac-ias span,
+.tac-alt span,
+.tac-alt em {
+  color: rgba(191, 225, 204, 0.52);
+  font-size: 8px;
+  font-style: normal;
+  letter-spacing: 0.06em;
+}
+
+.tac-lock {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 178px);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 11px;
+  border: 1px solid rgba(182, 226, 200, 0.2);
+  border-radius: 3px;
+  color: rgba(194, 228, 205, 0.48);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+.tac-lock small { color: rgba(185, 219, 197, 0.36); font-size: 8px; letter-spacing: 0.04em; }
+.tac-lock.is-locked { border-color: rgba(130, 255, 176, 0.65); color: #a6ffd0; }
+
+.tac-weapons {
+  position: absolute;
+  right: 104px;
+  bottom: 128px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 132px;
+  padding: 7px 9px;
+  border-left: 1px solid rgba(188, 226, 203, 0.22);
+  background: linear-gradient(90deg, rgba(6, 14, 11, 0.34), transparent);
+  font-size: 9px;
+}
+.tac-weapons__row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: baseline;
+  gap: 5px;
+  color: rgba(193, 226, 204, 0.56);
+}
+.tac-weapons__row b { color: rgba(218, 247, 227, 0.9); font-size: 11px; font-weight: 500; }
+.tac-weapons__row.is-selected { color: #b7ffd3; }
+.tac-weapons__unit { color: rgba(184, 220, 197, 0.34); font-size: 7px; }
+.tac-weapons__standby {
+  margin-top: 3px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(188, 226, 203, 0.1);
+  color: rgba(184, 218, 197, 0.3);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+}
+
+.tac-mission {
+  position: absolute;
+  left: 50%;
+  bottom: 44px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  color: rgba(208, 238, 218, 0.65);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.tac-mission strong {
+  color: #c9ffdf;
+  font-size: 22px;
+  font-weight: 500;
+}
+.tac-mission .is-ok { color: #7dffbe; }
+.tac-mission .is-warn { color: #ffd57a; }
+.viewport--cockpit .walk-minimap { top: 132px; width: 184px; }
+.viewport--cockpit .tower-toast { top: 66px; z-index: 12; }
+.viewport--cockpit .tower-radio { z-index: 11; }
+.viewport--cockpit .walk-hud__hints { z-index: 11; }
+.viewport--cockpit .walk-hud__area { z-index: 10; }
+
+/* 座舱操作面板：键位 → 可点击动作；按住类按键派发真实键盘事件。 */
+.cockpit-controls {
+  position: absolute;
+  left: 18px;
+  top: 106px;
+  z-index: 11;
+  width: 264px;
+  padding: 10px 12px 11px;
+  border: 1px solid rgba(205, 228, 212, 0.16);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(22, 28, 26, 0.82), rgba(9, 13, 12, 0.88)),
+    rgba(10, 14, 13, 0.8);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px) saturate(0.82);
+  color: #e8f0ea;
+  pointer-events: auto;
+  font-size: 11px;
+}
+.cockpit-controls__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(214, 232, 220, 0.1);
+}
+.cockpit-controls__title {
+  flex: 1;
+  color: rgba(231, 240, 234, 0.8);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+}
+.cockpit-controls__phase {
+  padding: 2px 7px;
+  border: 1px solid rgba(198, 224, 207, 0.18);
+  border-radius: 999px;
+  color: rgba(190, 222, 202, 0.62);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.cockpit-controls__fold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid rgba(214, 232, 220, 0.18);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(224, 238, 228, 0.62);
+  font: inherit;
+  font-size: 9px;
+  cursor: pointer;
+}
+.cockpit-controls__fold:hover {
+  border-color: rgba(158, 226, 184, 0.45);
+  color: #c9f4d9;
+}
+.cockpit-controls__section { margin-top: 9px; }
+.cockpit-controls__caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+  color: rgba(184, 214, 194, 0.42);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+}
+.cockpit-controls__pads {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+.cockpit-controls__pad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 2px 5px;
+  border: 1px solid rgba(206, 230, 214, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(219, 235, 224, 0.66);
+  font: inherit;
+  font-size: 9px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cockpit-controls__pad:hover {
+  border-color: rgba(158, 226, 184, 0.42);
+  background: rgba(112, 214, 154, 0.08);
+  color: #c9f4d9;
+}
+.cockpit-controls__pad:active {
+  background: rgba(112, 214, 154, 0.16);
+}
+.cockpit-controls__pad kbd,
+.cockpit-controls__tab kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  padding: 1px 4px;
+  border: 1px solid rgba(212, 232, 219, 0.24);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(233, 246, 238, 0.86);
+  font: 600 9px/1.2 var(--mono);
+}
+.cockpit-controls__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cockpit-controls__row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 26px;
+}
+.cockpit-controls__key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 2px 5px;
+  border: 1px solid rgba(212, 232, 219, 0.2);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(230, 244, 235, 0.82);
+  font: 600 9px/1.2 var(--mono);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.cockpit-controls__label {
+  min-width: 0;
+  color: rgba(219, 234, 223, 0.68);
+  font-size: 10.5px;
+  line-height: 1.25;
+}
+.cockpit-controls__label small {
+  display: block;
+  overflow: hidden;
+  color: rgba(180, 209, 189, 0.36);
+  font-size: 8px;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cockpit-controls__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 52px;
+  padding: 4px 9px;
+  border: 1px solid rgba(189, 225, 202, 0.24);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(226, 242, 232, 0.82);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.cockpit-controls__action:hover:not(:disabled) {
+  border-color: rgba(149, 240, 184, 0.62);
+  background: rgba(107, 221, 152, 0.14);
+  color: #d6ffe4;
+}
+.cockpit-controls__action:disabled { opacity: 0.38; cursor: default; }
+.cockpit-controls__action.is-on {
+  border-color: rgba(133, 246, 175, 0.55);
+  background: rgba(102, 220, 148, 0.16);
+  color: #b9ffd3;
+}
+.cockpit-controls__action.is-primary {
+  border-color: rgba(153, 240, 186, 0.42);
+  background: rgba(100, 214, 144, 0.12);
+}
+.cockpit-controls__seg {
+  display: inline-flex;
+  gap: 3px;
+}
+.cockpit-controls__seg .cockpit-controls__action {
+  min-width: 0;
+  padding: 4px 7px;
+}
+.cockpit-controls__status {
+  padding: 6px 8px;
+  margin-bottom: 5px;
+  border: 1px solid rgba(206, 230, 214, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.025);
+  color: rgba(210, 232, 218, 0.6);
+  font-size: 10px;
+  line-height: 1.45;
+}
+.cockpit-controls__note {
+  margin-top: 9px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(214, 232, 220, 0.08);
+  color: rgba(186, 216, 195, 0.38);
+  font-size: 8.5px;
+  line-height: 1.45;
+  letter-spacing: 0.03em;
+}
+.cockpit-controls__tab {
+  position: absolute;
+  left: 18px;
+  top: 106px;
+  z-index: 11;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid rgba(208, 230, 214, 0.16);
+  border-radius: 6px;
+  background: rgba(10, 14, 13, 0.66);
+  color: rgba(220, 236, 225, 0.62);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+.cockpit-controls__tab:hover {
+  border-color: rgba(158, 226, 184, 0.42);
+  color: #c9f4d9;
+}
+
+.tac-lock.is-projected {
+  transform: translate(-50%, -50%);
+  border-radius: 0;
+  border: 0;
+  padding: 5px 7px;
+  background: rgba(4, 14, 9, 0.22);
+  box-shadow:
+    inset 0 0 0 1px rgba(142, 255, 186, 0.75),
+    inset 0 0 18px rgba(76, 255, 155, 0.08);
+}
+.tac-lock.is-projected::before,
+.tac-lock.is-projected::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: #a7ffd0;
+  border-style: solid;
+}
+.tac-lock.is-projected::before {
+  left: -1px;
+  top: -1px;
+  border-width: 1px 0 0 1px;
+}
+.tac-lock.is-projected::after {
+  right: -1px;
+  bottom: -1px;
+  border-width: 0 1px 1px 0;
+}
+.tac-wez {
+  position: absolute;
+  right: 248px;
+  bottom: 130px;
+  width: 188px;
+  padding: 7px 9px 6px;
+  border-right: 1px solid rgba(188, 226, 203, 0.2);
+  background: linear-gradient(270deg, rgba(6, 14, 11, 0.36), transparent);
+  font-size: 8px;
+  color: rgba(191, 226, 203, 0.48);
+}
+.tac-wez__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 4px;
+  color: rgba(196, 230, 207, 0.58);
+  letter-spacing: 0.08em;
+}
+.tac-wez__head b { color: rgba(220, 250, 228, 0.92); font-size: 11px; font-weight: 500; letter-spacing: 0; }
+.tac-wez__bar {
+  position: relative;
+  height: 6px;
+  margin: 4px 0 4px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(125, 255, 180, 0.45), rgba(125, 255, 180, 0.08) 55%, rgba(255, 213, 122, 0.4));
+}
+.tac-wez__rmin,
+.tac-wez__nez,
+.tac-wez__rmax {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 9px;
+  background: rgba(228, 248, 235, 0.55);
+}
+.tac-wez__rmin { left: 6%; }
+.tac-wez__nez { left: 52%; }
+.tac-wez__rmax { right: 0; }
+.tac-wez__marker {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 12px;
+  background: #c8ffdd;
+  box-shadow: 0 0 7px rgba(142, 255, 186, 0.7);
+  transform: translateX(-1px);
+}
+.tac-wez__labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  color: rgba(190, 225, 203, 0.45);
+  font-size: 7px;
+}
+.tac-wez > small {
+  display: block;
+  margin-top: 3px;
+  color: rgba(190, 225, 203, 0.42);
+  font-size: 7px;
+}
+
+/* 火控雷达 PPI + 飞机状态栏。 */
+.tac-radar {
+  position: absolute;
+  right: 16px;
+  top: 132px;
+  width: 190px;
+  padding: 7px 8px 6px;
+  border: 1px solid rgba(185, 225, 201, 0.16);
+  border-radius: 6px;
+  background: rgba(5, 14, 10, 0.52);
+  backdrop-filter: blur(6px);
+  color: rgba(197, 233, 209, 0.62);
+  pointer-events: none;
+}
+.tac-radar__head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+}
+.tac-radar__head b { color: #b7ffd3; font-size: 10px; font-weight: 500; }
+.tac-radar__head small { margin-left: auto; color: rgba(185, 220, 198, 0.4); font-size: 7px; }
+.tac-radar__scope {
+  display: block;
+  width: 100%;
+  height: 174px;
+  margin-top: 3px;
+}
+.tac-radar__ring { fill: none; stroke: rgba(164, 225, 190, 0.22); stroke-width: 0.8; }
+.tac-radar__cross { fill: none; stroke: rgba(164, 225, 190, 0.14); stroke-width: 0.6; }
+.tac-radar__sweep { fill: rgba(130, 255, 180, 0.08); stroke: rgba(130, 255, 180, 0.3); stroke-width: 0.7; transform-origin: 80px 80px; animation: tac-radar-sweep 3.6s linear infinite; }
+.tac-radar__contact { fill: #ffd27a; }
+.tac-radar__contact.is-locked { fill: #8dffb9; }
+.tac-radar__lock-ring { fill: none; stroke: #8dffb9; stroke-width: 1; }
+.tac-radar__own { stroke: #d8f9e5; stroke-width: 1.4; }
+.tac-radar__foot {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 3px;
+  border-top: 1px solid rgba(185, 225, 201, 0.08);
+  color: rgba(185, 220, 198, 0.36);
+  font-size: 7px;
+  letter-spacing: 0.04em;
+}
+@keyframes tac-radar-sweep { to { transform: rotate(360deg); } }
+
+.tac-aircraft {
+  position: absolute;
+  left: 18px;
+  top: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 122px;
+  padding: 7px 9px;
+  border-left: 1px solid rgba(185, 225, 201, 0.18);
+  background: linear-gradient(90deg, rgba(5, 14, 10, 0.4), transparent);
+  color: rgba(190, 225, 202, 0.46);
+  font-size: 8px;
+}
+.tac-aircraft div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tac-aircraft span { letter-spacing: 0.08em; }
+.tac-aircraft b { color: rgba(217, 247, 228, 0.86); font-weight: 500; }

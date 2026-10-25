@@ -1,5 +1,6 @@
 import { A, B, C, M, S, T, type CarrierCtx } from "./common";
 import { CAT_TRACKS, CV, carrierJbdOffset, catPoint } from "./constants";
+import { carrierDeckExclusions, nearestDeckX } from "./deckClearance";
 
 // ============================================================================
 // 福建舰飞行甲板作业链：牵引车/消防车/挂弹车/系留/轮挡/JBD 液压/拦阻索附件。
@@ -126,22 +127,8 @@ export function addCarrierDeckOps(ctx: CarrierCtx): void {
 
   // ---------------- JBD 液压动力站/铰链附件 ----------------
   CAT_TRACKS.forEach((track, index) => {
-    // 动力站放在着舰区与返航滑行线之间的空档：既避开两条弹射轨道/挡焰板，
-    // 也避开演示机从着舰点返回停机位时经过的 x≈1.8 滑行线。
-    const pos = index === 0
-      ? { x: -3.8, z: 4.8 }
-      : index === 1
-        ? { x: -3.8, z: 5.7 }
-        : { x: -3.6, z: -12.4 };
-    for (const [k, dx, dz] of [[0, -0.32, 0], [1, 0.32, 0], [2, 0, 0.26], [3, 0, -0.26]] as const) {
-      add(
-        `jbd_hyd_pack_${index + 1}_${k + 1}`,
-        `挡焰板液压动力站 ${index + 1}-${k + 1}`,
-        k === 0 ? M(C(0.08, 0.2, [0, 0, 0], 10), B(0.24, 0.06, 0.18, [0, -0.1, 0], 0.004)) : k === 1 ? M(C(0.06, 0.28, [0, 0, 0], 10), T(0.09, 0.05, 0.04, [0, 0.15, 0], 10)) : M(C(0.025, 0.3, [0, 0, 0], 8)),
-        k === 1 ? "cv_copper" : "cv_steel_dark",
-        [pos.x + dx, deckTop + 0.1, pos.z + dz],
-      );
-    }
+    // 液压动力站模型整体取消：内收/外靠后三套泵站都会落到飞机滑行或着舰滑跑包络里，
+    // 又无法在甲板外提供真实支撑。电磁弹射轨道/挡焰板保留，不再用假泵站填补。
     // 铰链销必须跟挡焰板一起移动，不能落在旧的固定 z 位置。
     const hinge = catPoint(track, carrierJbdOffset(track.id));
     add(
@@ -163,7 +150,7 @@ export function addCarrierDeckOps(ctx: CarrierCtx): void {
         `拦阻索滑轮 ${i + 1} ${side === -1 ? "左" : "右"}`,
         M(T(0.12, 0.06, 0.05, [0, 0, 0], 12), B(0.2, 0.06, 0.1, [0, 0, 0], 0.004)),
         "cv_steel_dark",
-        [side * (CV.WIRE_HALF - 0.1), deckTop + 0.05, z],
+        [side === -1 ? -(CV.WIRE_HALF_PORT - 0.1) : CV.WIRE_HALF - 0.1, deckTop + 0.05, z],
       );
     }
     add(`wire_spring_${i + 1}`, `拦阻索张紧索 ${i + 1}`, M({ type: "weld", from: [-0.4, 0, 0], to: [0.4, 0, 0], radius: 0.03 }), "cv_steel", [0, deckTop + 0.035, z]);
@@ -173,15 +160,20 @@ export function addCarrierDeckOps(ctx: CarrierCtx): void {
   for (let i = 0; i < 30; i++) {
     const side = i % 2 === 0 ? -1 : 1;
     const z = -19.0 + Math.floor(i / 2) * 0.55;
+    const desired = side === -1 ? -2.4 : 1.45;
+    const x = nearestDeckX(desired, z, 0.08, { margin: 0.1, exclude: carrierDeckExclusions() }) ?? desired;
     add(
       `deck_chain_${i + 1}`,
       `甲板系留链 ${i + 1}`,
       M({ type: "weld", from: [0, 0, 0], to: [side * 0.08, 0.02, 0.1], radius: 0.008 }, T(0.035, 0.02, 0.012, [side * 0.08, 0.02, 0.1], 8)),
       "cv_steel",
-      [side === -1 ? -2.4 : 1.45, deckTop + 0.02, z],
+      [x, deckTop + 0.02, z],
     );
   }
   for (let i = 0; i < 12; i++) {
-    add(`deck_chock_${i + 1}`, `甲板轮挡 ${i + 1}`, M(B(0.12, 0.1, 0.08, [0, 0, 0], 0.004)), "cv_deck_yellow", [i % 2 === 0 ? -1.6 : 1.6, deckTop + 0.05, -18.2 + Math.floor(i / 2) * 0.6]);
+    const z = -18.2 + Math.floor(i / 2) * 0.6;
+    const desired = i % 2 === 0 ? -1.6 : 1.6;
+    const x = nearestDeckX(desired, z, 0.1, { margin: 0.1, exclude: carrierDeckExclusions() }) ?? desired;
+    add(`deck_chock_${i + 1}`, `甲板轮挡 ${i + 1}`, M(B(0.12, 0.1, 0.08, [0, 0, 0], 0.004)), "cv_deck_yellow", [x, deckTop + 0.05, z]);
   }
 }

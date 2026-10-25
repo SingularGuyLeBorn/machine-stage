@@ -230,6 +230,96 @@ export function addAircraft(ctx: CarrierCtx): void {
     });
   }
 
+  // ---- 座舱内装（第一人称弹射体验） ----
+  // 参考用户给的三张实机座舱图：地板/侧壁、三块大 MFD、平显、遮光罩、中央操纵台、
+  // 双油门、侧操纵台开关阵、弹射座椅背带/拉环、脚蹬、座舱盖滑轨。
+  const cockpitPart = (
+    id: string,
+    name_cn: string,
+    geometry: ReturnType<typeof M>,
+    at: [number, number, number],
+    material = "cv_cockpit",
+    rotation?: [number, number, number],
+  ) =>
+    add({
+      id: `${P}cockpit_${id}`,
+      name_cn,
+      name_en: id.replaceAll("_", " "),
+      assembly: "aircraft",
+      build_layer: 5,
+      geometry,
+      material,
+      node: AIRCRAFT_NODE,
+      mate: A(at, rotation),
+    });
+
+  cockpitPart("floor", "座舱地板", M(B(0.2, 0.008, 0.32, [0, 0, 0], 0.003)), [0, 0.452, 0.37]);
+  cockpitPart("floor_rib_l", "座舱地板加强筋 左", M(B(0.012, 0.012, 0.28, [0, 0, 0], 0.002)), [-0.06, 0.46, 0.37]);
+  cockpitPart("floor_rib_r", "座舱地板加强筋 右", M(B(0.012, 0.012, 0.28, [0, 0, 0], 0.002)), [0.06, 0.46, 0.37]);
+  for (const side of [-1, 1] as const) {
+    cockpitPart(`sidewall_${side === -1 ? "l" : "r"}`, `座舱侧壁 ${side === -1 ? "左" : "右"}`, M(B(0.016, 0.17, 0.3, [0, 0, 0], 0.003)), [side * 0.108, 0.535, 0.38], "cv_cockpit_inner");
+    cockpitPart(`canopy_rail_${side === -1 ? "l" : "r"}`, `座舱盖滑轨 ${side === -1 ? "左" : "右"}`, M(B(0.018, 0.014, 0.27, [0, 0, 0], 0.002)), [side * 0.105, 0.615, 0.4], "cv_steel_dark");
+    cockpitPart(`side_console_${side === -1 ? "l" : "r"}`, `${side === -1 ? "左" : "右"}侧操纵台`, M(B(0.065, 0.05, 0.22, [0, 0, 0], 0.004)), [side * 0.085, 0.545, 0.4]);
+    const switches: Array<Parameters<typeof M>[0]> = [];
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 4; col++) {
+        switches.push(B(0.008, 0.01, 0.008, [side * 0.085 + (col - 1.5) * 0.009, 0.575, 0.345 + row * 0.026], 0.001));
+      }
+    }
+    cockpitPart(`side_switch_bank_${side === -1 ? "l" : "r"}`, `${side === -1 ? "左" : "右"}侧开关阵`, M(...switches), [0, 0, 0], "cv_steel_dark");
+    cockpitPart(`console_lip_${side === -1 ? "l" : "r"}`, `${side === -1 ? "左" : "右"}操纵台护边`, M(B(0.008, 0.012, 0.22, [0, 0, 0], 0.002)), [side * 0.119, 0.572, 0.4], "cv_steel");
+  }
+  cockpitPart("rear_bulkhead", "座舱后隔板", M(B(0.23, 0.18, 0.016, [0, 0, 0], 0.003)), [0, 0.545, 0.235], "cv_cockpit_inner");
+  cockpitPart("rear_headrest_pad", "座舱后隔板软包", M(B(0.16, 0.07, 0.012, [0, 0, 0], 0.004)), [0, 0.61, 0.245], "cv_upholstery");
+  cockpitPart("front_coaming", "座舱前围板", M(B(0.235, 0.028, 0.04, [0, 0, 0], 0.004)), [0, 0.598, 0.492]);
+  cockpitPart("glare_lip", "遮光罩前唇", M(B(0.285, 0.022, 0.045, [0, 0, 0], 0.004)), [0, 0.702, 0.508], "cv_cockpit");
+  cockpitPart("panel_face", "仪表板主面板", M(B(0.222, 0.1, 0.016, [0, 0, 0], 0.004)), [0, 0.65, 0.535]);
+  for (const [i, x] of [[0, -0.062], [1, 0], [2, 0.062]] as const) {
+    cockpitPart(`mfd_bezel_${i + 1}`, `多功能显示器框 ${i + 1}`, M(B(0.063, 0.05, 0.012, [0, 0, 0], 0.003)), [x, 0.653, 0.545], "cv_steel_dark");
+    cockpitPart(`mfd_screen_${i + 1}`, `多功能显示器 ${i + 1}`, M(B(0.052, 0.039, 0.004, [0, 0, 0], 0.001)), [x, 0.653, 0.552], "cv_mfd");
+  }
+  cockpitPart("ufc_panel", "正中控制面板 UFC", M(B(0.06, 0.045, 0.012, [0, 0, 0], 0.002)), [0, 0.612, 0.532], "cv_gauge_face");
+  const keypad: Array<Parameters<typeof M>[0]> = [];
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      keypad.push(B(0.009, 0.004, 0.009, [(col - 1) * 0.011, 0.62, 0.527 + (row - 1) * 0.009], 0.001));
+    }
+  }
+  cockpitPart("ufc_keys", "UFC 键盘", M(...keypad), [0, 0, 0], "cv_steel_dark");
+  cockpitPart("hud_projector", "平显投影盒", M(B(0.055, 0.035, 0.05, [0, 0, 0], 0.004)), [0, 0.722, 0.5], "cv_steel_dark");
+  cockpitPart("hud_glass", "平显玻璃", M(B(0.06, 0.042, 0.003, [0, 0, 0], 0.001)), [0, 0.706, 0.566], "cv_canopy", [-8, 0, 0]);
+  cockpitPart("hud_glass_frame", "平显玻璃框", M(B(0.068, 0.004, 0.006, [0, 0, 0], 0.001), B(0.004, 0.048, 0.006, [0, 0, 0], 0.001)), [0, 0.726, 0.566], "cv_steel_dark");
+
+  cockpitPart("center_pedestal", "中央操纵台", M(B(0.085, 0.085, 0.17, [0, 0, 0], 0.005)), [0, 0.505, 0.43], "cv_cockpit");
+  cockpitPart("pedestal_panel", "中央操纵台面板", M(B(0.07, 0.006, 0.12, [0, 0, 0], 0.002)), [0, 0.55, 0.435], "cv_gauge_face");
+  cockpitPart("throttle_quadrant", "油门台", M(B(0.07, 0.05, 0.07, [0, 0, 0], 0.004)), [0.075, 0.552, 0.39], "cv_steel_dark");
+  cockpitPart("throttle_lever_l", "左油门杆", M(B(0.01, 0.06, 0.01, [0, 0, 0], 0.002), B(0.018, 0.018, 0.026, [0, 0.035, 0], 0.003)), [0.07, 0.595, 0.392], "cv_aircraft_dark", [-22, 0, 0]);
+  cockpitPart("throttle_lever_r", "右油门杆", M(B(0.01, 0.06, 0.01, [0, 0, 0], 0.002), B(0.018, 0.018, 0.026, [0, 0.035, 0], 0.003)), [0.095, 0.595, 0.392], "cv_aircraft_dark", [-22, 0, 0]);
+  cockpitPart("throttle_detent", "油门卡位槽", M(B(0.055, 0.004, 0.04, [0, 0, 0], 0.001)), [0.083, 0.565, 0.393], "cv_steel");
+  cockpitPart("stick_boot", "操纵杆防尘套", M({ type: "latheZ", profile: [[0.026, -0.03], [0.014, 0.01], [0.018, 0.04]], segments: 16 }), [0, 0.505, 0.35], "cv_rubber");
+  cockpitPart("stick_grip", "操纵杆握把", M(B(0.02, 0.045, 0.022, [0, 0, 0], 0.004), S(0.012, [0, 0.026, 0], 10), B(0.008, 0.008, 0.012, [0, 0.01, 0.01], 0.001)), [0, 0.565, 0.35], "cv_aircraft_dark");
+  cockpitPart("stick_trigger", "操纵杆扳机", M(B(0.006, 0.019, 0.009, [0, 0, 0], 0.001)), [0.013, 0.57, 0.348], "cv_warning");
+  cockpitPart("seat_pan", "弹射座椅坐垫", M(B(0.12, 0.025, 0.14, [0, 0, 0], 0.005)), [0, 0.575, 0.31], "cv_upholstery");
+  cockpitPart("seat_back", "弹射座椅靠背", M(B(0.13, 0.16, 0.025, [0, 0, 0], 0.005)), [0, 0.63, 0.255], "cv_upholstery", [-8, 0, 0]);
+  cockpitPart("seat_harness_l", "座椅左肩带", M(B(0.018, 0.13, 0.008, [0, 0, 0], 0.002)), [-0.035, 0.62, 0.285], "cv_canvas", [-8, 0, 0]);
+  cockpitPart("seat_harness_r", "座椅右肩带", M(B(0.018, 0.13, 0.008, [0, 0, 0], 0.002)), [0.035, 0.62, 0.285], "cv_canvas", [-8, 0, 0]);
+  cockpitPart("seat_buckle", "座椅安全带锁扣", M(B(0.03, 0.025, 0.012, [0, 0, 0], 0.003)), [0, 0.58, 0.3], "cv_steel");
+  cockpitPart("seat_buckle_l", "锁扣侧带 左", M(B(0.04, 0.01, 0.008, [0, 0, 0], 0.001)), [-0.035, 0.58, 0.3], "cv_canvas");
+  cockpitPart("seat_buckle_r", "锁扣侧带 右", M(B(0.04, 0.01, 0.008, [0, 0, 0], 0.001)), [0.035, 0.58, 0.3], "cv_canvas");
+  cockpitPart("ejection_handle", "弹射手柄", M(T(0.035, 0.026, 0.012, [0, 0, 0], 14), B(0.08, 0.012, 0.014, [0, -0.035, 0], 0.002)), [0, 0.545, 0.302], "cv_warning", [90, 0, 0]);
+  cockpitPart("ejection_handle_l", "弹射手柄 左", M(B(0.006, 0.055, 0.045, [0, 0, 0], 0.002)), [-0.078, 0.56, 0.31], "cv_warning");
+  cockpitPart("ejection_handle_r", "弹射手柄 右", M(B(0.006, 0.055, 0.045, [0, 0, 0], 0.002)), [0.078, 0.56, 0.31], "cv_warning");
+  cockpitPart("pedal_heel_l", "左脚蹬跟托", M(B(0.05, 0.012, 0.04, [0, 0, 0], 0.002)), [-0.06, 0.462, 0.595], "cv_steel_dark");
+  cockpitPart("pedal_heel_r", "右脚蹬跟托", M(B(0.05, 0.012, 0.04, [0, 0, 0], 0.002)), [0.06, 0.462, 0.595], "cv_steel_dark");
+  cockpitPart("oxygen_hose", "氧气软管", M({ type: "weld", from: [-0.09, 0.56, 0.36], to: [-0.05, 0.63, 0.3], radius: 0.007 }, { type: "weld", from: [-0.05, 0.63, 0.3], to: [0, 0.655, 0.285], radius: 0.007 }), [0, 0, 0], "cv_rubber");
+  cockpitPart("map_case", "座舱地图袋", M(B(0.06, 0.08, 0.014, [0, 0, 0], 0.002)), [0.09, 0.52, 0.29], "cv_canvas");
+  cockpitPart("warning_panel", "告警灯板", M(B(0.06, 0.03, 0.01, [0, 0, 0], 0.002)), [-0.075, 0.622, 0.54], "cv_gauge_face");
+  for (let lamp = 0; lamp < 4; lamp++) {
+    cockpitPart(`warning_lamp_${lamp + 1}`, `告警灯 ${lamp + 1}`, M(C(0.0028, 0.004, [0, 0, 0], 8)), [-0.095 + lamp * 0.012, 0.622, 0.547], lamp === 0 ? "cv_warning" : lamp === 1 ? "cv_glow" : "cv_deck_yellow");
+  }
+  cockpitPart("canopy_latch", "座舱盖锁钩", M(B(0.03, 0.02, 0.014, [0, 0, 0], 0.002)), [0, 0.7, 0.34], "cv_steel");
+  cockpitPart("canopy_rail_aft", "座舱盖后滑轨", M(B(0.22, 0.018, 0.018, [0, 0, 0], 0.002)), [0, 0.63, 0.25], "cv_steel_dark");
+
   // 歼-20 光电与隐身细节：EOTS 下颌窗 / 6 处 EODAS / 腹部弹舱门 / 背脊 / 放气百叶 / 侧操纵台。
   add({
     id: `${P}eots_window`,

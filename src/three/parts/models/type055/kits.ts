@@ -715,6 +715,53 @@ export const type055Rhib: GeometryBuilder = () => {
   ]);
 };
 
+/** 八棱台（切角隐身桅杆/平台）：四个宽面 + 四条 45° 折角面。
+ *  055 的一体化桅杆不是方形烟囱式堆叠，切角后侧面能接住斜射光，
+ *  顶视也呈八边形而不是一个大平板。 */
+export const type055ChamferFrustum: GeometryBuilder = (spec) => {
+  const p = (spec as {
+    params?: { w0?: number; d0?: number; w1?: number; d1?: number; h?: number; c0?: number; c1?: number };
+  }).params ?? {};
+  const w0 = (p.w0 ?? 6) / 2;
+  const d0 = (p.d0 ?? 8) / 2;
+  const w1 = (p.w1 ?? 4) / 2;
+  const d1 = (p.d1 ?? 6) / 2;
+  const h = p.h ?? 4;
+  const c0 = Math.min(p.c0 ?? 0.15, Math.min(w0, d0) * 0.48);
+  const c1 = Math.min(p.c1 ?? 0.12, Math.min(w1, d1) * 0.48);
+  const ring = (w: number, d: number, c: number, y: number) => [
+    new THREE.Vector3(-w + c, y, -d),
+    new THREE.Vector3(w - c, y, -d),
+    new THREE.Vector3(w, y, -d + c),
+    new THREE.Vector3(w, y, d - c),
+    new THREE.Vector3(w - c, y, d),
+    new THREE.Vector3(-w + c, y, d),
+    new THREE.Vector3(-w, y, d - c),
+    new THREE.Vector3(-w, y, -d + c),
+  ];
+  const bottom = ring(w0, d0, c0, 0);
+  const top = ring(w1, d1, c1, h);
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const push = (v: THREE.Vector3) => {
+    positions.push(v.x, v.y, v.z);
+    return positions.length / 3 - 1;
+  };
+  const b = bottom.map(push);
+  const t = top.map(push);
+  for (let i = 0; i < 8; i++) {
+    const j = (i + 1) % 8;
+    indices.push(b[i]!, t[i]!, b[j]!, b[j]!, t[i]!, t[j]!);
+  }
+  for (let i = 1; i < 7; i++) indices.push(b[0]!, b[i + 1]!, b[i]!);
+  for (let i = 1; i < 7; i++) indices.push(t[0]!, t[i]!, t[i + 1]!);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
 /** 四棱台（隐身内倾上层建筑/桅杆/炮塔壳体）；原点在底面中心。 */
 export const type055Frustum: GeometryBuilder = (spec) => {
   const p = (spec as { params?: { w0?: number; d0?: number; w1?: number; d1?: number; h?: number } }).params ?? {};

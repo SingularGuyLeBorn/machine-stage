@@ -32,3 +32,12 @@ docs/qa/carrier-static-report.json
 scripts/__pycache__/
 # 可从真实生成源重建的高密度发布二进制；本地 qa-out 保存确认版回退。
 public/models/hmt/
+
+# 本地 QA 截图与外部参考抓取：保留在工作区，不进入 Git。
+docs/qa/**/*.jpg
+docs/qa/**/*.jpeg
+docs/qa/**/*.png
+docs/qa/**/*.webp
+docs/briefs/wechat-articles/**/images/
+docs/briefs/wechat-articles/**/robot*/
+docs/briefs/wechat-articles/html/

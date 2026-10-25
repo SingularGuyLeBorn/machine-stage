@@ -86,19 +86,25 @@ export function deckPlan(): Array<[number, number]> {
 /** 甲板舷缘：给定世界 z 与舷别，返回该处甲板边缘 x 与切线偏航角。 */
 export function deckEdgeAt(z: number, side: -1 | 1): { x: number; yawDeg: number } {
   const outline = deckPlan();
+  let bestX = side > 0 ? -Infinity : Infinity;
+  let bestYaw = 0;
   for (let i = 0; i < outline.length; i++) {
     const [x0, z0] = outline[i]!;
     const [x1, z1] = outline[(i + 1) % outline.length]!;
     const lo = Math.min(z0, z1);
     const hi = Math.max(z0, z1);
     if (z < lo - 1e-6 || z > hi + 1e-6) continue;
-    // 只取对应舷侧的边；艉/艏封边跨中线，按斜率仍可确定归属。
     if (Math.abs(z1 - z0) < 1e-6) continue;
     const t = (z - z0) / (z1 - z0);
     const x = x0 + (x1 - x0) * t;
-    if (side > 0 ? x < -0.02 : x > 0.02) continue;
-    return { x, yawDeg: (Math.atan2(x1 - x0, z1 - z0) * 180) / Math.PI };
+    // 取该 z 与轮廓所有交点的最外缘：艉部斜边同时跨左右舷，
+    // 旧逻辑按“第一个同舷交点”取，会落空并返回舷外默认值 4.68。
+    if (side > 0 ? x > bestX : x < bestX) {
+      bestX = x;
+      bestYaw = (Math.atan2(x1 - x0, z1 - z0) * 180) / Math.PI;
+    }
   }
+  if (Number.isFinite(bestX)) return { x: bestX, yawDeg: bestYaw };
   return { x: side > 0 ? 4.68 : -4.8, yawDeg: 0 };
 }
 
@@ -381,11 +387,13 @@ export const carrierBowRake: GeometryBuilder = () => {
  *  上表面就是可站立的甲板弧面，不是另贴一块板。 */
 export const carrierBowRamp: GeometryBuilder = () => {
   const N = 14;
-  const bottomY = CV.DECK_Y + CV.DECK_T - 0.024;
-  const sections: Array<{ z: number; port: number; star: number; top: number }> = [];
+  const sections: Array<{ z: number; port: number; star: number; top: number; bottom: number }> = [];
   for (let i = 0; i <= N; i++) {
     const z = BOW_RAMP_Z0 + ((BOW_RAMP_Z1 - BOW_RAMP_Z0) * i) / N;
-    sections.push({ z, port: deckEdgeAt(z, -1).x, star: deckEdgeAt(z, 1).x, top: deckTopAt(z) });
+    const top = deckTopAt(z);
+    // 上翘段只做甲板结构面层；下面的水密基层已经随 deckTopAt 抬升，
+    // 这里不能再从 4.556 拉一块厚楔形，否则两块的侧板会重叠闪烁。
+    sections.push({ z, port: deckEdgeAt(z, -1).x, star: deckEdgeAt(z, 1).x, top, bottom: top - 0.018 });
   }
   const positions: number[] = [];
   const indices: number[] = [];
@@ -397,7 +405,7 @@ export const carrierBowRamp: GeometryBuilder = () => {
   const botIdx: Array<[number, number]> = [];
   for (const s of sections) {
     topIdx.push([push(s.port, s.top, s.z), push(s.star, s.top, s.z)]);
-    botIdx.push([push(s.port, bottomY, s.z), push(s.star, bottomY, s.z)]);
+    botIdx.push([push(s.port, s.bottom, s.z), push(s.star, s.bottom, s.z)]);
   }
   for (let i = 0; i < N; i++) {
     const [pt0, st0] = topIdx[i]!;
@@ -586,9 +594,53 @@ export const carrierSternTransom: GeometryBuilder = () => {
   return geometry;
 };
 
-/** 飞行甲板水密基层：顶面比装甲板低 0.018，装甲板之间的板缝会露出深色基层。 */
-export const carrierFlightDeck: GeometryBuilder = () =>
-  extrudedPlan(deckPlan(), CV.DECK_T - 0.018, CV.DECK_Y + CV.DECK_T - 0.018);
+/** 把平面多边形裁到 z0..z1（Sutherland–Hodgman，保留输入绕序）。 */
+function clipPlanZ(points: Array<[number, number]>, z0: number, z1: number): Array<[number, number]> {
+  let poly = points;
+  const clip = (axis: 0 | 1, value: number, keepGreater: boolean) => {
+    const out: Array<[number, number]> = [];
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i]!;
+      const b = poly[(i + 1) % poly.length]!;
+      const aIn = keepGreater ? a[axis] >= value : a[axis] <= value;
+      const bIn = keepGreater ? b[axis] >= value : b[axis] <= value;
+      if (aIn) out.push(a);
+      if (aIn !== bIn) {
+        const t = (value - a[axis]) / (b[axis] - a[axis]);
+        out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+      }
+    }
+    poly = out;
+  };
+  clip(1, z0, true);
+  clip(1, z1, false);
+  return poly;
+}
+
+/** 飞行甲板水密基层：顶面比装甲板低 0.018，艏部随甲板本体一起抬升。
+ *  不是只在上面盖一块起翘板——基层的顶面和两侧舷缘都沿 deckTopAt(z) 连续升高。
+ *  可按 z0/z1 切成多个水密分段：整船级 Extrude 的大三角在抬艏后会把平甲板
+ *  也拉成斜面，切成 10m 级分段后每块顶面只在自身范围内起翘。 */
+export const carrierFlightDeck: GeometryBuilder = (spec) => {
+  const params = (spec as { params?: { z0?: number; z1?: number } }).params ?? {};
+  const plan = params.z0 !== undefined && params.z1 !== undefined
+    ? clipPlanZ(deckPlan(), params.z0, params.z1)
+    : deckPlan();
+  if (plan.length < 3) return new THREE.BufferGeometry();
+  const flatTop = CV.DECK_Y + CV.DECK_T - 0.018;
+  const bottom = CV.DECK_Y;
+  const geometry = extrudedPlan(plan, CV.DECK_T - 0.018, flatTop);
+  const position = geometry.getAttribute("position");
+  for (let i = 0; i < position.count; i++) {
+    const z = position.getZ(i);
+    const y = position.getY(i);
+    const t = (y - bottom) / (flatTop - bottom);
+    position.setY(i, bottom + (deckTopAt(z) - 0.018 - bottom) * t);
+  }
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
+  return geometry;
+};
 
 /** 飞行甲板基层底面：从下往上看也必须是实心封板，不能透出船体内部。 */
 export const carrierDeckUnderside: GeometryBuilder = () =>
@@ -612,12 +664,32 @@ export const carrierDeckArmorPlate: GeometryBuilder = (spec) => {
   return geometry;
 };
 
+/** 甲板外缘带：外缘严格落在 deckPlan 轮廓上，向内按斜接宽度收边。
+ *  相邻段共用同一个斜接点，折线接头处不会漏缝；也不再出现半条红边悬在甲板外。 */
+export const carrierDeckEdgeBand: GeometryBuilder = (spec) => {
+  const params = (spec as {
+    params?: { points?: Array<[number, number]>; topY?: number; thickness?: number };
+  }).params ?? {};
+  const points = params.points ?? [];
+  if (points.length < 4) return new THREE.BufferGeometry();
+  const shape = new THREE.Shape(points.map(([x, z]) => new THREE.Vector2(x, z)));
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: params.thickness ?? 0.004,
+    bevelEnabled: false,
+    curveSegments: 1,
+    steps: 1,
+  });
+  geometry.rotateX(Math.PI / 2);
+  geometry.translate(0, params.topY ?? CV.DECK_Y + CV.DECK_T + 0.0025, 0);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
 /** 外飘封边板：沿甲板折线的舷墙板。传入 points 时只做一个/一组折线段（逐块零件）。 */
 export const carrierSponsonSkirt: GeometryBuilder = (spec) => {
   const params = (spec as { params?: { points?: Array<[number, number]> } }).params ?? {};
   const outline = params.points && params.points.length >= 2 ? params.points : deckPlan();
   const closed = !params.points;
-  const yTop = CV.DECK_Y + 0.02;
   const yBot = CV.DECK_Y - 0.32;
   const thickness = 0.07;
   const positions: number[] = [];
@@ -666,12 +738,14 @@ export const carrierSponsonSkirt: GeometryBuilder = (spec) => {
     const o1: [number, number, number] = [x1, 0, z1];
     const i0: [number, number, number] = [x0 + inX, 0, z0 + inZ];
     const i1: [number, number, number] = [x1 + inX, 0, z1 + inZ];
-    const ot0: [number, number, number] = [o0[0], yTop, o0[2]];
-    const ot1: [number, number, number] = [o1[0], yTop, o1[2]];
+    const yTop0 = deckTopAt(z0) - 0.16;
+    const yTop1 = deckTopAt(z1) - 0.16;
+    const ot0: [number, number, number] = [o0[0], yTop0, o0[2]];
+    const ot1: [number, number, number] = [o1[0], yTop1, o1[2]];
     const ob0: [number, number, number] = [o0[0], yBot, o0[2]];
     const ob1: [number, number, number] = [o1[0], yBot, o1[2]];
-    const it0: [number, number, number] = [i0[0], yTop, i0[2]];
-    const it1: [number, number, number] = [i1[0], yTop, i1[2]];
+    const it0: [number, number, number] = [i0[0], yTop0, i0[2]];
+    const it1: [number, number, number] = [i1[0], yTop1, i1[2]];
     const ib0: [number, number, number] = [i0[0], yBot, i0[2]];
     const ib1: [number, number, number] = [i1[0], yBot, i1[2]];
     quad(ob0, ob1, ot1, ot0, out);
@@ -1076,9 +1150,15 @@ export const carrierHullStrake: GeometryBuilder = (spec) => {
   const p = (spec as { params?: Record<string, number> }).params ?? {};
   const level = Number(p.level ?? 1.6);
   const side = Number(p.side ?? 1) >= 0 ? 1 : -1;
-  // 艏部曲率大，采样加密并把外缘抬到 0.03，避免列板前段切进壳板里面。
-  const outer = (z: number) => side * (hullSurfaceHalfAt(z, level) + 0.03);
-  return curvedHullRibbon(-16.6, 16.0, 140, side, outer, (z) => outer(z) - side * 0.16, level + 0.025, level - 0.025);
+  // 板条在舯部只比外板高 8mm；两端沿纵向收进壳板内，避免从舷侧看像一块
+  // 从船壳里穿出来的三角鳍。上半部 2.52/2.98 两道过去最明显。
+  const proud = (z: number) => {
+    const bowFade = Math.min(1, Math.max(0, (16.0 - z) / 0.6));
+    const sternFade = Math.min(1, Math.max(0, (z + 16.6) / 0.6));
+    return 0.008 * Math.min(bowFade, sternFade);
+  };
+  const outer = (z: number) => side * (hullSurfaceHalfAt(z, level) + proud(z));
+  return curvedHullRibbon(-16.6, 16.0, 140, side, outer, (z) => outer(z) - side * 0.12, level + 0.018, level - 0.018);
 };
 
 /** 舭龙骨：沿舭部曲面的外伸连续板，内外缘都按该高度真实外板取点。 */

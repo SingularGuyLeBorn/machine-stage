@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { CV } from "./constants";
 import { deckEdgeAt, hullSurfaceHalfAt } from "./kits";
+import { carrierDeckExclusions, nearestDeckX } from "./deckClearance";
 import { A, B, C, M, S, T, pad, type CarrierCtx } from "./common";
 
 // ============================================================================
@@ -661,6 +662,13 @@ export function addSurface(ctx: CarrierCtx): void {
   // 后续接入真实网格资产后再恢复甲板作业编组。
   // 系留链/轮挡散件。
   for (let c = 0; c < 10; c++) {
+    const z = -15.2 - Math.floor(c / 5) * 2.0;
+    const desired = -2.6 + (c % 5) * 1.3;
+    const x = nearestDeckX(desired, z, 0.3, {
+      margin: 0.1,
+      // 3 号弹射器 JBD 收起后仍占着左舷艉段；系留链绕开它，避免压在挡焰板上。
+      exclude: [...carrierDeckExclusions(), [-4.8, -15.7, -2.7, -14.3]],
+    }) ?? desired;
     add({
       id: `${P}tie_chain_${pad(c + 1)}`,
       name_cn: `系留链 ${c + 1}`,
@@ -669,7 +677,7 @@ export function addSurface(ctx: CarrierCtx): void {
       build_layer: 5,
       geometry: M(C(0.018, 0.7, [0, 0, 0], 8)),
       material: "cv_steel",
-      mate: A([-2.6 + (c % 5) * 1.3, deckTop + 0.02, -15.2 - Math.floor(c / 5) * 2.0], [90, 0, 20]),
+      mate: A([x, deckTop + 0.02, z], [90, 0, 20]),
     });
   }
 }

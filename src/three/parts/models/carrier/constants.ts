@@ -5,7 +5,7 @@
 // 坐标：+X 右舷（舰岛侧）、+Y 上、+Z 舰艏；龙骨底面 y=0，飞行甲板面 y=4.4（编辑单位）。
 // ============================================================================
 
-import { TAKEOFF_CAT_X, TAKEOFF_CAT_Z0, TAKEOFF_JBD_S } from "./runwayPlan";
+import { TAKEOFF_CAT_Z0, TAKEOFF_JBD_S } from "./runwayPlan";
 
 export const CV = {
   SCALE: 8,
@@ -44,9 +44,13 @@ export const CV = {
 
   WIRE_Z: [-7, -9, -11, -13] as const,
   WIRE_HALF: 3.0,
+  // 着舰跑道偏左舷，左端滑轮必须放到左舷外飘甲板边缘（而不是跑道边线内）。
+  WIRE_HALF_PORT: 4.45,
   WIRE_Y: 4.62,
 
-  ELEVATOR_X: 3.42,
+  // 舷侧升降机整体收在甲板折线以内：两个站位处的甲板半宽不同，不能共用一个 x。
+  ELEVATOR_X: 2.98,
+  ELEVATOR_X_BY_INDEX: [2.98, 2.46] as const,
   ELEVATOR_Z: [2.0, -12.8] as const,
   ELEVATOR_W: 2.53,
   ELEVATOR_L: 3.4,
@@ -98,19 +102,21 @@ export type CatTrack = {
 };
 
 export const CAT_TRACKS: readonly CatTrack[] = [
-  // 舰艏两条：按用户 lnj-coordinates.json 的两段电磁弹射器起箱位置，
-  // 都落在右舷起飞跑道内，平行于舰体轴线。
-  { id: 1, x0: TAKEOFF_CAT_X[0], z0: TAKEOFF_CAT_Z0, yawDeg: 0.0, length: 8.4 },
-  { id: 2, x0: TAKEOFF_CAT_X[1], z0: TAKEOFF_CAT_Z0, yawDeg: 0.0, length: 8.4 },
+  // 舰艏两条：均匀分在前甲板中线两侧（不再一起挤在右舷）。前甲板到艏端
+  // 只剩 3.2~3.6 宽，0.1/2.1 的轨道宽度仍能完整落在甲板内。
+  { id: 1, x0: 2.1, z0: TAKEOFF_CAT_Z0, yawDeg: 0.0, length: 8.4 },
+  { id: 2, x0: 0.1, z0: TAKEOFF_CAT_Z0, yawDeg: 0.0, length: 8.4 },
   // 腰部三号：移到着舰区左舷外侧的净空条带，与甲板中线平行。
   // 旧位置在斜角着舰区内部，和着舰跑道重叠；再向外就是着舰区边界，
   // 因此改成平行艏艉线，JBD/滑梭/喷流区随轨道整体平移。
-  { id: 3, x0: -3.6, z0: -7.2, yawDeg: 0, length: 8.4 },
+  // 腰部三号横穿斜角着舰区，必须后移并外靠到左舷净空条带；否则轨道/挡焰板
+  // 会直接铺在着舰滑跑线上。现在整条轨道位于着舰区左舷外，JBD 也完全让开。
+  { id: 3, x0: -3.82, z0: -12.4, yawDeg: 0, length: 8.4 },
 ];
 
 /** 挡焰板在各自轨道上的纵向位置：舰艏两条按用户 JSON 后移，三号保持原位。 */
 export function carrierJbdOffset(trackId: number): number {
-  return trackId === 3 ? -3.2 : TAKEOFF_JBD_S;
+  return trackId === 3 ? -2.2 : TAKEOFF_JBD_S;
 }
 
 export function catPoint(track: CatTrack, s: number): { x: number; z: number } {

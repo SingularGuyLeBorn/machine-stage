@@ -21,6 +21,7 @@ import {
   type055DeckUnderside,
   type055DeckWalkLines,
   type055Frustum,
+  type055ChamferFrustum,
   type055GunTurret,
   type055BridgeShell,
   type055CommandConsole,
@@ -372,9 +373,30 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     name_en: "integrated mast lower tier",
     assembly: "radar",
     build_layer: 4,
-    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 6.0, d0: 8.6, w1: 5.0, d1: 7.2, h: 4.0 } },
-    material: "cv_055_hull",
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 6.6, d0: 8.8, w1: 5.0, d1: 7.2, h: 4.0, c0: 0.24, c1: 0.17 } },
+    material: "cv_055_mast",
     mate: A([0, DECK + 12.9, 20]),
+  });
+  add({
+    id: `${P}super.mast_fairing`,
+    name_cn: "综合桅杆切角基座",
+    name_en: "integrated mast chamfered fairing",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 8.2, d0: 10.6, w1: 6.6, d1: 8.8, h: 0.85, c0: 0.38, c1: 0.26 } },
+    material: "cv_055_mast",
+    mate: A([0, DECK + 12.78, 20]),
+    source: "切角八棱基座，把方桅杆过渡到舰桥顶，避免一层薄平板大挑檐。",
+  });
+  add({
+    id: `${P}super.mast_seam_low`,
+    name_cn: "综合桅杆下段板缝",
+    name_en: "mast lower tier seam",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 5.26, d0: 7.46, w1: 5.22, d1: 7.42, h: 0.12, c0: 0.17, c1: 0.17 } },
+    material: "cv_steel_dark",
+    mate: A([0, DECK + 16.86, 20]),
   });
   add({
     id: `${P}super.mast_mid`,
@@ -382,9 +404,19 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     name_en: "integrated mast middle tier",
     assembly: "radar",
     build_layer: 4,
-    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 5.0, d0: 7.2, w1: 3.6, d1: 5.4, h: 4.5 } },
-    material: "cv_055_hull",
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 5.0, d0: 7.2, w1: 3.6, d1: 5.4, h: 4.5, c0: 0.17, c1: 0.12 } },
+    material: "cv_055_mast",
     mate: A([0, DECK + 16.9, 20]),
+  });
+  add({
+    id: `${P}super.mast_seam_high`,
+    name_cn: "综合桅杆上段板缝",
+    name_en: "mast upper tier seam",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 3.86, d0: 5.66, w1: 3.82, d1: 5.62, h: 0.12, c0: 0.13, c1: 0.13 } },
+    material: "cv_steel_dark",
+    mate: A([0, DECK + 21.32, 20]),
   });
   add({
     id: `${P}super.mast_top`,
@@ -392,8 +424,8 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     name_en: "integrated mast upper tier",
     assembly: "radar",
     build_layer: 4,
-    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 3.6, d0: 5.4, w1: 2.2, d1: 3.8, h: 4.5 } },
-    material: "cv_055_hull",
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 3.6, d0: 5.4, w1: 2.2, d1: 3.8, h: 4.5, c0: 0.12, c1: 0.08 } },
+    material: "cv_055_mast",
     mate: A([0, DECK + 21.4, 20]),
   });
   add({
@@ -402,7 +434,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     name_en: "mast middle platform",
     assembly: "radar",
     build_layer: 4,
-    geometry: M(B(5.4, 0.16, 7.6, [0, 0, 0], 0.02)),
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 5.5, d0: 7.7, w1: 5.5, d1: 7.7, h: 0.16, c0: 0.2, c1: 0.2 } },
     material: "cv_steel_dark",
     mate: A([0, DECK + 16.85, 20]),
   });
@@ -412,9 +444,9 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     name_en: "mast upper platform",
     assembly: "radar",
     build_layer: 4,
-    geometry: M(B(4.0, 0.16, 5.8, [0, 0, 0], 0.02)),
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 4.1, d0: 5.9, w1: 4.1, d1: 5.9, h: 0.16, c0: 0.14, c1: 0.14 } },
     material: "cv_steel_dark",
-    mate: A([0, DECK + 21.35, 20]),
+    mate: A([0, DECK + 21.3, 20]),
   });
   // 舰桥前窗（透明，第一人称可看出去）+ 两侧暗玻璃带
   add({
@@ -629,7 +661,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
   }
 
   // 旋转导航雷达 / 卫通 / ESM
-  ctx.node({ name: "CV_055_Radar", parent: "root", pivot: [0, DECK + 26.05, 20], motion: "rotate", axis: "y", note: "旋转导航雷达" });
+  ctx.node({ name: "CV_055_Radar", parent: "root", pivot: [0, DECK + 28.0, 20], motion: "rotate", axis: "y", note: "旋转导航雷达" });
   add({
     id: `${P}radar.nav`,
     name_cn: "旋转导航雷达",
@@ -735,7 +767,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 4,
       geometry: M(S(1.0, [0, 0, 0], 20), C(0.85, 0.4, [0, -0.7, 0], 18)),
       material: "cv_radar",
-      mate: A([side * 3.9, DECK + 13.9, 21]),
+      mate: A([side * 2.8, DECK + 13.9, 27.0]),
     });
     add({
       id: `${P}radar.satcom_ring_${side === -1 ? "l" : "r"}`,
@@ -745,7 +777,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 4,
       geometry: M(T(0.9, 0.76, 0.1, [0, 0, 0], 18)),
       material: "cv_055_fitting",
-      mate: A([side * 3.9, DECK + 13.2, 21]),
+      mate: A([side * 2.8, DECK + 13.2, 27.0]),
     });
     for (let b = 0; b < 4; b++) {
       const a = (Math.PI * 2 * b) / 4;
@@ -757,7 +789,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
         build_layer: 4,
         geometry: M(C(0.035, 0.08, [0, 0, 0], 8)),
         material: "cv_steel",
-        mate: A([side * 3.9 + Math.cos(a) * 0.82, DECK + 13.26, 21 + Math.sin(a) * 0.82]),
+        mate: A([side * 2.8 + Math.cos(a) * 0.82, DECK + 13.26, 27.0 + Math.sin(a) * 0.82]),
       });
     }
     add({
@@ -793,6 +825,150 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     material: "cv_055_hull",
     mate: A([0, t55DeckTop(-33), -33]),
   });
+  // ---------------- 后桅与后部卫通 ----------------
+  // 055 不只有前部综合桅杆：后部甲板室顶还有一根较小的后桅，承担后向通信/导航，
+  // 顶部带一部小型对海/导航雷达；两舷各一个卫通罩。公开俯拍照片能看到这组轮廓。
+  add({
+    id: `${P}super.aft_mast_base`,
+    name_cn: "后桅基座板",
+    name_en: "aft mast base plate",
+    assembly: "superstructure",
+    build_layer: 4,
+    geometry: M(B(3.4, 0.22, 3.4, [0, 0.11, 0], 0.02)),
+    material: "cv_steel_dark",
+    mate: A([0, 19.0, -34]),
+  });
+  add({
+    id: `${P}super.aft_mast_pedestal`,
+    name_cn: "后桅切角基座",
+    name_en: "aft mast chamfered pedestal",
+    assembly: "superstructure",
+    build_layer: 4,
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 2.9, d0: 2.9, w1: 2.0, d1: 2.0, h: 1.2, c0: 0.22, c1: 0.16 } },
+    material: "cv_055_mast",
+    mate: A([0, 19.05, -34]),
+  });
+  add({
+    id: `${P}super.aft_mast_pole_lower`,
+    name_cn: "后桅下段桅身",
+    name_en: "aft mast lower pole",
+    assembly: "superstructure",
+    build_layer: 4,
+    geometry: M(C(0.28, 3.2, [0, 1.6, 0], 14, 0.2)),
+    material: "cv_055_mast",
+    mate: A([0, 20.2, -34]),
+  });
+  add({
+    id: `${P}super.aft_mast_platform`,
+    name_cn: "后桅平台",
+    name_en: "aft mast platform",
+    assembly: "superstructure",
+    build_layer: 4,
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 3.4, d0: 3.4, w1: 3.4, d1: 3.4, h: 0.16, c0: 0.3, c1: 0.3 } },
+    material: "cv_steel_dark",
+    mate: A([0, 23.4, -34]),
+  });
+  add({
+    id: `${P}super.aft_mast_pole_upper`,
+    name_cn: "后桅上段桅身",
+    name_en: "aft mast upper pole",
+    assembly: "superstructure",
+    build_layer: 4,
+    geometry: M(C(0.14, 3.2, [0, 1.6, 0], 12, 0.1)),
+    material: "cv_055_mast",
+    mate: A([0, 23.5, -34]),
+  });
+  add({
+    id: `${P}radar.aft_nav_pedestal`,
+    name_cn: "后桅雷达基座",
+    name_en: "aft mast radar pedestal",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(C(0.22, 0.4, [0, 0.2, 0], 12), T(0.3, 0.24, 0.06, [0, 0.02, 0], 12)),
+    material: "cv_steel_dark",
+    mate: A([0, 26.3, -34]),
+  });
+  add({
+    id: `${P}radar.aft_nav`,
+    name_cn: "后桅对海/导航雷达",
+    name_en: "aft mast surface search radar",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(C(0.32, 0.24, [0, 0, 0], 14), B(2.4, 0.16, 0.28, [0, 0.2, 0], 0.01), B(1.9, 0.05, 0.34, [0, 0.31, 0], 0.006)),
+    material: "cv_radar_dark",
+    mate: A([0, 26.6, -34]),
+  });
+  {
+    const mastRail: Array<Parameters<typeof M>[0]> = [];
+    for (const [x, z] of [
+      [-1.45, -1.45],
+      [1.45, -1.45],
+      [-1.45, 1.45],
+      [1.45, 1.45],
+    ] as const) {
+      mastRail.push(C(0.025, 0.8, [x, 0.4, z], 6));
+    }
+    for (const y of [0.75, 0.38]) {
+      mastRail.push(
+        { type: "weld", from: [-1.45, y, -1.45], to: [1.45, y, -1.45], radius: 0.022 },
+        { type: "weld", from: [-1.45, y, 1.45], to: [1.45, y, 1.45], radius: 0.022 },
+        { type: "weld", from: [-1.45, y, -1.45], to: [-1.45, y, 1.45], radius: 0.022 },
+        { type: "weld", from: [1.45, y, -1.45], to: [1.45, y, 1.45], radius: 0.022 },
+      );
+    }
+    add({
+      id: `${P}super.aft_mast_railing`,
+      name_cn: "后桅平台栏杆",
+      name_en: "aft mast platform railing",
+      assembly: "superstructure",
+      build_layer: 4,
+      geometry: M(...mastRail),
+      material: "cv_steel_dark",
+      mate: A([0, 23.56, -34]),
+    });
+  }
+  for (const side of [-1, 1] as const) {
+    add({
+      id: `${P}radar.aft_satcom_${side === -1 ? "l" : "r"}`,
+      name_cn: `后部卫通罩 ${side === -1 ? "左" : "右"}`,
+      name_en: `aft SATCOM dome ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(T(0.58, 0.47, 0.1, [0, 0.05, 0], 18), C(0.44, 0.28, [0, 0.24, 0], 16), S(0.5, [0, 0.62, 0], 16)),
+      material: "cv_radar",
+      mate: A([side * 2.85, 19.0, -29.2]),
+    });
+    add({
+      id: `${P}radar.aft_satcom_ring_${side === -1 ? "l" : "r"}`,
+      name_cn: `后部卫通基座环 ${side === -1 ? "左" : "右"}`,
+      name_en: `aft SATCOM ring ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(T(0.62, 0.5, 0.08, [0, 0, 0], 18)),
+      material: "cv_055_fitting",
+      mate: A([side * 2.85, 19.02, -29.2]),
+    });
+    add({
+      id: `${P}radar.aft_whip_${side === -1 ? "l" : "r"}`,
+      name_cn: `后桅鞭状天线 ${side === -1 ? "左" : "右"}`,
+      name_en: `aft mast whip antenna ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(C(0.025, 2.4, [0, 1.2, 0], 6), C(0.05, 0.08, [0, 0, 0], 6)),
+      material: "cv_steel_dark",
+      mate: A([side * 1.15, 23.56, -34]),
+    });
+    add({
+      id: `${P}radar.aft_stay_${side === -1 ? "l" : "r"}`,
+      name_cn: `后桅斜拉索 ${side === -1 ? "左" : "右"}`,
+      name_en: `aft mast stay ${side === -1 ? "l" : "r"}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M({ type: "weld", from: [side * 0.08, 26.55, -34], to: [side * 3.6, 19.0, side > 0 ? -30 : -38], radius: 0.016 }),
+      material: "cv_steel",
+      mate: A([0, 0, 0]),
+    });
+  }
 
   // 舰桥两翼平台 + 斜撑 + 栏杆（直升机指挥/靠泊观察位）
   for (const side of [-1, 1] as const) {
@@ -844,6 +1020,53 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       });
     }
   }
+  // 舰桥顶面栏杆与设备箱：真实 055 的舰桥顶不是一块光板，四周有栏杆、后部有设备柜。
+  {
+    const roofRail: Array<Parameters<typeof M>[0]> = [];
+    for (const side of [-1, 1] as const) {
+      for (const z of [22.0, 25.0, 28.0, 31.2]) {
+        roofRail.push(C(0.028, 0.8, [side * 3.95, 0.4, z], 6));
+      }
+    }
+    for (const x of [-2.0, 0, 2.0]) roofRail.push(C(0.028, 0.8, [x, 0.4, 31.7], 6));
+    for (const y of [0.78, 0.4]) {
+      roofRail.push(
+        { type: "weld", from: [-3.95, y, 22.0], to: [-3.95, y, 31.7], radius: 0.025 },
+        { type: "weld", from: [3.95, y, 22.0], to: [3.95, y, 31.7], radius: 0.025 },
+        { type: "weld", from: [-3.95, y, 31.7], to: [3.95, y, 31.7], radius: 0.025 },
+      );
+    }
+    add({
+      id: `${P}super.bridge_roof_railing`,
+      name_cn: "舰桥顶栏杆",
+      name_en: "bridge roof railing",
+      assembly: "superstructure",
+      build_layer: 4,
+      geometry: M(...roofRail),
+      material: "cv_steel_dark",
+      mate: A([0, 27.1, 0]),
+    });
+  }
+  add({
+    id: `${P}super.bridge_roof_locker`,
+    name_cn: "舰桥顶设备箱",
+    name_en: "bridge roof equipment locker",
+    assembly: "superstructure",
+    build_layer: 4,
+    geometry: M(B(1.2, 1.0, 2.0, [0, 0.5, 0], 0.02), B(0.9, 0.08, 1.7, [0, 1.03, 0], 0.01), B(0.04, 0.6, 1.5, [0.62, 0.5, 0], 0.006)),
+    material: "cv_055_mast",
+    mate: A([2.5, 27.1, 30.0]),
+  });
+  add({
+    id: `${P}super.bridge_roof_locker_vent`,
+    name_cn: "舰桥顶设备箱通风口",
+    name_en: "bridge roof locker vent",
+    assembly: "superstructure",
+    build_layer: 5,
+    geometry: M(B(0.5, 0.08, 0.8, [0, 0, 0], 0.01)),
+    material: "cv_grate",
+    mate: A([2.5, 28.14, 30.0]),
+  });
   // 舰桥正面窗框
   for (let i = 0; i < 6; i++) {
     add({
@@ -1102,13 +1325,23 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
 
   // 桅顶平台/横桁/天线/电子战/导航灯
   add({
+    id: `${P}super.mast_neck`,
+    name_cn: "综合桅杆顶部收颈",
+    name_en: "mast top neck collar",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 2.4, d0: 4.0, w1: 2.0, d1: 3.6, h: 0.32, c0: 0.1, c1: 0.1 } },
+    material: "cv_055_mast",
+    mate: A([0, 39.95, 20]),
+  });
+  add({
     id: `${P}radar.mast_platform`,
     name_cn: "桅顶平台",
     name_en: "mast top platform",
     assembly: "radar",
     build_layer: 4,
-    geometry: M(B(6.4, 0.26, 5.0, [0, 0, 0], 0.02), B(6.0, 0.1, 0.12, [0, 0.16, 2.44], 0.006)),
-    material: "cv_steel",
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 6.4, d0: 5.2, w1: 6.4, d1: 5.2, h: 0.16, c0: 0.35, c1: 0.35 } },
+    material: "cv_055_mast",
     mate: A([0, 40.15, 20]),
   });
   add({
@@ -1153,9 +1386,9 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       mate: A([side * 1.9, 34.6, 20], [0, side * 90, 0]),
     });
   }
-  for (const [tag, z, yaw] of [
-    ["fwd", 22.9, 0],
-    ["aft", 17.1, 180],
+  for (const [tag, yaw] of [
+    ["fwd", 0],
+    ["aft", 180],
   ] as const) {
     add({
       id: `${P}radar.xband_${tag}`,
@@ -1165,7 +1398,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 4,
       geometry: M(B(1.2, 1.0, 0.14, [0, 0, 0], 0.01)),
       material: "cv_aesa",
-      mate: A([0, 34.8, z], [0, yaw, 0]),
+      mate: A([0, 34.8, tag === "aft" ? 17.24 : 22.76], [0, yaw, 0]),
     });
   }
   for (const side of [-1, 1] as const) {
@@ -1190,12 +1423,12 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       build_layer: 4,
       geometry: M(B(0.12, 2.6, 3.0, [0, 0, 0], 0.01)),
       material: "cv_aesa",
-      mate: A([side * 2.3, 31.5, 20]),
+      mate: A([side * 2.47, 31.5, 20]),
     });
   }
   for (const [tag, z, yaw] of [
-    ["front", 23.4, 0],
-    ["aft", 16.6, 180],
+    ["front", 23.58, 0],
+    ["aft", 16.42, 180],
   ] as const) {
     add({
       id: `${P}radar.mast_panel_${tag}`,
@@ -1208,19 +1441,141 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       mate: A([0, 31.5, z], [0, yaw, 0]),
     });
   }
-  // 桅顶平台栏杆
-  for (let i = 0; i < 4; i++) {
+  // 桅身相控阵/电子战面板外框：把大面积暗色阵面收进浅灰结构框，
+  // 近景能看出桅杆是“结构 + 阵面”而不是一整根黑柱。
+  for (const side of [-1, 1] as const) {
     add({
-      id: `${P}radar.mast_post_${i + 1}`,
-      name_cn: `桅顶栏杆立柱 ${i + 1}`,
-      name_en: `mast rail post ${i + 1}`,
+      id: `${P}radar.mast_panel_frame_${side === -1 ? "l" : "r"}`,
+      name_cn: `桅身侧面阵外框 ${side === -1 ? "左" : "右"}`,
+      name_en: `mast side array frame ${side === -1 ? "l" : "r"}`,
       assembly: "radar",
       build_layer: 4,
-      geometry: M(C(0.03, 0.9, [0, 0, 0], 6)),
+      geometry: M(
+        B(0.12, 0.1, 3.12, [0, 1.32, 0], 0.004),
+        B(0.12, 0.1, 3.12, [0, -1.32, 0], 0.004),
+        B(0.12, 2.62, 0.1, [0, 0, 1.52], 0.004),
+        B(0.12, 2.62, 0.1, [0, 0, -1.52], 0.004),
+      ),
       material: "cv_steel_dark",
-      mate: A([i % 2 === 0 ? -3.1 : 3.1, 40.73, i < 2 ? 17.6 : 22.4]),
+      mate: A([side * 2.53, 31.5, 20]),
     });
   }
+  for (const [tag, z] of [
+    ["front", 23.67],
+    ["aft", 16.33],
+  ] as const) {
+    add({
+      id: `${P}radar.mast_panel_frame_${tag}`,
+      name_cn: `桅身前后阵外框 ${tag}`,
+      name_en: `mast front/aft array frame ${tag}`,
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(
+        B(2.72, 0.1, 0.12, [0, 1.22, 0], 0.004),
+        B(2.72, 0.1, 0.12, [0, -1.22, 0], 0.004),
+        B(0.1, 2.52, 0.12, [1.32, 0, 0], 0.004),
+        B(0.1, 2.52, 0.12, [-1.32, 0, 0], 0.004),
+      ),
+      material: "cv_steel_dark",
+      mate: A([0, 31.5, z]),
+    });
+  }
+  // 桅顶平台栏杆：环绕平台边缘的立柱 + 上下两道横杆，不再是 4 根孤立立柱。
+  {
+    const railing: Array<Parameters<typeof M>[0]> = [];
+    for (const [x, z] of [
+      [-2.95, -2.3],
+      [0, -2.3],
+      [2.95, -2.3],
+      [-2.95, 0],
+      [2.95, 0],
+      [-2.95, 2.3],
+      [0, 2.3],
+      [2.95, 2.3],
+    ] as const) {
+      railing.push(C(0.03, 0.95, [x, 0.475, z], 6));
+    }
+    for (const y of [0.9, 0.45]) {
+      railing.push(
+        { type: "weld", from: [-2.95, y, -2.3], to: [2.95, y, -2.3], radius: 0.028 },
+        { type: "weld", from: [-2.95, y, 2.3], to: [2.95, y, 2.3], radius: 0.028 },
+        { type: "weld", from: [-2.95, y, -2.3], to: [-2.95, y, 2.3], radius: 0.028 },
+        { type: "weld", from: [2.95, y, -2.3], to: [2.95, y, 2.3], radius: 0.028 },
+      );
+    }
+    add({
+      id: `${P}radar.mast_railing`,
+      name_cn: "桅顶平台栏杆",
+      name_en: "mast top platform railing",
+      assembly: "radar",
+      build_layer: 4,
+      geometry: M(...railing),
+      material: "cv_steel_dark",
+      mate: A([0, 40.31, 20]),
+    });
+  }
+  // 桅顶收口：八棱台之上接一段细圆柱/锥台，顶部再架导航雷达；
+  // 真实 055 的桅顶是收窄的圆润柱体，不是一个 6×5m 的大桌面。
+  add({
+    id: `${P}radar.mast_crown`,
+    name_cn: "综合桅杆顶部收口",
+    name_en: "integrated mast crown",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(
+      T(1.08, 0.98, 0.12, [0, 0.06, 0], 20),
+      C(0.98, 1.5, [0, 0.87, 0], 20, 0.72),
+      C(0.72, 0.3, [0, 1.77, 0], 20, 0.55),
+      T(0.45, 0.28, 0.08, [0, 1.96, 0], 20),
+    ),
+    material: "cv_055_mast",
+    mate: A([0, 40.15, 20]),
+  });
+  add({
+    id: `${P}radar.mast_crown_band`,
+    name_cn: "桅顶收口暗色环",
+    name_en: "mast crown dark band",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(T(1.0, 0.94, 0.1, [0, 0, 0], 20)),
+    material: "cv_radar_dark",
+    mate: A([0, 40.95, 20]),
+  });
+  add({
+    id: `${P}radar.nav_pedestal`,
+    name_cn: "导航雷达基座",
+    name_en: "navigation radar pedestal",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(C(0.3, 0.22, [0, 0, 0], 12), T(0.38, 0.3, 0.06, [0, -0.08, 0], 14)),
+    material: "cv_steel_dark",
+    mate: A([0, 42.11, 20]),
+  });
+  // 中央旗杆：真实 055 桅顶有一根很高的旗杆，和导航雷达分开。
+  add({
+    id: `${P}radar.mast_flagpole`,
+    name_cn: "桅顶旗杆",
+    name_en: "mast flagpole",
+    assembly: "radar",
+    build_layer: 4,
+    geometry: M(
+      C(0.06, 7.4, [0, 3.75, 0], 10),
+      C(0.12, 0.12, [0, 7.48, 0], 10),
+      B(1.0, 0.05, 0.05, [0, 6.7, 0], 0.002),
+    ),
+    material: "cv_steel",
+    mate: A([0, 40.15, 22.1]),
+  });
+  add({
+    id: `${P}radar.mast_flag`,
+    name_cn: "桅顶国旗",
+    name_en: "mast ensign",
+    assembly: "radar",
+    build_layer: 5,
+    geometry: M(B(1.25, 0.02, 0.8, [0.68, 0, 0], 0.002)),
+    material: "cv_deck_red",
+    mate: A([0, 46.35, 22.1]),
+  });
 
   // 桅顶/桥楼电子设备补充：卫通副罩、设备柜、横桁天线、告警/数据链阵面
   for (const side of [-1, 1] as const) {
@@ -1449,16 +1804,18 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
       });
     }
   }
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 4; i++) {
     const side = i % 2 === 0 ? -1 : 1;
-    const z = i < 4 ? 17.8 : 22.2;
+    const z = i < 2 ? 17.8 : 22.2;
     add({
       id: `${P}radar.mast_conduit_${i + 1}`,
       name_cn: `桅顶波导管 ${i + 1}`,
       name_en: `mast waveguide conduit ${i + 1}`,
       assembly: "radar",
       build_layer: 4,
-      geometry: M({ type: "weld", from: [side * 2.5, 40.05, z], to: [side * 2.5, 38.85, z], radius: 0.04 }),
+      // 旧版 8 根里有 4 对完全重合，且顶端停在桅顶平台下方 0.1m，切角桅杆后成了浮空孤岛。
+      // 现在只保留 4 个真实象限，顶端正插进平台底面。
+      geometry: M({ type: "weld", from: [side * 2.5, 40.28, z], to: [side * 2.5, 38.85, z], radius: 0.04 }),
       material: "cv_copper",
       mate: A([0, 0, 0]),
     });
@@ -6269,6 +6626,7 @@ export const TYPE055_BUILDERS = {
   type055DeckUnderside,
   type055DeckWalkLines,
   type055Frustum,
+  type055ChamferFrustum,
   type055AesaPanel,
   type055Propeller,
   type055Rhib,

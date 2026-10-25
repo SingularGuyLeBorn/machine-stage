@@ -70,12 +70,14 @@ const MARKER_COLOR: Record<string, string> = {
   jbd: "#ffa94d",
   mount: "#d58bff",
   dismount: "#a9b7c6",
+  cockpit: "#7dffbe",
 };
 
 export function WalkMinimap() {
   const modelId = useStageStore((state) => state.modelId);
   const areaId = useStageStore((state) => state.walkArea);
   const pose = useStageStore((state) => state.walkPose);
+  const cockpit = useStageStore((state) => state.cockpit);
   const config = walkConfigOf(modelId);
   const area = config?.areas[areaId];
 
@@ -241,6 +243,37 @@ export function WalkMinimap() {
           );
         })}
 
+        {cockpit?.active ? (
+          <g>
+            <line
+              x1={px}
+              y1={py}
+              x2={cockpit.target[0]}
+              y2={-cockpit.target[1]}
+              stroke={cockpit.aligned ? "rgba(125,255,190,0.85)" : "rgba(255,213,122,0.72)"}
+              strokeWidth={span * 0.006}
+              strokeDasharray={`${span * 0.02} ${span * 0.016}`}
+            />
+            <circle
+              cx={cockpit.target[0]}
+              cy={-cockpit.target[1]}
+              r={markerR * (cockpit.aligned ? 2.2 : 1.8)}
+              fill={cockpit.aligned ? "rgba(125,255,190,0.28)" : "rgba(255,213,122,0.18)"}
+              stroke={cockpit.aligned ? "#7dffbe" : "#ffd57a"}
+              strokeWidth={span * 0.006}
+            />
+            <circle cx={cockpit.target[0]} cy={-cockpit.target[1]} r={markerR * 0.45} fill={cockpit.aligned ? "#7dffbe" : "#ffd57a"} />
+            <text
+              x={cockpit.target[0]}
+              y={-cockpit.target[1] - markerR * 2.4}
+              fill="rgba(228,255,242,0.9)"
+              fontSize={font * 0.78}
+              textAnchor="middle"
+            >
+              2 号弹射位
+            </text>
+          </g>
+        ) : null}
         <g transform={`translate(${px} ${py}) rotate(${headingDeg})`}>
           <circle r={playerR} fill="rgba(16,30,40,0.85)" stroke="rgba(255,255,255,0.9)" strokeWidth={span * 0.004} />
           <path d={`M 0 ${-arrow} L ${arrow * 0.62} ${arrow * 0.55} L 0 ${arrow * 0.24} L ${-arrow * 0.62} ${arrow * 0.55} Z`} fill="#7fe7ff" stroke="rgba(6,18,26,0.8)" strokeWidth={span * 0.003} />
@@ -250,7 +283,7 @@ export function WalkMinimap() {
         <span>
           x {pose.x.toFixed(1)} · z {pose.z.toFixed(1)}
         </span>
-        <span>{interactions.length} 个交互点</span>
+        <span>{cockpit?.active ? (cockpit.aligned ? "已对准弹射位" : `距滑梭 ${cockpit.distance.toFixed(1)}`) : `${interactions.length} 个交互点`}</span>
       </div>
     </div>
   );

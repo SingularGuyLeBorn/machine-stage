@@ -1,5 +1,6 @@
 import { CV } from "./constants";
 import { hullSurfaceHalfAt } from "./kits";
+import { carrierDeckExclusions, freeDeckColumns } from "./deckClearance";
 import { A, B, C, M, pad, T, type CarrierCtx } from "./common";
 
 // ============================================================================
@@ -512,10 +513,17 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
       build_layer: 3,
       geometry: M(B(0.3, 0.18, 0.26, [0, 0, 0], 0.006)),
       material: "cv_steel_dark",
-      mate: A([(b % 2 === 0 ? -1 : 1) * (CV.WIRE_HALF + 0.35), DECK_TOP + 0.1, CV.WIRE_Z[Math.floor(b / 4)]!]),
+      // 左舷滑轮座放在外飘甲板边缘；原先 x=-3.35 只剩 0.2 就压进着舰跑道。
+      mate: A([(b % 2 === 0 ? -1 : 1) * (b % 2 === 0 ? CV.WIRE_HALF_PORT - 0.1 : CV.WIRE_HALF + 0.35), DECK_TOP + 0.1, CV.WIRE_Z[Math.floor(b / 4)]!]),
     });
   }
+  // 30 个甲板系留环同样避开着舰/起飞跑道、舰岛和升降机；不能只按固定 x 网格铺。
+  const padeyeRows = [-14.5, -10, -5.5].map((z) =>
+    freeDeckColumns(z, 10, { margin: 0.14, exclude: carrierDeckExclusions() }),
+  );
   for (let p = 0; p < 30; p++) {
+    const row = Math.floor(p / 10);
+    const x = padeyeRows[row]?.[p % 10] ?? -3.5 + (p % 10) * 0.74;
     add({
       id: `carrier.deck.detail_padeye_${pad(p + 1)}`,
       name_cn: `甲板系留环 ${p + 1}`,
@@ -524,7 +532,7 @@ export function addCarrierDetails(ctx: CarrierCtx): void {
       build_layer: 4,
       geometry: M(T(0.07, 0.04, 0.02, [0, 0, 0], 12)),
       material: "cv_steel",
-      mate: A([-3.8 + (p % 10) * 0.84, DECK_TOP + 0.02, -14.5 + Math.floor(p / 10) * 4.5]),
+      mate: A([x, DECK_TOP + 0.02, -14.5 + row * 4.5]),
     });
   }
   for (let m = 0; m < 20; m++) {

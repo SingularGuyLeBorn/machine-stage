@@ -3,6 +3,7 @@ import {
   CloudRain,
   Crosshair,
   DoorOpen,
+  Droplets,
   Eye,
   Grid3x3,
   Layers,
@@ -25,6 +26,9 @@ import { CAMERA_MODE_LABELS, isCarrierInteriorMode } from "../three/viewpoints";
 import { walkConfigOf } from "../three/walk";
 import { WalkMinimap } from "./WalkMinimap";
 import { WalkTravelPanel } from "./WalkTravelPanel";
+import { TowerRadio } from "./TowerRadio";
+import { CockpitTacticalHud } from "./CockpitTacticalHud";
+import { CockpitControlsPanel } from "./CockpitControlsPanel";
 
 // ============================================================================
 // Viewport —— 中栏：3D 视口 + 视口工具条 + 穿模报告抽屉 + 隔离小视图 + 读数图例
@@ -66,6 +70,8 @@ export function Viewport() {
   const modelId = useStageStore((state) => state.modelId);
   const views = useStageStore((state) => state.views);
   const toggleView = useStageStore((state) => state.toggleView);
+  const setView = useStageStore((state) => state.setView);
+  const underwaterActive = useStageStore((state) => state.underwaterActive);
   const worn = useStageStore((state) => state.worn);
   const toggleWorn = useStageStore((state) => state.toggleWorn);
   const requestViewReset = useStageStore((state) => state.requestViewReset);
@@ -87,6 +93,12 @@ export function Viewport() {
   const walkPrompt = useStageStore((state) => state.walkPrompt);
   const walkLocked = useStageStore((state) => state.walkLocked);
   const walkFading = useStageStore((state) => state.walkFading);
+  const walkHover = useStageStore((state) => state.walkHover);
+  // 座舱状态每 80ms 更新；这里只订阅低频的开关/阶段/对准，避免整页跟着重渲染。
+  const cockpitActive = useStageStore((state) => Boolean(state.cockpit?.active));
+  const cockpitPhase = useStageStore((state) => state.cockpit?.phase ?? null);
+  const cockpitAligned = useStageStore((state) => state.cockpit?.aligned ?? false);
+  const requestWalkCockpitEntry = useStageStore((state) => state.requestWalkCockpitEntry);
   const model = findModel(modelId);
   const walkConfig = walkConfigOf(modelId);
   const walkAreaLabel = walkConfig?.areas[walkArea]?.label ?? "甲板";
@@ -116,45 +128,113 @@ export function Viewport() {
   const hoverLidOpen = hoverLid ? effectiveLidOpen(hoverLid, lidOverrides, machineState) : false;
 
   return (
-    <div className="viewport">
+    <div className={`viewport${cockpitActive ? " viewport--cockpit" : ""}`}>
       <div className={`viewport__canvas${views.thermal ? " viewport__canvas--thermal" : ""}`}>
         {/* 三维视口单独设边界：WebGL / 渲染层出问题时只有视口被替换，左右面板照常可用 */}
         <ErrorBoundary scope="三维视口">
           <StageCanvas />
         </ErrorBoundary>
+        <div className={`underwater-veil${underwaterActive ? " is-on" : ""}`} aria-hidden />
+        {underwaterActive ? <div className="underwater-badge">水下视角 · 拖动环视 · 滚轮升降</div> : null}
       </div>
 
       <ClippingDock />
       <IsolationView />
-      <PartInfoCard />
+      {!cockpitActive ? <PartInfoCard /> : null}
 
       {cameraMode === "walk" ? (
-        <div className="walk-hud">
-          <div className="walk-hud__crosshair" aria-hidden />
-          <div className="walk-hud__area">{walkAreaLabel} · 第一人称漫游</div>
-          <WalkMinimap />
-          <WalkTravelPanel />
-          {walkPrompt ? (
-            <div className="walk-hud__prompt" role="status">
-              <kbd>F</kbd>
-              <span>{walkPrompt}</span>
-            </div>
-          ) : null}
-          {!walkLocked ? <div className="walk-hud__lock">点击画面锁定鼠标环视</div> : null}
-          <div className="walk-hud__hints">
-            WASD 移动 · Shift 冲刺 · 空格跳 · F 交互 · Esc {walkLocked ? "释放鼠标" : "退出漫游"}
-          </div>
-          <button
-            type="button"
-            className="btn btn--sm walk-hud__exit"
-            onClick={() => {
-              if (document.pointerLockElement) document.exitPointerLock();
-              setCameraMode("orbit");
-            }}
-          >
-            退出漫游
-          </button>
-          <div className={`walk-fade${walkFading ? " is-on" : ""}`} aria-hidden />
+        <div className={`walk-hud${cockpitActive ? " walk-hud--cockpit" : ""}`}>
+          {cockpitActive ? (
+            <>
+              <div className="walk-hud__area">
+                舰载机座舱 · {cockpitPhase === "taxi" ? "滑行至 2 号弹射位" : cockpitPhase === "arming" ? "弹射准备" : cockpitPhase === "launch" ? "电磁弹射" : cockpitPhase === "airborne" ? "离舰爬升" : cockpitPhase === "combat" ? "武器试射" : "体验完成"}
+              </div>
+              <CockpitTacticalHud />
+              <CockpitControlsPanel />
+              {cockpitPhase === "taxi" || cockpitPhase === "arming" ? <WalkMinimap /> : null}
+              {!walkLocked ? <div className="walk-hud__lock">点击画面锁定鼠标 · 拖动/移动鼠标 360° 环视</div> : null}
+              <TowerRadio />
+              <div className="cockpit-rig" aria-hidden>
+                <div className="cockpit-visor" />
+                <div className="cockpit-glasses" />
+                <div className="cockpit-headset cockpit-headset--l"><span /></div>
+                <div className="cockpit-headset cockpit-headset--r"><span /></div>
+                <div className="cockpit-boom"><i /><b /></div>
+              </div>
+              {cockpitPhase === "taxi" ? (
+                cockpitAligned ? (
+                  <div className="walk-hud__prompt" role="status">
+                    <kbd>F</kbd>
+                    <span>报告塔台：准备就绪</span>
+                  </div>
+                ) : (
+                  <div className="walk-hud__prompt walk-hud__prompt--muted" role="status">
+                    <span>W/S 油门 · A/D 转向 · 对准滑梭后按 F 报告</span>
+                  </div>
+                )
+              ) : null}
+              <div className="walk-hud__hints">
+                {cockpitPhase === "combat"
+                  ? "H 操作面板 · R 锁定 · Space 发射 · 1/2 武器 · C 干扰 · P 自驾 · Esc 退出"
+                  : "H 操作面板 · W/S 油门 · A/D 转向 · F 报告 · Esc 退出"}
+              </div>
+              <button
+                type="button"
+                className="btn btn--sm walk-hud__exit"
+                onClick={() => {
+                  if (document.pointerLockElement) document.exitPointerLock();
+                  setCameraMode("orbit");
+                }}
+              >
+                退出漫游
+              </button>
+              <div className={`walk-fade${walkFading ? " is-on" : ""}`} aria-hidden />
+            </>
+          ) : (
+            <>
+              <div className="walk-hud__crosshair" aria-hidden />
+              <div className="walk-hud__area">{walkAreaLabel} · 第一人称漫游</div>
+              <WalkMinimap />
+              <WalkTravelPanel />
+              {modelId === "carrier" ? (
+                <button
+                  type="button"
+                  className="btn btn--sm walk-enter-aircraft"
+                  onClick={() => requestWalkCockpitEntry()}
+                >
+                  上飞机 · 舰载机座舱 <kbd>G</kbd>
+                </button>
+              ) : null}
+              {walkPrompt ? (
+                <div className="walk-hud__prompt" role="status">
+                  <kbd>F</kbd>
+                  <span>{walkPrompt}</span>
+                </div>
+              ) : null}
+              {walkHover ? (
+                <div className="walk-hud__hover" role="status">
+                  <kbd>E</kbd>
+                  <span>{walkHover.name}</span>
+                </div>
+              ) : null}
+              {!walkLocked ? <div className="walk-hud__lock">点击画面锁定鼠标环视</div> : null}
+              <div className="walk-hud__hints">
+                WASD 移动 · Shift 冲刺 · 空格跳 · F 交互 · E 查看
+                {modelId === "carrier" ? " · G 上飞机" : ""} · Esc {walkLocked ? "释放鼠标" : "退出漫游"}
+              </div>
+              <button
+                type="button"
+                className="btn btn--sm walk-hud__exit"
+                onClick={() => {
+                  if (document.pointerLockElement) document.exitPointerLock();
+                  setCameraMode("orbit");
+                }}
+              >
+                退出漫游
+              </button>
+              <div className={`walk-fade${walkFading ? " is-on" : ""}`} aria-hidden />
+            </>
+          )}
         </div>
       ) : cameraMode !== "orbit" ? (
         isCarrierInteriorMode(cameraMode) || cameraMode === "flight" ? (
@@ -352,16 +432,38 @@ export function Viewport() {
             雨天
           </button>
           {model.id === "carrier" ? (
-            <button
-              type="button"
-              className="btn btn--sm"
-              aria-pressed={views.sea}
-              title="海面/艏浪/尾流开关；关闭后可把视角降到舰体下方做 360° 检查"
-              onClick={() => toggleView("sea")}
-            >
-              <Waves size={13} aria-hidden />
-              海面
-            </button>
+            <>
+              <button
+                type="button"
+                className="btn btn--sm"
+                aria-pressed={views.sea}
+                title="海面/艏浪/尾流开关；关闭后可把视角降到舰体下方做 360° 检查"
+                onClick={() => {
+                  if (views.sea) setView("underwater", false);
+                  toggleView("sea");
+                }}
+              >
+                <Waves size={13} aria-hidden />
+                海面
+              </button>
+              <button
+                type="button"
+                className="btn btn--sm"
+                aria-pressed={views.underwater}
+                title="水下视角：镜头下潜到水面以下，从舰底仰视舰体与螺旋桨；漫游中点击会先退出漫游"
+                onClick={() => {
+                  if (!views.underwater && !views.sea) setView("sea", true);
+                  toggleView("underwater");
+                  if (cameraMode !== "orbit") {
+                    if (document.pointerLockElement) document.exitPointerLock();
+                    setCameraMode("orbit");
+                  }
+                }}
+              >
+                <Droplets size={13} aria-hidden />
+                水下
+              </button>
+            </>
           ) : null}
           <button
             type="button"

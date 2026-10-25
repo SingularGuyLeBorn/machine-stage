@@ -902,17 +902,50 @@ function makeMfdTexture(page: number) {
     ctx.fill();
     ctx.fillText("WPT 3", 120, 150);
   } else {
-    // 武器页：挂架状态与弹药余量。
+    // 火控雷达页：PPI 扫描环、十字线、航迹点和扫描扇区，给座舱一个实体雷达屏。
     ctx.strokeRect(6, 6, 244, 188);
-    ctx.fillText("STORE", 16, 30);
-    for (let row = 0; row < 4; row += 1) {
-      ctx.strokeRect(16, 42 + row * 34, 150, 26);
-      ctx.fillText(row % 2 === 0 ? "PL-15 x2" : "PL-10 x2", 24, 60 + row * 34);
-      ctx.fillStyle = "#0a2a1a";
-      ctx.fillRect(176, 42 + row * 34, 60, 26);
-      ctx.fillStyle = "#38ff9a";
-      ctx.fillText("RDY", 188, 60 + row * 34);
+    ctx.fillText("RDR 80", 14, 24);
+    ctx.fillText("RWS", 206, 24);
+    ctx.save();
+    ctx.translate(128, 108);
+    ctx.globalAlpha = 0.8;
+    for (const radius of [28, 58, 88]) {
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.stroke();
     }
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    ctx.moveTo(-92, 0);
+    ctx.lineTo(92, 0);
+    ctx.moveTo(0, -92);
+    ctx.lineTo(0, 92);
+    ctx.stroke();
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-38, -82);
+    ctx.lineTo(38, -82);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(56,255,154,0.10)";
+    ctx.fill();
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    // 航迹点/锁定框。
+    for (const [x, y, lock] of [[-46, -48, false], [33, -62, true], [62, 20, false]] as const) {
+      if (lock) {
+        ctx.strokeRect(x - 6, y - 6, 12, 12);
+      } else {
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+    ctx.globalAlpha = 0.7;
+    ctx.fillText("3 CONTACT", 14, 184);
+    ctx.fillText("STT", 214, 184);
+    ctx.globalAlpha = 1;
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -3546,8 +3579,11 @@ export function buildJ20(): CodeCharacter {
 
   // 仪表台 + 三块多功能显示器（canvas 屏幕）
   const panelGroup = new THREE.Group();
-  panelGroup.position.set(0, 2.54, 4.36);
-  panelGroup.rotation.x = -1.05;
+  panelGroup.name = "CockpitPanel";
+  // 面板朝向第一人称眼位（pilotStation 3.16m），而不是朝下/朝机头：
+  // 原 -1.05 的倾角在座舱视角里只能看到面板背面，MFD 全被盖住。
+  panelGroup.position.set(0, 2.72, 4.22);
+  panelGroup.rotation.x = -0.55;
   cockpit.add(panelGroup);
   const panelBox = new THREE.Mesh(
     new THREE.BoxGeometry(1.02, 0.56, 0.07),
@@ -3638,11 +3674,12 @@ export function buildJ20(): CodeCharacter {
   hudGroup.add(projectorLens);
   // 仪表台遮光罩（防眩板内侧深色罩，宽度避开舱盖玻璃）
   const coaming = new THREE.Mesh(
-    bevelBoxGeometry(1.0, 0.06, 0.36, 0.012),
+    bevelBoxGeometry(0.98, 0.04, 0.26, 0.012),
     cockpitDark,
   );
-  coaming.position.set(0, 2.7, 4.24);
-  coaming.rotation.x = -0.42;
+  coaming.name = "Coaming";
+  coaming.position.set(0, 2.585, 4.17);
+  coaming.rotation.x = -0.28;
   cockpit.add(coaming);
 
   // 弹射座椅（头枕 / 靠背 / 座盆 / 侧轨 / 安全带 / 拉环）
@@ -3911,6 +3948,7 @@ export function buildJ20(): CodeCharacter {
     canopyGeometry.setIndex(indices);
     canopyGeometry.computeVertexNormals();
     const canopyGlass = new THREE.Mesh(canopyGeometry, glass);
+    canopyGlass.name = "CanopyGlass";
     canopyHinge.add(canopyGlass);
     // 风挡前框与后框（沿玻璃截面采样成管，贴合座舱盖曲面）
     const archCurve = (

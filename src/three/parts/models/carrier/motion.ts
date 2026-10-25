@@ -204,6 +204,18 @@ export interface CarrierWalkOverlay {
   barrier: number;
   /** 漫游新增水密门：节点名 → 0 关闭 / 1 全开。 */
   walkDoors: Map<string, number>;
+  /** 座舱弹射体验：玩家驾驶的舰载机绝对位姿；null = 状态机继续控制飞机。 */
+  aircraft: {
+    x: number;
+    y: number;
+    z: number;
+    yaw: number;
+    pitch: number;
+    roll: number;
+    wingFold: number;
+    hook: number;
+    shuttleZ: number;
+  } | null;
 }
 
 const walkOverlays = new WeakMap<AssembledModel, CarrierWalkOverlay>();
@@ -211,7 +223,7 @@ const walkOverlays = new WeakMap<AssembledModel, CarrierWalkOverlay>();
 export function carrierWalkOverlay(assembled: AssembledModel): CarrierWalkOverlay {
   let overlay = walkOverlays.get(assembled);
   if (!overlay) {
-    overlay = { doors: new Map(), jbd: new Map(), barrier: 0, walkDoors: new Map() };
+    overlay = { doors: new Map(), jbd: new Map(), barrier: 0, walkDoors: new Map(), aircraft: null };
     walkOverlays.set(assembled, overlay);
   }
   return overlay;
@@ -247,6 +259,13 @@ function applyWalkOverlay(assembled: AssembledModel): void {
     for (const [name, open] of overlay.walkDoors) {
       const door = assembled.getNode(name);
       if (door) door.rotation.y = -1.8326 * open;
+    }
+    if (overlay.aircraft) {
+      const pilot = overlay.aircraft;
+      setAircraftPose(assembled, new THREE.Vector3(pilot.x, pilot.y, pilot.z), pilot.pitch, pilot.yaw, pilot.roll);
+      setWings(assembled, pilot.wingFold);
+      setHook(assembled, pilot.hook);
+      setShuttle(assembled, pilot.shuttleZ);
     }
   }
 }

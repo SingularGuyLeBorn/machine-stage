@@ -12,7 +12,8 @@ const DECK = CV.DECK_Y + CV.DECK_T;
 
 export function addScaleFigure(ctx: CarrierCtx): void {
   const P = "carrier.surface.scale_figure_";
-  const x = 0.4;
+  // 站在右舷起飞位外侧：弹射器 2 改到中线后，x=0.4 正好压进弹射滑跑线。
+  const x = 3.0;
   const z = 12.0;
   const add = (
     id: string,
