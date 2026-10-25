@@ -235,6 +235,23 @@ describe("stageStore 参数与扫描", () => {
 describe("stageStore 视图 / 状态机 / 聚焦", () => {
   beforeEach(resetStore);
 
+  it("切换模型与清除旧装配是同一次状态更新，读数不会读取别的模型", () => {
+    const old = buildTestModel();
+    useStageStore.setState({ assembled: old, stats: { parts: 3, triangles: 100 } });
+    const observed: Array<{ id: string; hasModel: boolean }> = [];
+    const unsubscribe = useStageStore.subscribe((state) =>
+      observed.push({ id: state.modelId, hasModel: state.assembled !== null }),
+    );
+    try {
+      useStageStore.getState().setModel("hmt");
+      expect(observed).toEqual([{ id: "hmt", hasModel: false }]);
+      expect(useStageStore.getState().stats).toBeNull();
+    } finally {
+      unsubscribe();
+      old.dispose();
+    }
+  });
+
   it("toggleView 与 setView", () => {
     useStageStore.getState().toggleView("explode");
     expect(useStageStore.getState().views.explode).toBe(true);

@@ -28,3 +28,7 @@ qa-out/
 
 # carrier QA generated dump
 docs/qa/carrier-static-report.json
+
+scripts/__pycache__/
+# 可从真实生成源重建的高密度发布二进制；本地 qa-out 保存确认版回退。
+public/models/hmt/

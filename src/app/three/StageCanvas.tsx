@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber"
 import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { acceleratedRaycast } from "three-mesh-bvh";
 import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
 import {
   buildModel,
@@ -78,12 +79,13 @@ interface CachedBuild {
 
 export function StageCanvas() {
   const heavy = useStageStore((state) => state.modelId === "carrier");
+  const hmt = useStageStore((state) => state.modelId === "hmt");
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <Canvas
         shadows
         dpr={heavy ? [0.9, 1.1] : [1, 1.5]}
-        camera={{ position: [4.6, 3.4, 5.2], fov: 34, near: 0.05, far: 4000 }}
+        camera={{ position: [4.6, 3.4, 5.2], fov: 34, near: 0.05, far: hmt ? 200 : 4000 }}
         gl={{
           antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
@@ -95,7 +97,7 @@ export function StageCanvas() {
           gl.toneMappingExposure = 0.9;
         }}
       >
-        <color attach="background" args={["#e9ecf0"]} />
+        <color attach="background" args={[hmt ? "#292b2e" : "#e9ecf0"]} />
         <Suspense fallback={null}>
           <Studio />
         </Suspense>
@@ -312,6 +314,8 @@ function CommandCabinShowcaseLight() {
 }
 
 function Studio() {
+  const hmt = useStageStore((state) => state.modelId === "hmt");
+  if (hmt) return <HmtStudio />;
   return (
     <>
       <ambientLight intensity={0.12} />
@@ -344,6 +348,50 @@ function Studio() {
         environmentRotation={[0, 0.42, 0]}
       />
       <SceneEnvIntensity value={1.1} />
+    </>
+  );
+}
+
+/** 深灰参考的长条高光来自面积光源；用侧向柔光塑造金属壳的曲率。 */
+function HmtStudio() {
+  const scene = useThree((state) => state.scene);
+  useEffect(() => {
+    RectAreaLightUniformsLib.init();
+    const configs: Array<[number, number, number, [number, number, number]]> = [
+      [3, 1.4, 3.8, [-2.2, 3, 2.5]],
+      [1.5, 0.55, 3.3, [2.4, 2.3, 0.7]],
+      [3.2, 2.4, 0.65, [0, 3.6, -1.3]],
+    ];
+    const lights = configs.map(([intensity, width, height, position]) => {
+      const light = new THREE.RectAreaLight(0xf0f3f7, intensity, width, height);
+      light.position.set(...position);
+      light.lookAt(0, 1.3, 0);
+      scene.add(light);
+      return light;
+    });
+    return () =>
+      lights.forEach((light) => {
+        scene.remove(light);
+        light.dispose();
+      });
+  }, [scene]);
+  return (
+    <>
+      <ambientLight intensity={0.035} />
+      <directionalLight
+        position={[-3, 5, 4]}
+        intensity={1.1}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0001}
+      />
+      <Environment
+        files="/hdr/studio_small_08_1k.hdr"
+        background={false}
+        environmentIntensity={0.55}
+        environmentRotation={[0, 1.4, 0]}
+      />
+      <SceneEnvIntensity value={0.55} />
     </>
   );
 }
@@ -434,6 +482,37 @@ function StageRuntime() {
     Array<{ id: string; name: string; position: [number, number, number] }>
   >([]);
   const [buildError, setBuildError] = useState<string | null>(null);
+  const [assets, setAssets] = useState<{
+    id: string;
+    ready: boolean;
+    progress: number;
+    error?: string;
+  } | null>(null);
+  useEffect(() => {
+    const model = findModel(modelId);
+    if (!model.prepare) return;
+    const controller = new AbortController();
+    setScene(null);
+    setAssets({ id: modelId, ready: false, progress: 0 });
+    model
+      .prepare(controller.signal, (progress) => {
+        if (!controller.signal.aborted) setAssets({ id: modelId, ready: false, progress });
+      })
+      .then(() => {
+        if (!controller.signal.aborted) setAssets({ id: modelId, ready: true, progress: 1 });
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted)
+          setAssets({
+            id: modelId,
+            ready: false,
+            progress: 0,
+            error: error instanceof Error ? error.message : String(error),
+          });
+      });
+    return () => controller.abort();
+  }, [modelId]);
+  const assetsReady = !findModel(modelId).prepare || (assets?.id === modelId && assets.ready);
   // 模型「地面」：包围盒底 + 水平footprint（接触阴影与网格都锚在这里，避免
   // 阴影板切在机体中间、网格从模型腰部穿出）。
   const [stageFloor, setStageFloor] = useState<{ y: number; footprint: number } | null>(null);
@@ -441,6 +520,7 @@ function StageRuntime() {
   const clockRef = useRef(0);
   const realTimeRef = useRef(0);
   const lastStateRef = useRef<string | null>(null);
+  const staticPoseRef = useRef<{ assembled: AssembledModel; explode: boolean } | null>(null);
   const cacheRef = useRef(new Map<string, CachedBuild>());
   const currentKeyRef = useRef<string | null>(null);
   const assembled = scene?.assembled ?? null;
@@ -449,6 +529,7 @@ function StageRuntime() {
   const variantId = useStageStore((state) => state.variantId);
   useEffect(() => {
     const model = findModel(modelId);
+    if (!assetsReady) return;
     // 变体优先：有 variants 时用选中的那个（原型 / 机械拆解版）
     const variant = model.variants?.find((item) => item.id === variantId) ?? model.variants?.[0];
     const source = variant?.registry ?? model.registry;
@@ -480,12 +561,18 @@ function StageRuntime() {
           finish();
           return;
         }
-        // compileAsync 会一次性编译全部可见/隐藏材质；DOM 提示层先绘制，再开始编译。
-        void gl.compileAsync(rootScene, camera).catch(() => {}).finally(() => window.setTimeout(finish, 140));
+        // HMT 分支的修复：compileAsync 的延迟轮询会在材质释放后仍持有它；
+        // 这里只在本次空闲回调内同步编译，不跨材质生命周期。
+        gl.compile(rootScene, camera);
+        window.setTimeout(finish, 140);
       };
-      // 先让加载提示完成一帧绘制，再开始编译，避免低端 GPU 看起来像直接卡死。
-      window.setTimeout(warm, 80);
-      // 兜底：驱动异常/编译 Promise 不返回时不把提示层永久留在画面上。
+      // 先让加载提示完成一帧绘制，再在空闲段预热隐藏材质。
+      if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(warm, { timeout: 1500 });
+      } else {
+        window.setTimeout(warm, 160);
+      }
+      // 兜底：驱动异常/编译不返回时不把提示层永久留在画面上。
       window.setTimeout(finish, 12000);
     };
 
@@ -523,6 +610,7 @@ function StageRuntime() {
     };
 
     const cleanupFor = (target: AssembledModel) => () => {
+      staticPoseRef.current = null;
       store.detach();
       applyXray(target, false);
       clearPose(target);
@@ -595,11 +683,21 @@ function StageRuntime() {
           object.receiveShadow = true;
         }
       });
-      for (const handle of next.parts) {
-        if (handle.def.tags?.includes("internal")) continue;
-        if (!handle.geometry.boundingSphere) handle.geometry.computeBoundingSphere();
-        const radius = handle.geometry.boundingSphere?.radius ?? 0;
-        handle.object.castShadow = radius * worldScale > 0.8;
+      if (modelId === "hmt") {
+        // HMT 的分件需要真实投影与 BVH 加速拾取；万件舰船仍走下方的大件投影策略。
+        next.root.traverse((object) => {
+          if ((object as THREE.Mesh).isMesh) {
+            if ((object as THREE.Mesh).geometry.boundsTree) (object as THREE.Mesh).raycast = acceleratedRaycast;
+            object.castShadow = true;
+          }
+        });
+      } else {
+        for (const handle of next.parts) {
+          if (handle.def.tags?.includes("internal")) continue;
+          if (!handle.geometry.boundingSphere) handle.geometry.computeBoundingSphere();
+          const radius = handle.geometry.boundingSphere?.radius ?? 0;
+          handle.object.castShadow = radius * worldScale > 0.8;
+        }
       }
       // 特效件（tags: fx）默认不可见，由动画在需要时切 visible；否则首帧会先闪一下。
       // 海面/尾流同用 fx 标签（不参与结构检测、不撑大取景），但需要常显。
@@ -678,7 +776,7 @@ function StageRuntime() {
     }
     const built = runBuild();
     return built ? cleanupFor(built) : undefined;
-  }, [modelId, variantId, rebuildToken, overrides, damageSeed, worn, gl, rootScene, camera]);
+  }, [modelId, variantId, rebuildToken, overrides, damageSeed, worn, gl, rootScene, camera, assetsReady]);
 
   // 组件卸载时释放所有缓存模型；模型切换时只是缓存/复用，不立即销毁。
   useEffect(() => {
@@ -746,6 +844,20 @@ function StageRuntime() {
     const store = useStageStore.getState();
     const model = findModel(assembled.registry.model);
     const state = store.machineState;
+    // HMT 是静态分件模型；只在装配或拆解状态变化时写矩阵，旋转相机不重写整机。
+    if (model.id === "hmt") {
+      const previous = staticPoseRef.current;
+      if (previous?.assembled !== assembled || previous.explode !== store.views.explode) {
+        assembled.resetNodes();
+        assembled.syncInstances();
+        applyExplode(assembled, store.views.explode ? 1 : 0);
+        assembled.root.updateMatrixWorld(true);
+        staticPoseRef.current = { assembled, explode: store.views.explode };
+      }
+      setArmourWet(store.views.rain);
+      localXrayRef.current?.update(camera, gl);
+      return;
+    }
     // King Joe 等多形态模型用 animatedStates 显式声明时钟推进状态；
     // 其余模型沿用主线的规则：除 idle/scanning 外都推进（悬挂/击发/受损等）。
     const running = model.animatedStates
@@ -1007,8 +1119,8 @@ function StageRuntime() {
     RectAreaLightUniformsLib.init();
     const light = new THREE.RectAreaLight(0xeef3ff, 1.05, 0.34, 0.14);
     light.name = "ak-inspection-light";
-    light.position.set(0.16, 0.30, -0.07);
-    light.lookAt(0, 0.30, -0.07);
+    light.position.set(0.16, 0.3, -0.07);
+    light.lookAt(0, 0.3, -0.07);
     three.scene.add(light);
     return () => {
       three.scene.remove(light);
@@ -1016,6 +1128,15 @@ function StageRuntime() {
     };
   }, [modelId, three.scene]);
 
+  if (!assetsReady)
+    return (
+      <Html center>
+        <div className="scene-error" role="status">
+          <strong>{assets?.error ? "模型加载失败" : "正在加载完整模型"}</strong>
+          <p>{assets?.error ?? `${Math.round((assets?.progress ?? 0) * 100)}%`}</p>
+        </div>
+      </Html>
+    );
   if (!assembled && !buildError) return null;
 
   // 网格随模型尺度（航母 316m / 坦克 8m）调整，避免大舰下网格细得看不见。
@@ -1225,6 +1346,7 @@ function CameraRig() {
     | null
     | undefined;
   const focus = useStageStore((state) => state.focus);
+  const currentModel = useStageStore((state) => state.modelId);
   const cameraMode = useStageStore((state) => state.cameraMode);
   const setCameraMode = useStageStore((state) => state.setCameraMode);
   const machineState = useStageStore((state) => state.machineState);
@@ -1358,7 +1480,9 @@ function CameraRig() {
     const target = new THREE.Vector3(focus.center[0], focus.center[1], focus.center[2]);
     const currentTarget = controls.target.clone();
     const direction = focus.resetAngle
-      ? HOME_DIRECTION.clone()
+      ? currentModel === "hmt"
+        ? new THREE.Vector3(-0.98, 0.24, 1.5).normalize()
+        : HOME_DIRECTION.clone()
       : new THREE.Vector3().subVectors(camera.position, currentTarget);
     if (direction.lengthSq() < 1e-8) direction.copy(HOME_DIRECTION);
     direction.normalize();
@@ -1400,7 +1524,7 @@ function CameraRig() {
       duration: 0.55,
       elapsed: 0,
     };
-  }, [focus, camera, controls, cameraMode]);
+  }, [focus, camera, controls, cameraMode, currentModel]);
 
   useFrame((_state, delta) => {
     // —— 跟拍舰载机：以 CV_Aircraft 节点位姿为基准，完整覆盖弹射/拦阻闭环 ——
