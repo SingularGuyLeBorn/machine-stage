@@ -48,7 +48,6 @@ const resetStore = () => {
       shadow: true,
       rain: false,
       thermal: false,
-      underwater: false,
       sea: true,
     },
     layout: {

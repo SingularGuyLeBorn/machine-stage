@@ -104,6 +104,7 @@ function StageCanvasImpl() {
         </Suspense>
         <StageFog />
         <StageRuntime />
+        <CarrierSailController />
         <CarrierWalkLod />
         <TigerVfx />
         <MbtVfx />
@@ -114,7 +115,7 @@ function StageCanvasImpl() {
         <CameraRig />
         <WalkGate />
         <CarrierCameraFloor />
-        <CarrierUnderwaterView />
+        <ShipHullCameraGuard />
         <UnderwaterBackground />
         {!qaNoFx && <StageEffects />}
       </Canvas>
@@ -651,12 +652,20 @@ function TopFill() {
   return null;
 }
 
-/** 航母海面铺到千米级，远处用与背景同色的大气雾把海面矩形边缘化开，形成海天线。 */
+/** 航母/055 海面铺到千米级，远处用与背景同色的大气雾把海面矩形边缘化开，形成海天线；
+ *  相机入水后切换成深水雾，让舰体/海床按距离沉进水体，避免水下像贴图。 */
 function StageFog() {
   const scene = useThree((state) => state.scene);
   const modelId = useStageStore((state) => state.modelId);
+  const underwater = useStageStore((state) => state.underwaterActive);
   useEffect(() => {
-    if (modelId !== "carrier") {
+    if (underwater) {
+      scene.fog = new THREE.FogExp2("#0a3340", 0.017);
+      return () => {
+        scene.fog = null;
+      };
+    }
+    if (modelId !== "carrier" && modelId !== "type055") {
       scene.fog = null;
       return;
     }
@@ -664,7 +673,7 @@ function StageFog() {
     return () => {
       scene.fog = null;
     };
-  }, [scene, modelId]);
+  }, [scene, modelId, underwater]);
   return null;
 }
 
@@ -679,14 +688,13 @@ function SceneEnvIntensity({ value }: { value: number }) {
 
 function StageEffects() {
   const xray = useStageStore((state) => state.views.xray);
-  // 透视/局部透视时物体大量重叠，AO/Bloom 意义不大且会放大混合开销；
-  // 航母是万件、500 万三角面：EffectComposer 的场景 Pass 在本机会输出黑帧，
-  // 直接走默认帧缓冲，同时省掉 Bloom/Vignette 的全屏开销。
+  // 透视/局部透视时物体大量重叠，Bloom 意义不大且会放大混合开销。
+  // 万件级舰船统一用 8-bit、无 MSAA 的低开销后处理：HalfFloat + 4xMSAA 的
+  // 场景 Pass 在本机会输出黑帧，这条路径同时避开显存峰值。
   const localXray = useStageStore((state) => state.views.localXray);
-  const heavy = useStageStore((state) => state.modelId === "carrier");
-  if (xray || localXray || heavy) return null;
+  if (xray || localXray) return null;
   return (
-    <EffectComposer multisampling={4}>
+    <EffectComposer multisampling={0} frameBufferType={THREE.UnsignedByteType}>
       <Bloom luminanceThreshold={0.95} luminanceSmoothing={0.25} intensity={0.3} mipmapBlur />
       <Vignette offset={0.32} darkness={0.28} />
     </EffectComposer>
@@ -1399,7 +1407,7 @@ function StageRuntime() {
         />
       ) : null}
       <Weather assembled={assembled} />
-      {modelId === "carrier" ? <CarrierOcean /> : null}
+      {modelId === "carrier" || modelId === "type055" ? <CarrierOcean /> : null}
       {assembled ? (
         <AssembledObject
           key={`assembled:${scene?.seq ?? 0}`}
@@ -1535,20 +1543,101 @@ function ContactShadow({ y, scale }: { y: number; scale: number }) {
 }
 
 /** 航母外部视角护栏：防止拖动/平移把相机压到海面下或舰体内部造成黑屏。 */
-function CarrierCameraFloor() {
+/** 航母航行：只平移舰体根节点；驾驶台座椅/舰载机/尾流都随根节点走。
+ *  相机留在世界坐标，所以能看到舰体从眼前驶过；螺旋桨同步转动。 */
+function CarrierSailController() {
+  const modelId = useStageStore((state) => state.modelId);
+  const assembled = useStageStore((state) => state.assembled);
+  const sail = useStageStore((state) => state.carrierSail);
+  const propClock = useRef(0);
+  const reportedZ = useRef(0);
+  const previousSail = useRef(sail);
+  useEffect(() => {
+    reportedZ.current = assembled?.root.position.z ?? 0;
+    previousSail.current = useStageStore.getState().carrierSail;
+  }, [assembled]);
+  useEffect(() => {
+    if (sail === 0 && previousSail.current !== 0 && assembled) {
+      const home = useStageStore.getState().home;
+      if (home) {
+        const dz = assembled.root.position.z - reportedZ.current;
+        useStageStore.getState().setHome([home.center[0], home.center[1], home.center[2] + dz], home.radius);
+        reportedZ.current = assembled.root.position.z;
+      }
+    }
+    previousSail.current = sail;
+  }, [sail, assembled]);
+  useFrame((_, delta) => {
+    if (modelId !== "carrier" || !assembled || sail === 0) return;
+    const dt = Math.min(delta, 0.05);
+    assembled.root.position.z += (sail > 0 ? 8 : -4) * dt;
+    propClock.current += dt * (sail > 0 ? 24 : -18);
+    for (const tag of ["l", "r"] as const) {
+      const prop = assembled.getNode(`CV_Prop_${tag}`);
+      if (prop) prop.rotation.z = propClock.current;
+    }
+  });
+  return null;
+}
+
+/** 海面开启时的舰体相机保护：自由视角不允许停在舰体内部。
+ *  否则拖进船壳会看到空舱/轴隧，看不到海；要检查内部请走舰内视角或关掉海面。 */
+function ShipHullCameraGuard() {
   const modelId = useStageStore((state) => state.modelId);
   const cameraMode = useStageStore((state) => state.cameraMode);
-  const camera = useThree((state) => state.camera);
   const seaOn = useStageStore((state) => state.views.sea);
-  const underwater = useStageStore((state) => state.views.underwater);
+  const assembled = useStageStore((state) => state.assembled);
+  const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls) as
     | { target: THREE.Vector3; update: () => void }
     | null;
   useFrame(() => {
-    if (modelId !== "carrier" || cameraMode !== "orbit" || !controls) return;
+    if (!seaOn || cameraMode !== "orbit" || !assembled || !controls) return;
+    if (modelId !== "carrier" && modelId !== "type055") return;
+    assembled.root.updateWorldMatrix(true, false);
+    const inverse = assembled.root.matrixWorld.clone().invert();
+    const p = camera.position.clone().applyMatrix4(inverse);
+    const box =
+      modelId === "carrier"
+        ? { hx: 4.9, y0: 0.05, y1: 4.6, z0: -20.2, z1: 20.8 }
+        : { hx: 10.2, y0: 0.3, y1: 14.2, z0: -90.5, z1: 90.5 };
+    if (Math.abs(p.x) > box.hx || p.y < box.y0 || p.y > box.y1 || p.z < box.z0 || p.z > box.z1) return;
+    const distances = [box.hx - p.x, p.x + box.hx, box.y1 - p.y, p.y - box.y0, box.z1 - p.z, p.z - box.z0];
+    // 不往甲板上方推：优先落到舷外或水下，让用户看到舰体/海面而不是空舱顶。
+    distances[2] = Number.POSITIVE_INFINITY;
+    let face = 0;
+    for (let i = 1; i < distances.length; i++) if (distances[i]! < distances[face]!) face = i;
+    const push = (v: THREE.Vector3) => {
+      if (face === 0) v.x = box.hx + 1.6;
+      else if (face === 1) v.x = -box.hx - 1.6;
+      else if (face === 2) v.y = box.y1 + 1.6;
+      else if (face === 3) v.y = box.y0 - 1.6;
+      else if (face === 4) v.z = box.z1 + 1.6;
+      else v.z = box.z0 - 1.6;
+    };
+    push(p);
+    camera.position.copy(p.applyMatrix4(assembled.root.matrixWorld));
+    const t = controls.target.clone().applyMatrix4(inverse);
+    if (Math.abs(t.x) <= box.hx && t.y >= box.y0 && t.y <= box.y1 && t.z >= box.z0 && t.z <= box.z1) {
+      push(t);
+      controls.target.copy(t.applyMatrix4(assembled.root.matrixWorld));
+    }
+    controls.update();
+  });
+  return null;
+}
+
+function CarrierCameraFloor() {  const modelId = useStageStore((state) => state.modelId);
+  const cameraMode = useStageStore((state) => state.cameraMode);
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls) as
+    | { target: THREE.Vector3; update: () => void }
+    | null;
+  useFrame(() => {
+    if ((modelId !== "carrier" && modelId !== "type055") || cameraMode !== "orbit" || !controls) return;
     let changed = false;
-    // 海面可见时把相机压在水面以上；水下视角或关掉海面后允许降到舰底以下。
-    const floorY = seaOn && !underwater ? 24 : 2;
+    // 有水面的舰船允许直接把相机拖到水下；这里只兜住无海底的极深空间。
+    const floorY = -12;
     if (camera.position.y < floorY) {
       camera.position.y = floorY;
       changed = true;
@@ -1557,11 +1646,11 @@ function CarrierCameraFloor() {
       controls.target.y = floorY;
       changed = true;
     }
-    if (controls.target.y > 120) {
-      controls.target.y = 120;
+    if (controls.target.y > 140) {
+      controls.target.y = 140;
       changed = true;
     }
-    const maxTargetXZ = 220;
+    const maxTargetXZ = 260;
     if (Math.abs(controls.target.x) > maxTargetXZ) {
       controls.target.x = Math.sign(controls.target.x) * maxTargetXZ;
       changed = true;
@@ -1572,60 +1661,6 @@ function CarrierCameraFloor() {
     }
     if (changed) controls.update();
   });
-  return null;
-}
-
-/** 水下视角：打开时把 Orbit 相机送到水面以下，关闭时恢复原相机位。 */
-function CarrierUnderwaterView() {
-  const modelId = useStageStore((state) => state.modelId);
-  const cameraMode = useStageStore((state) => state.cameraMode);
-  const underwater = useStageStore((state) => state.views.underwater);
-  const assembled = useStageStore((state) => state.assembled);
-  const camera = useThree((state) => state.camera);
-  const scene = useThree((state) => state.scene);
-  const controls = useThree((state) => state.controls) as
-    | { target: THREE.Vector3; update: () => void }
-    | null;
-  const previous = useRef<{ position: THREE.Vector3; target: THREE.Vector3 } | null>(null);
-  const home = useStageStore((state) => state.home);
-  const settleUntil = useRef(0);
-
-  useEffect(() => {
-    if (modelId !== "carrier" || cameraMode !== "orbit" || !assembled || !controls) return;
-    if (underwater) {
-      settleUntil.current = performance.now() + 1600;
-      if (!previous.current) {
-        previous.current = { position: camera.position.clone(), target: controls.target.clone() };
-      }
-      const ocean = scene.getObjectByName("carrier-ocean-gpu");
-      const waterY = ocean?.position.y ?? 18;
-      const center = home ? new THREE.Vector3(...home.center) : new THREE.Vector3();
-      camera.position.set(center.x + 135, waterY - 8, center.z - 10);
-      controls.target.set(center.x, waterY - 4, center.z - 100);
-      controls.update();
-    } else if (previous.current) {
-      camera.position.copy(previous.current.position);
-      controls.target.copy(previous.current.target);
-      previous.current = null;
-      controls.update();
-    }
-  }, [underwater, modelId, cameraMode, assembled, camera, controls, scene, home]);
-
-  // 从漫游切回自由视角时，CameraRig 会在入场后一帧把相机飞回原方位；
-  // 入水后的 1.6 秒内持续校正，避免水下按钮被漫游退出动画覆盖。
-  useFrame(() => {
-    if (!underwater || cameraMode !== "orbit" || !controls) return;
-    if (performance.now() > settleUntil.current) return;
-    const ocean = scene.getObjectByName("carrier-ocean-gpu");
-    const waterY = ocean?.position.y ?? 18;
-    if (camera.position.y > waterY - 1) {
-      const center = home ? new THREE.Vector3(...home.center) : new THREE.Vector3();
-      camera.position.set(center.x + 135, waterY - 8, center.z - 10);
-      controls.target.set(center.x, waterY - 4, center.z - 100);
-      controls.update();
-    }
-  });
-
   return null;
 }
 
@@ -1901,8 +1936,7 @@ function CameraRig() {
   });
 
   const target = useMemo(() => new THREE.Vector3(0, 0.8, 0), []);
-  const seaOn = useStageStore((state) => state.views.sea);
-  const underwaterView = useStageStore((state) => state.views.underwater);
+  const seaModel = modelId === "carrier" || modelId === "type055";
   return (
     <OrbitControls
       makeDefault
@@ -1911,8 +1945,8 @@ function CameraRig() {
       dampingFactor={0.12}
       minDistance={0.1}
       maxDistance={2000}
-      minPolarAngle={modelId === "carrier" ? 0.02 : 0.04}
-      maxPolarAngle={modelId === "carrier" ? (underwaterView || !seaOn ? Math.PI - 0.06 : 1.55) : Math.PI / 2 - 0.015}
+      minPolarAngle={seaModel ? 0.02 : 0.04}
+      maxPolarAngle={seaModel ? Math.PI - 0.06 : Math.PI / 2 - 0.015}
     />
   );
 }

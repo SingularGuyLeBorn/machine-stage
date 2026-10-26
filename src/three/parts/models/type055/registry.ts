@@ -341,7 +341,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     name_en: "integrated superstructure",
     assembly: "superstructure",
     build_layer: 4,
-    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 13.6, d0: 34, w1: 11.2, d1: 30, h: 7.4 } },
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 13.6, d0: 34, w1: 11.2, d1: 30, h: 7.4, c0: 0.7, c1: 0.55 } },
     material: "cv_055_hull",
     mate: A([0, DECK, 22]),
   });
@@ -387,6 +387,18 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     material: "cv_055_mast",
     mate: A([0, DECK + 12.78, 20]),
     source: "切角八棱基座，把方桅杆过渡到舰桥顶，避免一层薄平板大挑檐。",
+  });
+  // 桅杆基座后半段伸出舰桥顶；补一个从主上建顶升上来的承力筒，避免近景看像悬空。
+  add({
+    id: `${P}super.mast_support_trunk`,
+    name_cn: "综合桅杆基座承力筒",
+    name_en: "integrated mast support trunk",
+    assembly: "superstructure",
+    build_layer: 4,
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 6.6, d0: 5.6, w1: 7.8, d1: 7.8, h: 5.4, c0: 0.5, c1: 0.6 } },
+    material: "cv_055_hull",
+    mate: A([0, DECK + 7.5, 17.0]),
+    source: "主上建顶 → 桅杆切角基座的承力筒；补住基座后半段的悬挑。",
   });
   add({
     id: `${P}super.mast_seam_low`,
@@ -490,21 +502,33 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     name_en: "funnel casing",
     assembly: "superstructure",
     build_layer: 4,
-    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 11.0, d0: 18, w1: 9.8, d1: 16, h: 5.8 } },
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 11.0, d0: 18, w1: 9.8, d1: 16, h: 5.8, c0: 0.6, c1: 0.5 } },
     material: "cv_055_hull",
     mate: A([0, DECK, -13]),
   });
   // 烟囱：055 是低矮内埋式排气口，不是高耸的塔状烟囱；上建顶只露出约 2.4m 的黑色排气帽。
-  for (const [i, z] of [-8, -20].entries()) {
+  for (const [i, z] of [-8, -18].entries()) {
     add({
       id: `${P}super.funnel_${pad(i + 1)}`,
       name_cn: `内埋式烟囱 ${i + 1}`,
       name_en: `enclosed uptake ${i + 1}`,
       assembly: "superstructure",
       build_layer: 4,
-      geometry: { type: "kit", kit: "type055Frustum", params: { w0: 4.8, d0: 5.8, w1: 4.2, d1: 5.0, h: 2.4 } },
+      geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 4.8, d0: 5.8, w1: 4.2, d1: 5.0, h: 2.4, c0: 0.28, c1: 0.24 } },
       material: "cv_hull_dark",
       mate: A([0, DECK + 5.8, z]),
+    });
+  }
+  for (const [i, z] of [-8, -18].entries()) {
+    add({
+      id: `${P}super.funnel_collar_${i + 1}`,
+      name_cn: `烟囱基座围圈 ${i + 1}`,
+      name_en: `funnel base collar ${i + 1}`,
+      assembly: "superstructure",
+      build_layer: 4,
+      geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 5.1, d0: 6.1, w1: 5.0, d1: 6.0, h: 0.18, c0: 0.32, c1: 0.32 } },
+      material: "cv_steel_dark",
+      mate: A([0, DECK + 5.78, z]),
     });
   }
 
@@ -811,7 +835,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     name_en: "forward deckhouse connector",
     assembly: "superstructure",
     build_layer: 4,
-    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 11.6, d0: 9, w1: 11.0, d1: 8.4, h: 4.4 } },
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 11.6, d0: 9, w1: 11.0, d1: 8.4, h: 4.4, c0: 0.5, c1: 0.45 } },
     material: "cv_055_hull",
     mate: A([0, t55DeckTop(0.5), 0.5]),
   });
@@ -821,7 +845,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     name_en: "aft deckhouse",
     assembly: "superstructure",
     build_layer: 4,
-    geometry: { type: "kit", kit: "type055Frustum", params: { w0: 12.2, d0: 22, w1: 11.2, d1: 20.4, h: 4.8 } },
+    geometry: { type: "kit", kit: "type055ChamferFrustum", params: { w0: 12.2, d0: 22, w1: 11.2, d1: 20.4, h: 4.8, c0: 0.65, c1: 0.55 } },
     material: "cv_055_hull",
     mate: A([0, t55DeckTop(-33), -33]),
   });
@@ -1286,7 +1310,7 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
   });
 
   // 低矮烟囱顶盖/排气格栅/侧百叶
-  for (const [i, z] of [-8, -20].entries()) {
+  for (const [i, z] of [-8, -18].entries()) {
     add({
       id: `${P}super.funnel_cap_dark_${i + 1}`,
       name_cn: `烟囱顶盖 ${i + 1}`,
@@ -6514,6 +6538,8 @@ function buildType055Once(): { registry: ModelRegistry; layouts: Record<string, 
     staticOnly("t55-hull-deck", "type055.hull.*", "type055.deck.*", "主甲板与舰体搭接", 200),
     staticOnly("t55-super-deck", "type055.super.*", "type055.deck.*", "上层建筑与甲板安装", 120),
     staticOnly("t55-super-self", "type055.super.*", "type055.super.*", "上层建筑/烟囱/舰桥安装"),
+    staticOnly("t55-mast-trunk-bridge", "type055.super.mast_support_trunk", "type055.super.bridge", "桅杆承力筒穿入舰桥后壁/顶板的构造连接", 6000),
+    staticOnly("t55-mast-trunk-main", "type055.super.mast_support_trunk", "type055.super.main_block", "桅杆承力筒落在主上建顶", 6000),
     staticOnly("t55-radar-super", "type055.radar.*", "type055.super.*", "相控阵/桅杆与上建安装", 150),
     staticOnly("t55-radar-self", "type055.radar.*", "type055.radar.*", "阵面/天线/安装框装配"),
     staticOnly("t55-radar-mast-panel", "type055.radar.mast_panel_*", "type055.super.mast*", "桅身相控阵/电子战面板嵌入综合桅杆表面", 2200),

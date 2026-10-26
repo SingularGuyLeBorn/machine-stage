@@ -178,7 +178,6 @@ const VIEWS_DEFAULT: Record<ViewKey, boolean> = {
   shadow: true,
   rain: false,
   thermal: false,
-  underwater: false,
   sea: true,
 };
 
@@ -229,6 +228,8 @@ interface StageState {
   views: Record<ViewKey, boolean>;
   /** 相机实际位于水面以下（水下遮罩/提示用；由 CarrierOcean 根据相机高度更新）。 */
   underwaterActive: boolean;
+  /** 航母航行档位：-1 后退 / 0 停车 / 1 前进。 */
+  carrierSail: -1 | 0 | 1;
   layout: PanelLayout;
   machineState: string;
   energyBoost: boolean;
@@ -291,6 +292,7 @@ interface StageState {
   toggleView(key: ViewKey): void;
   setView(key: ViewKey, value: boolean): void;
   setUnderwaterActive(active: boolean): void;
+  setCarrierSail(value: -1 | 0 | 1): void;
   setColumnWidth(side: "left" | "right", width: number): void;
   toggleColumn(side: "left" | "right"): void;
   setDrawer(open: boolean): void;
@@ -418,6 +420,7 @@ export const useStageStore = create<StageState>((set, get) => ({
 
   views: { ...VIEWS_DEFAULT },
   underwaterActive: false,
+  carrierSail: 0,
   layout: {
     left: { ...LAYOUT_DEFAULT.left },
     right: { ...LAYOUT_DEFAULT.right },
@@ -496,6 +499,7 @@ export const useStageStore = create<StageState>((set, get) => ({
       variantId: model.variants?.[0]?.id ?? "",
       views: { ...VIEWS_DEFAULT },
       underwaterActive: false,
+      carrierSail: 0,
       focus: null,
       home: null,
       notice: null,
@@ -608,6 +612,7 @@ export const useStageStore = create<StageState>((set, get) => ({
   setUnderwaterActive: (active) => {
     if (get().underwaterActive !== active) set({ underwaterActive: active });
   },
+  setCarrierSail: (carrierSail) => set({ carrierSail }),
 
   setColumnWidth: (side, width) =>
     set((state) => ({

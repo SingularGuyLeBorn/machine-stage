@@ -67,7 +67,6 @@ const resetStore = () => {
       shadow: true,
       rain: false,
       thermal: false,
-      underwater: false,
       sea: true,
     },
     layout: {
@@ -318,7 +317,6 @@ describe("stageStore 模型切换", () => {
         shadow: false,
         rain: true,
         thermal: true,
-        underwater: true,
         sea: false,
       },
     });
@@ -336,7 +334,6 @@ describe("stageStore 模型切换", () => {
       shadow: true,
       rain: false,
       thermal: false,
-      underwater: false,
       sea: true,
     });
     expect(state.selectedPart).toBeNull();

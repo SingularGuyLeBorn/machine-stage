@@ -105,7 +105,6 @@ export type ViewKey =
   | "shadow"
   | "rain"
   | "thermal"
-  | "underwater"
   | "sea";
 
 export type StageAction =

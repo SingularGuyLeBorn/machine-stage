@@ -1,108 +1,148 @@
 # machine-stage · 装备展示台
 
-**纯前端 3D 军工装备展示台**：零件化程序化建模（无外部模型资产）+ **自内向外构建**（L1 核心机构 → L5 表面附件）+ **实例级穿模检测** + **构建进度回放**。
+**纯前端 3D 军工装备展示台**：零件化程序化建模 + 自内向外装配（L1 核心机构 → L5 表面附件）+ 实例级穿模检测 + 构建回放。
 
-每个零件都在注册表里有名字、有层号、有装配关系；每一条穿模报告都指到具体实例（`tiger.track.link[42] ↔ tiger.suspension.roadwheel[7]`）。
+不是只能围着看的模型：福建舰和 055 可以走进去、开起来、潜下去。甲板、机库、弹药库、机舱、反应堆舱、舰桥、CIC 都能第一人称漫游；舰载机可以弹射起飞并进入座舱武器试射；海面、螺旋桨、尾流和水下体积实时生成。
 
-![展示台总览](docs/screenshots/m-a-overview.png)
+![福建舰](docs/showcase/01-fujian-carrier.jpg)
 
 ---
 
-## 现在能做什么（M-A 框架底座已交付）
+## 现在能做什么
 
-| 能力              | 说明                                                                                                                       |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| **零件化注册表**  | `<model>.<assembly>.<part>[index]` 命名；坐标全部由 `constants` + `mate` 派生，无匿名 mesh 流水账                          |
-| **装配器**        | 注册表 → 场景树：节点树、双侧件展开、锚点/同轴装配、实例布局、构建阈值                                                     |
-| **穿模检测器**    | AABB 粗检 + three-mesh-bvh 精检；**实例级**报告带 `depth_mm / point / hint`；支持静态、动画扫掠（≥30fps 采样）与层验收过滤 |
-| **构建进度滑杆**  | 按 `build_order` 逐件展开，从单件核心机构一层层装到整车                                                                    |
-| **三栏展示台 UI** | 左：模型库 + 零件树；中：视口 + 构建滑杆 + 穿模浮层；右：动作 / 状态机 / 参数（单一真值源）                                |
-| **视口**          | 轨道相机、总成标签、爆炸视图、透视、零件聚焦与高亮；程序化 studio 环境 + ACES + SSAO（无 HDR 资产依赖）                    |
+| 模块 | 现状 |
+| --- | --- |
+| **模型库** | 18 个条目 / 17 个已交付：福建舰、055、HMT 双足机器人、T-800 内骨骼、金古桥三种形态、虎式、MBT-90、ED-90、三八式 / PP-19 / M60 / AK-47 / RPK / M2HB / M134，以及框架自检台。J-20 单机条目保留为规划占位 |
+| **福建舰** | 10,635 个注册零件 / 约 562 万三角面；甲板、机库、弹药库、机舱、反应堆舱、舰桥、CIC、生活区、维修车间全部可走；F 交互、E 检查、快速传送、小地图；电磁弹射与舰载机起降流程 |
+| **舰载机座舱** | J-20 座舱 HUD：俯仰梯 / 航向带 / IAS·ASL / 火控雷达 / WEZ / RWR；AIM-9 六自由度制导、机炮、干扰弹、自动驾驶、靶机与 360° 环视 |
+| **055 型驱逐舰** | 11,972 个注册零件 / 约 560 万三角面；112 单元垂发、346B 四面阵、130mm 主炮、1130 近防、COGAG 四燃双轴、双机库与直-20；切角八棱一体化桅杆与上层建筑 |
+| **海面与航行** | 航母 / 055 共用 GPU 频谱海（JONSWAP + Gerstner 涌浪、开尔文尾迹、白浪、菲涅耳与太阳高光）；航速三档，螺旋桨转动、艉迹泡沫带跟船；相机可直接拖到水下环视，水体含海床、深度雾、悬浮颗粒与斜射光束；进入任何舱室自动隐藏海面，不会“舱内进水” |
+| **工程工具** | 注册表 / 装配器 / 实例级穿模报告、构建滑杆回放、爆炸 / 透视 / 热像 / 标签、动作与状态机、参数单一真值源；万件级模型做了内部件剔除、屏幕空间 LOD 与拾取候选裁剪 |
 
-![构建回放](docs/screenshots/m-a-build-replay.png)
+|  |  |
+| --- | --- |
+| ![飞行甲板](docs/showcase/02-fujian-deck.jpg) | ![座舱试射](docs/showcase/04-fujian-cockpit.jpg) |
+| ![水下视角](docs/showcase/05-fujian-underwater.jpg) | ![055 桅杆](docs/showcase/06-055-mast.jpg) |
+
+更多展示图（1920×1080 实时截图）见 [`docs/showcase/`](docs/showcase/README.md)。
 
 ## 快速开始
 
+要求：Node.js 20+，npm 10+。
+
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # 默认 http://localhost:5173；端口被占用时 Vite 会顺延（本机为 5174）
 ```
 
-| 命令                              | 作用                                    |
-| --------------------------------- | --------------------------------------- |
-| `npm run dev`                     | 开发服务器                              |
-| `npm run build`                   | 类型检查 + 生产构建（`dist/`）          |
-| `npm run preview`                 | 预览生产构建                            |
-| `npm test`                        | 单元测试（vitest，node + jsdom 双环境） |
-| `npm run test:watch`              | 监听模式                                |
-| `npm run test:coverage`           | 覆盖率                                  |
-| `npm run typecheck`               | `tsc --noEmit`                          |
-| `npm run lint`                    | ESLint                                  |
-| `npm run format` / `format:check` | Prettier                                |
+| 命令 | 作用 |
+| --- | --- |
+| `npm run dev` | 开发服务器 |
+| `npm run build` | 类型检查 + 生产构建（`dist/`） |
+| `npm run preview` | 预览生产构建 |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | 单元测试（vitest，node + jsdom 双环境） |
+| `npm run test:watch` | 监听模式 |
+| `npm run lint` | ESLint |
+| `npm run format` / `format:check` | Prettier |
 
-## 自检台（M-A 验收场景，默认加载）
+> 福建舰 / 055 全量装配是万件级，冷启动会花几秒；模型切换有装配缓存，第二次进入明显更快。HMT 的本地运行时资产（约 776MB gzip 分片）不入 Git，缺失时按报错重新导出。
 
-`框架自检台` 是一张只有 3 个零件、2 个实例的测试注册表，专门用来验收框架：
+## 操作
 
-1. **实例级报告**：`基准盒` 两个实例的名义间距由 `GAP` 决定，`GAP > 0` 即重叠 → 浮层出现 `test.frame.box[0] ↔ test.frame.box[1] 1.00mm`，并提示「检查 GAP 常量」。
-2. **参数闭环**：右栏点「修复装配间隙」（`GAP = -0.002`）→ 重建 → 报告清空 → 浮层显示「实例级穿模报告为空」。
-3. **动画扫掠**：点「转子运转」让 `TestRotor` 节点转起来，再点「动画扫掠」→ 30fps 逐帧采样检测，结果同样按实例给报告。
-4. **构建回放**：拖构建滑杆，模型从 L1 核心机构一件件长出来；`立柱` 抬高时，贴在它顶面上的`翼片` 通过锚点装配自动跟随（改常量不改坐标）。
+### 通用视角
 
-## 里程碑
+| 操作 | 功能 |
+| --- | --- |
+| 左键拖动 | 旋转视角（航母 / 055 可以一直拖到水下） |
+| 右键拖动 | 平移 |
+| 滚轮 | 缩放；水下时升降 |
+| 点击零件 | 查看并聚焦；`Esc` 退出聚焦 / 漫游 |
 
-| 里程碑  | 内容                                                                                                                                                | 状态                                  |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| **M-A** | 框架底座：装配器 + 穿模检测器 + 构建滑杆 + 展示台 UI                                                                                                | ✅ 已交付                             |
-| **M-B** | 虎式坦克 L1：HL230 V12 发动机（缸体 / 曲轴 / 活塞 / 双风扇）+ 求解器联动                                                                            | ⏳ 进行中                             |
-| **M-C** | 虎式全五层（L2 传动支撑 → L5 表面附件），每层过验收才进下一层                                                                                       | ⏳                                    |
-| **M-D** | M2HB 重机枪（管退式自动机）                                                                                                                         | ⏳                                    |
-| **M-E** | AK-47（导气式自动机）                                                                                                                               | ⏳                                    |
-| **M-F** | 歼-20（主承力框 + 弹舱滑轨）                                                                                                                        | ⏳                                    |
-| **M-G** | 金古桥 King Joe：真实网格皮（39 部位件）+ 四体分离合体 / 阻尼对接 / 电弧 / 编队 / 怪光线 / 彩虹胸；另有 578 分件参考卡 + 整机单件实心卡（1 partId，表面原皮 + 内部闭合实心核） | ✅ 已交付（149 定义件 / 七态 0 穿插） |
+### 福建舰 / 055 第一人称漫游
 
-详细进度、每层验收证据见 [`docs/PROGRESS.md`](docs/PROGRESS.md)。
+| 操作 | 功能 |
+| --- | --- |
+| `W A S D` | 移动 |
+| `Shift` | 冲刺（约 20 m/s） |
+| `Space` | 跳跃 |
+| 鼠标（点击锁定） | 环视 |
+| `F` | 交互：开门、升降机、弹药升降机、上飞机等 |
+| `E` | 检查零件 |
+| `G` | 一键上飞机 / 弹射流程 |
+| `T` | 快速前往区域 / 关键位置 |
+| `Esc` | 退出漫游 |
+
+### 座舱武器试射
+
+| 操作 | 功能 |
+| --- | --- |
+| `R` | 锁定 / 切换目标 |
+| `Space` | 发射 |
+| `1` / `2` | 机炮 / AIM-9 |
+| `C` | 干扰弹 |
+| `P` | 自动驾驶 |
+| `Esc` | 退出座舱 |
+
+### 航母航行
+
+视口右下角的「航行」面板提供 `前进 / 停车 / 后退`：前进 8 m/s、后退 4 m/s。航行时舰体前后移动、双轴螺旋桨转动、艉迹泡沫带展开并随速度衰减；停车后回到当前位置的环绕中心。
+
+## 工程基线
+
+- **真实米制**：尺寸单位是米，来自公开资料近似值并注明出处；单一真值源是注册表 `constants`。
+- **禁止匿名 mesh**：每个零件在注册表里有名字、层号、装配关系；坐标由 `constants` / `mate` 派生。
+- **实例级报告**：穿模报告定位到 `零件ID[实例下标]`，例如 `tiger.track.link[42] ↔ tiger.suspension.roadwheel[7]`。
+- **自内向外**：先核心机构，再包壳；一层零穿模才进下一层。
+- **视觉红线**：真实比例、微倒角、曲面放样 / Lathe、面板三联贴图、PBR 材质；具体口径见 [`docs/MACHINE_STYLE.md`](docs/MACHINE_STYLE.md) §9。
 
 ## 目录结构
 
 ```
 src/three/parts/
-  registry/    注册表：types（数据格式）/ expression（常量表达式）/ validate（校验）/ testKit（自检台）
-  assembler/   装配器：geometry（声明 → BufferGeometry）/ assembler（注册表 → 场景树）
-  solver/      report（报告格式与提示）/ detect（静态 + 扫掠检测）
-  kernel/      几何与贴图工具箱（倒角盒 / 放样 / 铆钉 / 三联贴图 / 材质库）
-src/app/       UI：catalog（模型清单）/ state（zustand）/ three（视口与姿态层）/ components（三栏面板）
-docs/          设计基线文档（总体设计 / 零件化建模框架 / MACHINE_STYLE / 真实感指南）
+  registry/    数据类型、表达式、校验、自检台
+  assembler/   注册表 → 场景树；几何构建
+  solver/      静态 / 动画扫掠穿模检测；报告格式
+  kernel/      倒角盒、放样、铆钉、三联贴图等几何工具箱
+  models/      carrier / type055 / tiger / mbt / edrive / guns7 / kingjoe / t800 / hmt …
+src/app/
+  catalog.ts   模型清单：注册表 + 布局 + 动画 + 动作声明
+  state/       zustand 单一状态源
+  three/       视口、相机、海面、漫游、座舱、海战、VFX
+  components/  三栏 UI、座舱 HUD、控制面板、快速传送
+docs/          架构、视觉规范、验收记录、展示图
 ```
 
 ## 文档
 
-| 文档                                                       | 内容                                                          |
-| ---------------------------------------------------------- | ------------------------------------------------------------- |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)             | 分层、数据流、mate/实例布局语义、检测算法、扩展新机的标准动作 |
-| [`docs/PROGRESS.md`](docs/PROGRESS.md)                     | 里程碑进度、每层验收证据、已知边界                            |
-| [`docs/展示台项目总体设计.md`](docs/展示台项目总体设计.md) | 总规格（里程碑、UI、验收口径）                                |
-| [`docs/零件化建模框架.md`](docs/零件化建模框架.md)         | 注册表 / 命名 / 穿模报告格式基线                              |
-| [`docs/MACHINE_STYLE.md`](docs/MACHINE_STYLE.md)           | 视觉规范与红线（§6 剖切、§9 视觉红线）                        |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md)                       | 开发流程、门禁、建模与提交约定                                |
-| [`CHANGELOG.md`](CHANGELOG.md)                             | 版本变更记录                                                  |
+| 文档 | 内容 |
+| --- | --- |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 分层、数据流、mate / 实例布局语义、检测算法、扩展新机的标准动作 |
+| [`docs/PROGRESS.md`](docs/PROGRESS.md) | 里程碑、每层验收证据、已知边界 |
+| [`docs/MACHINE_STYLE.md`](docs/MACHINE_STYLE.md) | 视觉规范与红线（§6 剖切、§9 视觉红线） |
+| [`docs/qa/carrier-acceptance.md`](docs/qa/carrier-acceptance.md) | 福建舰验收记录：甲板、漫游、弹射、座舱、航行、水下 |
+| [`docs/qa/055-acceptance.md`](docs/qa/055-acceptance.md) | 055 验收记录：VLS、动力、桅杆、上建、海面、水下 |
+| [`docs/展示台项目总体设计.md`](docs/展示台项目总体设计.md) | 总规格（里程碑、UI、验收口径） |
+| [`docs/零件化建模框架.md`](docs/零件化建模框架.md) | 注册表 / 命名 / 穿模报告格式基线 |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | 开发流程、门禁、建模与提交约定 |
+| [`CHANGELOG.md`](CHANGELOG.md) | 版本变更记录 |
 
-## 设计纪律（不可协商项）
+## 自动化与验收
 
-- **真实米制**：所有尺寸单位是米，来自公开资料近似值并注明出处；单一真值源是注册表 `constants`。
-- **禁止匿名 mesh**：一切零件来自注册表，一切坐标来自 `constants` / `mate` 派生。
-- **实例级报告**：`a` / `b` 必须是 `零件ID[实例下标]`。
-- **自内向外**：先核心机构，再包壳；一层零穿模才进下一层。
-- **视觉红线**：最小可见单元 ≤0.35m、曲面用放样/Lathe、微倒角、面板三联贴图、SSAO + ACES 必开（见 `docs/MACHINE_STYLE.md` §9）。
+- 开发模式或 URL 带 `?qa=1` 时，控制台暴露 `window.__stage`（场景、相机、store、setCamera）和 `window.__walk`（传送、机位、交互、座舱快照），用于浏览器实测。
+- 大模型避免全量慢测：日常门禁只跑目标测试 + `tsc --noEmit` + 浏览器检查；完整扫描是独立脚本（`npm run sweep`）。
+- 关键回归覆盖：舱内海面隐藏、航线净空、甲板边缘、VLS 井盖 / 井筒、舰载机弹射、055 桅杆 / 上建接触。
 
 ## 已知边界
 
-- 剖切（带实心端盖的剖面）按 `MACHINE_STYLE` §6 要求实现，随 M-C 交付；当前未提供半成品按钮。
-- 穿模检测目前同步执行（自检台 ~10ms）；整车级模型计划移入 Web Worker。
-- 高亮到实例级（当前是零件级）随 L2 履带/轮组接入时补齐。
+- J-20 单机在模型库中是规划占位；可玩的 J-20 目前挂在福建舰的弹射 / 座舱流程里。
+- 剖切（带实心端盖）按 `MACHINE_STYLE` §6 规划；当前透视 / 爆炸视图可用，剖切尚未提供。
+- 航母 / 055 冷装配与首次材质编译需要几秒；万件级画面在集显或小显存设备上会降帧。
+- 水下海床、悬浮颗粒与光束是实时风格化水体，不是流体仿真；舰体水下部分以真实比例和螺旋桨 / 舵几何为准。
+- 穿模扫描在重型模型上走 Web Worker 池；单人低配设备仍建议按需触发，不要自动全量扫描。
 
 ## 许可与致谢
 
-MIT © 2026 OasisMind contributors。几何/贴图工具箱衍生自同作者的 `detailKit.ts`，署名见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。三方依赖：three.js、@react-three/*、three-mesh-bvh、Zustand、lucide-react。
+MIT © 2026 OasisMind contributors。几何 / 贴图工具箱衍生自同作者的 `detailKit.ts`，署名见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。三方依赖：three.js、@react-three/*、three-mesh-bvh、Zustand、lucide-react、three.quarks。
 
-MBT-90 爆炸/炮口焰 VFX 使用 **fscopel** 的 *Photo Realistic Explosions* 序列帧（CC-BY 3.0，OpenGameArt）与 **Kenney** 烟环（CC0）；完整署名和修改说明见 [`public/vfx/CREDITS.md`](public/vfx/CREDITS.md)。
+MBT-90 / ED-90 爆炸与炮口焰使用 **fscopel** 的 *Photo Realistic Explosions* 序列帧（CC-BY 3.0，OpenGameArt）与 **Kenney** 烟环（CC0）；完整署名和修改说明见 [`public/vfx/CREDITS.md`](public/vfx/CREDITS.md)。055 参考照片只用于轮廓与比例对照，不进入模型贴图，来源见 [`docs/qa/refs/055/CREDITS.md`](docs/qa/refs/055/CREDITS.md)。

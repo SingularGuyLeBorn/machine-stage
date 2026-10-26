@@ -1,5 +1,34 @@
 # 福建舰 · 验收记录（carrier worktree）
 
+## 2026-10-25 · 直接下潜 / 航母航行 / 实时尾流
+
+### 直接下潜
+- 取消单独的「水下」工具条模式；海面开启时 Orbit 相机可直接拖到水面以下，
+  `uUnderwater`、深水背景和水下遮罩自动切换。
+- 相机可以在海面与水下连续拖动，不需要切相机模式。
+- 新增自由视角舰体保护：相机进入航母/055 舰体 AABB 时沿最近面推到舷外或水下，
+  不再停在空舱/轴隧里；海面关闭时可关闭该保护做内部检查。
+
+### 航母航行
+- 视口右下新增「航行 · 前进/停车/后退」控制：前进 8m/s、后退 4m/s；停车后航速归零。
+- 前进/后退直接平移舰体根节点；甲板、舰载机、舰桥和舰内视角随舰移动。
+- `CV_Prop_l/r` 螺旋桨随航速旋转；停车后恢复状态动画。
+- 海面 shader 的尾流中心每帧跟随舰体（不再只在装配时计算）；新增 420m 长、
+  随航速展开的艉迹泡沫带，船动时出现、停船后淡出。
+- 停车时同步更新相机复位 home，复位视角仍能回到舰体。
+
+### 055 海面
+- `CarrierOcean` 同时服务福建舰与 055；055 水线 6.6m，有海面/尾流和直接下潜。
+
+### 门禁
+- `npx vitest run src/app/components/components.test.tsx src/app/state/stageStore.test.ts src/three/parts/models/carrier/carrier.test.ts`：**84 passed**。
+- `npx vitest run src/three/parts/models/type055/type055.test.ts`：**3 passed**。
+- `npx tsc --noEmit`、`npm run build` 通过。
+- 浏览器实测：航行 2.6s 舰体前进 20.9m，螺旋桨连续转动，`uSail=1`；
+  相机 [0,24,0] 在舰体内被推到 y=-12（水下舰底），不再出现空舱视角。
+
+---
+
 ## 2026-10-25 · 按 lnj-coordinates.json 修正跑道/挡焰板/舰岛机位
 
 ### 输入
@@ -701,3 +730,35 @@ npm run build
 - 门户/升降机/梯口使用 0.4s 黑场过渡，不是连续可走的真实梯道；舰内 10,000+ 件尺度下优先保证不穿模与可读性。
 - 055 舰岛/机库是实体块，甲板漫游通过两舷通道绕行，入口按现有舱门/升降口布置。
 - MBT/ED 驾驶席为舱口视角；虎式为舱内视角。
+
+---
+
+## 2026-10-26 舱内禁海 / 水下体积 / 后处理黑帧
+
+### 问题
+- 海面是无限平面，进入机库/弹药库/机舱/反应堆/生活区/维修间等舱室后会从舱壁和地板穿进房间，读起来像“被淹了”。
+- 自由视角把相机拖进舰体或舰岛内部时同样会看到这层海面；从外部看水下又只有一张平面，没有水体厚度。
+- 055 水下画面在黑帧与正常之间跳变：`EffectComposer` 的 HalfFloat + 4xMSAA 场景 Pass 在万件级模型上不稳定；水下 shader 里的反向 `smoothstep` 属 GLSL 未定义行为，会被 Bloom 放大成黑帧。
+
+### 修复
+- 新增 `src/app/three/oceanVisibility.ts`：统一判定海面可见性。
+  - 漫游内部区域（hangar/magazine/engine_room/reactor_room/bridge/cic/crew/crew_berth/crew_mess/workshop/fuel）→ 隐藏海面、尾流、水下穹顶/海床/海雪/光束和水下遮罩。
+  - 内部相机预设（机库/机舱/舰桥/CIC/…）→ 隐藏。
+  - 相机世界位置换算到舰体局部坐标，落入舰体或岛式上建包围盒 → 隐藏；甲板、机顶、座舱保持可见。
+- `CarrierOcean` 水下体积：水体穹顶（上亮下暗渐变）、34m 海床（沙脊/暗礁/焦散）、3,200 颗海雪、14 束从水面斜射的加法光束、`FogExp2` 深水雾；水面下可直接拖拽环视。
+- 后处理：所有反向 `smoothstep` 改为 `1 - smoothstep(lo, hi, x)` 的规范形式；`EffectComposer` 改为 `multisampling=0` + `UnsignedByteType`，去掉 HalfFloat/4xMSAA 黑帧路径。航母、055 水面与水下均恢复 Bloom + Vignette。
+- 回归测试：`src/app/three/oceanVisibility.test.ts` 6 项，覆盖甲板/座舱可见、全部舱室隐藏、内部预设隐藏、自由视角进入舰体/上建隐藏、海面开关。
+
+### 浏览器证据（headless Chrome 9223，1440×900）
+| 场景 | ocean | 水下层 | 结果 |
+| --- | --- | --- | --- |
+| 航母甲板漫游 | true | — | 海面可见 |
+| 航母机库漫游 | false | — | 无海水/无尾流/无水下遮罩 |
+| 航母舰桥自由视角（相机在岛内） | false | — | 无海水 |
+| 航母水下 | true | dome/seabed/snow/rays 全部 true | 舰体 + 海床 + 光束 + 海雪，无黑帧 |
+| 055 水下（开启后处理） | true | 全部 true | 正常出帧，无黑帧 |
+| 055 上建内部 / 机库 | false | — | 无海水 |
+
+### 门禁
+- `npx tsc --noEmit`：0 错。
+- `npx vitest run src/app/three/oceanVisibility.test.ts src/three/parts/models/type055/type055.test.ts`：**9 passed**（6 + 3）。

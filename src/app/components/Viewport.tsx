@@ -3,7 +3,6 @@ import {
   CloudRain,
   Crosshair,
   DoorOpen,
-  Droplets,
   Eye,
   Grid3x3,
   Layers,
@@ -70,8 +69,9 @@ export function Viewport() {
   const modelId = useStageStore((state) => state.modelId);
   const views = useStageStore((state) => state.views);
   const toggleView = useStageStore((state) => state.toggleView);
-  const setView = useStageStore((state) => state.setView);
   const underwaterActive = useStageStore((state) => state.underwaterActive);
+  const carrierSail = useStageStore((state) => state.carrierSail);
+  const setCarrierSail = useStageStore((state) => state.setCarrierSail);
   const worn = useStageStore((state) => state.worn);
   const toggleWorn = useStageStore((state) => state.toggleWorn);
   const requestViewReset = useStageStore((state) => state.requestViewReset);
@@ -135,7 +135,7 @@ export function Viewport() {
           <StageCanvas />
         </ErrorBoundary>
         <div className={`underwater-veil${underwaterActive ? " is-on" : ""}`} aria-hidden />
-        {underwaterActive ? <div className="underwater-badge">水下视角 · 拖动环视 · 滚轮升降</div> : null}
+        {underwaterActive ? <div className="underwater-badge">水下 · 拖动环视 · 滚轮升降</div> : null}
       </div>
 
       <ClippingDock />
@@ -263,6 +263,37 @@ export function Viewport() {
             </button>
           </div>
         )
+      ) : null}
+
+      {modelId === "carrier" && !cockpitActive ? (
+        <div className="carrier-helm" aria-label="航母航行">
+          <span className="carrier-helm__title">航行</span>
+          <button
+            type="button"
+            className={`carrier-helm__btn${carrierSail === 1 ? " is-on" : ""}`}
+            aria-pressed={carrierSail === 1}
+            onClick={() => setCarrierSail(1)}
+          >
+            前进
+          </button>
+          <button
+            type="button"
+            className={`carrier-helm__btn${carrierSail === 0 ? " is-on" : ""}`}
+            aria-pressed={carrierSail === 0}
+            onClick={() => setCarrierSail(0)}
+          >
+            停车
+          </button>
+          <button
+            type="button"
+            className={`carrier-helm__btn${carrierSail === -1 ? " is-on" : ""}`}
+            aria-pressed={carrierSail === -1}
+            onClick={() => setCarrierSail(-1)}
+          >
+            后退
+          </button>
+          <em>{carrierSail === 0 ? "0 m/s" : carrierSail > 0 ? "8 m/s" : "4 m/s"}</em>
+        </div>
       ) : null}
 
       {hoverLid ? (
@@ -431,39 +462,17 @@ export function Viewport() {
             <CloudRain size={13} aria-hidden />
             雨天
           </button>
-          {model.id === "carrier" ? (
-            <>
-              <button
-                type="button"
-                className="btn btn--sm"
-                aria-pressed={views.sea}
-                title="海面/艏浪/尾流开关；关闭后可把视角降到舰体下方做 360° 检查"
-                onClick={() => {
-                  if (views.sea) setView("underwater", false);
-                  toggleView("sea");
-                }}
-              >
-                <Waves size={13} aria-hidden />
-                海面
-              </button>
-              <button
-                type="button"
-                className="btn btn--sm"
-                aria-pressed={views.underwater}
-                title="水下视角：镜头下潜到水面以下，从舰底仰视舰体与螺旋桨；漫游中点击会先退出漫游"
-                onClick={() => {
-                  if (!views.underwater && !views.sea) setView("sea", true);
-                  toggleView("underwater");
-                  if (cameraMode !== "orbit") {
-                    if (document.pointerLockElement) document.exitPointerLock();
-                    setCameraMode("orbit");
-                  }
-                }}
-              >
-                <Droplets size={13} aria-hidden />
-                水下
-              </button>
-            </>
+          {model.id === "carrier" || model.id === "type055" ? (
+            <button
+              type="button"
+              className="btn btn--sm"
+              aria-pressed={views.sea}
+              title="海面/艏浪/尾流开关；相机可直接拖到水面以下"
+              onClick={() => toggleView("sea")}
+            >
+              <Waves size={13} aria-hidden />
+              海面
+            </button>
           ) : null}
           <button
             type="button"
